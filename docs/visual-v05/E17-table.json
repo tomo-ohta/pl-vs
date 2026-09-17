@@ -1,0 +1,83 @@
+{
+  "props": {
+    "modelInstances": {
+      "dining_table": 16
+    },
+    "modelPartInstances": {
+      "dining_table": 16
+    },
+    "errors": [],
+    "vehicles": 0
+  },
+  "surfaceRevision": "surface-environment-1",
+  "surfaceEnvironment": true,
+  "surfaceWear": true,
+  "surfaceVariation": true,
+  "revision": "v01-v02-complete-1",
+  "room": "E17",
+  "seed": 42,
+  "variant": 0,
+  "view": "furniture",
+  "quality": "high",
+  "doorsOpen": false,
+  "exposure": 1.25,
+  "diagnostic": "beauty",
+  "time": 0,
+  "camera": {
+    "position": [
+      11.543821594377363,
+      1.25,
+      10.98394010133076
+    ],
+    "quaternion": [
+      -0.1058641829808892,
+      -0.5978869314086952,
+      -0.08006787210187825,
+      0.7905144703732881
+    ],
+    "fov": 72
+  },
+  "imagingPreset": "off",
+  "mirroredUV": false,
+  "device": {
+    "platform": "MacIntel",
+    "cores": 10
+  },
+  "materialIds": [
+    "floorLino",
+    "ceilingWhite",
+    "wallWhite",
+    "columnConcrete",
+    "furnitureDark",
+    "furnitureLight",
+    "lightPanel",
+    "lightOff",
+    "screenDark",
+    "neonBlue"
+  ],
+  "lighting": "scene",
+  "viewport": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "generationMs": 55.800000071525574,
+  "calls": 23,
+  "triangles": 31874,
+  "memoryCounts": {
+    "geometries": 23,
+    "textures": 104
+  },
+  "measurement": null,
+  "referenceRooms": [
+    "C02",
+    "C06",
+    "C13",
+    "C18",
+    "C20",
+    "U10",
+    "R01",
+    "R07"
+  ]
+}

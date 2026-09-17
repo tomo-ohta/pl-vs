@@ -1,0 +1,80 @@
+{
+  "models": {
+    "pachira_aquatica_01": {
+      "group": "waste/plants",
+      "1k": {
+        "size": 5138831,
+        "urls": [
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/pachira_aquatica_01/pachira_aquatica_01_1k.gltf",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/pachira_aquatica_01/pachira_aquatica_01_bark_nor_gl_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/pachira_aquatica_01/pachira_aquatica_01_leaves_nor_gl_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/pachira_aquatica_01/pachira_aquatica_01_leaves_diff_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/pachira_aquatica_01/pachira_aquatica_01_bark_arm_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/pachira_aquatica_01/pachira_aquatica_01_bark_diff_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/pachira_aquatica_01/pachira_aquatica_01_leaves_arm_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/pachira_aquatica_01/pachira_aquatica_01.bin"
+        ]
+      },
+      "2k": {
+        "size": 12373619,
+        "urls": [
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/pachira_aquatica_01/pachira_aquatica_01_2k.gltf",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pachira_aquatica_01/pachira_aquatica_01_bark_diff_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pachira_aquatica_01/pachira_aquatica_01_bark_arm_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pachira_aquatica_01/pachira_aquatica_01_leaves_nor_gl_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pachira_aquatica_01/pachira_aquatica_01_bark_nor_gl_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/pachira_aquatica_01/pachira_aquatica_01.bin",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pachira_aquatica_01/pachira_aquatica_01_leaves_arm_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pachira_aquatica_01/pachira_aquatica_01_leaves_diff_2k.jpg"
+        ]
+      }
+    },
+    "metal_office_desk": {
+      "group": "tables/desks",
+      "1k": {
+        "size": 1606530,
+        "urls": [
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/metal_office_desk/metal_office_desk_1k.gltf",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/metal_office_desk/metal_office_desk_nor_gl_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/metal_office_desk/metal_office_desk_diff_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/metal_office_desk/metal_office_desk_arm_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/metal_office_desk/metal_office_desk.bin"
+        ]
+      },
+      "2k": {
+        "size": 5245769,
+        "urls": [
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/metal_office_desk/metal_office_desk_2k.gltf",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/metal_office_desk/metal_office_desk_nor_gl_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/metal_office_desk/metal_office_desk_diff_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/metal_office_desk/metal_office_desk_arm_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/metal_office_desk/metal_office_desk.bin"
+        ]
+      }
+    },
+    "dining_table": {
+      "group": "tables/desks",
+      "1k": {
+        "size": 2283933,
+        "urls": [
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/dining_table/dining_table_1k.gltf",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dining_table/dining_table_nor_gl_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dining_table/dining_table_diff_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dining_table/dining_table_arm_1k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dining_table/dining_table.bin"
+        ]
+      },
+      "2k": {
+        "size": 8993550,
+        "urls": [
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/dining_table/dining_table_2k.gltf",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dining_table/dining_table_nor_gl_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dining_table/dining_table_diff_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dining_table/dining_table_arm_2k.jpg",
+          "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dining_table/dining_table.bin"
+        ]
+      }
+    }
+  },
+  "materials": {}
+}

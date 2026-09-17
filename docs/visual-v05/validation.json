@@ -1,0 +1,216 @@
+{
+  "objectRevision": 1,
+  "seed": 42,
+  "rows": [
+    {
+      "room": "U06",
+      "quality": "low",
+      "triangles": 26799,
+      "calls": 11,
+      "colliders": 975,
+      "modelInstances": {
+        "pachira_aquatica_01": 2
+      },
+      "modelPartInstances": {
+        "pachira_aquatica_01": 4
+      },
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "U06",
+      "quality": "mid",
+      "triangles": 26867,
+      "calls": 12,
+      "colliders": 975,
+      "modelInstances": {
+        "pachira_aquatica_01": 2
+      },
+      "modelPartInstances": {
+        "pachira_aquatica_01": 4
+      },
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "U06",
+      "quality": "high",
+      "triangles": 26867,
+      "calls": 12,
+      "colliders": 975,
+      "modelInstances": {
+        "pachira_aquatica_01": 2
+      },
+      "modelPartInstances": {
+        "pachira_aquatica_01": 4
+      },
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "U14",
+      "quality": "low",
+      "triangles": 550187,
+      "calls": 26,
+      "colliders": 71,
+      "modelInstances": {
+        "metal_office_desk": 88,
+        "pachira_aquatica_01": 2
+      },
+      "modelPartInstances": {
+        "metal_office_desk": 88,
+        "pachira_aquatica_01": 4
+      },
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "U14",
+      "quality": "mid",
+      "triangles": 552401,
+      "calls": 27,
+      "colliders": 71,
+      "modelInstances": {
+        "metal_office_desk": 88,
+        "pachira_aquatica_01": 2
+      },
+      "modelPartInstances": {
+        "metal_office_desk": 88,
+        "pachira_aquatica_01": 4
+      },
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "U14",
+      "quality": "high",
+      "triangles": 554429,
+      "calls": 27,
+      "colliders": 71,
+      "modelInstances": {
+        "metal_office_desk": 88,
+        "pachira_aquatica_01": 2
+      },
+      "modelPartInstances": {
+        "metal_office_desk": 88,
+        "pachira_aquatica_01": 4
+      },
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "U16",
+      "quality": "low",
+      "triangles": 96156,
+      "calls": 105,
+      "colliders": 101,
+      "modelInstances": {},
+      "modelPartInstances": {},
+      "errors": [],
+      "vehicles": 2
+    },
+    {
+      "room": "U16",
+      "quality": "mid",
+      "triangles": 96520,
+      "calls": 111,
+      "colliders": 101,
+      "modelInstances": {},
+      "modelPartInstances": {},
+      "errors": [],
+      "vehicles": 2
+    },
+    {
+      "room": "U16",
+      "quality": "high",
+      "triangles": 96592,
+      "calls": 113,
+      "colliders": 101,
+      "modelInstances": {},
+      "modelPartInstances": {},
+      "errors": [],
+      "vehicles": 2
+    },
+    {
+      "room": "R07",
+      "quality": "low",
+      "triangles": 339100,
+      "calls": 31,
+      "colliders": 123,
+      "modelInstances": {},
+      "modelPartInstances": {},
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "R07",
+      "quality": "mid",
+      "triangles": 719870,
+      "calls": 34,
+      "colliders": 123,
+      "modelInstances": {},
+      "modelPartInstances": {},
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "R07",
+      "quality": "high",
+      "triangles": 787454,
+      "calls": 34,
+      "colliders": 123,
+      "modelInstances": {},
+      "modelPartInstances": {},
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "E17",
+      "quality": "low",
+      "triangles": 31702,
+      "calls": 21,
+      "colliders": 52,
+      "modelInstances": {
+        "dining_table": 16
+      },
+      "modelPartInstances": {
+        "dining_table": 16
+      },
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "E17",
+      "quality": "mid",
+      "triangles": 31874,
+      "calls": 23,
+      "colliders": 52,
+      "modelInstances": {
+        "dining_table": 16
+      },
+      "modelPartInstances": {
+        "dining_table": 16
+      },
+      "errors": [],
+      "vehicles": 0
+    },
+    {
+      "room": "E17",
+      "quality": "high",
+      "triangles": 31874,
+      "calls": 23,
+      "colliders": 52,
+      "modelInstances": {
+        "dining_table": 16
+      },
+      "modelPartInstances": {
+        "dining_table": 16
+      },
+      "errors": [],
+      "vehicles": 0
+    }
+  ],
+  "shaderErrors": [],
+  "textureErrors": [],
+  "propErrors": []
+}

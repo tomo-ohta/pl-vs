@@ -1,0 +1,81 @@
+{
+  "props": {
+    "modelInstances": {},
+    "modelPartInstances": {},
+    "errors": [],
+    "vehicles": 2
+  },
+  "surfaceRevision": "surface-environment-1",
+  "surfaceEnvironment": true,
+  "surfaceWear": true,
+  "surfaceVariation": true,
+  "revision": "v01-v02-complete-1",
+  "room": "U16",
+  "seed": 42,
+  "variant": 0,
+  "view": "vehicle",
+  "quality": "high",
+  "doorsOpen": false,
+  "exposure": 1.25,
+  "diagnostic": "beauty",
+  "time": 0,
+  "camera": {
+    "position": [
+      -2.179738135711106,
+      1.9,
+      25.41164212221068
+    ],
+    "quaternion": [
+      -0.013916273583932205,
+      0.9856219198917244,
+      0.1029038154188866,
+      0.13329130928430405
+    ],
+    "fov": 72
+  },
+  "imagingPreset": "off",
+  "mirroredUV": false,
+  "device": {
+    "platform": "MacIntel",
+    "cores": 10
+  },
+  "materialIds": [
+    "floorConcrete",
+    "ceilingDark",
+    "wallConcrete",
+    "wallWhite",
+    "columnConcrete",
+    "yellowLine",
+    "metalDark",
+    "lightOff",
+    "lightPanel",
+    "carPaint",
+    "carGlass",
+    "rubber"
+  ],
+  "lighting": "scene",
+  "viewport": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "generationMs": 193.39999997615814,
+  "calls": 113,
+  "triangles": 96592,
+  "memoryCounts": {
+    "geometries": 81,
+    "textures": 106
+  },
+  "measurement": null,
+  "referenceRooms": [
+    "C02",
+    "C06",
+    "C13",
+    "C18",
+    "C20",
+    "U10",
+    "R01",
+    "R07"
+  ]
+}

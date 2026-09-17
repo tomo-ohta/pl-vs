@@ -1,0 +1,87 @@
+{
+  "props": {
+    "modelInstances": {
+      "pachira_aquatica_01": 2
+    },
+    "modelPartInstances": {
+      "pachira_aquatica_01": 4
+    },
+    "errors": [],
+    "vehicles": 0
+  },
+  "surfaceRevision": "surface-environment-1",
+  "surfaceEnvironment": true,
+  "surfaceWear": true,
+  "surfaceVariation": true,
+  "revision": "v01-v02-complete-1",
+  "room": "U06",
+  "seed": 42,
+  "variant": 0,
+  "view": "plant",
+  "quality": "high",
+  "doorsOpen": false,
+  "exposure": 1.25,
+  "diagnostic": "beauty",
+  "time": 0,
+  "camera": {
+    "position": [
+      15.138051979915659,
+      1.25,
+      2.031750330750567
+    ],
+    "quaternion": [
+      -0.11975694843009535,
+      -0.4274218890469699,
+      -0.057239520297128664,
+      0.8942552428598816
+    ],
+    "fov": 72
+  },
+  "imagingPreset": "off",
+  "mirroredUV": false,
+  "device": {
+    "platform": "MacIntel",
+    "cores": 10
+  },
+  "materialIds": [
+    "floorLino",
+    "ceilingTile",
+    "wallWhite",
+    "furnitureLight",
+    "furnitureDark",
+    "glass",
+    "metalDark",
+    "seatBlue",
+    "lightPanel",
+    "lightOff",
+    "trim",
+    "noticeGreen",
+    "signPlate",
+    "plant"
+  ],
+  "lighting": "scene",
+  "viewport": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "generationMs": 106.59999990463257,
+  "calls": 12,
+  "triangles": 26867,
+  "memoryCounts": {
+    "geometries": 54,
+    "textures": 108
+  },
+  "measurement": null,
+  "referenceRooms": [
+    "C02",
+    "C06",
+    "C13",
+    "C18",
+    "C20",
+    "U10",
+    "R01",
+    "R07"
+  ]
+}

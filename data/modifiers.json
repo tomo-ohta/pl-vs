@@ -1,0 +1,656 @@
+{
+  "version": "1.3",
+  "modifiers": [
+    {
+      "id": "LightingPhase",
+      "target": "照明",
+      "parameters": "色温度/明滅周期/区画",
+      "implementation": "共有Materialのuniform/LightPreset切替",
+      "cost": "低",
+      "usedBy": [
+        "U01",
+        "R02",
+        "E04",
+        "L10",
+        "M14"
+      ],
+      "notes": "v1.1: mode(seedPhase|unpowered|daylight|allWindowsLit|singleLight) を追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "DuplicateNumber",
+      "target": "サイン",
+      "parameters": "番号重複率",
+      "implementation": "テキスト/デカール差替え",
+      "cost": "低",
+      "usedBy": [
+        "U02",
+        "U16",
+        "R20"
+      ],
+      "notes": "v1.1: mode(duplicate|skipAndDuplicate) を追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "Wetness",
+      "target": "床",
+      "parameters": "濡れ率/反射",
+      "implementation": "roughness変更+簡易normal",
+      "cost": "低",
+      "usedBy": [
+        "U07",
+        "U08",
+        "U13",
+        "L09"
+      ],
+      "notes": null,
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "ShallowWater",
+      "target": "床",
+      "parameters": "水深/流速",
+      "implementation": "平面シェーダ+深度フェード",
+      "cost": "中",
+      "usedBy": [
+        "R01",
+        "R14",
+        "L02"
+      ],
+      "notes": "v1.3: L02 は浅水（膝下 0.5m）+ 入口と全出口を結ぶ桟橋。深水（mode sea）は保留",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "LoopTopology",
+      "target": "接続",
+      "parameters": "loopEdgeId",
+      "implementation": "RoomGraphのエッジを自己/祖先へ接続",
+      "cost": "低",
+      "usedBy": [
+        "E01",
+        "L08",
+        "L11"
+      ],
+      "notes": "v1.3: ループ継ぎ目は意図的 Seam（閉扉→フェード→入口へ）。周期ノードは別 RoomNode",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "GravityAxis",
+      "target": "物理",
+      "parameters": "mode(fixed), upVector, visualOnly, rollDeg, floorDoors(hole), wallDoors(slot)  ※pathFollow はオミット",
+      "implementation": "v1.3: 見た目だけ横倒し。部屋の中身を 90° ロールして生成し、床の扉は hole ソケット + 扉パネル、壁の扉は横長スロット → crawl Adapter。プレイヤー座標系・camera.up は変えない",
+      "cost": "中",
+      "usedBy": [
+        "E03"
+      ],
+      "notes": "v1.1: 90 度単位・フェード付きに限定。v1.3: E03 のみ・見た目ロール（中身を 90° ロール生成）+ 床扉 Hole + 横長スロット（2.1×1.0m、下端 0.6m）→ 'crawl' Adapter。真の重力回転と mode pathFollow（E10）はオミット",
+      "status": "実装対象（E03 のみ・見た目ロール）",
+      "deferred": false
+    },
+    {
+      "id": "ObservationRewire",
+      "target": "接続",
+      "parameters": "再配線率",
+      "implementation": "Portalが画面外の時のみedge差替え",
+      "cost": "低",
+      "usedBy": [
+        "E07"
+      ],
+      "notes": "v1.3: 再配線は意図的 Seam（非観測の前進扉の接続先差し替え）",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "ScaleAnomaly",
+      "target": "空間",
+      "parameters": "scaleX/Y/Z",
+      "implementation": "親Groupスケール+コライダ再生成",
+      "cost": "低",
+      "usedBy": [
+        "R13",
+        "R16",
+        "L12",
+        "L17",
+        "M12"
+      ],
+      "notes": "v1.1: mode(room|perProp) を追加。v1.3: perProp の小型扉（0.7×1.2m）= しゃがみ抜け道（'crawl' Adapter 経由で通常の部屋への近道）、巨大扉は壁面の偽扉。room は Portal 開口を通常寸法のまま",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "ColorMissing",
+      "target": "描画",
+      "parameters": "欠損色",
+      "implementation": "材質色変換または軽量ポスト処理",
+      "cost": "低〜中",
+      "usedBy": [
+        "E20"
+      ],
+      "notes": null,
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "TemperatureField",
+      "target": "ナビ",
+      "parameters": "scalar field",
+      "implementation": "セルごとの温度値+UI/音",
+      "cost": "低",
+      "usedBy": [
+        "E19"
+      ],
+      "notes": null,
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "FutureAudio",
+      "target": "音",
+      "parameters": "leadSec",
+      "implementation": "予約再生イベント",
+      "cost": "低",
+      "usedBy": [],
+      "notes": "v1.1: E05 欠番により使用部屋なし（保留）。v1.3 保留を継続（実装なし。効果音イベントログのみ AudioEngine に持つ）",
+      "status": "v1.3 保留（使用部屋なし）",
+      "deferred": true
+    },
+    {
+      "id": "PastWindow",
+      "target": "窓",
+      "parameters": "historyDepth",
+      "implementation": "低解像度RenderTargetまたは静止キャプチャ",
+      "cost": "中〜高",
+      "usedBy": [
+        "R09",
+        "E12"
+      ],
+      "notes": "v1.1: mode(window|screen) を追加。v1.3: E12 は 10 秒ごとの静止画 3 枚（30 秒）を窓に古い順で表示、R09 は劇場内の固定カメラ映像に自分が 3 秒遅れて映る。Low Tier は静止画",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "MovingWalls",
+      "target": "壁",
+      "parameters": "速度/位相",
+      "implementation": "セル単位Transform更新",
+      "cost": "中",
+      "usedBy": [
+        "E18",
+        "M07"
+      ],
+      "notes": "v1.3: 外殻・出口ソケット・footprint は固定。内部の壁ブロック（スライド型、最大 8 個）のみ可動。扉前 ±1.6m と通路幅 1.2m を常に確保",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "FakeSignage",
+      "target": "UI/サイン",
+      "parameters": "truthRatio / mode(misleading|blank|fixedTime|fractional) / target",
+      "implementation": "接続先とサイン表示を別抽選",
+      "cost": "低",
+      "usedBy": [
+        "U04",
+        "U05",
+        "U06",
+        "U17",
+        "R10",
+        "E15",
+        "E16"
+      ],
+      "notes": "v1.1: mode(misleading|blank|fixedTime|fractional) を追加。U04 / U06 / U17 / E15 を吸収。v1.3: U06 は 3:17 固定の装飾のみ（解錠イベント無し）",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "DynamicMapNode",
+      "target": "マップ",
+      "parameters": "swapInterval",
+      "implementation": "論理グラフ上でnode edge swap",
+      "cost": "低",
+      "usedBy": [
+        "M03",
+        "M07"
+      ],
+      "notes": "v1.3: swap は意図的 Seam。M07 は外殻固定・内部のみ可動",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "FakeExit",
+      "target": "接続",
+      "parameters": "returnDepth",
+      "implementation": "開始/既知ノード風の偽接続",
+      "cost": "低",
+      "usedBy": [
+        "M04"
+      ],
+      "notes": "v1.1: showEndingOverlay を追加（終了条件が無いため UI 演出のみ）。Seam は意図的用途（一方通行）",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "RewindState",
+      "target": "状態",
+      "parameters": "seconds",
+      "implementation": "RoomStateリングバッファ",
+      "cost": "中",
+      "usedBy": [],
+      "notes": "v1.3 保留（M10 オミットにより使用部屋なし。実装しない）",
+      "status": "v1.3 保留（使用部屋なし）",
+      "deferred": true
+    },
+    {
+      "id": "MapErase",
+      "target": "マップ",
+      "parameters": "hidePolicy",
+      "implementation": "表示MapGraphからnodeを非表示",
+      "cost": "低",
+      "usedBy": [
+        "M02"
+      ],
+      "notes": null,
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "InstanceOvergrowth",
+      "target": "植生",
+      "parameters": "density",
+      "implementation": "InstancedMesh密度+seed",
+      "cost": "低〜中",
+      "usedBy": [
+        "R07",
+        "L03",
+        "L14"
+      ],
+      "notes": null,
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "AmbientCarryover",
+      "target": "環境",
+      "parameters": "sourceRoomId",
+      "implementation": "fog/audio/light presetをコピー",
+      "cost": "低",
+      "usedBy": [
+        "M18"
+      ],
+      "notes": null,
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "SurfaceFriction",
+      "target": "物理",
+      "parameters": "friction(0〜1), zone",
+      "implementation": "ゾーン内のプレイヤー加減速係数を変更（滑る床）",
+      "cost": "低",
+      "usedBy": [
+        "C11",
+        "U08",
+        "L19"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "ExternalForce",
+      "target": "物理",
+      "parameters": "mode(conveyor|wind), vector, speed, zone",
+      "implementation": "ゾーン内でプレイヤー速度に一定ベクトルを加算（動く床 / 風）",
+      "cost": "低",
+      "usedBy": [
+        "U03",
+        "R18",
+        "L15"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "PropOrientation",
+      "target": "家具",
+      "parameters": "facing(wall|oneWay|random)",
+      "implementation": "PropSpawner の向き決定を差し替える",
+      "cost": "低",
+      "usedBy": [
+        "U10"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "PropRepetition",
+      "target": "家具",
+      "parameters": "propId, density, scale",
+      "implementation": "同一プロップを InstancedMesh で大量反復配置",
+      "cost": "低〜中",
+      "usedBy": [
+        "U11",
+        "U15",
+        "R03",
+        "R20",
+        "L13",
+        "L17"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "ParticleDetail",
+      "target": "環境",
+      "parameters": "type(steam|mist|rain|snow), density, respawn",
+      "implementation": "少数のスプライトパーティクル。rain は Wetness と連動",
+      "cost": "低〜中",
+      "usedBy": [
+        "U07",
+        "U12",
+        "R19",
+        "L09",
+        "L19"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "AudioEvent",
+      "target": "音",
+      "parameters": "mode(oneShot|beacon), sound, interval, portalId",
+      "implementation": "確率再生の一発音、または特定 Portal へ誘導する定常音源。v1.3: 全音を WebAudio 合成し、public/audio/manifest.json にファイルがあれば差し替え（合成フォールバック）",
+      "cost": "低",
+      "usedBy": [
+        "U14",
+        "U19",
+        "R08"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "MirrorOffset",
+      "target": "描画",
+      "parameters": "offset, delay",
+      "implementation": "鏡面を RenderTarget にせず、部屋ジオメトリの鏡像コピー + ずらしたプレイヤー代理で表現",
+      "cost": "中",
+      "usedBy": [
+        "U09"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "RepeatDestination",
+      "target": "接続",
+      "parameters": "repeatCount, definitionId",
+      "implementation": "Portal の接続先を同一定義へ N 回接続してから解放（反復 EV / 無限病棟）",
+      "cost": "低",
+      "usedBy": [
+        "U18",
+        "R17"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "FakeSky",
+      "target": "描画",
+      "parameters": "skyPreset, lightColor",
+      "implementation": "天井 / 開口を発光スカイテクスチャに置換し、光源方向を連動",
+      "cost": "低",
+      "usedBy": [
+        "U20",
+        "R04",
+        "E04"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "FogDepth",
+      "target": "描画",
+      "parameters": "color, near, far",
+      "implementation": "部屋ごとの霧。v1.3: 入室時に scene.fog を補間（A）を基盤に、材質 variant の部屋別 fog（B。扉口から向こうが固有の霧色で見える）へ発展。far は Tier の fogFar でクランプ",
+      "cost": "低〜中",
+      "usedBy": [
+        "U13",
+        "R03",
+        "R05",
+        "R06",
+        "L01",
+        "L19",
+        "M14"
+      ],
+      "notes": "v1.1 追加。v1.3 D15: 入室時の scene.fog 補間（A）を基盤に、材質 variant の部屋別 fog（B）へ発展。far は Tier の fogFar でクランプ",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "EraPreset",
+      "target": "材質 / 家具",
+      "parameters": "eras[], segmentLength",
+      "implementation": "区画ごとに Material / Props / Lighting プリセットを切替",
+      "cost": "低",
+      "usedBy": [
+        "R11",
+        "E02"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "MaterialGradient",
+      "target": "材質",
+      "parameters": "from, to, axis",
+      "implementation": "進行方向に沿って 2 材質をブレンド（uniform）",
+      "cost": "低",
+      "usedBy": [
+        "R15"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "InvertedShadow",
+      "target": "描画",
+      "parameters": "mode",
+      "implementation": "ブロブ影デカールの向きを光源側へ反転（動的影は使わない）",
+      "cost": "低",
+      "usedBy": [
+        "E06"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "NonEuclideanVolume",
+      "target": "接続",
+      "parameters": "interiorScale",
+      "implementation": "入口寸法より大きい内部を Seam Portal 越しの別配置で実現",
+      "cost": "中",
+      "usedBy": [
+        "E08"
+      ],
+      "notes": "v1.1 追加。v1.3: 内部は意図的 Seam 越しの別配置（殻 + 内部の 2 ノード、内部は初回開扉時に遅延生成）",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "WaterWall",
+      "target": "描画 / 接続",
+      "parameters": "height, flow",
+      "implementation": "垂直水面シェーダ平面を Portal(water) として配置",
+      "cost": "中",
+      "usedBy": [
+        "E09"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "VehicleRide",
+      "target": "接続",
+      "parameters": "vehicleType(train|boat|monorail), durationSec, path",
+      "implementation": "v1.3 C 案: 乗車で移動入力を無効化し、車内で durationSec 待つ（窓の流光 + 微振動、視点のみ操作可）。5 秒経過後は E / タップで到着を早められる。到着先は 'platform' Adapter へ Seam 遷移（意図的 Seam）",
+      "cost": "中",
+      "usedBy": [
+        "E11",
+        "L02",
+        "L11"
+      ],
+      "notes": "v1.1 追加。v1.3 D16: C 案（車内待機 + 5 秒後スキップ）。到着先は 'platform' Adapter。車両は Box 合成で GLB は導入しない",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "DynamicLength",
+      "target": "空間",
+      "parameters": "rate, min, max",
+      "implementation": "v1.3: 配置は最大長で確定し、室内の偽の突き当たり（動的コライダ）で見える長さだけをプレイヤー位置の関数で伸縮。外殻・出口ソケットは不動",
+      "cost": "中",
+      "usedBy": [
+        "E13"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "GraphReference",
+      "target": "演出",
+      "parameters": "mode(past|adjacent), count",
+      "implementation": "既訪または隣接ノードの定義名・簡易サムネイル・プロップを展示",
+      "cost": "低",
+      "usedBy": [
+        "E14",
+        "L16",
+        "M16"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "NoiseGate",
+      "target": "接続",
+      "parameters": "thresholds, useMic",
+      "implementation": "マイク入力（getUserMedia）の音量で開く扉を分岐。マイク許可が無い端末ではプレイヤー移動音量（静止 / 歩行 / ダッシュ / ジャンプ）で代替",
+      "cost": "低〜中",
+      "usedBy": [
+        "E17"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "ZoneThemeShuffle",
+      "target": "材質 / 家具",
+      "parameters": "zoneCount, presetPool",
+      "implementation": "ゾーンごとに Props / Material プリセットをシードで乱択",
+      "cost": "低",
+      "usedBy": [
+        "L05",
+        "L20"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "SelfMap",
+      "target": "演出",
+      "parameters": "scale",
+      "implementation": "DisplayedMapGraph を CanvasTexture に描画して壁面に貼る",
+      "cost": "低〜中",
+      "usedBy": [
+        "M01"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "DiscoveryGate",
+      "target": "接続",
+      "parameters": "threshold",
+      "implementation": "発見済み RoomNode 数が閾値以上のとき扉を解錠（v1.3 保留: M06 オミットにより使用部屋なし）",
+      "cost": "低",
+      "usedBy": [],
+      "notes": "v1.1 追加。v1.3 保留（M06 オミットにより使用部屋なし。実装しない）",
+      "status": "v1.3 保留（使用部屋なし）",
+      "deferred": true
+    },
+    {
+      "id": "FarLink",
+      "target": "接続",
+      "parameters": "minGraphDistance, targetFilter, count",
+      "implementation": "グラフ距離の遠いノードへ Seam Portal で接続（意図的 Seam、一方通行）。v1.3: 使用部屋は M08 のみ",
+      "cost": "低",
+      "usedBy": [
+        "M08"
+      ],
+      "notes": "v1.1 追加。v1.3: 使用部屋は M08 のみ（M20 オミット）。意図的 Seam・一方通行。既訪部屋に戻り Portal は追加しない",
+      "status": "実装対象（M08 のみ）",
+      "deferred": false
+    },
+    {
+      "id": "MultiEdge",
+      "target": "接続",
+      "parameters": "edgeCount",
+      "implementation": "同一部屋への Portal を複数配置。主扉 1 枚を物理接続し、他は mirrorOf で開閉状態を共有する Seam（意図的 Seam）",
+      "cost": "低",
+      "usedBy": [
+        "M11"
+      ],
+      "notes": "v1.1 追加。v1.3: 主扉 1 枚を物理接続、他は mirrorOf の Seam（意図的 Seam）",
+      "status": "実装対象",
+      "deferred": false
+    },
+    {
+      "id": "RenderStyle",
+      "target": "描画",
+      "parameters": "style(untextured|legacy)  ※backside は v1.3 保留",
+      "implementation": "部屋単位で Material を白無地 / フラット低ポリへ差替え。扉パネルは通常描画（唯一のランドマーク）。backside（M15）は保留",
+      "cost": "低",
+      "usedBy": [
+        "M13",
+        "M17"
+      ],
+      "notes": "v1.1 追加。v1.3: untextured（M13）/ legacy（M17）のみ実装。backside は M15 オミットにより保留",
+      "status": "実装対象（untextured / legacy のみ。backside 保留）",
+      "deferred": false
+    },
+    {
+      "id": "MapRotation",
+      "target": "マップ",
+      "parameters": "angle, drift",
+      "implementation": "ワールド北と表示地図の北を分離（DisplayedMapGraph のみ）",
+      "cost": "低",
+      "usedBy": [
+        "M19"
+      ],
+      "notes": "v1.1 追加",
+      "status": "実装対象",
+      "deferred": false
+    }
+  ]
+}

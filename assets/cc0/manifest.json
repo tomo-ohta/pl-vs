@@ -1,0 +1,2019 @@
+{
+ "license": "CC0-1.0",
+ "fetchedAt": "2026-09-17T06:05:13",
+ "sources": {
+  "polyhaven": "https://polyhaven.com/license",
+  "ambientcg": "https://ambientcg.com/license"
+ },
+ "models": {
+  "WetFloorSign_01": {
+   "group": "safety/signage",
+   "resolution": "1k",
+   "gltf": "models/WetFloorSign_01/WetFloorSign_01_1k.gltf",
+   "files": [
+    "WetFloorSign_01_1k.gltf",
+    "WetFloorSign_01_arm_1k.jpg",
+    "WetFloorSign_01_nor_gl_1k.jpg",
+    "WetFloorSign_01_diff_1k.jpg",
+    "WetFloorSign_01.bin"
+   ],
+   "source": "https://polyhaven.com/a/WetFloorSign_01",
+   "license": "CC0-1.0"
+  },
+  "korean_fire_extinguisher_01": {
+   "group": "safety/signage",
+   "resolution": "1k",
+   "gltf": "models/korean_fire_extinguisher_01/korean_fire_extinguisher_01_1k.gltf",
+   "files": [
+    "korean_fire_extinguisher_01_1k.gltf",
+    "korean_fire_extinguisher_01_paper_nor_gl_1k.jpg",
+    "korean_fire_extinguisher_01_paper_diff_1k.jpg",
+    "korean_fire_extinguisher_01_body_nor_gl_1k.jpg",
+    "korean_fire_extinguisher_01_paper_arm_1k.jpg",
+    "korean_fire_extinguisher_01_glass_diff_1k.jpg",
+    "korean_fire_extinguisher_01_glass_nor_gl_1k.jpg",
+    "korean_fire_extinguisher_01_glass_arm_1k.jpg",
+    "korean_fire_extinguisher_01.bin",
+    "korean_fire_extinguisher_01_body_diff_1k.jpg",
+    "korean_fire_extinguisher_01_body_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/korean_fire_extinguisher_01",
+   "license": "CC0-1.0"
+  },
+  "fire_alarm": {
+   "group": "safety/signage",
+   "resolution": "1k",
+   "gltf": "models/fire_alarm/fire_alarm_1k.gltf",
+   "files": [
+    "fire_alarm_1k.gltf",
+    "fire_alarm_nor_gl_1k.jpg",
+    "fire_alarm_diff_1k.jpg",
+    "fire_alarm_arm_1k.jpg",
+    "fire_alarm.bin"
+   ],
+   "source": "https://polyhaven.com/a/fire_alarm",
+   "license": "CC0-1.0"
+  },
+  "security_camera_01": {
+   "group": "safety/signage",
+   "resolution": "1k",
+   "gltf": "models/security_camera_01/security_camera_01_1k.gltf",
+   "files": [
+    "security_camera_01_1k.gltf",
+    "security_camera_01.bin",
+    "security_camera_01_diff_1k.jpg",
+    "security_camera_01_arm_1k.jpg",
+    "security_camera_01_nor_gl_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/security_camera_01",
+   "license": "CC0-1.0"
+  },
+  "wall_clock": {
+   "group": "safety/signage",
+   "resolution": "1k",
+   "gltf": "models/wall_clock/wall_clock_1k.gltf",
+   "files": [
+    "wall_clock_1k.gltf",
+    "wall_clock_nor_gl_1k.jpg",
+    "wall_clock_diff_1k.jpg",
+    "wall_clock_arm_1k.jpg",
+    "wall_clock_glass_arm_1k.jpg",
+    "wall_clock.bin"
+   ],
+   "source": "https://polyhaven.com/a/wall_clock",
+   "license": "CC0-1.0"
+  },
+  "power_box_01": {
+   "group": "safety/signage",
+   "resolution": "1k",
+   "gltf": "models/power_box_01/power_box_01_1k.gltf",
+   "files": [
+    "power_box_01_1k.gltf",
+    "power_box_01_arm_1k.jpg",
+    "power_box_01_nor_gl_1k.jpg",
+    "power_box_01.bin",
+    "power_box_01_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/power_box_01",
+   "license": "CC0-1.0"
+  },
+  "utility_box_01": {
+   "group": "safety/signage",
+   "resolution": "1k",
+   "gltf": "models/utility_box_01/utility_box_01_1k.gltf",
+   "files": [
+    "utility_box_01_1k.gltf",
+    "utility_box_01_diff_1k.jpg",
+    "utility_box_01_nor_gl_1k.jpg",
+    "utility_box_01_arm_1k.jpg",
+    "utility_box_01.bin"
+   ],
+   "source": "https://polyhaven.com/a/utility_box_01",
+   "license": "CC0-1.0"
+  },
+  "metal_trash_can": {
+   "group": "waste/plants",
+   "resolution": "1k",
+   "gltf": "models/metal_trash_can/metal_trash_can_1k.gltf",
+   "files": [
+    "metal_trash_can_1k.gltf",
+    "metal_trash_can_diff_1k.jpg",
+    "metal_trash_can_rust_diff_1k.jpg",
+    "metal_trash_can_arm_1k.jpg",
+    "metal_trash_can_rust_nor_gl_1k.jpg",
+    "metal_trash_can_nor_gl_1k.jpg",
+    "metal_trash_can.bin",
+    "metal_trash_can_rust_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/metal_trash_can",
+   "license": "CC0-1.0"
+  },
+  "trashbag": {
+   "group": "waste/plants",
+   "resolution": "1k",
+   "gltf": "models/trashbag/trashbag_1k.gltf",
+   "files": [
+    "trashbag_1k.gltf",
+    "trashbag_nor_gl_1k.jpg",
+    "trashbag_diff_1k.jpg",
+    "trashbag_arm_1k.jpg",
+    "trashbag.bin"
+   ],
+   "source": "https://polyhaven.com/a/trashbag",
+   "license": "CC0-1.0"
+  },
+  "potted_plant_01": {
+   "group": "waste/plants",
+   "resolution": "1k",
+   "gltf": "models/potted_plant_01/potted_plant_01_1k.gltf",
+   "files": [
+    "potted_plant_01_1k.gltf",
+    "potted_plant_01_pot_rough_1k.jpg",
+    "potted_plant_01_leaves_nor_gl_1k.jpg",
+    "potted_plant_01_pot_diff_1k.jpg",
+    "potted_plant_01.bin",
+    "potted_plant_01_leaves_rough_1k.jpg",
+    "potted_plant_01_pot_nor_gl_1k.jpg",
+    "potted_plant_01_leaves_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/potted_plant_01",
+   "license": "CC0-1.0"
+  },
+  "potted_plant_02": {
+   "group": "waste/plants",
+   "resolution": "1k",
+   "gltf": "models/potted_plant_02/potted_plant_02_1k.gltf",
+   "files": [
+    "potted_plant_02_1k.gltf",
+    "potted_plant_02_leaves_diff_1k.jpg",
+    "potted_plant_02.bin",
+    "potted_plant_02_pot_rough_1k.jpg",
+    "potted_plant_02_leaves_rough_1k.jpg",
+    "potted_plant_02_pot_diff_1k.jpg",
+    "potted_plant_02_leaves_nor_gl_1k.jpg",
+    "potted_plant_02_pot_nor_gl_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/potted_plant_02",
+   "license": "CC0-1.0"
+  },
+  "potted_plant_04": {
+   "group": "waste/plants",
+   "resolution": "1k",
+   "gltf": "models/potted_plant_04/potted_plant_04_1k.gltf",
+   "files": [
+    "potted_plant_04_1k.gltf",
+    "potted_plant_04.bin",
+    "potted_plant_04_nor_gl_1k.jpg",
+    "potted_plant_04_arm_1k.jpg",
+    "potted_plant_04_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/potted_plant_04",
+   "license": "CC0-1.0"
+  },
+  "pachira_aquatica_01": {
+   "group": "waste/plants",
+   "resolution": "1k",
+   "gltf": "models/pachira_aquatica_01/pachira_aquatica_01_1k.gltf",
+   "files": [
+    "pachira_aquatica_01_1k.gltf",
+    "pachira_aquatica_01_bark_nor_gl_1k.jpg",
+    "pachira_aquatica_01_leaves_nor_gl_1k.jpg",
+    "pachira_aquatica_01_leaves_diff_1k.jpg",
+    "pachira_aquatica_01_bark_arm_1k.jpg",
+    "pachira_aquatica_01_bark_diff_1k.jpg",
+    "pachira_aquatica_01_leaves_arm_1k.jpg",
+    "pachira_aquatica_01.bin"
+   ],
+   "source": "https://polyhaven.com/a/pachira_aquatica_01",
+   "license": "CC0-1.0"
+  },
+  "SchoolChair_01": {
+   "group": "seating",
+   "resolution": "1k",
+   "gltf": "models/SchoolChair_01/SchoolChair_01_1k.gltf",
+   "files": [
+    "SchoolChair_01_1k.gltf",
+    "SchoolChair_01_nor_gl_1k.jpg",
+    "SchoolChair_01_diff_1k.jpg",
+    "SchoolChair_01_arm_1k.jpg",
+    "SchoolChair_01.bin"
+   ],
+   "source": "https://polyhaven.com/a/SchoolChair_01",
+   "license": "CC0-1.0"
+  },
+  "plastic_monobloc_chair_01": {
+   "group": "seating",
+   "resolution": "1k",
+   "gltf": "models/plastic_monobloc_chair_01/plastic_monobloc_chair_01_1k.gltf",
+   "files": [
+    "plastic_monobloc_chair_01_1k.gltf",
+    "plastic_monobloc_chair_01.bin",
+    "plastic_monobloc_chair_01_arm_1k.jpg",
+    "plastic_monobloc_chair_01_diff_1k.jpg",
+    "plastic_monobloc_chair_01_nor_gl_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/plastic_monobloc_chair_01",
+   "license": "CC0-1.0"
+  },
+  "dining_chair_02": {
+   "group": "seating",
+   "resolution": "1k",
+   "gltf": "models/dining_chair_02/dining_chair_02_1k.gltf",
+   "files": [
+    "dining_chair_02_1k.gltf",
+    "dining_chair_02.bin",
+    "dining_chair_02_nor_gl_1k.jpg",
+    "dining_chair_02_diff_1k.jpg",
+    "dining_chair_02_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/dining_chair_02",
+   "license": "CC0-1.0"
+  },
+  "sofa_02": {
+   "group": "seating",
+   "resolution": "1k",
+   "gltf": "models/sofa_02/sofa_02_1k.gltf",
+   "files": [
+    "sofa_02_1k.gltf",
+    "sofa_02_diff_1k.jpg",
+    "sofa_02_arm_1k.jpg",
+    "sofa_02_nor_gl_1k.jpg",
+    "sofa_02.bin"
+   ],
+   "source": "https://polyhaven.com/a/sofa_02",
+   "license": "CC0-1.0"
+  },
+  "modern_arm_chair_01": {
+   "group": "seating",
+   "resolution": "1k",
+   "gltf": "models/modern_arm_chair_01/modern_arm_chair_01_1k.gltf",
+   "files": [
+    "modern_arm_chair_01_1k.gltf",
+    "modern_arm_chair_01_pillow_nor_gl_1k.jpg",
+    "modern_arm_chair_01_legs_nor_gl_1k.jpg",
+    "modern_arm_chair_01_pillow_arm_1k.jpg",
+    "modern_arm_chair_01_legs_diff_1k.jpg",
+    "modern_arm_chair_01_legs_arm_1k.jpg",
+    "modern_arm_chair_01.bin",
+    "modern_arm_chair_01_pillow_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/modern_arm_chair_01",
+   "license": "CC0-1.0"
+  },
+  "mid_century_lounge_chair": {
+   "group": "seating",
+   "resolution": "1k",
+   "gltf": "models/mid_century_lounge_chair/mid_century_lounge_chair_1k.gltf",
+   "files": [
+    "mid_century_lounge_chair_1k.gltf",
+    "mid_century_lounge_chair_nor_gl_1k.jpg",
+    "mid_century_lounge_chair_diff_1k.jpg",
+    "mid_century_lounge_chair_arm_1k.jpg",
+    "mid_century_lounge_chair.bin"
+   ],
+   "source": "https://polyhaven.com/a/mid_century_lounge_chair",
+   "license": "CC0-1.0"
+  },
+  "modular_street_seating": {
+   "group": "seating",
+   "resolution": "1k",
+   "gltf": "models/modular_street_seating/modular_street_seating_1k.gltf",
+   "files": [
+    "modular_street_seating_1k.gltf",
+    "modular_street_seating_supports_diff_1k.jpg",
+    "modular_street_seating_armrests_nor_gl_1k.jpg",
+    "modular_street_seating_timber_arm_1k.jpg",
+    "modular_street_seating_supports_nor_gl_1k.jpg",
+    "modular_street_seating_timber_diff_1k.jpg",
+    "modular_street_seating_connectors_nor_gl_1k.jpg",
+    "modular_street_seating_armrests_diff_1k.jpg",
+    "modular_street_seating_supports_arm_1k.jpg",
+    "modular_street_seating_connectors_diff_1k.jpg",
+    "modular_street_seating_armrests_arm_1k.jpg",
+    "modular_street_seating_timber_nor_gl_1k.jpg",
+    "modular_street_seating_connectors_arm_1k.jpg",
+    "modular_street_seating.bin"
+   ],
+   "source": "https://polyhaven.com/a/modular_street_seating",
+   "license": "CC0-1.0"
+  },
+  "wheelchair_01": {
+   "group": "seating",
+   "resolution": "1k",
+   "gltf": "models/wheelchair_01/wheelchair_01_1k.gltf",
+   "files": [
+    "wheelchair_01_1k.gltf",
+    "wheelchair_01_diff_1k.jpg",
+    "wheelchair_01_nor_gl_1k.jpg",
+    "wheelchair_01.bin",
+    "wheelchair_01_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/wheelchair_01",
+   "license": "CC0-1.0"
+  },
+  "SchoolDesk_01": {
+   "group": "tables/desks",
+   "resolution": "1k",
+   "gltf": "models/SchoolDesk_01/SchoolDesk_01_1k.gltf",
+   "files": [
+    "SchoolDesk_01_1k.gltf",
+    "SchoolDesk_01_diff_1k.jpg",
+    "SchoolDesk_01_nor_gl_1k.jpg",
+    "SchoolDesk_01_arm_1k.jpg",
+    "SchoolDesk_01.bin"
+   ],
+   "source": "https://polyhaven.com/a/SchoolDesk_01",
+   "license": "CC0-1.0"
+  },
+  "dining_table": {
+   "group": "tables/desks",
+   "resolution": "1k",
+   "gltf": "models/dining_table/dining_table_1k.gltf",
+   "files": [
+    "dining_table_1k.gltf",
+    "dining_table_nor_gl_1k.jpg",
+    "dining_table_diff_1k.jpg",
+    "dining_table_arm_1k.jpg",
+    "dining_table.bin"
+   ],
+   "source": "https://polyhaven.com/a/dining_table",
+   "license": "CC0-1.0"
+  },
+  "coffee_table_round_01": {
+   "group": "tables/desks",
+   "resolution": "1k",
+   "gltf": "models/coffee_table_round_01/coffee_table_round_01_1k.gltf",
+   "files": [
+    "coffee_table_round_01_1k.gltf",
+    "coffee_table_round_01_diff_1k.jpg",
+    "coffee_table_round_01_arm_1k.jpg",
+    "coffee_table_round_01.bin",
+    "coffee_table_round_01_nor_gl_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/coffee_table_round_01",
+   "license": "CC0-1.0"
+  },
+  "modern_coffee_table_01": {
+   "group": "tables/desks",
+   "resolution": "1k",
+   "gltf": "models/modern_coffee_table_01/modern_coffee_table_01_1k.gltf",
+   "files": [
+    "modern_coffee_table_01_1k.gltf",
+    "modern_coffee_table_01.bin",
+    "modern_coffee_table_01_rough_1k.jpg",
+    "modern_coffee_table_01_diff_1k.jpg",
+    "modern_coffee_table_01_nor_gl_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/modern_coffee_table_01",
+   "license": "CC0-1.0"
+  },
+  "side_table_01": {
+   "group": "tables/desks",
+   "resolution": "1k",
+   "gltf": "models/side_table_01/side_table_01_1k.gltf",
+   "files": [
+    "side_table_01_1k.gltf",
+    "side_table_01.bin",
+    "side_table_01_diff_1k.jpg",
+    "side_table_01_nor_gl_1k.jpg",
+    "side_table_01_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/side_table_01",
+   "license": "CC0-1.0"
+  },
+  "metal_office_desk": {
+   "group": "tables/desks",
+   "resolution": "1k",
+   "gltf": "models/metal_office_desk/metal_office_desk_1k.gltf",
+   "files": [
+    "metal_office_desk_1k.gltf",
+    "metal_office_desk_nor_gl_1k.jpg",
+    "metal_office_desk_diff_1k.jpg",
+    "metal_office_desk_arm_1k.jpg",
+    "metal_office_desk.bin"
+   ],
+   "source": "https://polyhaven.com/a/metal_office_desk",
+   "license": "CC0-1.0"
+  },
+  "drawer_cabinet": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/drawer_cabinet/drawer_cabinet_1k.gltf",
+   "files": [
+    "drawer_cabinet_1k.gltf",
+    "drawer_cabinet_arm_1k.jpg",
+    "drawer_cabinet_nor_gl_1k.jpg",
+    "drawer_cabinet_diff_1k.jpg",
+    "drawer_cabinet.bin"
+   ],
+   "source": "https://polyhaven.com/a/drawer_cabinet",
+   "license": "CC0-1.0"
+  },
+  "modern_wooden_cabinet": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/modern_wooden_cabinet/modern_wooden_cabinet_1k.gltf",
+   "files": [
+    "modern_wooden_cabinet_1k.gltf",
+    "modern_wooden_cabinet.bin",
+    "modern_wooden_cabinet_nor_gl_1k.jpg",
+    "modern_wooden_cabinet_arm_1k.jpg",
+    "modern_wooden_cabinet_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/modern_wooden_cabinet",
+   "license": "CC0-1.0"
+  },
+  "vintage_wooden_drawer_01": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/vintage_wooden_drawer_01/vintage_wooden_drawer_01_1k.gltf",
+   "files": [
+    "vintage_wooden_drawer_01_1k.gltf",
+    "vintage_wooden_drawer_01_nor_gl_1k.jpg",
+    "vintage_wooden_drawer_01.bin",
+    "vintage_wooden_drawer_01_arm_1k.jpg",
+    "vintage_wooden_drawer_01_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/vintage_wooden_drawer_01",
+   "license": "CC0-1.0"
+  },
+  "steel_frame_shelves_01": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/steel_frame_shelves_01/steel_frame_shelves_01_1k.gltf",
+   "files": [
+    "steel_frame_shelves_01_1k.gltf",
+    "steel_frame_shelves_01_diff_1k.jpg",
+    "steel_frame_shelves_01_nor_gl_1k.jpg",
+    "steel_frame_shelves_01_arm_1k.jpg",
+    "steel_frame_shelves_01.bin"
+   ],
+   "source": "https://polyhaven.com/a/steel_frame_shelves_01",
+   "license": "CC0-1.0"
+  },
+  "steel_frame_shelves_02": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/steel_frame_shelves_02/steel_frame_shelves_02_1k.gltf",
+   "files": [
+    "steel_frame_shelves_02_1k.gltf",
+    "steel_frame_shelves_02_nor_gl_1k.jpg",
+    "steel_frame_shelves_02.bin",
+    "steel_frame_shelves_02_diff_1k.jpg",
+    "steel_frame_shelves_02_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/steel_frame_shelves_02",
+   "license": "CC0-1.0"
+  },
+  "wooden_display_shelves_01": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/wooden_display_shelves_01/wooden_display_shelves_01_1k.gltf",
+   "files": [
+    "wooden_display_shelves_01_1k.gltf",
+    "wooden_display_shelves_01_arm_1k.jpg",
+    "wooden_display_shelves_01_nor_gl_1k.jpg",
+    "wooden_display_shelves_01.bin",
+    "wooden_display_shelves_01_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/wooden_display_shelves_01",
+   "license": "CC0-1.0"
+  },
+  "Shelf_01": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/Shelf_01/Shelf_01_1k.gltf",
+   "files": [
+    "Shelf_01_1k.gltf",
+    "Shelf_01_diff_1k.jpg",
+    "Shelf_01.bin",
+    "Shelf_01_nor_gl_1k.jpg",
+    "Shelf_01_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/Shelf_01",
+   "license": "CC0-1.0"
+  },
+  "worn_metal_rack": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/worn_metal_rack/worn_metal_rack_1k.gltf",
+   "files": [
+    "worn_metal_rack_1k.gltf",
+    "worn_metal_rack_nor_gl_1k.jpg",
+    "worn_metal_rack_diff_1k.jpg",
+    "worn_metal_rack_arm_1k.jpg",
+    "worn_metal_rack.bin"
+   ],
+   "source": "https://polyhaven.com/a/worn_metal_rack",
+   "license": "CC0-1.0"
+  },
+  "cardboard_box_01": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/cardboard_box_01/cardboard_box_01_1k.gltf",
+   "files": [
+    "cardboard_box_01_1k.gltf",
+    "cardboard_box_01_arm_1k.jpg",
+    "cardboard_box_01.bin",
+    "cardboard_box_01_diff_1k.jpg",
+    "cardboard_box_01_nor_gl_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/cardboard_box_01",
+   "license": "CC0-1.0"
+  },
+  "plastic_crate_01": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/plastic_crate_01/plastic_crate_01_1k.gltf",
+   "files": [
+    "plastic_crate_01_1k.gltf",
+    "plastic_crate_01_nor_gl_1k.jpg",
+    "plastic_crate_01_diff_1k.jpg",
+    "plastic_crate_01_arm_1k.jpg",
+    "plastic_crate_01.bin"
+   ],
+   "source": "https://polyhaven.com/a/plastic_crate_01",
+   "license": "CC0-1.0"
+  },
+  "plastic_crate_02": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/plastic_crate_02/plastic_crate_02_1k.gltf",
+   "files": [
+    "plastic_crate_02_1k.gltf",
+    "plastic_crate_02_nor_gl_1k.jpg",
+    "plastic_crate_02_diff_1k.jpg",
+    "plastic_crate_02_arm_1k.jpg",
+    "plastic_crate_02.bin"
+   ],
+   "source": "https://polyhaven.com/a/plastic_crate_02",
+   "license": "CC0-1.0"
+  },
+  "plastic_container": {
+   "group": "storage",
+   "resolution": "1k",
+   "gltf": "models/plastic_container/plastic_container_1k.gltf",
+   "files": [
+    "plastic_container_1k.gltf",
+    "plastic_container_nor_gl_1k.jpg",
+    "plastic_container_diff_1k.jpg",
+    "plastic_container_arm_1k.jpg",
+    "plastic_container.bin"
+   ],
+   "source": "https://polyhaven.com/a/plastic_container",
+   "license": "CC0-1.0"
+  },
+  "mounted_fluorescent_lights": {
+   "group": "lighting/mep",
+   "resolution": "1k",
+   "gltf": "models/mounted_fluorescent_lights/mounted_fluorescent_lights_1k.gltf",
+   "files": [
+    "mounted_fluorescent_lights_1k.gltf",
+    "mounted_fluorescent_lights_nor_gl_1k.jpg",
+    "mounted_fluorescent_lights_diff_1k.jpg",
+    "mounted_fluorescent_lights_arm_1k.jpg",
+    "mounted_fluorescent_lights_emission_1k.jpg",
+    "mounted_fluorescent_lights.bin"
+   ],
+   "source": "https://polyhaven.com/a/mounted_fluorescent_lights",
+   "license": "CC0-1.0"
+  },
+  "caged_hanging_light": {
+   "group": "lighting/mep",
+   "resolution": "1k",
+   "gltf": "models/caged_hanging_light/caged_hanging_light_1k.gltf",
+   "files": [
+    "caged_hanging_light_1k.gltf",
+    "caged_hanging_light_emissive_1k.jpg",
+    "caged_hanging_light_nor_gl_1k.jpg",
+    "caged_hanging_light_diff_1k.jpg",
+    "caged_hanging_light_arm_1k.jpg",
+    "caged_hanging_light.bin"
+   ],
+   "source": "https://polyhaven.com/a/caged_hanging_light",
+   "license": "CC0-1.0"
+  },
+  "hanging_industrial_lamp": {
+   "group": "lighting/mep",
+   "resolution": "1k",
+   "gltf": "models/hanging_industrial_lamp/hanging_industrial_lamp_1k.gltf",
+   "files": [
+    "hanging_industrial_lamp_1k.gltf",
+    "hanging_industrial_lamp_emissive_1k.jpg",
+    "hanging_industrial_lamp_nor_gl_1k.jpg",
+    "hanging_industrial_lamp_diff_1k.jpg",
+    "hanging_industrial_lamp_arm_1k.jpg",
+    "hanging_industrial_lamp_glass_nor_gl_1k.jpg",
+    "hanging_industrial_lamp.bin"
+   ],
+   "source": "https://polyhaven.com/a/hanging_industrial_lamp",
+   "license": "CC0-1.0"
+  },
+  "industrial_wall_lamp": {
+   "group": "lighting/mep",
+   "resolution": "1k",
+   "gltf": "models/industrial_wall_lamp/industrial_wall_lamp_1k.gltf",
+   "files": [
+    "industrial_wall_lamp_1k.gltf",
+    "industrial_wall_lamp_emissive_1k.jpg",
+    "industrial_wall_lamp_nor_gl_1k.jpg",
+    "industrial_wall_lamp_diff_1k.jpg",
+    "industrial_wall_lamp_arm_1k.jpg",
+    "industrial_wall_lamp_glass_nor_gl_1k.jpg",
+    "industrial_wall_lamp_glass_diff_1k.jpg",
+    "industrial_wall_lamp_glass_arm_1k.jpg",
+    "industrial_wall_lamp.bin"
+   ],
+   "source": "https://polyhaven.com/a/industrial_wall_lamp",
+   "license": "CC0-1.0"
+  },
+  "ceiling_fan": {
+   "group": "lighting/mep",
+   "resolution": "1k",
+   "gltf": "models/ceiling_fan/ceiling_fan_1k.gltf",
+   "files": [
+    "ceiling_fan_1k.gltf",
+    "ceiling_fan_emissive_1k.jpg",
+    "ceiling_fan_spec_1k.jpg",
+    "ceiling_fan_nor_gl_1k.jpg",
+    "ceiling_fan_diff_1k.jpg",
+    "ceiling_fan_arm_1k.jpg",
+    "ceiling_fan.bin"
+   ],
+   "source": "https://polyhaven.com/a/ceiling_fan",
+   "license": "CC0-1.0"
+  },
+  "modular_airduct_rectangular_01": {
+   "group": "lighting/mep",
+   "resolution": "1k",
+   "gltf": "models/modular_airduct_rectangular_01/modular_airduct_rectangular_01_1k.gltf",
+   "files": [
+    "modular_airduct_rectangular_01_1k.gltf",
+    "modular_airduct_rectangular_01_parts01_nor_gl_1k.jpg",
+    "modular_airduct_rectangular_01_parts02_nor_gl_1k.jpg",
+    "modular_airduct_rectangular_01_parts02_diff_1k.jpg",
+    "modular_airduct_rectangular_01.bin",
+    "modular_airduct_rectangular_01_parts01_arm_1k.jpg",
+    "modular_airduct_rectangular_01_parts02_arm_1k.jpg",
+    "modular_airduct_rectangular_01_parts01_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/modular_airduct_rectangular_01",
+   "license": "CC0-1.0"
+  },
+  "modular_pipes": {
+   "group": "lighting/mep",
+   "resolution": "1k",
+   "gltf": "models/modular_pipes/modular_pipes_1k.gltf",
+   "files": [
+    "modular_pipes_1k.gltf",
+    "modular_pipes_metal_nor_gl_1k.jpg",
+    "modular_pipes_metal_diff_1k.jpg",
+    "modular_pipes_metal_arm_1k.jpg",
+    "modular_pipes_pvc_nor_gl_1k.jpg",
+    "modular_pipes_pvc_diff_1k.jpg",
+    "modular_pipes_pvc_arm_1k.jpg",
+    "modular_pipes.bin"
+   ],
+   "source": "https://polyhaven.com/a/modular_pipes",
+   "license": "CC0-1.0"
+  },
+  "exterior_aircon_unit": {
+   "group": "lighting/mep",
+   "resolution": "1k",
+   "gltf": "models/exterior_aircon_unit/exterior_aircon_unit_1k.gltf",
+   "files": [
+    "exterior_aircon_unit_1k.gltf",
+    "exterior_aircon_unit_01_nor_gl_1k.jpg",
+    "exterior_aircon_unit_01_opacity_1k.jpg",
+    "exterior_aircon_unit_rusted_01_arm_1k.jpg",
+    "exterior_aircon_unit_01_arm_1k.jpg",
+    "exterior_aircon_unit_02_arm_1k.jpg",
+    "exterior_aircon_unit_rusted_02_arm_1k.jpg",
+    "exterior_aircon_unit.bin",
+    "exterior_aircon_unit_02_nor_gl_1k.jpg",
+    "exterior_aircon_unit_rusted_01_nor_gl_1k.jpg",
+    "exterior_aircon_unit_rusted_01_diff_1k.jpg",
+    "exterior_aircon_unit_01_diff_1k.jpg",
+    "exterior_aircon_unit_rusted_02_opacity_1k.jpg",
+    "exterior_aircon_unit_rusted_02_nor_gl_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/exterior_aircon_unit",
+   "license": "CC0-1.0"
+  },
+  "street_lamp_01": {
+   "group": "lighting/mep",
+   "resolution": "1k",
+   "gltf": "models/street_lamp_01/street_lamp_01_1k.gltf",
+   "files": [
+    "street_lamp_01_1k.gltf",
+    "street_lamp_01_arm_1k.jpg",
+    "street_lamp_01_diff_1k.jpg",
+    "street_lamp_01_nor_gl_1k.jpg",
+    "street_lamp_01.bin"
+   ],
+   "source": "https://polyhaven.com/a/street_lamp_01",
+   "license": "CC0-1.0"
+  },
+  "office_notepads": {
+   "group": "office small",
+   "resolution": "1k",
+   "gltf": "models/office_notepads/office_notepads_1k.gltf",
+   "files": [
+    "office_notepads_1k.gltf",
+    "office_notepads_nor_gl_1k.jpg",
+    "office_notepads_diff_1k.jpg",
+    "office_notepads_arm_1k.jpg",
+    "office_notepads.bin"
+   ],
+   "source": "https://polyhaven.com/a/office_notepads",
+   "license": "CC0-1.0"
+  },
+  "stationery_supplies": {
+   "group": "office small",
+   "resolution": "1k",
+   "gltf": "models/stationery_supplies/stationery_supplies_1k.gltf",
+   "files": [
+    "stationery_supplies_1k.gltf",
+    "stationery_supplies_nor_gl_1k.jpg",
+    "stationery_supplies_diff_1k.jpg",
+    "stationery_supplies_arm_1k.jpg",
+    "stationery_supplies.bin"
+   ],
+   "source": "https://polyhaven.com/a/stationery_supplies",
+   "license": "CC0-1.0"
+  },
+  "clipboard": {
+   "group": "office small",
+   "resolution": "1k",
+   "gltf": "models/clipboard/clipboard_1k.gltf",
+   "files": [
+    "clipboard_1k.gltf",
+    "clipboard_nor_gl_1k.jpg",
+    "clipboard_diff_1k.jpg",
+    "clipboard_arm_1k.jpg",
+    "clipboard.bin"
+   ],
+   "source": "https://polyhaven.com/a/clipboard",
+   "license": "CC0-1.0"
+  },
+  "classic_laptop": {
+   "group": "office small",
+   "resolution": "1k",
+   "gltf": "models/classic_laptop/classic_laptop_1k.gltf",
+   "files": [
+    "classic_laptop_1k.gltf",
+    "classic_laptop_nor_gl_1k.jpg",
+    "classic_laptop_diff_1k.jpg",
+    "classic_laptop_arm_1k.jpg",
+    "classic_laptop.bin"
+   ],
+   "source": "https://polyhaven.com/a/classic_laptop",
+   "license": "CC0-1.0"
+  },
+  "projector_screen": {
+   "group": "office small",
+   "resolution": "1k",
+   "gltf": "models/projector_screen/projector_screen_1k.gltf",
+   "files": [
+    "projector_screen_1k.gltf",
+    "projector_screen_frame_nor_gl_1k.jpg",
+    "projector_screen_frame_diff_1k.jpg",
+    "projector_screen_frame_arm_1k.jpg",
+    "projector_screen_nor_gl_1k.jpg",
+    "projector_screen_diff_1k.jpg",
+    "projector_screen_arm_1k.jpg",
+    "projector_screen.bin"
+   ],
+   "source": "https://polyhaven.com/a/projector_screen",
+   "license": "CC0-1.0"
+  },
+  "vintage_stapler": {
+   "group": "office small",
+   "resolution": "1k",
+   "gltf": "models/vintage_stapler/vintage_stapler_1k.gltf",
+   "files": [
+    "vintage_stapler_1k.gltf",
+    "vintage_stapler_nor_gl_1k.jpg",
+    "vintage_stapler_diff_1k.jpg",
+    "vintage_stapler_arm_1k.jpg",
+    "vintage_stapler.bin"
+   ],
+   "source": "https://polyhaven.com/a/vintage_stapler",
+   "license": "CC0-1.0"
+  },
+  "binder_notebook": {
+   "group": "office small",
+   "resolution": "1k",
+   "gltf": "models/binder_notebook/binder_notebook_1k.gltf",
+   "files": [
+    "binder_notebook_1k.gltf",
+    "binder_notebook_nor_gl_1k.jpg",
+    "binder_notebook_diff_1k.jpg",
+    "binder_notebook_arm_1k.jpg",
+    "binder_notebook.bin"
+   ],
+   "source": "https://polyhaven.com/a/binder_notebook",
+   "license": "CC0-1.0"
+  },
+  "book_encyclopedia_set_01": {
+   "group": "office small",
+   "resolution": "1k",
+   "gltf": "models/book_encyclopedia_set_01/book_encyclopedia_set_01_1k.gltf",
+   "files": [
+    "book_encyclopedia_set_01_1k.gltf",
+    "book_encyclopedia_set_01_cover_diff_1k.jpg",
+    "book_encyclopedia_set_01.bin",
+    "book_encyclopedia_set_01_paper_nor_gl_1k.jpg",
+    "book_encyclopedia_set_01_cover_arm_1k.jpg",
+    "book_encyclopedia_set_01_cover_nor_gl_1k.jpg",
+    "book_encyclopedia_set_01_paper_diff_1k.jpg",
+    "book_encyclopedia_set_01_paper_roughness_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/book_encyclopedia_set_01",
+   "license": "CC0-1.0"
+  },
+  "standing_chalkboard_01": {
+   "group": "office small",
+   "resolution": "1k",
+   "gltf": "models/standing_chalkboard_01/standing_chalkboard_01_1k.gltf",
+   "files": [
+    "standing_chalkboard_01_1k.gltf",
+    "standing_chalkboard_01.bin",
+    "standing_chalkboard_01_frame_nor_gl_1k.jpg",
+    "standing_chalkboard_01_board_arm_1k.jpg",
+    "standing_chalkboard_01_board_diff_1k.jpg",
+    "standing_chalkboard_01_frame_arm_1k.jpg",
+    "standing_chalkboard_01_board_nor_gl_1k.jpg",
+    "standing_chalkboard_01_frame_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/standing_chalkboard_01",
+   "license": "CC0-1.0"
+  },
+  "CoffeeCart_01": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/CoffeeCart_01/CoffeeCart_01_1k.gltf",
+   "files": [
+    "CoffeeCart_01_1k.gltf",
+    "CoffeeCart_01_cart_arm_1k.jpg",
+    "CoffeeCart_01_props_arm_1k.jpg",
+    "CoffeeCart_01.bin",
+    "CoffeeCart_01_props_nor_gl_1k.jpg",
+    "CoffeeCart_01_cart_nor_gl_1k.jpg",
+    "CoffeeCart_01_cart_diff_1k.jpg",
+    "CoffeeCart_01_props_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/CoffeeCart_01",
+   "license": "CC0-1.0"
+  },
+  "vintage_microwave": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/vintage_microwave/vintage_microwave_1k.gltf",
+   "files": [
+    "vintage_microwave_1k.gltf",
+    "vintage_microwave_nor_gl_1k.jpg",
+    "vintage_microwave_diff_1k.jpg",
+    "vintage_microwave_arm_1k.jpg",
+    "vintage_microwave.bin"
+   ],
+   "source": "https://polyhaven.com/a/vintage_microwave",
+   "license": "CC0-1.0"
+  },
+  "television_02": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/television_02/television_02_1k.gltf",
+   "files": [
+    "television_02_1k.gltf",
+    "television_02_nor_gl_1k.jpg",
+    "television_02_diff_1k.jpg",
+    "television_02_arm_1k.jpg",
+    "television_02.bin"
+   ],
+   "source": "https://polyhaven.com/a/television_02",
+   "license": "CC0-1.0"
+  },
+  "Television_01": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/Television_01/Television_01_1k.gltf",
+   "files": [
+    "Television_01_1k.gltf",
+    "Television_01.bin",
+    "Television_01_arm_1k.jpg",
+    "Television_01_diff_1k.jpg",
+    "Television_01_nor_gl_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/Television_01",
+   "license": "CC0-1.0"
+  },
+  "korean_public_payphone_01": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/korean_public_payphone_01/korean_public_payphone_01_1k.gltf",
+   "files": [
+    "korean_public_payphone_01_1k.gltf",
+    "korean_public_payphone_01_nor_gl_1k.jpg",
+    "korean_public_payphone_01_diff_1k.jpg",
+    "korean_public_payphone_01.bin",
+    "korean_public_payphone_01_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/korean_public_payphone_01",
+   "license": "CC0-1.0"
+  },
+  "boombox": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/boombox/boombox_1k.gltf",
+   "files": [
+    "boombox_1k.gltf",
+    "boombox_nor_gl_1k.jpg",
+    "boombox_speakers_arm_1k.jpg",
+    "boombox_diff_1k.jpg",
+    "boombox.bin",
+    "boombox_speakers_diff_1k.jpg",
+    "boombox_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/boombox",
+   "license": "CC0-1.0"
+  },
+  "hand_truck": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/hand_truck/hand_truck_1k.gltf",
+   "files": [
+    "hand_truck_1k.gltf",
+    "hand_truck_nor_gl_1k.jpg",
+    "hand_truck_diff_1k.jpg",
+    "hand_truck_arm_1k.jpg",
+    "hand_truck.bin"
+   ],
+   "source": "https://polyhaven.com/a/hand_truck",
+   "license": "CC0-1.0"
+  },
+  "ladder_sectioned_01": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/ladder_sectioned_01/ladder_sectioned_01_1k.gltf",
+   "files": [
+    "ladder_sectioned_01_1k.gltf",
+    "ladder_sectioned_01_nor_gl_1k.jpg",
+    "ladder_sectioned_01_diff_1k.jpg",
+    "ladder_sectioned_01.bin",
+    "ladder_sectioned_01_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/ladder_sectioned_01",
+   "license": "CC0-1.0"
+  },
+  "wooden_ladder": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/wooden_ladder/wooden_ladder_1k.gltf",
+   "files": [
+    "wooden_ladder_1k.gltf",
+    "wooden_ladder_nor_gl_1k.jpg",
+    "wooden_ladder_diff_1k.jpg",
+    "wooden_ladder_arm_1k.jpg",
+    "wooden_ladder.bin"
+   ],
+   "source": "https://polyhaven.com/a/wooden_ladder",
+   "license": "CC0-1.0"
+  },
+  "rollershutter_door": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/rollershutter_door/rollershutter_door_1k.gltf",
+   "files": [
+    "rollershutter_door_1k.gltf",
+    "rollershutter_door.bin",
+    "rollershutter_door_arm_1k.jpg",
+    "rollershutter_door_diff_1k.jpg",
+    "rollershutter_door_nor_gl_1k.jpg",
+    "rollershutter_door_graffiti_diff_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/rollershutter_door",
+   "license": "CC0-1.0"
+  },
+  "all_purpose_cleaner": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/all_purpose_cleaner/all_purpose_cleaner_1k.gltf",
+   "files": [
+    "all_purpose_cleaner_1k.gltf",
+    "all_purpose_cleaner_diff_1k.jpg",
+    "all_purpose_cleaner_arm_1k.jpg",
+    "all_purpose_cleaner_nor_gl_1k.jpg",
+    "all_purpose_cleaner.bin"
+   ],
+   "source": "https://polyhaven.com/a/all_purpose_cleaner",
+   "license": "CC0-1.0"
+  },
+  "plunger": {
+   "group": "appliances/misc",
+   "resolution": "1k",
+   "gltf": "models/plunger/plunger_1k.gltf",
+   "files": [
+    "plunger_1k.gltf",
+    "plunger.bin",
+    "plunger_nor_gl_1k.jpg",
+    "plunger_diff_1k.jpg",
+    "plunger_arm_1k.jpg"
+   ],
+   "source": "https://polyhaven.com/a/plunger",
+   "license": "CC0-1.0"
+  }
+ },
+ "materials": {
+  "Carpet016": {
+   "group": "carpet",
+   "resolution": "2K",
+   "maps": {
+    "AmbientOcclusion": "materials/Carpet016/Carpet016_2K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Carpet016/Carpet016_2K-JPG_Color.jpg",
+    "Displacement": "materials/Carpet016/Carpet016_2K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Carpet016/Carpet016_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Carpet016/Carpet016_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Carpet016/Carpet016_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/Carpet016",
+   "license": "CC0-1.0"
+  },
+  "Carpet004": {
+   "group": "carpet",
+   "resolution": "2K",
+   "maps": {
+    "AmbientOcclusion": "materials/Carpet004/Carpet004_2K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Carpet004/Carpet004_2K-JPG_Color.jpg",
+    "Displacement": "materials/Carpet004/Carpet004_2K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Carpet004/Carpet004_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Carpet004/Carpet004_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Carpet004/Carpet004_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/Carpet004",
+   "license": "CC0-1.0"
+  },
+  "Carpet012": {
+   "group": "carpet",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Carpet012/Carpet012_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Carpet012/Carpet012_1K-JPG_Color.jpg",
+    "Displacement": "materials/Carpet012/Carpet012_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Carpet012/Carpet012_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Carpet012/Carpet012_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Carpet012/Carpet012_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Carpet012",
+   "license": "CC0-1.0"
+  },
+  "Carpet015": {
+   "group": "carpet",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Carpet015/Carpet015_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Carpet015/Carpet015_1K-JPG_Color.jpg",
+    "Displacement": "materials/Carpet015/Carpet015_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Carpet015/Carpet015_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Carpet015/Carpet015_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Carpet015/Carpet015_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Carpet015",
+   "license": "CC0-1.0"
+  },
+  "Fabric028": {
+   "group": "carpet",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Fabric028/Fabric028_1K-JPG_Color.jpg",
+    "Displacement": "materials/Fabric028/Fabric028_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Fabric028/Fabric028_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Fabric028/Fabric028_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Fabric028/Fabric028_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Fabric028",
+   "license": "CC0-1.0"
+  },
+  "Fabric029": {
+   "group": "carpet",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Fabric029/Fabric029_1K-JPG_Color.jpg",
+    "Displacement": "materials/Fabric029/Fabric029_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Fabric029/Fabric029_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Fabric029/Fabric029_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Fabric029/Fabric029_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Fabric029",
+   "license": "CC0-1.0"
+  },
+  "OfficeCeiling001": {
+   "group": "ceiling",
+   "resolution": "2K",
+   "maps": {
+    "AmbientOcclusion": "materials/OfficeCeiling001/OfficeCeiling001_2K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/OfficeCeiling001/OfficeCeiling001_2K-JPG_Color.jpg",
+    "Displacement": "materials/OfficeCeiling001/OfficeCeiling001_2K-JPG_Displacement.jpg",
+    "Metalness": "materials/OfficeCeiling001/OfficeCeiling001_2K-JPG_Metalness.jpg",
+    "NormalGL": "materials/OfficeCeiling001/OfficeCeiling001_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/OfficeCeiling001/OfficeCeiling001_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/OfficeCeiling001/OfficeCeiling001_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/OfficeCeiling001",
+   "license": "CC0-1.0"
+  },
+  "OfficeCeiling002": {
+   "group": "ceiling",
+   "resolution": "2K",
+   "maps": {
+    "AmbientOcclusion": "materials/OfficeCeiling002/OfficeCeiling002_2K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/OfficeCeiling002/OfficeCeiling002_2K-JPG_Color.jpg",
+    "Displacement": "materials/OfficeCeiling002/OfficeCeiling002_2K-JPG_Displacement.jpg",
+    "Metalness": "materials/OfficeCeiling002/OfficeCeiling002_2K-JPG_Metalness.jpg",
+    "NormalGL": "materials/OfficeCeiling002/OfficeCeiling002_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/OfficeCeiling002/OfficeCeiling002_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/OfficeCeiling002/OfficeCeiling002_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/OfficeCeiling002",
+   "license": "CC0-1.0"
+  },
+  "OfficeCeiling005": {
+   "group": "ceiling",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/OfficeCeiling005/OfficeCeiling005_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/OfficeCeiling005/OfficeCeiling005_1K-JPG_Color.jpg",
+    "Displacement": "materials/OfficeCeiling005/OfficeCeiling005_1K-JPG_Displacement.jpg",
+    "Metalness": "materials/OfficeCeiling005/OfficeCeiling005_1K-JPG_Metalness.jpg",
+    "NormalGL": "materials/OfficeCeiling005/OfficeCeiling005_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/OfficeCeiling005/OfficeCeiling005_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/OfficeCeiling005/OfficeCeiling005_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/OfficeCeiling005",
+   "license": "CC0-1.0"
+  },
+  "Wallpaper001A": {
+   "group": "wall",
+   "resolution": "2K",
+   "maps": {
+    "Color": "materials/Wallpaper001A/Wallpaper001A_2K-JPG_Color.jpg",
+    "Displacement": "materials/Wallpaper001A/Wallpaper001A_2K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Wallpaper001A/Wallpaper001A_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Wallpaper001A/Wallpaper001A_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Wallpaper001A/Wallpaper001A_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/Wallpaper001A",
+   "license": "CC0-1.0"
+  },
+  "Wallpaper001B": {
+   "group": "wall",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Wallpaper001B/Wallpaper001B_1K-JPG_Color.jpg",
+    "Displacement": "materials/Wallpaper001B/Wallpaper001B_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Wallpaper001B/Wallpaper001B_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Wallpaper001B/Wallpaper001B_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Wallpaper001B/Wallpaper001B_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Wallpaper001B",
+   "license": "CC0-1.0"
+  },
+  "PaintedPlaster017": {
+   "group": "wall",
+   "resolution": "2K",
+   "maps": {
+    "Color": "materials/PaintedPlaster017/PaintedPlaster017_2K-JPG_Color.jpg",
+    "Displacement": "materials/PaintedPlaster017/PaintedPlaster017_2K-JPG_Displacement.jpg",
+    "NormalGL": "materials/PaintedPlaster017/PaintedPlaster017_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/PaintedPlaster017/PaintedPlaster017_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/PaintedPlaster017/PaintedPlaster017_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/PaintedPlaster017",
+   "license": "CC0-1.0"
+  },
+  "Plaster001": {
+   "group": "wall",
+   "resolution": "2K",
+   "maps": {
+    "Color": "materials/Plaster001/Plaster001_2K-JPG_Color.jpg",
+    "Displacement": "materials/Plaster001/Plaster001_2K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Plaster001/Plaster001_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Plaster001/Plaster001_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Plaster001/Plaster001_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/Plaster001",
+   "license": "CC0-1.0"
+  },
+  "Plaster007": {
+   "group": "wall",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Plaster007/Plaster007_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Plaster007/Plaster007_1K-JPG_Color.jpg",
+    "Displacement": "materials/Plaster007/Plaster007_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Plaster007/Plaster007_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Plaster007/Plaster007_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Plaster007/Plaster007_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Plaster007",
+   "license": "CC0-1.0"
+  },
+  "Concrete034": {
+   "group": "wall",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Concrete034/Concrete034_1K-JPG_Color.jpg",
+    "Displacement": "materials/Concrete034/Concrete034_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Concrete034/Concrete034_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Concrete034/Concrete034_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Concrete034/Concrete034_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Concrete034",
+   "license": "CC0-1.0"
+  },
+  "Concrete046": {
+   "group": "wall",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Concrete046/Concrete046_1K-JPG_Color.jpg",
+    "Displacement": "materials/Concrete046/Concrete046_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Concrete046/Concrete046_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Concrete046/Concrete046_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Concrete046/Concrete046_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Concrete046",
+   "license": "CC0-1.0"
+  },
+  "Bricks101": {
+   "group": "wall",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Bricks101/Bricks101_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Bricks101/Bricks101_1K-JPG_Color.jpg",
+    "Displacement": "materials/Bricks101/Bricks101_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Bricks101/Bricks101_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Bricks101/Bricks101_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Bricks101/Bricks101_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Bricks101",
+   "license": "CC0-1.0"
+  },
+  "Tiles107": {
+   "group": "floor",
+   "resolution": "2K",
+   "maps": {
+    "AmbientOcclusion": "materials/Tiles107/Tiles107_2K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Tiles107/Tiles107_2K-JPG_Color.jpg",
+    "Displacement": "materials/Tiles107/Tiles107_2K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Tiles107/Tiles107_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Tiles107/Tiles107_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Tiles107/Tiles107_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/Tiles107",
+   "license": "CC0-1.0"
+  },
+  "Tiles133A": {
+   "group": "floor",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Tiles133A/Tiles133A_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Tiles133A/Tiles133A_1K-JPG_Color.jpg",
+    "Displacement": "materials/Tiles133A/Tiles133A_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Tiles133A/Tiles133A_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Tiles133A/Tiles133A_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Tiles133A/Tiles133A_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Tiles133A",
+   "license": "CC0-1.0"
+  },
+  "Tiles141": {
+   "group": "floor",
+   "resolution": "2K",
+   "maps": {
+    "Color": "materials/Tiles141/Tiles141_2K-JPG_Color.jpg",
+    "Displacement": "materials/Tiles141/Tiles141_2K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Tiles141/Tiles141_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Tiles141/Tiles141_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Tiles141/Tiles141_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/Tiles141",
+   "license": "CC0-1.0"
+  },
+  "Tiles040": {
+   "group": "floor",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Tiles040/Tiles040_1K-JPG_Color.jpg",
+    "Displacement": "materials/Tiles040/Tiles040_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Tiles040/Tiles040_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Tiles040/Tiles040_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Tiles040/Tiles040_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Tiles040",
+   "license": "CC0-1.0"
+  },
+  "Tiles132A": {
+   "group": "floor",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Tiles132A/Tiles132A_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Tiles132A/Tiles132A_1K-JPG_Color.jpg",
+    "Displacement": "materials/Tiles132A/Tiles132A_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Tiles132A/Tiles132A_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Tiles132A/Tiles132A_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Tiles132A/Tiles132A_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Tiles132A",
+   "license": "CC0-1.0"
+  },
+  "Concrete048": {
+   "group": "floor",
+   "resolution": "2K",
+   "maps": {
+    "AmbientOcclusion": "materials/Concrete048/Concrete048_2K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Concrete048/Concrete048_2K-JPG_Color.jpg",
+    "Displacement": "materials/Concrete048/Concrete048_2K-JPG_Displacement.jpg",
+    "Metalness": "materials/Concrete048/Concrete048_2K-JPG_Metalness.jpg",
+    "NormalGL": "materials/Concrete048/Concrete048_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Concrete048/Concrete048_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Concrete048/Concrete048_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/Concrete048",
+   "license": "CC0-1.0"
+  },
+  "Concrete047A": {
+   "group": "floor",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Concrete047A/Concrete047A_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Concrete047A/Concrete047A_1K-JPG_Color.jpg",
+    "Displacement": "materials/Concrete047A/Concrete047A_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Concrete047A/Concrete047A_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Concrete047A/Concrete047A_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Concrete047A/Concrete047A_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Concrete047A",
+   "license": "CC0-1.0"
+  },
+  "WoodFloor051": {
+   "group": "floor",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/WoodFloor051/WoodFloor051_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/WoodFloor051/WoodFloor051_1K-JPG_Color.jpg",
+    "Displacement": "materials/WoodFloor051/WoodFloor051_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/WoodFloor051/WoodFloor051_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/WoodFloor051/WoodFloor051_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/WoodFloor051/WoodFloor051_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/WoodFloor051",
+   "license": "CC0-1.0"
+  },
+  "Rubber004": {
+   "group": "floor",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Rubber004/Rubber004_1K-JPG_Color.jpg",
+    "Displacement": "materials/Rubber004/Rubber004_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Rubber004/Rubber004_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Rubber004/Rubber004_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Rubber004/Rubber004_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Rubber004",
+   "license": "CC0-1.0"
+  },
+  "Asphalt031": {
+   "group": "floor",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Asphalt031/Asphalt031_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Asphalt031/Asphalt031_1K-JPG_Color.jpg",
+    "Displacement": "materials/Asphalt031/Asphalt031_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Asphalt031/Asphalt031_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Asphalt031/Asphalt031_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Asphalt031/Asphalt031_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Asphalt031",
+   "license": "CC0-1.0"
+  },
+  "Road007": {
+   "group": "floor",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Road007/Road007_1K-JPG_Color.jpg",
+    "Displacement": "materials/Road007/Road007_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Road007/Road007_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Road007/Road007_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Road007/Road007_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Road007",
+   "license": "CC0-1.0"
+  },
+  "PavingStones136": {
+   "group": "floor",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/PavingStones136/PavingStones136_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/PavingStones136/PavingStones136_1K-JPG_Color.jpg",
+    "Displacement": "materials/PavingStones136/PavingStones136_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/PavingStones136/PavingStones136_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/PavingStones136/PavingStones136_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/PavingStones136/PavingStones136_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/PavingStones136",
+   "license": "CC0-1.0"
+  },
+  "Marble012": {
+   "group": "floor",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Marble012/Marble012_1K-JPG_Color.jpg",
+    "Displacement": "materials/Marble012/Marble012_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Marble012/Marble012_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Marble012/Marble012_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Marble012/Marble012_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Marble012",
+   "license": "CC0-1.0"
+  },
+  "Wood049": {
+   "group": "furniture/metal",
+   "resolution": "2K",
+   "maps": {
+    "Color": "materials/Wood049/Wood049_2K-JPG_Color.jpg",
+    "Displacement": "materials/Wood049/Wood049_2K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Wood049/Wood049_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Wood049/Wood049_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Wood049/Wood049_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/Wood049",
+   "license": "CC0-1.0"
+  },
+  "Wood051": {
+   "group": "furniture/metal",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Wood051/Wood051_1K-JPG_Color.jpg",
+    "Displacement": "materials/Wood051/Wood051_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Wood051/Wood051_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Wood051/Wood051_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Wood051/Wood051_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Wood051",
+   "license": "CC0-1.0"
+  },
+  "Metal009": {
+   "group": "furniture/metal",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Metal009/Metal009_1K-JPG_Color.jpg",
+    "Displacement": "materials/Metal009/Metal009_1K-JPG_Displacement.jpg",
+    "Metalness": "materials/Metal009/Metal009_1K-JPG_Metalness.jpg",
+    "NormalGL": "materials/Metal009/Metal009_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Metal009/Metal009_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Metal009/Metal009_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Metal009",
+   "license": "CC0-1.0"
+  },
+  "Metal027": {
+   "group": "furniture/metal",
+   "resolution": "2K",
+   "maps": {
+    "Color": "materials/Metal027/Metal027_2K-JPG_Color.jpg",
+    "Displacement": "materials/Metal027/Metal027_2K-JPG_Displacement.jpg",
+    "Metalness": "materials/Metal027/Metal027_2K-JPG_Metalness.jpg",
+    "NormalGL": "materials/Metal027/Metal027_2K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Metal027/Metal027_2K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Metal027/Metal027_2K-JPG.zip",
+   "source": "https://ambientcg.com/a/Metal027",
+   "license": "CC0-1.0"
+  },
+  "Metal038": {
+   "group": "furniture/metal",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Metal038/Metal038_1K-JPG_Color.jpg",
+    "Displacement": "materials/Metal038/Metal038_1K-JPG_Displacement.jpg",
+    "Metalness": "materials/Metal038/Metal038_1K-JPG_Metalness.jpg",
+    "NormalGL": "materials/Metal038/Metal038_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Metal038/Metal038_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Metal038/Metal038_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Metal038",
+   "license": "CC0-1.0"
+  },
+  "DiamondPlate009": {
+   "group": "furniture/metal",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/DiamondPlate009/DiamondPlate009_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/DiamondPlate009/DiamondPlate009_1K-JPG_Color.jpg",
+    "Displacement": "materials/DiamondPlate009/DiamondPlate009_1K-JPG_Displacement.jpg",
+    "Metalness": "materials/DiamondPlate009/DiamondPlate009_1K-JPG_Metalness.jpg",
+    "NormalGL": "materials/DiamondPlate009/DiamondPlate009_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/DiamondPlate009/DiamondPlate009_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/DiamondPlate009/DiamondPlate009_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/DiamondPlate009",
+   "license": "CC0-1.0"
+  },
+  "Plastic010": {
+   "group": "furniture/metal",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Plastic010/Plastic010_1K-JPG_Color.jpg",
+    "Displacement": "materials/Plastic010/Plastic010_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Plastic010/Plastic010_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Plastic010/Plastic010_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Plastic010/Plastic010_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Plastic010",
+   "license": "CC0-1.0"
+  },
+  "Fabric030": {
+   "group": "furniture/metal",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Fabric030/Fabric030_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Fabric030/Fabric030_1K-JPG_Color.jpg",
+    "Displacement": "materials/Fabric030/Fabric030_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Fabric030/Fabric030_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Fabric030/Fabric030_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Fabric030/Fabric030_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Fabric030",
+   "license": "CC0-1.0"
+  },
+  "Leather037": {
+   "group": "furniture/metal",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Leather037/Leather037_1K-JPG_Color.jpg",
+    "Displacement": "materials/Leather037/Leather037_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Leather037/Leather037_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Leather037/Leather037_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Leather037/Leather037_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Leather037",
+   "license": "CC0-1.0"
+  },
+  "Cork003": {
+   "group": "furniture/metal",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Cork003/Cork003_1K-JPG_Color.jpg",
+    "Displacement": "materials/Cork003/Cork003_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Cork003/Cork003_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Cork003/Cork003_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Cork003/Cork003_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Cork003",
+   "license": "CC0-1.0"
+  },
+  "Grass005": {
+   "group": "nature",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Grass005/Grass005_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Grass005/Grass005_1K-JPG_Color.jpg",
+    "Displacement": "materials/Grass005/Grass005_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Grass005/Grass005_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Grass005/Grass005_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Grass005/Grass005_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Grass005",
+   "license": "CC0-1.0"
+  },
+  "Snow010A": {
+   "group": "nature",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Snow010A/Snow010A_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Snow010A/Snow010A_1K-JPG_Color.jpg",
+    "Displacement": "materials/Snow010A/Snow010A_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Snow010A/Snow010A_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Snow010A/Snow010A_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Snow010A/Snow010A_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Snow010A",
+   "license": "CC0-1.0"
+  },
+  "Plaster003": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Plaster003/Plaster003_1K-JPG_Color.jpg",
+    "Displacement": "materials/Plaster003/Plaster003_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Plaster003/Plaster003_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Plaster003/Plaster003_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Plaster003/Plaster003_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Plaster003",
+   "license": "CC0-1.0"
+  },
+  "Fabric022": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Fabric022/Fabric022_1K-JPG_Color.jpg",
+    "Displacement": "materials/Fabric022/Fabric022_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Fabric022/Fabric022_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Fabric022/Fabric022_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Fabric022/Fabric022_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Fabric022",
+   "license": "CC0-1.0"
+  },
+  "Wallpaper002A": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Wallpaper002A/Wallpaper002A_1K-JPG_Color.jpg",
+    "Displacement": "materials/Wallpaper002A/Wallpaper002A_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Wallpaper002A/Wallpaper002A_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Wallpaper002A/Wallpaper002A_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Wallpaper002A/Wallpaper002A_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Wallpaper002A",
+   "license": "CC0-1.0"
+  },
+  "PaintedPlaster016": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/PaintedPlaster016/PaintedPlaster016_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/PaintedPlaster016/PaintedPlaster016_1K-JPG_Color.jpg",
+    "Displacement": "materials/PaintedPlaster016/PaintedPlaster016_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/PaintedPlaster016/PaintedPlaster016_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/PaintedPlaster016/PaintedPlaster016_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/PaintedPlaster016/PaintedPlaster016_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/PaintedPlaster016",
+   "license": "CC0-1.0"
+  },
+  "PaintedPlaster010": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/PaintedPlaster010/PaintedPlaster010_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/PaintedPlaster010/PaintedPlaster010_1K-JPG_Color.jpg",
+    "Displacement": "materials/PaintedPlaster010/PaintedPlaster010_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/PaintedPlaster010/PaintedPlaster010_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/PaintedPlaster010/PaintedPlaster010_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/PaintedPlaster010/PaintedPlaster010_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/PaintedPlaster010",
+   "license": "CC0-1.0"
+  },
+  "PaintedMetal004": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/PaintedMetal004/PaintedMetal004_1K-JPG_Color.jpg",
+    "Displacement": "materials/PaintedMetal004/PaintedMetal004_1K-JPG_Displacement.jpg",
+    "Metalness": "materials/PaintedMetal004/PaintedMetal004_1K-JPG_Metalness.jpg",
+    "NormalGL": "materials/PaintedMetal004/PaintedMetal004_1K-JPG_NormalGL.jpg",
+    "Opacity": "materials/PaintedMetal004/PaintedMetal004_1K-JPG_Opacity.jpg",
+    "Roughness": "materials/PaintedMetal004/PaintedMetal004_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/PaintedMetal004/PaintedMetal004_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/PaintedMetal004",
+   "license": "CC0-1.0"
+  },
+  "Terrazzo005": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Terrazzo005/Terrazzo005_1K-JPG_Color.jpg",
+    "Displacement": "materials/Terrazzo005/Terrazzo005_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Terrazzo005/Terrazzo005_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Terrazzo005/Terrazzo005_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Terrazzo005/Terrazzo005_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Terrazzo005",
+   "license": "CC0-1.0"
+  },
+  "Carpet003": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/Carpet003/Carpet003_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/Carpet003/Carpet003_1K-JPG_Color.jpg",
+    "Displacement": "materials/Carpet003/Carpet003_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Carpet003/Carpet003_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Carpet003/Carpet003_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Carpet003/Carpet003_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Carpet003",
+   "license": "CC0-1.0"
+  },
+  "Fabric027": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/Fabric027/Fabric027_1K-JPG_Color.jpg",
+    "Displacement": "materials/Fabric027/Fabric027_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/Fabric027/Fabric027_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/Fabric027/Fabric027_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/Fabric027/Fabric027_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/Fabric027",
+   "license": "CC0-1.0"
+  },
+  "PaintedMetal013": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/PaintedMetal013/PaintedMetal013_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/PaintedMetal013/PaintedMetal013_1K-JPG_Color.jpg",
+    "Displacement": "materials/PaintedMetal013/PaintedMetal013_1K-JPG_Displacement.jpg",
+    "Metalness": "materials/PaintedMetal013/PaintedMetal013_1K-JPG_Metalness.jpg",
+    "NormalGL": "materials/PaintedMetal013/PaintedMetal013_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/PaintedMetal013/PaintedMetal013_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/PaintedMetal013/PaintedMetal013_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/PaintedMetal013",
+   "license": "CC0-1.0"
+  },
+  "OfficeCeiling003": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/OfficeCeiling003/OfficeCeiling003_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/OfficeCeiling003/OfficeCeiling003_1K-JPG_Color.jpg",
+    "Displacement": "materials/OfficeCeiling003/OfficeCeiling003_1K-JPG_Displacement.jpg",
+    "Metalness": "materials/OfficeCeiling003/OfficeCeiling003_1K-JPG_Metalness.jpg",
+    "NormalGL": "materials/OfficeCeiling003/OfficeCeiling003_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/OfficeCeiling003/OfficeCeiling003_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/OfficeCeiling003/OfficeCeiling003_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/OfficeCeiling003",
+   "license": "CC0-1.0"
+  },
+  "OfficeCeiling006": {
+   "group": "acg",
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/OfficeCeiling006/OfficeCeiling006_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/OfficeCeiling006/OfficeCeiling006_1K-JPG_Color.jpg",
+    "Displacement": "materials/OfficeCeiling006/OfficeCeiling006_1K-JPG_Displacement.jpg",
+    "Metalness": "materials/OfficeCeiling006/OfficeCeiling006_1K-JPG_Metalness.jpg",
+    "NormalGL": "materials/OfficeCeiling006/OfficeCeiling006_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/OfficeCeiling006/OfficeCeiling006_1K-JPG_Roughness.jpg"
+   },
+   "zip": "materials/OfficeCeiling006/OfficeCeiling006_1K-JPG.zip",
+   "source": "https://ambientcg.com/a/OfficeCeiling006",
+   "license": "CC0-1.0"
+  }
+ },
+ "totalBytes": 16337565,
+ "textures": {
+  "linoleum_brown": {
+   "group": "linoleum",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/linoleum_brown/linoleum_brown_diff_1k.jpg",
+    "NormalGL": "textures/linoleum_brown/linoleum_brown_nor_gl_1k.jpg",
+    "Roughness": "textures/linoleum_brown/linoleum_brown_rough_1k.jpg",
+    "AmbientOcclusion": "textures/linoleum_brown/linoleum_brown_ao_1k.jpg",
+    "Displacement": "textures/linoleum_brown/linoleum_brown_disp_1k.jpg",
+    "ARM": "textures/linoleum_brown/linoleum_brown_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/linoleum_brown",
+   "license": "CC0-1.0",
+   "bytes": 3406207
+  },
+  "old_linoleum_flooring_01": {
+   "group": "linoleum",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/old_linoleum_flooring_01/old_linoleum_flooring_01_diff_1k.jpg",
+    "NormalGL": "textures/old_linoleum_flooring_01/old_linoleum_flooring_01_nor_gl_1k.jpg",
+    "Roughness": "textures/old_linoleum_flooring_01/old_linoleum_flooring_01_rough_1k.jpg",
+    "AmbientOcclusion": "textures/old_linoleum_flooring_01/old_linoleum_flooring_01_ao_1k.jpg",
+    "Displacement": "textures/old_linoleum_flooring_01/old_linoleum_flooring_01_disp_1k.jpg",
+    "ARM": "textures/old_linoleum_flooring_01/old_linoleum_flooring_01_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/old_linoleum_flooring_01",
+   "license": "CC0-1.0",
+   "bytes": 2801852
+  },
+  "dirty_carpet": {
+   "group": "carpet",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/dirty_carpet/dirty_carpet_diff_1k.jpg",
+    "NormalGL": "textures/dirty_carpet/dirty_carpet_nor_gl_1k.jpg",
+    "Roughness": "textures/dirty_carpet/dirty_carpet_rough_1k.jpg",
+    "AmbientOcclusion": "textures/dirty_carpet/dirty_carpet_ao_1k.jpg",
+    "Displacement": "textures/dirty_carpet/dirty_carpet_disp_1k.jpg",
+    "ARM": "textures/dirty_carpet/dirty_carpet_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/dirty_carpet",
+   "license": "CC0-1.0",
+   "bytes": 5191031
+  },
+  "beige_wall_001": {
+   "group": "wall",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/beige_wall_001/beige_wall_001_diff_1k.jpg",
+    "NormalGL": "textures/beige_wall_001/beige_wall_001_nor_gl_1k.jpg",
+    "Roughness": "textures/beige_wall_001/beige_wall_001_rough_1k.jpg",
+    "AmbientOcclusion": "textures/beige_wall_001/beige_wall_001_ao_1k.jpg",
+    "Displacement": "textures/beige_wall_001/beige_wall_001_disp_1k.jpg",
+    "ARM": "textures/beige_wall_001/beige_wall_001_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/beige_wall_001",
+   "license": "CC0-1.0",
+   "bytes": 694788
+  },
+  "beige_wall_002": {
+   "group": "wall",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/beige_wall_002/beige_wall_002_diff_1k.jpg",
+    "NormalGL": "textures/beige_wall_002/beige_wall_002_nor_gl_1k.jpg",
+    "Roughness": "textures/beige_wall_002/beige_wall_002_rough_1k.jpg",
+    "AmbientOcclusion": "textures/beige_wall_002/beige_wall_002_ao_1k.jpg",
+    "Displacement": "textures/beige_wall_002/beige_wall_002_disp_1k.jpg",
+    "ARM": "textures/beige_wall_002/beige_wall_002_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/beige_wall_002",
+   "license": "CC0-1.0",
+   "bytes": 268122
+  },
+  "painted_plaster_wall": {
+   "group": "wall",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/painted_plaster_wall/painted_plaster_wall_diff_1k.jpg",
+    "NormalGL": "textures/painted_plaster_wall/painted_plaster_wall_nor_gl_1k.jpg",
+    "Roughness": "textures/painted_plaster_wall/painted_plaster_wall_rough_1k.jpg",
+    "AmbientOcclusion": "textures/painted_plaster_wall/painted_plaster_wall_ao_1k.jpg",
+    "Displacement": "textures/painted_plaster_wall/painted_plaster_wall_disp_1k.jpg",
+    "ARM": "textures/painted_plaster_wall/painted_plaster_wall_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/painted_plaster_wall",
+   "license": "CC0-1.0",
+   "bytes": 3476266
+  },
+  "concrete_floor_worn_001": {
+   "group": "concrete",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/concrete_floor_worn_001/concrete_floor_worn_001_diff_1k.jpg",
+    "NormalGL": "textures/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_1k.jpg",
+    "Roughness": "textures/concrete_floor_worn_001/concrete_floor_worn_001_rough_1k.jpg",
+    "AmbientOcclusion": "textures/concrete_floor_worn_001/concrete_floor_worn_001_ao_1k.jpg",
+    "Displacement": "textures/concrete_floor_worn_001/concrete_floor_worn_001_disp_1k.jpg",
+    "ARM": "textures/concrete_floor_worn_001/concrete_floor_worn_001_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/concrete_floor_worn_001",
+   "license": "CC0-1.0",
+   "bytes": 839784
+  },
+  "painted_concrete": {
+   "group": "concrete",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/painted_concrete/painted_concrete_diff_1k.jpg",
+    "NormalGL": "textures/painted_concrete/painted_concrete_nor_gl_1k.jpg",
+    "Roughness": "textures/painted_concrete/painted_concrete_rough_1k.jpg",
+    "AmbientOcclusion": "textures/painted_concrete/painted_concrete_ao_1k.jpg",
+    "Displacement": "textures/painted_concrete/painted_concrete_disp_1k.jpg",
+    "ARM": "textures/painted_concrete/painted_concrete_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/painted_concrete",
+   "license": "CC0-1.0",
+   "bytes": 4055540
+  },
+  "dirty_tiles": {
+   "group": "tile",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/dirty_tiles/dirty_tiles_diff_1k.jpg",
+    "NormalGL": "textures/dirty_tiles/dirty_tiles_nor_gl_1k.jpg",
+    "Roughness": "textures/dirty_tiles/dirty_tiles_rough_1k.jpg",
+    "AmbientOcclusion": "textures/dirty_tiles/dirty_tiles_ao_1k.jpg",
+    "Displacement": "textures/dirty_tiles/dirty_tiles_disp_1k.jpg",
+    "ARM": "textures/dirty_tiles/dirty_tiles_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/dirty_tiles",
+   "license": "CC0-1.0",
+   "bytes": 2717338
+  },
+  "floor_tiles_06": {
+   "group": "tile",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/floor_tiles_06/floor_tiles_06_diff_1k.jpg",
+    "NormalGL": "textures/floor_tiles_06/floor_tiles_06_nor_gl_1k.jpg",
+    "Roughness": "textures/floor_tiles_06/floor_tiles_06_rough_1k.jpg",
+    "AmbientOcclusion": "textures/floor_tiles_06/floor_tiles_06_ao_1k.jpg",
+    "Displacement": "textures/floor_tiles_06/floor_tiles_06_disp_1k.jpg",
+    "ARM": "textures/floor_tiles_06/floor_tiles_06_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/floor_tiles_06",
+   "license": "CC0-1.0",
+   "bytes": 931240
+  },
+  "laminate_floor_02": {
+   "group": "wood",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/laminate_floor_02/laminate_floor_02_diff_1k.jpg",
+    "NormalGL": "textures/laminate_floor_02/laminate_floor_02_nor_gl_1k.jpg",
+    "Roughness": "textures/laminate_floor_02/laminate_floor_02_rough_1k.jpg",
+    "AmbientOcclusion": "textures/laminate_floor_02/laminate_floor_02_ao_1k.jpg",
+    "Displacement": "textures/laminate_floor_02/laminate_floor_02_disp_1k.jpg",
+    "ARM": "textures/laminate_floor_02/laminate_floor_02_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/laminate_floor_02",
+   "license": "CC0-1.0",
+   "bytes": 3357742
+  },
+  "american_walnut_veneer": {
+   "group": "wood",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/american_walnut_veneer/american_walnut_veneer_diff_1k.jpg",
+    "NormalGL": "textures/american_walnut_veneer/american_walnut_veneer_nor_gl_1k.jpg",
+    "Roughness": "textures/american_walnut_veneer/american_walnut_veneer_rough_1k.jpg",
+    "AmbientOcclusion": "textures/american_walnut_veneer/american_walnut_veneer_ao_1k.jpg",
+    "Displacement": "textures/american_walnut_veneer/american_walnut_veneer_disp_1k.jpg",
+    "ARM": "textures/american_walnut_veneer/american_walnut_veneer_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/american_walnut_veneer",
+   "license": "CC0-1.0",
+   "bytes": 3198136
+  },
+  "dark_paneled_wood": {
+   "group": "wood",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/dark_paneled_wood/dark_paneled_wood_diff_1k.jpg",
+    "NormalGL": "textures/dark_paneled_wood/dark_paneled_wood_nor_gl_1k.jpg",
+    "Roughness": "textures/dark_paneled_wood/dark_paneled_wood_rough_1k.jpg",
+    "AmbientOcclusion": "textures/dark_paneled_wood/dark_paneled_wood_ao_1k.jpg",
+    "Displacement": "textures/dark_paneled_wood/dark_paneled_wood_disp_1k.jpg",
+    "ARM": "textures/dark_paneled_wood/dark_paneled_wood_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/dark_paneled_wood",
+   "license": "CC0-1.0",
+   "bytes": 3831257
+  },
+  "metal_plate": {
+   "group": "metal",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/metal_plate/metal_plate_diff_1k.jpg",
+    "NormalGL": "textures/metal_plate/metal_plate_nor_gl_1k.jpg",
+    "Roughness": "textures/metal_plate/metal_plate_rough_1k.jpg",
+    "AmbientOcclusion": "textures/metal_plate/metal_plate_ao_1k.jpg",
+    "Displacement": "textures/metal_plate/metal_plate_disp_1k.jpg",
+    "ARM": "textures/metal_plate/metal_plate_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/metal_plate",
+   "license": "CC0-1.0",
+   "bytes": 4185349
+  },
+  "rubber_tiles": {
+   "group": "rubber",
+   "resolution": "1k",
+   "maps": {
+    "Color": "textures/rubber_tiles/rubber_tiles_diff_1k.jpg",
+    "NormalGL": "textures/rubber_tiles/rubber_tiles_nor_gl_1k.jpg",
+    "Roughness": "textures/rubber_tiles/rubber_tiles_rough_1k.jpg",
+    "AmbientOcclusion": "textures/rubber_tiles/rubber_tiles_ao_1k.jpg",
+    "Displacement": "textures/rubber_tiles/rubber_tiles_disp_1k.jpg",
+    "ARM": "textures/rubber_tiles/rubber_tiles_arm_1k.jpg"
+   },
+   "source": "https://polyhaven.com/a/rubber_tiles",
+   "license": "CC0-1.0",
+   "bytes": 2505100
+  }
+ }
+}

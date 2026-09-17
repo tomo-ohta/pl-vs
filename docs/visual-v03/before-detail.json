@@ -1,0 +1,48 @@
+{
+  "revision": "corridor-material-lighting-1",
+  "room": "C02",
+  "seed": 42,
+  "variant": 0,
+  "view": "detail",
+  "quality": "high",
+  "doorsOpen": false,
+  "exposure": 1.25,
+  "diagnostic": "beauty",
+  "time": 0,
+  "camera": {
+    "position": [
+      -0.7,
+      1.6,
+      2.5
+    ],
+    "quaternion": [
+      -0.050543632308970285,
+      0.8698754306885682,
+      0.09119322938666044,
+      0.48212640586409045
+    ],
+    "fov": 72
+  },
+  "viewport": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "generationMs": 23.59999990463257,
+  "calls": 10,
+  "triangles": 3860,
+  "memoryCounts": {
+    "geometries": 10,
+    "textures": 14
+  },
+  "measurement": null,
+  "referenceRooms": [
+    "C02",
+    "C06",
+    "C13",
+    "C18",
+    "C20",
+    "U10"
+  ]
+}

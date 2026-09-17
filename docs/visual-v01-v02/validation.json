@@ -1,0 +1,106 @@
+{
+  "revision": "v01-v02-complete-1",
+  "shaderCases": 406,
+  "shaderErrors": [],
+  "roomCaptureCount": 32,
+  "lightingCaptureCount": 3,
+  "mirroredUVCaptureCount": 2,
+  "restorePNGIdentical": true,
+  "restoreSHA1": "58f344291f986e1612b481eda8e4aa7be312eb3a",
+  "materialCount": 58,
+  "detailFamilies": 16,
+  "roomInventory": {
+    "C02": [
+      "floorCarpetGrey",
+      "ceilingTile",
+      "wallWhite",
+      "glass",
+      "lightPanel",
+      "lightOff"
+    ],
+    "C13": [
+      "floorConcrete",
+      "ceilingDark",
+      "wallConcrete",
+      "shelfMetal",
+      "boxCardboard",
+      "columnConcrete",
+      "lightPanel",
+      "lightOff"
+    ],
+    "R01": [
+      "floorTile",
+      "ceilingWhite",
+      "waterShallow",
+      "trim",
+      "columnConcrete",
+      "wallDark",
+      "metal",
+      "wallWhite",
+      "lightPanel"
+    ],
+    "U10": [
+      "floorWood",
+      "ceilingWhite",
+      "wallCream",
+      "lightPanel",
+      "wallGreen",
+      "furnitureDark",
+      "furnitureLight"
+    ],
+    "C20": [
+      "floorConcrete",
+      "ceilingDark",
+      "metal",
+      "wallConcrete",
+      "lightWarm",
+      "lightPanel"
+    ],
+    "C06": [
+      "floorConcrete",
+      "ceilingDark",
+      "wallConcrete",
+      "columnConcrete",
+      "yellowLine",
+      "wallWhite",
+      "lightPanel",
+      "lightOff",
+      "carPaint",
+      "carGlass",
+      "rubber",
+      "doorMetal"
+    ],
+    "R07": [
+      "floorConcrete",
+      "glass",
+      "plant",
+      "lightPanel",
+      "lightOff"
+    ],
+    "C18": [
+      "floorTile",
+      "ceilingWhite",
+      "wallCream",
+      "columnConcrete",
+      "trim",
+      "furnitureLight",
+      "plant",
+      "furnitureDark",
+      "lightWarm",
+      "metal",
+      "lightPanel"
+    ]
+  },
+  "tests": [
+    "typecheck",
+    "production build",
+    "surface-detail.mjs",
+    "surface-appearance.mjs"
+  ],
+  "limitations": [
+    "Not all-map gameplay audit",
+    "No mobile GPU benchmark",
+    "Authored microstructure, not measured PBR",
+    "Water reflection/depth and foliage silhouette remain V06/V05 work"
+  ]
+}

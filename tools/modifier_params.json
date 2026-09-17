@@ -1,0 +1,599 @@
+{
+  "C11": {
+    "SurfaceFriction": {
+      "friction": 0.6
+    }
+  },
+  "U01": {
+    "LightingPhase": {
+      "mode": "seedPhase"
+    }
+  },
+  "U02": {
+    "DuplicateNumber": {
+      "duplicateRate": 0.5
+    }
+  },
+  "U03": {
+    "ExternalForce": {
+      "mode": "conveyor",
+      "speed": 0.8
+    }
+  },
+  "U04": {
+    "FakeSignage": {
+      "mode": "blank",
+      "target": "productLabel"
+    }
+  },
+  "U05": {
+    "FakeSignage": {
+      "mode": "misleading",
+      "target": "exitSign"
+    }
+  },
+  "U06": {
+    "FakeSignage": {
+      "mode": "fixedTime",
+      "time": "3:17"
+    }
+  },
+  "U07": {
+    "ParticleDetail": {
+      "type": "rain",
+      "density": 0.5
+    },
+    "Wetness": {
+      "wetness": 0.6
+    }
+  },
+  "U08": {
+    "Wetness": {
+      "wetness": 0.8
+    },
+    "SurfaceFriction": {
+      "friction": 0.5
+    }
+  },
+  "U09": {
+    "MirrorOffset": {
+      "offset": 0.3,
+      "delay": 0.5
+    }
+  },
+  "U10": {
+    "PropOrientation": {
+      "facing": "wall"
+    }
+  },
+  "U11": {
+    "PropRepetition": {
+      "propId": "luggage",
+      "density": 0.8
+    }
+  },
+  "U12": {
+    "ParticleDetail": {
+      "type": "steam",
+      "density": 0.3
+    }
+  },
+  "U13": {
+    "Wetness": {
+      "wetness": 0.4
+    },
+    "FogDepth": {
+      "color": "#bfe6e6",
+      "near": 8,
+      "far": 40
+    }
+  },
+  "U14": {
+    "AudioEvent": {
+      "mode": "beacon",
+      "sound": "phoneRing"
+    }
+  },
+  "U15": {
+    "PropRepetition": {
+      "propId": "sameProduct",
+      "density": 1.0
+    }
+  },
+  "U16": {
+    "DuplicateNumber": {
+      "mode": "skipAndDuplicate"
+    }
+  },
+  "U17": {
+    "FakeSignage": {
+      "mode": "blank",
+      "target": "nameTag"
+    }
+  },
+  "U18": {
+    "RepeatDestination": {
+      "repeatCount": 3
+    }
+  },
+  "U19": {
+    "AudioEvent": {
+      "mode": "oneShot",
+      "sound": "children",
+      "interval": 20
+    }
+  },
+  "U20": {
+    "FakeSky": {
+      "skyPreset": "dusk"
+    }
+  },
+  "R01": {
+    "ShallowWater": {
+      "depth": 0.25,
+      "slow": 0.7
+    }
+  },
+  "R02": {
+    "LightingPhase": {
+      "mode": "unpowered"
+    }
+  },
+  "R03": {
+    "PropRepetition": {
+      "propId": "banquetTable",
+      "density": 1.0
+    },
+    "FogDepth": {
+      "color": "#e8e0d0",
+      "near": 15,
+      "far": 60
+    }
+  },
+  "R04": {
+    "FakeSky": {
+      "skyPreset": "dusk"
+    }
+  },
+  "R05": {
+    "FogDepth": {
+      "color": "#0b0f1a",
+      "near": 5,
+      "far": 40
+    }
+  },
+  "R06": {
+    "FogDepth": {
+      "color": "#1a4a8a",
+      "near": 6,
+      "far": 35
+    }
+  },
+  "R07": {
+    "InstanceOvergrowth": {
+      "density": 0.7,
+      "blocksPath": true
+    }
+  },
+  "R08": {
+    "AudioEvent": {
+      "mode": "oneShot",
+      "sound": "pageTurn",
+      "interval": 12
+    }
+  },
+  "R09": {
+    "PastWindow": {
+      "mode": "screen",
+      "delaySec": 3,
+      "source": "theaterCamera"
+    }
+  },
+  "R10": {
+    "FakeSignage": {
+      "mode": "misleading",
+      "target": "flightBoard"
+    }
+  },
+  "R11": {
+    "EraPreset": {
+      "eras": [
+        "1970s",
+        "1990s",
+        "2010s"
+      ],
+      "segmentLength": 8
+    }
+  },
+  "R13": {
+    "ScaleAnomaly": {
+      "mode": "room",
+      "scale": 3.0
+    }
+  },
+  "R14": {
+    "ShallowWater": {
+      "depth": 0.3,
+      "slow": 0.7
+    }
+  },
+  "R15": {
+    "MaterialGradient": {
+      "from": "concrete",
+      "to": "carpet",
+      "axis": "forward"
+    }
+  },
+  "R16": {
+    "ScaleAnomaly": {
+      "mode": "perProp",
+      "min": 0.5,
+      "max": 2.0,
+      "smallDoor": "crawl"
+    }
+  },
+  "R17": {
+    "RepeatDestination": {
+      "repeatCount": 4
+    }
+  },
+  "R18": {
+    "ExternalForce": {
+      "mode": "wind",
+      "speed": 2.5
+    }
+  },
+  "R19": {
+    "ParticleDetail": {
+      "type": "steam",
+      "density": 0.2,
+      "respawn": true
+    }
+  },
+  "R20": {
+    "PropRepetition": {
+      "propId": "storageDoor",
+      "density": 1.0
+    },
+    "DuplicateNumber": {
+      "duplicateRate": 0.3
+    }
+  },
+  "E01": {
+    "LoopTopology": {
+      "loopLength": 3
+    }
+  },
+  "E02": {
+    "EraPreset": {
+      "eras": [
+        "1960s",
+        "1980s",
+        "2000s",
+        "2020s"
+      ],
+      "segmentLength": 1
+    }
+  },
+  "E03": {
+    "GravityAxis": {
+      "mode": "fixed",
+      "upVector": [
+        1,
+        0,
+        0
+      ],
+      "visualOnly": true,
+      "rollDeg": 90,
+      "floorDoors": "hole",
+      "wallDoors": "slot"
+    }
+  },
+  "E04": {
+    "FakeSky": {
+      "skyPreset": "noonSun"
+    },
+    "LightingPhase": {
+      "mode": "daylight"
+    }
+  },
+  "E07": {
+    "ObservationRewire": {
+      "rewireRate": 0.5
+    }
+  },
+  "E08": {
+    "NonEuclideanVolume": {
+      "interiorScale": 4.0
+    }
+  },
+  "E09": {
+    "WaterWall": {
+      "height": 3.0
+    }
+  },
+  "E10": {
+    "GravityAxis": {
+      "mode": "pathFollow"
+    }
+  },
+  "E11": {
+    "VehicleRide": {
+      "vehicleType": "train",
+      "durationSec": 20,
+      "skipAfterSec": 5
+    }
+  },
+  "E12": {
+    "PastWindow": {
+      "mode": "window",
+      "historyDepthSec": 30,
+      "snapshotIntervalSec": 10,
+      "snapshotCount": 3
+    }
+  },
+  "E13": {
+    "DynamicLength": {
+      "rate": 0.5,
+      "min": 8,
+      "max": 60
+    }
+  },
+  "E14": {
+    "GraphReference": {
+      "mode": "adjacent",
+      "count": 4
+    }
+  },
+  "E15": {
+    "FakeSignage": {
+      "mode": "fractional",
+      "target": "floorLabel"
+    }
+  },
+  "E16": {
+    "FakeSignage": {
+      "mode": "misleading",
+      "truthRatio": 0.3
+    }
+  },
+  "E17": {
+    "NoiseGate": {
+      "thresholds": [
+        "still",
+        "walk",
+        "dash"
+      ],
+      "useMic": true
+    }
+  },
+  "E18": {
+    "MovingWalls": {
+      "speed": 0.2
+    }
+  },
+  "E20": {
+    "ColorMissing": {
+      "channel": "red"
+    }
+  },
+  "L01": {
+    "FogDepth": {
+      "color": "#2b2f4a",
+      "near": 10,
+      "far": 70
+    }
+  },
+  "L02": {
+    "ShallowWater": {
+      "depth": 0.5,
+      "slow": 0.7,
+      "pier": true
+    },
+    "VehicleRide": {
+      "vehicleType": "boat",
+      "durationSec": 25,
+      "skipAfterSec": 5
+    }
+  },
+  "L03": {
+    "InstanceOvergrowth": {
+      "propId": "wheat",
+      "density": 1.0
+    }
+  },
+  "L05": {
+    "ZoneThemeShuffle": {
+      "zoneCount": 6,
+      "presetPool": "campus"
+    }
+  },
+  "L08": {
+    "LoopTopology": {
+      "loopLength": 4
+    }
+  },
+  "L09": {
+    "Wetness": {
+      "wetness": 0.7
+    },
+    "ParticleDetail": {
+      "type": "mist",
+      "density": 0.5
+    }
+  },
+  "L10": {
+    "LightingPhase": {
+      "mode": "allWindowsLit"
+    }
+  },
+  "L11": {
+    "VehicleRide": {
+      "vehicleType": "monorail",
+      "durationSec": 30,
+      "skipAfterSec": 5
+    },
+    "LoopTopology": {
+      "loopLength": 1
+    }
+  },
+  "L12": {
+    "ScaleAnomaly": {
+      "mode": "perProp",
+      "min": 3,
+      "max": 8
+    }
+  },
+  "L13": {
+    "PropRepetition": {
+      "propId": "serverRack",
+      "density": 1.0
+    }
+  },
+  "L14": {
+    "InstanceOvergrowth": {
+      "density": 0.9,
+      "blocksPath": true
+    }
+  },
+  "L15": {
+    "ExternalForce": {
+      "mode": "conveyor",
+      "speed": 6.0
+    }
+  },
+  "L16": {
+    "GraphReference": {
+      "mode": "past",
+      "count": 8
+    }
+  },
+  "L17": {
+    "PropRepetition": {
+      "propId": "apartmentBlock",
+      "density": 1.0
+    },
+    "ScaleAnomaly": {
+      "mode": "room",
+      "scale": 1.5
+    }
+  },
+  "L19": {
+    "SurfaceFriction": {
+      "friction": 0.2
+    },
+    "FogDepth": {
+      "color": "#dfe7ee",
+      "near": 10,
+      "far": 80
+    },
+    "ParticleDetail": {
+      "type": "snow",
+      "density": 0.3
+    }
+  },
+  "L20": {
+    "ZoneThemeShuffle": {
+      "zoneCount": 8,
+      "presetPool": "any"
+    }
+  },
+  "M02": {
+    "MapErase": {
+      "hidePolicy": "self"
+    }
+  },
+  "M03": {
+    "DynamicMapNode": {
+      "swapIntervalSec": 45
+    }
+  },
+  "M04": {
+    "FakeExit": {
+      "returnDepth": 3,
+      "showEndingOverlay": true
+    }
+  },
+  "M06": {
+    "DiscoveryGate": {
+      "threshold": 100
+    }
+  },
+  "M07": {
+    "DynamicMapNode": {
+      "swapIntervalSec": 20
+    },
+    "MovingWalls": {
+      "speed": 0.5
+    }
+  },
+  "M08": {
+    "FarLink": {
+      "minGraphDistance": 30
+    }
+  },
+  "M10": {
+    "RewindState": {
+      "seconds": 20
+    }
+  },
+  "M11": {
+    "MultiEdge": {
+      "edgeCount": 4
+    }
+  },
+  "M12": {
+    "ScaleAnomaly": {
+      "mode": "room",
+      "scale": 4.0
+    }
+  },
+  "M13": {
+    "RenderStyle": {
+      "style": "untextured"
+    }
+  },
+  "M14": {
+    "LightingPhase": {
+      "mode": "singleLight"
+    },
+    "FogDepth": {
+      "color": "#000000",
+      "near": 2,
+      "far": 18
+    }
+  },
+  "M15": {
+    "RenderStyle": {
+      "style": "backside"
+    }
+  },
+  "M16": {
+    "GraphReference": {
+      "mode": "past",
+      "count": 12
+    }
+  },
+  "M17": {
+    "RenderStyle": {
+      "style": "legacy"
+    }
+  },
+  "M18": {
+    "AmbientCarryover": {
+      "source": "lastVisited"
+    }
+  },
+  "M19": {
+    "MapRotation": {
+      "angle": 90,
+      "drift": true
+    }
+  },
+  "M20": {
+    "FarLink": {
+      "targetFilter": "discoveredLegendary",
+      "count": 4
+    }
+  }
+}

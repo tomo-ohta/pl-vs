@@ -1,0 +1,16 @@
+{
+  "seed": 42,
+  "revision": "corridor-material-lighting-1",
+  "definitions": 122,
+  "roomDefinitions": 118,
+  "implementedDefinitions": 98,
+  "variants": 244,
+  "qualityLevels": 3,
+  "materials": 38,
+  "failures": [],
+  "shaderErrors": [],
+  "textureErrors": [],
+  "geometriesBefore": 20,
+  "geometriesAfterDispose": 0,
+  "maxTriangles": 51156
+}

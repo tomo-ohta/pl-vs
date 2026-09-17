@@ -1,0 +1,13 @@
+{
+  "baseline": {
+    "src/render/SurfaceGeometry.ts": "36f9efd56c6642a26561c14e11e047e2a62ade1e2b2b9ec3628a8eeba26e4428",
+    "src/render/MaterialLibrary.ts": "fa98ee3e2e33c4806f9894115e48d6487b7727b678e32d5f0ef60df340ad4d49",
+    "src/dev/VisualReview.ts": "a6fd525925f8113839140560337eebfe2a0942e48499360fe7261181190b5d25"
+  },
+  "integrated": {
+    "src/render/SurfaceGeometry.ts": "6c3e001a07d24cf8bfad3896d8341c17bef51cbeeb714da2416a81b09ee3a640",
+    "src/render/MaterialLibrary.ts": "364cfd4c992189feaa7a917e8affef701c287b1aec3bb6a5e8c5883568a15b38",
+    "src/dev/VisualReview.ts": "7b9b9af62b4255c43a3308c63e23173fc221d5b0f8026f841916e9223b00d078"
+  },
+  "note": "Shared-file edits are imports/hooks only; compare with current content before editing. No repository reset or rollback performed."
+}

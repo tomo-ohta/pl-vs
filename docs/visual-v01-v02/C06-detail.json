@@ -1,0 +1,74 @@
+{
+  "surfaceRevision": "surface-environment-1",
+  "surfaceEnvironment": true,
+  "surfaceWear": true,
+  "surfaceVariation": true,
+  "revision": "v01-v02-complete-1",
+  "room": "C06",
+  "seed": 42,
+  "variant": 0,
+  "view": "detail",
+  "quality": "high",
+  "doorsOpen": false,
+  "exposure": 1.25,
+  "diagnostic": "beauty",
+  "time": 0,
+  "camera": {
+    "position": [
+      -11.453249991672612,
+      0.9500000000000001,
+      5.579270416830546
+    ],
+    "quaternion": [
+      -0.060117742538853276,
+      0.3726419104413285,
+      0.024200236340194806,
+      0.9257095722610561
+    ],
+    "fov": 72
+  },
+  "imagingPreset": "off",
+  "device": {
+    "platform": "MacIntel",
+    "cores": 10
+  },
+  "materialIds": [
+    "floorConcrete",
+    "ceilingDark",
+    "wallConcrete",
+    "columnConcrete",
+    "yellowLine",
+    "wallWhite",
+    "lightPanel",
+    "lightOff",
+    "carPaint",
+    "carGlass",
+    "rubber",
+    "doorMetal"
+  ],
+  "lighting": "scene",
+  "viewport": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "generationMs": 63.299999952316284,
+  "calls": 35,
+  "triangles": 28220,
+  "memoryCounts": {
+    "geometries": 18,
+    "textures": 40
+  },
+  "measurement": null,
+  "referenceRooms": [
+    "C02",
+    "C06",
+    "C13",
+    "C18",
+    "C20",
+    "U10",
+    "R01",
+    "R07"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "revision": "surface-wear-1",
+  "date": "2026-09-16",
+  "seed": 42,
+  "variant": 0,
+  "shaderCompatibility": {
+    "cases": 49,
+    "errors": []
+  },
+  "renderSmoke": {
+    "rooms": [
+      "C02",
+      "C06",
+      "C18",
+      "R01",
+      "L02",
+      "M17"
+    ],
+    "tiers": [
+      "high",
+      "mid",
+      "low"
+    ],
+    "cases": 18,
+    "consoleErrors": [],
+    "textureLoadErrors": 0
+  },
+  "gameBoot": "C02 loaded; no console errors",
+  "rebuild": {
+    "comparison": "C02 door view after other room/tier rebuilds",
+    "pngIdentical": true,
+    "sha1": "47bd9f9d0c643035889866b1eaeb33c9892ddd57"
+  },
+  "limitations": [
+    "No full-map audit this iteration",
+    "No gameplay save/load traversal test",
+    "No GPU timing or mobile performance certification"
+  ]
+}

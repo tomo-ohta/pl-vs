@@ -1,0 +1,77 @@
+:root {
+  --ui-bg: rgba(10, 12, 18, 0.72);
+  --ui-fg: #e6e8ee;
+  --ui-dim: #9aa3b2;
+  --accent: #f2c14e;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  background: #000; color: var(--ui-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none;
+  overscroll-behavior: none;
+}
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+#hud { position: fixed; left: 12px; top: 12px; pointer-events: none; text-shadow: 0 1px 2px #000; }
+#hud-room { font-size: 14px; }
+#hud-room .rar { color: var(--accent); margin-left: 6px; font-size: 12px; }
+#hud-count { font-size: 12px; color: var(--ui-dim); margin-top: 2px; }
+#hud-hint { position: fixed; left: 50%; top: 58%; transform: translateX(-50%); font-size: 14px; color: var(--ui-fg); background: var(--ui-bg); padding: 4px 10px; border-radius: 6px; }
+#hud-hint:empty { display: none; }
+
+#minimap { position: fixed; right: 12px; bottom: 12px; width: 180px; height: 180px; background: rgba(10,12,18,0.6); border-radius: 8px; pointer-events: none; }
+#reticle { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,0.75); pointer-events: none; }
+#debug { position: fixed; right: 12px; top: 12px; font: 11px/1.4 ui-monospace, Menlo, monospace; color: #cfd6e4; background: var(--ui-bg); padding: 6px 8px; border-radius: 6px; white-space: pre; pointer-events: none; }
+#fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.25s linear; }
+
+/* overlays */
+#start, #menu {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.72); z-index: 20;
+}
+.panel {
+  background: rgba(16, 18, 26, 0.96); border: 1px solid #2a2f3d; border-radius: 12px;
+  padding: 20px 24px; max-width: min(92vw, 720px); max-height: 92vh; overflow: auto; text-align: center;
+}
+.panel h1 { letter-spacing: 0.4em; margin: 0 0 8px; font-weight: 300; }
+.panel h2 { margin: 0 0 12px; font-weight: 500; }
+.panel .small { font-size: 12px; color: var(--ui-dim); }
+.panel .row { display: flex; justify-content: space-between; gap: 16px; padding: 4px 0; font-size: 14px; }
+.panel .mono { font-family: ui-monospace, Menlo, monospace; }
+.panel select { background: #1c2030; color: var(--ui-fg); border: 1px solid #3a4054; border-radius: 6px; padding: 2px 6px; }
+#fullmap, #map3d { width: 100%; max-width: 640px; height: auto; background: #0b0d14; border-radius: 8px; margin: 10px 0; touch-action: none; }
+#map-tabs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+#map-tabs button { background: #1c2030; color: var(--ui-fg); border: 1px solid #3a4054; border-radius: 8px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+#map-tabs button.active { border-color: var(--accent); color: var(--accent); }
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.buttons button, .tbtn {
+  background: #1c2030; color: var(--ui-fg); border: 1px solid #3a4054; border-radius: 8px;
+  padding: 8px 14px; font-size: 14px; cursor: pointer;
+}
+.buttons button:hover { border-color: var(--accent); }
+
+/* touch UI */
+#touch-ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+#stick {
+  position: absolute; left: 28px; bottom: 28px; width: 132px; height: 132px; border-radius: 50%;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.25); pointer-events: auto; touch-action: none;
+}
+#stick-knob {
+  position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
+  background: rgba(255,255,255,0.35); pointer-events: none;
+}
+.tbtn { position: absolute; pointer-events: auto; touch-action: none; width: 72px; height: 72px; border-radius: 50%; font-size: 12px; letter-spacing: 0.1em; }
+#btn-dash { right: 28px; bottom: 28px; }
+#btn-jump { right: 28px; bottom: 116px; }
+#btn-crouch { right: 28px; bottom: 204px; }
+#btn-menu { right: 12px; top: 12px; width: 44px; height: 44px; border-radius: 10px; font-size: 20px; }
+.tbtn.active { background: rgba(242, 193, 78, 0.35); border-color: var(--accent); }
+/* しゃがみトグルは点灯を強めて状態を分かりやすくする */
+#btn-crouch.active { background: rgba(242, 193, 78, 0.5); color: #1a1408; }
+
+/* 設定パネルの差し込み口（中身は SettingsPanel が生成） */
+#settings-slot { margin: 8px 0; text-align: left; }
+#settings-slot:empty { display: none; }

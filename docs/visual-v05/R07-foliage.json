@@ -1,0 +1,74 @@
+{
+  "props": {
+    "modelInstances": {},
+    "modelPartInstances": {},
+    "errors": [],
+    "vehicles": 0
+  },
+  "surfaceRevision": "surface-environment-1",
+  "surfaceEnvironment": true,
+  "surfaceWear": true,
+  "surfaceVariation": true,
+  "revision": "v01-v02-complete-1",
+  "room": "R07",
+  "seed": 42,
+  "variant": 0,
+  "view": "plant",
+  "quality": "high",
+  "doorsOpen": false,
+  "exposure": 1.25,
+  "diagnostic": "beauty",
+  "time": 0,
+  "camera": {
+    "position": [
+      -2.1545058977904485,
+      1.25,
+      12.820187406741383
+    ],
+    "quaternion": [
+      -0.11696163595053229,
+      0.46859992998413064,
+      0.06275400462846246,
+      0.8733819417859142
+    ],
+    "fov": 72
+  },
+  "imagingPreset": "off",
+  "mirroredUV": false,
+  "device": {
+    "platform": "MacIntel",
+    "cores": 10
+  },
+  "materialIds": [
+    "floorConcrete",
+    "glass",
+    "plant",
+    "skyOvercast",
+    "shelfMetal"
+  ],
+  "lighting": "scene",
+  "viewport": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "generationMs": 348,
+  "calls": 34,
+  "triangles": 787454,
+  "memoryCounts": {
+    "geometries": 41,
+    "textures": 55
+  },
+  "measurement": null,
+  "referenceRooms": [
+    "C02",
+    "C06",
+    "C13",
+    "C18",
+    "C20",
+    "U10",
+    "R01",
+    "R07"
+  ]
+}

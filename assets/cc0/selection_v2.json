@@ -1,0 +1,552 @@
+{
+ "phTextures": {
+  "linoleum_brown": {
+   "group": "linoleum",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/linoleum_brown/linoleum_brown_diff_1k.jpg",
+     "size": 684269
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/linoleum_brown/linoleum_brown_nor_gl_1k.jpg",
+     "size": 555729
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/linoleum_brown/linoleum_brown_rough_1k.jpg",
+     "size": 617859
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/linoleum_brown/linoleum_brown_ao_1k.jpg",
+     "size": 609853
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/linoleum_brown/linoleum_brown_disp_1k.jpg",
+     "size": 244355
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/linoleum_brown/linoleum_brown_arm_1k.jpg",
+     "size": 694142
+    }
+   },
+   "size": 3406207
+  },
+  "old_linoleum_flooring_01": {
+   "group": "linoleum",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/old_linoleum_flooring_01/old_linoleum_flooring_01_diff_1k.jpg",
+     "size": 677917
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/old_linoleum_flooring_01/old_linoleum_flooring_01_nor_gl_1k.jpg",
+     "size": 387519
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/old_linoleum_flooring_01/old_linoleum_flooring_01_rough_1k.jpg",
+     "size": 461548
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/old_linoleum_flooring_01/old_linoleum_flooring_01_ao_1k.jpg",
+     "size": 342673
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/old_linoleum_flooring_01/old_linoleum_flooring_01_disp_1k.jpg",
+     "size": 436188
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/old_linoleum_flooring_01/old_linoleum_flooring_01_arm_1k.jpg",
+     "size": 496007
+    }
+   },
+   "size": 2801852
+  },
+  "dirty_carpet": {
+   "group": "carpet",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_carpet/dirty_carpet_diff_1k.jpg",
+     "size": 978020
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_carpet/dirty_carpet_nor_gl_1k.jpg",
+     "size": 1089297
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_carpet/dirty_carpet_rough_1k.jpg",
+     "size": 434062
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_carpet/dirty_carpet_ao_1k.jpg",
+     "size": 1157894
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_carpet/dirty_carpet_disp_1k.jpg",
+     "size": 477077
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_carpet/dirty_carpet_arm_1k.jpg",
+     "size": 1054681
+    }
+   },
+   "size": 5191031
+  },
+  "beige_wall_001": {
+   "group": "wall",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_001/beige_wall_001_diff_1k.jpg",
+     "size": 33074
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_001/beige_wall_001_nor_gl_1k.jpg",
+     "size": 153434
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_001/beige_wall_001_rough_1k.jpg",
+     "size": 151256
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_001/beige_wall_001_ao_1k.jpg",
+     "size": 120414
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_001/beige_wall_001_disp_1k.jpg",
+     "size": 149252
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_001/beige_wall_001_arm_1k.jpg",
+     "size": 87358
+    }
+   },
+   "size": 694788
+  },
+  "beige_wall_002": {
+   "group": "wall",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_002/beige_wall_002_diff_1k.jpg",
+     "size": 33581
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_002/beige_wall_002_nor_gl_1k.jpg",
+     "size": 71919
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_002/beige_wall_002_rough_1k.jpg",
+     "size": 30841
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_002/beige_wall_002_ao_1k.jpg",
+     "size": 50406
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_002/beige_wall_002_disp_1k.jpg",
+     "size": 52094
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_002/beige_wall_002_arm_1k.jpg",
+     "size": 29281
+    }
+   },
+   "size": 268122
+  },
+  "painted_plaster_wall": {
+   "group": "wall",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_diff_1k.jpg",
+     "size": 686726
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_nor_gl_1k.jpg",
+     "size": 900461
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_rough_1k.jpg",
+     "size": 354762
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_ao_1k.jpg",
+     "size": 555806
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_disp_1k.jpg",
+     "size": 467406
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_arm_1k.jpg",
+     "size": 511105
+    }
+   },
+   "size": 3476266
+  },
+  "concrete_floor_worn_001": {
+   "group": "concrete",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_diff_1k.jpg",
+     "size": 118806
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_1k.jpg",
+     "size": 110906
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_rough_1k.jpg",
+     "size": 181942
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_ao_1k.jpg",
+     "size": 124987
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_disp_1k.jpg",
+     "size": 150224
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_arm_1k.jpg",
+     "size": 152919
+    }
+   },
+   "size": 839784
+  },
+  "painted_concrete": {
+   "group": "concrete",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_concrete/painted_concrete_diff_1k.jpg",
+     "size": 995059
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_concrete/painted_concrete_nor_gl_1k.jpg",
+     "size": 553139
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_concrete/painted_concrete_rough_1k.jpg",
+     "size": 420750
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_concrete/painted_concrete_ao_1k.jpg",
+     "size": 903855
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_concrete/painted_concrete_disp_1k.jpg",
+     "size": 313314
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_concrete/painted_concrete_arm_1k.jpg",
+     "size": 869423
+    }
+   },
+   "size": 4055540
+  },
+  "dirty_tiles": {
+   "group": "tile",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_tiles/dirty_tiles_diff_1k.jpg",
+     "size": 585084
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_tiles/dirty_tiles_nor_gl_1k.jpg",
+     "size": 543981
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_tiles/dirty_tiles_rough_1k.jpg",
+     "size": 555155
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_tiles/dirty_tiles_ao_1k.jpg",
+     "size": 261573
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_tiles/dirty_tiles_disp_1k.jpg",
+     "size": 151139
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirty_tiles/dirty_tiles_arm_1k.jpg",
+     "size": 620406
+    }
+   },
+   "size": 2717338
+  },
+  "floor_tiles_06": {
+   "group": "tile",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/floor_tiles_06/floor_tiles_06_diff_1k.jpg",
+     "size": 356257
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/floor_tiles_06/floor_tiles_06_nor_gl_1k.jpg",
+     "size": 121299
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/floor_tiles_06/floor_tiles_06_rough_1k.jpg",
+     "size": 114013
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/floor_tiles_06/floor_tiles_06_ao_1k.jpg",
+     "size": 196815
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/floor_tiles_06/floor_tiles_06_disp_1k.jpg",
+     "size": 87985
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/floor_tiles_06/floor_tiles_06_arm_1k.jpg",
+     "size": 54871
+    }
+   },
+   "size": 931240
+  },
+  "laminate_floor_02": {
+   "group": "wood",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/laminate_floor_02/laminate_floor_02_diff_1k.jpg",
+     "size": 721641
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/laminate_floor_02/laminate_floor_02_nor_gl_1k.jpg",
+     "size": 515725
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/laminate_floor_02/laminate_floor_02_rough_1k.jpg",
+     "size": 560815
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/laminate_floor_02/laminate_floor_02_ao_1k.jpg",
+     "size": 419048
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/laminate_floor_02/laminate_floor_02_disp_1k.jpg",
+     "size": 544686
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/laminate_floor_02/laminate_floor_02_arm_1k.jpg",
+     "size": 595827
+    }
+   },
+   "size": 3357742
+  },
+  "american_walnut_veneer": {
+   "group": "wood",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_diff_1k.jpg",
+     "size": 579182
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_nor_gl_1k.jpg",
+     "size": 414945
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_rough_1k.jpg",
+     "size": 691712
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_ao_1k.jpg",
+     "size": 647888
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_disp_1k.jpg",
+     "size": 160293
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_arm_1k.jpg",
+     "size": 704116
+    }
+   },
+   "size": 3198136
+  },
+  "dark_paneled_wood": {
+   "group": "wood",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_paneled_wood/dark_paneled_wood_diff_1k.jpg",
+     "size": 635595
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_paneled_wood/dark_paneled_wood_nor_gl_1k.jpg",
+     "size": 953395
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_paneled_wood/dark_paneled_wood_rough_1k.jpg",
+     "size": 703536
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_paneled_wood/dark_paneled_wood_ao_1k.jpg",
+     "size": 501071
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_paneled_wood/dark_paneled_wood_disp_1k.jpg",
+     "size": 213790
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_paneled_wood/dark_paneled_wood_arm_1k.jpg",
+     "size": 823870
+    }
+   },
+   "size": 3831257
+  },
+  "metal_plate": {
+   "group": "metal",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metal_plate/metal_plate_diff_1k.jpg",
+     "size": 692234
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metal_plate/metal_plate_nor_gl_1k.jpg",
+     "size": 770307
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metal_plate/metal_plate_rough_1k.jpg",
+     "size": 775206
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metal_plate/metal_plate_ao_1k.jpg",
+     "size": 565996
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metal_plate/metal_plate_disp_1k.jpg",
+     "size": 377563
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metal_plate/metal_plate_arm_1k.jpg",
+     "size": 1004043
+    }
+   },
+   "size": 4185349
+  },
+  "rubber_tiles": {
+   "group": "rubber",
+   "maps": {
+    "Diffuse": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rubber_tiles/rubber_tiles_diff_1k.jpg",
+     "size": 351085
+    },
+    "nor_gl": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rubber_tiles/rubber_tiles_nor_gl_1k.jpg",
+     "size": 477716
+    },
+    "Rough": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rubber_tiles/rubber_tiles_rough_1k.jpg",
+     "size": 590975
+    },
+    "AO": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rubber_tiles/rubber_tiles_ao_1k.jpg",
+     "size": 294901
+    },
+    "Displacement": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rubber_tiles/rubber_tiles_disp_1k.jpg",
+     "size": 151293
+    },
+    "arm": {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rubber_tiles/rubber_tiles_arm_1k.jpg",
+     "size": 639130
+    }
+   },
+   "size": 2505100
+  }
+ },
+ "materials": {
+  "Plaster003": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 7879772,
+    "url": "https://ambientcg.com/get?file=Plaster003_1K-JPG.zip",
+    "file": "Plaster003_1K-JPG.zip"
+   }
+  },
+  "Fabric022": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 8456497,
+    "url": "https://ambientcg.com/get?file=Fabric022_1K-JPG.zip",
+    "file": "Fabric022_1K-JPG.zip"
+   }
+  },
+  "Wallpaper002A": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 6514665,
+    "url": "https://ambientcg.com/get?file=Wallpaper002A_1K-JPG.zip",
+    "file": "Wallpaper002A_1K-JPG.zip"
+   }
+  },
+  "PaintedPlaster016": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 9361420,
+    "url": "https://ambientcg.com/get?file=PaintedPlaster016_1K-JPG.zip",
+    "file": "PaintedPlaster016_1K-JPG.zip"
+   }
+  },
+  "PaintedPlaster010": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 9450075,
+    "url": "https://ambientcg.com/get?file=PaintedPlaster010_1K-JPG.zip",
+    "file": "PaintedPlaster010_1K-JPG.zip"
+   }
+  },
+  "PaintedMetal004": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 8537287,
+    "url": "https://ambientcg.com/get?file=PaintedMetal004_1K-JPG.zip",
+    "file": "PaintedMetal004_1K-JPG.zip"
+   }
+  },
+  "Terrazzo005": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 6956162,
+    "url": "https://ambientcg.com/get?file=Terrazzo005_1K-JPG.zip",
+    "file": "Terrazzo005_1K-JPG.zip"
+   }
+  },
+  "Carpet003": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 9316581,
+    "url": "https://ambientcg.com/get?file=Carpet003_1K-JPG.zip",
+    "file": "Carpet003_1K-JPG.zip"
+   }
+  },
+  "Fabric027": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 8578018,
+    "url": "https://ambientcg.com/get?file=Fabric027_1K-JPG.zip",
+    "file": "Fabric027_1K-JPG.zip"
+   }
+  },
+  "PaintedMetal013": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 10344261,
+    "url": "https://ambientcg.com/get?file=PaintedMetal013_1K-JPG.zip",
+    "file": "PaintedMetal013_1K-JPG.zip"
+   }
+  },
+  "OfficeCeiling003": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 7212931,
+    "url": "https://ambientcg.com/get?file=OfficeCeiling003_1K-JPG.zip",
+    "file": "OfficeCeiling003_1K-JPG.zip"
+   }
+  },
+  "OfficeCeiling006": {
+   "group": "acg",
+   "1K-JPG": {
+    "size": 7300997,
+    "url": "https://ambientcg.com/get?file=OfficeCeiling006_1K-JPG.zip",
+    "file": "OfficeCeiling006_1K-JPG.zip"
+   }
+  }
+ }
+}

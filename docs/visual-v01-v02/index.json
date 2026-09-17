@@ -1,0 +1,587 @@
+[
+  {
+    "name": "C02-entry",
+    "metadata": "C02-entry.json",
+    "image": "C02-entry.png",
+    "materials": [
+      "floorCarpetGrey",
+      "ceilingTile",
+      "wallWhite",
+      "glass",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "C02-center",
+    "metadata": "C02-center.json",
+    "image": "C02-center.png",
+    "materials": [
+      "floorCarpetGrey",
+      "ceilingTile",
+      "wallWhite",
+      "glass",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "C02-reverse",
+    "metadata": "C02-reverse.json",
+    "image": "C02-reverse.png",
+    "materials": [
+      "floorCarpetGrey",
+      "ceilingTile",
+      "wallWhite",
+      "glass",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "C02-detail",
+    "metadata": "C02-detail.json",
+    "image": "C02-detail.png",
+    "materials": [
+      "floorCarpetGrey",
+      "ceilingTile",
+      "wallWhite",
+      "glass",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "C06-entry",
+    "metadata": "C06-entry.json",
+    "image": "C06-entry.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "wallConcrete",
+      "columnConcrete",
+      "yellowLine",
+      "wallWhite",
+      "lightPanel",
+      "lightOff",
+      "carPaint",
+      "carGlass",
+      "rubber",
+      "doorMetal"
+    ]
+  },
+  {
+    "name": "C06-center",
+    "metadata": "C06-center.json",
+    "image": "C06-center.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "wallConcrete",
+      "columnConcrete",
+      "yellowLine",
+      "wallWhite",
+      "lightPanel",
+      "lightOff",
+      "carPaint",
+      "carGlass",
+      "rubber",
+      "doorMetal"
+    ]
+  },
+  {
+    "name": "C06-reverse",
+    "metadata": "C06-reverse.json",
+    "image": "C06-reverse.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "wallConcrete",
+      "columnConcrete",
+      "yellowLine",
+      "wallWhite",
+      "lightPanel",
+      "lightOff",
+      "carPaint",
+      "carGlass",
+      "rubber",
+      "doorMetal"
+    ]
+  },
+  {
+    "name": "C06-detail",
+    "metadata": "C06-detail.json",
+    "image": "C06-detail.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "wallConcrete",
+      "columnConcrete",
+      "yellowLine",
+      "wallWhite",
+      "lightPanel",
+      "lightOff",
+      "carPaint",
+      "carGlass",
+      "rubber",
+      "doorMetal"
+    ]
+  },
+  {
+    "name": "C13-entry",
+    "metadata": "C13-entry.json",
+    "image": "C13-entry.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "wallConcrete",
+      "shelfMetal",
+      "boxCardboard",
+      "columnConcrete",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "C13-center",
+    "metadata": "C13-center.json",
+    "image": "C13-center.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "wallConcrete",
+      "shelfMetal",
+      "boxCardboard",
+      "columnConcrete",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "C13-reverse",
+    "metadata": "C13-reverse.json",
+    "image": "C13-reverse.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "wallConcrete",
+      "shelfMetal",
+      "boxCardboard",
+      "columnConcrete",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "C13-detail",
+    "metadata": "C13-detail.json",
+    "image": "C13-detail.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "wallConcrete",
+      "shelfMetal",
+      "boxCardboard",
+      "columnConcrete",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "C18-entry",
+    "metadata": "C18-entry.json",
+    "image": "C18-entry.png",
+    "materials": [
+      "floorTile",
+      "ceilingWhite",
+      "wallCream",
+      "columnConcrete",
+      "trim",
+      "furnitureLight",
+      "plant",
+      "furnitureDark",
+      "lightWarm",
+      "metal",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "C18-center",
+    "metadata": "C18-center.json",
+    "image": "C18-center.png",
+    "materials": [
+      "floorTile",
+      "ceilingWhite",
+      "wallCream",
+      "columnConcrete",
+      "trim",
+      "furnitureLight",
+      "plant",
+      "furnitureDark",
+      "lightWarm",
+      "metal",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "C18-reverse",
+    "metadata": "C18-reverse.json",
+    "image": "C18-reverse.png",
+    "materials": [
+      "floorTile",
+      "ceilingWhite",
+      "wallCream",
+      "columnConcrete",
+      "trim",
+      "furnitureLight",
+      "plant",
+      "furnitureDark",
+      "lightWarm",
+      "metal",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "C18-detail",
+    "metadata": "C18-detail.json",
+    "image": "C18-detail.png",
+    "materials": [
+      "floorTile",
+      "ceilingWhite",
+      "wallCream",
+      "columnConcrete",
+      "trim",
+      "furnitureLight",
+      "plant",
+      "furnitureDark",
+      "lightWarm",
+      "metal",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "C20-entry",
+    "metadata": "C20-entry.json",
+    "image": "C20-entry.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "metal",
+      "wallConcrete",
+      "lightWarm",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "C20-center",
+    "metadata": "C20-center.json",
+    "image": "C20-center.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "metal",
+      "wallConcrete",
+      "lightWarm",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "C20-reverse",
+    "metadata": "C20-reverse.json",
+    "image": "C20-reverse.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "metal",
+      "wallConcrete",
+      "lightWarm",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "C20-detail",
+    "metadata": "C20-detail.json",
+    "image": "C20-detail.png",
+    "materials": [
+      "floorConcrete",
+      "ceilingDark",
+      "metal",
+      "wallConcrete",
+      "lightWarm",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "U10-entry",
+    "metadata": "U10-entry.json",
+    "image": "U10-entry.png",
+    "materials": [
+      "floorWood",
+      "ceilingWhite",
+      "wallCream",
+      "lightPanel",
+      "wallGreen",
+      "furnitureDark",
+      "furnitureLight"
+    ]
+  },
+  {
+    "name": "U10-center",
+    "metadata": "U10-center.json",
+    "image": "U10-center.png",
+    "materials": [
+      "floorWood",
+      "ceilingWhite",
+      "wallCream",
+      "lightPanel",
+      "wallGreen",
+      "furnitureDark",
+      "furnitureLight"
+    ]
+  },
+  {
+    "name": "U10-reverse",
+    "metadata": "U10-reverse.json",
+    "image": "U10-reverse.png",
+    "materials": [
+      "floorWood",
+      "ceilingWhite",
+      "wallCream",
+      "lightPanel",
+      "wallGreen",
+      "furnitureDark",
+      "furnitureLight"
+    ]
+  },
+  {
+    "name": "U10-detail",
+    "metadata": "U10-detail.json",
+    "image": "U10-detail.png",
+    "materials": [
+      "floorWood",
+      "ceilingWhite",
+      "wallCream",
+      "lightPanel",
+      "wallGreen",
+      "furnitureDark",
+      "furnitureLight"
+    ]
+  },
+  {
+    "name": "R01-entry",
+    "metadata": "R01-entry.json",
+    "image": "R01-entry.png",
+    "materials": [
+      "floorTile",
+      "ceilingWhite",
+      "waterShallow",
+      "trim",
+      "columnConcrete",
+      "wallDark",
+      "metal",
+      "wallWhite",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "R01-center",
+    "metadata": "R01-center.json",
+    "image": "R01-center.png",
+    "materials": [
+      "floorTile",
+      "ceilingWhite",
+      "waterShallow",
+      "trim",
+      "columnConcrete",
+      "wallDark",
+      "metal",
+      "wallWhite",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "R01-reverse",
+    "metadata": "R01-reverse.json",
+    "image": "R01-reverse.png",
+    "materials": [
+      "floorTile",
+      "ceilingWhite",
+      "waterShallow",
+      "trim",
+      "columnConcrete",
+      "wallDark",
+      "metal",
+      "wallWhite",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "R01-detail",
+    "metadata": "R01-detail.json",
+    "image": "R01-detail.png",
+    "materials": [
+      "floorTile",
+      "ceilingWhite",
+      "waterShallow",
+      "trim",
+      "columnConcrete",
+      "wallDark",
+      "metal",
+      "wallWhite",
+      "lightPanel"
+    ]
+  },
+  {
+    "name": "R07-entry",
+    "metadata": "R07-entry.json",
+    "image": "R07-entry.png",
+    "materials": [
+      "floorConcrete",
+      "glass",
+      "plant",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "R07-center",
+    "metadata": "R07-center.json",
+    "image": "R07-center.png",
+    "materials": [
+      "floorConcrete",
+      "glass",
+      "plant",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "R07-reverse",
+    "metadata": "R07-reverse.json",
+    "image": "R07-reverse.png",
+    "materials": [
+      "floorConcrete",
+      "glass",
+      "plant",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "R07-detail",
+    "metadata": "R07-detail.json",
+    "image": "R07-detail.png",
+    "materials": [
+      "floorConcrete",
+      "glass",
+      "plant",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "materials-white",
+    "metadata": "materials-white.json",
+    "image": "materials-white.png",
+    "materials": [
+      "wallWhite",
+      "floorCarpetGrey",
+      "ceilingTile",
+      "doorWood",
+      "floorConcrete",
+      "floorTile",
+      "metal",
+      "floorLino",
+      "boxCardboard",
+      "plant",
+      "lightOff",
+      "water",
+      "doorMetal",
+      "carPaint",
+      "carGlass",
+      "rubber"
+    ]
+  },
+  {
+    "name": "materials-warm",
+    "metadata": "materials-warm.json",
+    "image": "materials-warm.png",
+    "materials": [
+      "wallWhite",
+      "floorCarpetGrey",
+      "ceilingTile",
+      "doorWood",
+      "floorConcrete",
+      "floorTile",
+      "metal",
+      "floorLino",
+      "boxCardboard",
+      "plant",
+      "lightOff",
+      "water",
+      "doorMetal",
+      "carPaint",
+      "carGlass",
+      "rubber"
+    ]
+  },
+  {
+    "name": "materials-raking",
+    "metadata": "materials-raking.json",
+    "image": "materials-raking.png",
+    "materials": [
+      "wallWhite",
+      "floorCarpetGrey",
+      "ceilingTile",
+      "doorWood",
+      "floorConcrete",
+      "floorTile",
+      "metal",
+      "floorLino",
+      "boxCardboard",
+      "plant",
+      "lightOff",
+      "water",
+      "doorMetal",
+      "carPaint",
+      "carGlass",
+      "rubber"
+    ]
+  },
+  {
+    "name": "restore-after",
+    "metadata": "restore-after.json",
+    "image": "restore-after.png",
+    "materials": [
+      "floorCarpetGrey",
+      "ceilingTile",
+      "wallWhite",
+      "glass",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "restore-before",
+    "metadata": "restore-before.json",
+    "image": "restore-before.png",
+    "materials": [
+      "floorCarpetGrey",
+      "ceilingTile",
+      "wallWhite",
+      "glass",
+      "lightPanel",
+      "lightOff"
+    ]
+  },
+  {
+    "name": "materials-mirrored-normal",
+    "image": "materials-mirrored-normal.png",
+    "metadata": "materials-mirrored-normal.json"
+  },
+  {
+    "name": "materials-mirrored-beauty",
+    "image": "materials-mirrored-beauty.png",
+    "metadata": "materials-mirrored-beauty.json"
+  }
+]

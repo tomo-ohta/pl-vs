@@ -1,0 +1,70 @@
+{
+  "surfaceRevision": "surface-environment-1",
+  "surfaceEnvironment": true,
+  "surfaceWear": true,
+  "surfaceVariation": true,
+  "revision": "v01-v02-complete-1",
+  "room": "C13",
+  "seed": 42,
+  "variant": 0,
+  "view": "center",
+  "quality": "high",
+  "doorsOpen": false,
+  "exposure": 1.25,
+  "diagnostic": "beauty",
+  "time": 0,
+  "camera": {
+    "position": [
+      0,
+      1.6,
+      16.5
+    ],
+    "quaternion": [
+      0.002632962986815343,
+      0.9818612046589977,
+      0.013671877274581223,
+      -0.18908919076266736
+    ],
+    "fov": 72
+  },
+  "imagingPreset": "off",
+  "device": {
+    "platform": "MacIntel",
+    "cores": 10
+  },
+  "materialIds": [
+    "floorConcrete",
+    "ceilingDark",
+    "wallConcrete",
+    "shelfMetal",
+    "boxCardboard",
+    "columnConcrete",
+    "lightPanel",
+    "lightOff"
+  ],
+  "lighting": "scene",
+  "viewport": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "generationMs": 96.19999992847443,
+  "calls": 40,
+  "triangles": 53148,
+  "memoryCounts": {
+    "geometries": 38,
+    "textures": 44
+  },
+  "measurement": null,
+  "referenceRooms": [
+    "C02",
+    "C06",
+    "C13",
+    "C18",
+    "C20",
+    "U10",
+    "R01",
+    "R07"
+  ]
+}

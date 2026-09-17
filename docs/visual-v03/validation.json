@@ -1,0 +1,42 @@
+{
+  "revision": "v03-macro1",
+  "tests": {
+    "coordinateContracts": "passed",
+    "materialCompileCases": 49,
+    "materialShaderErrors": [],
+    "representativeRooms": [
+      "C02",
+      "C06",
+      "C13",
+      "C18",
+      "C20",
+      "U10"
+    ],
+    "qualities": [
+      "low",
+      "mid",
+      "high"
+    ],
+    "browserConsoleErrors": [],
+    "typecheck": "passed",
+    "productionBuild": "passed"
+  },
+  "limits": [
+    "Representative rooms only; not a full map/seed audit",
+    "GPU time and mobile performance not measured",
+    "No dynamic save/reload or door traversal regression test in this step"
+  ],
+  "timingObservations": {
+    "samples": 120,
+    "conditions": "C02 seed42 variant0 entry high 1280x720 DPR1 exposure1.25",
+    "variationOff": {
+      "rafP95Ms": 9,
+      "cpuSubmissionP95Ms": 0.8
+    },
+    "variationOn": {
+      "rafP95Ms": 9.2,
+      "cpuSubmissionP95Ms": 1.0
+    },
+    "note": "OFF is a uniform visual toggle: the shader still samples both albedo inputs. These are scheduling/CPU observations, not the GPU cost of enabling the implementation."
+  }
+}

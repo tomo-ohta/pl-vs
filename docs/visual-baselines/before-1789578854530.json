@@ -1,0 +1,20 @@
+{
+  "label": "C02 seed 7 (l2=off)",
+  "stage": "before",
+  "room": "r1",
+  "def": "C02",
+  "seed": 7,
+  "l2": {
+    "bitmap": false,
+    "queue": false,
+    "prefetch": false,
+    "split": false,
+    "precompile": false
+  },
+  "lightmapReady": true,
+  "cc0Loaded": 32,
+  "W": 730,
+  "H": 490,
+  "mean": 83.6173366880999,
+  "note": "L2 部屋切り替え軽量化の見た目不変確認（docs/perf-room-switch.md）"
+}

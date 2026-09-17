@@ -1,0 +1,3526 @@
+{
+  "version": "1.3",
+  "source": "liminal_procedural_generation_design.xlsx",
+  "rooms": [
+    {
+      "id": "C01",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "閉館後の学校廊下",
+      "category": "学校廊下",
+      "baseTemplate": "CorridorSchool",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "冷白色蛍光灯、一部消灯",
+      "audioPreset": "換気音・遠い時計",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "通常ドア接続。教室は行き止まりまたは小部屋。",
+      "mapShape": "直線/枝分かれ",
+      "dangerTag": 1,
+      "effectLabel": "特になし",
+      "modifiers": [],
+      "layoutHints": [],
+      "recipe": "CorridorSchool + Props[閉館後の学校廊下] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C02",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "オフィス廊下",
+      "category": "オフィス廊下",
+      "baseTemplate": "CorridorOffice",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "均一蛍光灯",
+      "audioPreset": "空調ハム・PCファン残響",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "会議室・休憩室へ通常接続。",
+      "mapShape": "L字/直線",
+      "dangerTag": 1,
+      "effectLabel": "特になし",
+      "modifiers": [],
+      "layoutHints": [],
+      "recipe": "CorridorOffice + Props[オフィス廊下] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C03",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "ビジネスホテル廊下",
+      "category": "ホテル廊下",
+      "baseTemplate": "CorridorHotel",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "暖色壁灯+低照度天井灯",
+      "audioPreset": "空調・遠い水音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "客室扉を複数配置。階段室へ最低1接続。",
+      "mapShape": "長方形リング",
+      "dangerTag": 1,
+      "effectLabel": "特になし",
+      "modifiers": [],
+      "layoutHints": [],
+      "recipe": "CorridorHotel + Props[ビジネスホテル廊下] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C04",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "モール従業員通路",
+      "category": "サービス通路",
+      "baseTemplate": "CorridorService",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "冷白色蛍光灯",
+      "audioPreset": "台車の軋み・換気設備",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "店舗裏・搬入口・階段へ接続。",
+      "mapShape": "折れ廊下",
+      "dangerTag": 1,
+      "effectLabel": "特になし",
+      "modifiers": [],
+      "layoutHints": [],
+      "recipe": "CorridorService + Props[モール従業員通路] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C05",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "病院外来廊下",
+      "category": "病院廊下",
+      "baseTemplate": "CorridorHospital",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "高照度白色灯",
+      "audioPreset": "空調・電子音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "診察室・待合・非常階段へ接続。",
+      "mapShape": "T字/十字",
+      "dangerTag": 1,
+      "effectLabel": "特になし",
+      "modifiers": [],
+      "layoutHints": [],
+      "recipe": "CorridorHospital + Props[病院外来廊下] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C06",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "地下駐車場",
+      "category": "駐車場",
+      "baseTemplate": "ParkingGrid",
+      "generator": "ParkingGenerator",
+      "lightingPreset": "間引き蛍光灯",
+      "audioPreset": "換気扇・遠い車道音",
+      "primaryPortal": "ramp",
+      "minExits": 2,
+      "maxExits": 5,
+      "connectionRule": "スロープ・防火扉・階段で接続。",
+      "mapShape": "大矩形+柱グリッド",
+      "dangerTag": 2,
+      "effectLabel": "視界が長い",
+      "modifiers": [],
+      "layoutHints": [
+        "longSightlines"
+      ],
+      "recipe": "ParkingGrid + Props[地下駐車場] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C07",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "駅の連絡通路",
+      "category": "駅通路",
+      "baseTemplate": "TransitCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "均一白色灯",
+      "audioPreset": "換気・遠い列車音",
+      "primaryPortal": "stairs",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "階段・改札風ゲート・通路で接続。",
+      "mapShape": "直線/分岐",
+      "dangerTag": 1,
+      "effectLabel": "特になし",
+      "modifiers": [],
+      "layoutHints": [],
+      "recipe": "TransitCorridor + Props[駅の連絡通路] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C08",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "マンション共用廊下",
+      "category": "集合住宅廊下",
+      "baseTemplate": "ApartmentCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "暖色玄関灯",
+      "audioPreset": "遠い街音・室外機",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "住戸扉と階段室。",
+      "mapShape": "直線+片側開口",
+      "dangerTag": 1,
+      "effectLabel": "特になし",
+      "modifiers": [],
+      "layoutHints": [],
+      "recipe": "ApartmentCorridor + Props[マンション共用廊下] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C09",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "社員食堂",
+      "category": "食堂",
+      "baseTemplate": "LargeRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色天井灯",
+      "audioPreset": "冷蔵庫・自販機",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "厨房・廊下・倉庫に接続。",
+      "mapShape": "大矩形",
+      "dangerTag": 1,
+      "effectLabel": "遮蔽物多め",
+      "modifiers": [],
+      "layoutHints": [
+        "denseOcclusion"
+      ],
+      "recipe": "LargeRoom + Props[社員食堂] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C10",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "市役所待合室",
+      "category": "待合室",
+      "baseTemplate": "LargeRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "均一白色灯",
+      "audioPreset": "空調・番号呼出音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "窓口裏・廊下・階段へ接続。",
+      "mapShape": "大矩形+小部屋",
+      "dangerTag": 1,
+      "effectLabel": "特になし",
+      "modifiers": [],
+      "layoutHints": [],
+      "recipe": "LargeRoom + Props[市役所待合室] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C11",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "体育館更衣室",
+      "category": "更衣室",
+      "baseTemplate": "LockerRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "冷白色灯",
+      "audioPreset": "換気・水滴",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "シャワー・廊下へ接続。",
+      "mapShape": "矩形+ロッカー島",
+      "dangerTag": 2,
+      "effectLabel": "床が滑りやすい",
+      "modifiers": [
+        {
+          "id": "SurfaceFriction",
+          "params": {
+            "friction": 0.6
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "LockerRoom + Props[体育館更衣室] + Modifiers[SurfaceFriction]",
+      "notes": null
+    },
+    {
+      "id": "C12",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "スーパーのバックヤード",
+      "category": "倉庫通路",
+      "baseTemplate": "WarehouseGrid",
+      "generator": "GridGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "冷蔵機・台車",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "売場裏・冷蔵庫・搬入口へ接続。",
+      "mapShape": "棚グリッド",
+      "dangerTag": 1,
+      "effectLabel": "遮蔽が多い",
+      "modifiers": [],
+      "layoutHints": [
+        "denseOcclusion"
+      ],
+      "recipe": "WarehouseGrid + Props[スーパーのバックヤード] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C13",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "倉庫の棚列",
+      "category": "倉庫",
+      "baseTemplate": "WarehouseGrid",
+      "generator": "GridGenerator",
+      "lightingPreset": "高所灯",
+      "audioPreset": "空調・金属音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "棚列端の扉/シャッターで接続。",
+      "mapShape": "長い棚グリッド",
+      "dangerTag": 2,
+      "effectLabel": "視線遮断",
+      "modifiers": [],
+      "layoutHints": [
+        "denseOcclusion"
+      ],
+      "recipe": "WarehouseGrid + Props[倉庫の棚列] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C14",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "オフィス休憩室",
+      "category": "小部屋",
+      "baseTemplate": "SmallRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "暖白色灯",
+      "audioPreset": "冷蔵庫・蛍光灯",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "オフィス廊下への単純接続。",
+      "mapShape": "矩形",
+      "dangerTag": 1,
+      "effectLabel": "特になし",
+      "modifiers": [],
+      "layoutHints": [],
+      "recipe": "SmallRoom + Props[オフィス休憩室] + Modifiers[なし]",
+      "notes": "v1.1: 回復アイテム廃止に伴い特殊効果を「特になし」へ変更。"
+    },
+    {
+      "id": "C15",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "コインランドリー",
+      "category": "店舗",
+      "baseTemplate": "RetailRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色蛍光灯",
+      "audioPreset": "乾燥機低音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "道路風通路/裏口に接続。",
+      "mapShape": "矩形",
+      "dangerTag": 1,
+      "effectLabel": "反射面多め",
+      "modifiers": [],
+      "layoutHints": [
+        "glossyMaterials"
+      ],
+      "recipe": "RetailRoom + Props[コインランドリー] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C16",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "公衆トイレ",
+      "category": "トイレ",
+      "baseTemplate": "Restroom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "換気扇・水滴",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "入口1～2、奥は袋小路。",
+      "mapShape": "細長矩形",
+      "dangerTag": 1,
+      "effectLabel": "視界遮蔽",
+      "modifiers": [],
+      "layoutHints": [
+        "denseOcclusion"
+      ],
+      "recipe": "Restroom + Props[公衆トイレ] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C17",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "カラオケ店廊下",
+      "category": "娯楽施設廊下",
+      "baseTemplate": "CorridorEntertainment",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "暗め暖色+非常灯",
+      "audioPreset": "低いBGM・空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "個室群・非常階段へ接続。",
+      "mapShape": "蛇行",
+      "dangerTag": 1,
+      "effectLabel": "音響遮断区画",
+      "modifiers": [],
+      "layoutHints": [
+        "audioZones"
+      ],
+      "recipe": "CorridorEntertainment + Props[カラオケ店廊下] + Modifiers[なし]",
+      "notes": "扉ごとの漏れ音は AudioPreset で表現（Modifier 不要）。"
+    },
+    {
+      "id": "C18",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "ホテルロビー",
+      "category": "ロビー",
+      "baseTemplate": "AtriumLobby",
+      "generator": "AtriumGenerator",
+      "lightingPreset": "暖色間接照明",
+      "audioPreset": "空調・微かなBGM",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "廊下・エレベーター・階段へ接続。",
+      "mapShape": "大矩形+吹抜",
+      "dangerTag": 1,
+      "effectLabel": "ランドマーク向き",
+      "modifiers": [],
+      "layoutHints": [
+        "landmark"
+      ],
+      "recipe": "AtriumLobby + Props[ホテルロビー] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C19",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "地下歩道",
+      "category": "地下通路",
+      "baseTemplate": "TransitCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "換気・反響",
+      "primaryPortal": "stairs",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "階段・地下街・駅通路へ接続。",
+      "mapShape": "長直線+分岐",
+      "dangerTag": 1,
+      "effectLabel": "反響強",
+      "modifiers": [],
+      "layoutHints": [
+        "reverbHigh"
+      ],
+      "recipe": "TransitCorridor + Props[地下歩道] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "C20",
+      "rarity": "Common",
+      "weight": 55,
+      "name": "非常階段",
+      "category": "階段室",
+      "baseTemplate": "VerticalCore",
+      "generator": "VerticalGenerator",
+      "lightingPreset": "非常灯+蛍光灯",
+      "audioPreset": "換気・足音反響",
+      "primaryPortal": "stairs",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "上下階と防火扉で接続。",
+      "mapShape": "縦方向スタック",
+      "dangerTag": 2,
+      "effectLabel": "縦移動ハブ",
+      "modifiers": [],
+      "layoutHints": [
+        "verticalHub"
+      ],
+      "recipe": "VerticalCore + Props[非常階段] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "U01",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "蛍光灯位相廊下",
+      "category": "廊下",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "区画ごとに緑/白/黄へ変化",
+      "audioPreset": "照明ハムの位相ずれ",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "出口は通常だが照明相で接続先の雰囲気が変わる。",
+      "mapShape": "直線",
+      "dangerTag": 1,
+      "effectLabel": "色温度相がシード依存",
+      "modifiers": [
+        {
+          "id": "LightingPhase",
+          "params": {
+            "mode": "seedPhase"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[蛍光灯位相廊下] + Modifiers[LightingPhase]",
+      "notes": null
+    },
+    {
+      "id": "U02",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "重複客室階",
+      "category": "ホテル廊下",
+      "baseTemplate": "CorridorHotel",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "暖色壁灯",
+      "audioPreset": "空調・遠いノック",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "同一番号の扉2つが別部屋へ接続。",
+      "mapShape": "リング",
+      "dangerTag": 1,
+      "effectLabel": "番号重複",
+      "modifiers": [
+        {
+          "id": "DuplicateNumber",
+          "params": {
+            "duplicateRate": 0.5
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "CorridorHotel + Props[重複客室階] + Modifiers[DuplicateNumber]",
+      "notes": null
+    },
+    {
+      "id": "U03",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "無人エスカレーター",
+      "category": "アトリウム",
+      "baseTemplate": "AtriumLobby",
+      "generator": "AtriumGenerator",
+      "lightingPreset": "周囲暗転、エスカレーターのみ点灯",
+      "audioPreset": "駆動音",
+      "primaryPortal": "escalator",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "稼働中の1基のみ次階へ。",
+      "mapShape": "縦+吹抜",
+      "dangerTag": 2,
+      "effectLabel": "常時移動床",
+      "modifiers": [
+        {
+          "id": "ExternalForce",
+          "params": {
+            "mode": "conveyor",
+            "speed": 0.8
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "AtriumLobby + Props[無人エスカレーター] + Modifiers[ExternalForce]",
+      "notes": null
+    },
+    {
+      "id": "U04",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "無名自販機室",
+      "category": "自販機室",
+      "baseTemplate": "SmallRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "冷白色",
+      "audioPreset": "コンプレッサー",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "入口1～2。自販機裏に低確率隠し口。",
+      "mapShape": "小矩形",
+      "dangerTag": 1,
+      "effectLabel": "商品ラベル消失",
+      "modifiers": [
+        {
+          "id": "FakeSignage",
+          "params": {
+            "mode": "blank",
+            "target": "productLabel"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "SmallRoom + Props[無名自販機室] + Modifiers[FakeSignage]",
+      "notes": null
+    },
+    {
+      "id": "U05",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "出口のないEXIT",
+      "category": "廊下終端",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "非常灯",
+      "audioPreset": "低い電気音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "EXIT標識位置は壁。真の出口は別壁に生成。",
+      "mapShape": "袋小路",
+      "dangerTag": 1,
+      "effectLabel": "誤誘導",
+      "modifiers": [
+        {
+          "id": "FakeSignage",
+          "params": {
+            "mode": "misleading",
+            "target": "exitSign"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[出口のないEXIT] + Modifiers[FakeSignage]",
+      "notes": null
+    },
+    {
+      "id": "U06",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "3:17の待合室",
+      "category": "待合室",
+      "baseTemplate": "LargeRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "時計秒針・空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "全時計3:17。3:17相当イベントで出口候補が1つ解錠。",
+      "mapShape": "矩形",
+      "dangerTag": 1,
+      "effectLabel": "時刻固定",
+      "modifiers": [
+        {
+          "id": "FakeSignage",
+          "params": {
+            "mode": "fixedTime",
+            "time": "3:17"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "LargeRoom + Props[3:17の待合室] + Modifiers[FakeSignage]",
+      "notes": "v1.3: 全時計を 3:17 に固定する装飾のみ（秒針 1 本だけ回す）。解錠イベントは無し。"
+    },
+    {
+      "id": "U07",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "室内雨漏り広場",
+      "category": "アトリウム",
+      "baseTemplate": "AtriumLobby",
+      "generator": "AtriumGenerator",
+      "lightingPreset": "天井灯+局所反射",
+      "audioPreset": "局所的な雨音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "雨域を横切ると別通路が開くことがある。",
+      "mapShape": "大矩形",
+      "dangerTag": 1,
+      "effectLabel": "局所降雨",
+      "modifiers": [
+        {
+          "id": "ParticleDetail",
+          "params": {
+            "type": "rain",
+            "density": 0.5
+          }
+        },
+        {
+          "id": "Wetness",
+          "params": {
+            "wetness": 0.6
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "AtriumLobby + Props[室内雨漏り広場] + Modifiers[ParticleDetail, Wetness]",
+      "notes": null
+    },
+    {
+      "id": "U08",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "湿ったホテル廊下",
+      "category": "ホテル廊下",
+      "baseTemplate": "CorridorHotel",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "暖色低照度",
+      "audioPreset": "湿った足音・水滴",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "通常接続。湿潤区画で歩行音が変化。",
+      "mapShape": "長直線",
+      "dangerTag": 2,
+      "effectLabel": "摩擦低下",
+      "modifiers": [
+        {
+          "id": "Wetness",
+          "params": {
+            "wetness": 0.8
+          }
+        },
+        {
+          "id": "SurfaceFriction",
+          "params": {
+            "friction": 0.5
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "CorridorHotel + Props[湿ったホテル廊下] + Modifiers[Wetness, SurfaceFriction]",
+      "notes": null
+    },
+    {
+      "id": "U09",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "鏡のずれる洗面所",
+      "category": "トイレ",
+      "baseTemplate": "Restroom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "換気扇",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "鏡内だけ存在する疑似扉をヒントとして表示。",
+      "mapShape": "矩形",
+      "dangerTag": 1,
+      "effectLabel": "反射不一致",
+      "modifiers": [
+        {
+          "id": "MirrorOffset",
+          "params": {
+            "offset": 0.3,
+            "delay": 0.5
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "Restroom + Props[鏡のずれる洗面所] + Modifiers[MirrorOffset]",
+      "notes": "鏡は RenderTarget を使わず鏡像ジオメトリで表現。"
+    },
+    {
+      "id": "U10",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "壁向き教室",
+      "category": "教室",
+      "baseTemplate": "Classroom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色蛍光灯",
+      "audioPreset": "時計・空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "入口は通常。机方向が出口候補と逆を指す。",
+      "mapShape": "矩形",
+      "dangerTag": 1,
+      "effectLabel": "家具配向異常",
+      "modifiers": [
+        {
+          "id": "PropOrientation",
+          "params": {
+            "facing": "wall"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "Classroom + Props[壁向き教室] + Modifiers[PropOrientation]",
+      "notes": null
+    },
+    {
+      "id": "U11",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "手荷物受取所",
+      "category": "空港室",
+      "baseTemplate": "LargeRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "冷白色",
+      "audioPreset": "コンベア音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "同一スーツケースを追うと隠し出口発見率上昇。",
+      "mapShape": "楕円+リング",
+      "dangerTag": 1,
+      "effectLabel": "反復オブジェクト",
+      "modifiers": [
+        {
+          "id": "PropRepetition",
+          "params": {
+            "propId": "luggage",
+            "density": 0.8
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "LargeRoom + Props[手荷物受取所] + Modifiers[PropRepetition]",
+      "notes": null
+    },
+    {
+      "id": "U12",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "営業時間外フードコート",
+      "category": "フードコート",
+      "baseTemplate": "LargeRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "店舗看板のみ暖色",
+      "audioPreset": "冷蔵庫・遠いBGM",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "厨房奥にサービス扉。",
+      "mapShape": "大矩形",
+      "dangerTag": 1,
+      "effectLabel": "食物だけ温かい",
+      "modifiers": [
+        {
+          "id": "ParticleDetail",
+          "params": {
+            "type": "steam",
+            "density": 0.3
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "LargeRoom + Props[営業時間外フードコート] + Modifiers[ParticleDetail]",
+      "notes": null
+    },
+    {
+      "id": "U13",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "プールのない更衣室",
+      "category": "更衣室",
+      "baseTemplate": "LockerRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "冷白色",
+      "audioPreset": "換気・水滴・遠い反響",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "プール扉は別タイプ部屋へ接続。",
+      "mapShape": "矩形",
+      "dangerTag": 1,
+      "effectLabel": "塩素雰囲気",
+      "modifiers": [
+        {
+          "id": "Wetness",
+          "params": {
+            "wetness": 0.4
+          }
+        },
+        {
+          "id": "FogDepth",
+          "params": {
+            "color": "#bfe6e6",
+            "near": 8,
+            "far": 40
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "LockerRoom + Props[プールのない更衣室] + Modifiers[Wetness, FogDepth]",
+      "notes": null
+    },
+    {
+      "id": "U14",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "受話器の上がったオフィス",
+      "category": "オフィス",
+      "baseTemplate": "OfficeGrid",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "受話器の無音・回線ノイズ",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "特定電話の近くに次出口を生成。",
+      "mapShape": "グリッド",
+      "dangerTag": 1,
+      "effectLabel": "音源誘導",
+      "modifiers": [
+        {
+          "id": "AudioEvent",
+          "params": {
+            "mode": "beacon",
+            "sound": "phoneRing"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "OfficeGrid + Props[受話器の上がったオフィス] + Modifiers[AudioEvent]",
+      "notes": null
+    },
+    {
+      "id": "U15",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "単一商品スーパー",
+      "category": "売場",
+      "baseTemplate": "RetailGrid",
+      "generator": "GridGenerator",
+      "lightingPreset": "白色高照度",
+      "audioPreset": "冷蔵設備",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "棚列終端・バックヤードへ接続。",
+      "mapShape": "棚グリッド",
+      "dangerTag": 1,
+      "effectLabel": "全商品同一",
+      "modifiers": [
+        {
+          "id": "PropRepetition",
+          "params": {
+            "propId": "sameProduct",
+            "density": 1.0
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "RetailGrid + Props[単一商品スーパー] + Modifiers[PropRepetition]",
+      "notes": null
+    },
+    {
+      "id": "U16",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "番号異常駐車場",
+      "category": "駐車場",
+      "baseTemplate": "ParkingGrid",
+      "generator": "ParkingGenerator",
+      "lightingPreset": "間引き白色灯",
+      "audioPreset": "換気扇",
+      "primaryPortal": "ramp",
+      "minExits": 2,
+      "maxExits": 5,
+      "connectionRule": "番号列が接続方角ヒントになるが一部欠落。",
+      "mapShape": "柱グリッド",
+      "dangerTag": 1,
+      "effectLabel": "標識欠番/重複",
+      "modifiers": [
+        {
+          "id": "DuplicateNumber",
+          "params": {
+            "mode": "skipAndDuplicate"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "ParkingGrid + Props[番号異常駐車場] + Modifiers[DuplicateNumber]",
+      "notes": null
+    },
+    {
+      "id": "U17",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "終了後の展示会場",
+      "category": "展示ホール",
+      "baseTemplate": "LargeRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "作業灯",
+      "audioPreset": "遠い金属音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "ブース裏の搬入口から接続。",
+      "mapShape": "大矩形+ブース",
+      "dangerTag": 1,
+      "effectLabel": "空白名札",
+      "modifiers": [
+        {
+          "id": "FakeSignage",
+          "params": {
+            "mode": "blank",
+            "target": "nameTag"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "LargeRoom + Props[終了後の展示会場] + Modifiers[FakeSignage]",
+      "notes": "v1.1: 収集要素を廃止し「空白名札」の装飾のみ。"
+    },
+    {
+      "id": "U18",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "反復エレベーター",
+      "category": "エレベーター",
+      "baseTemplate": "VerticalCore",
+      "generator": "VerticalGenerator",
+      "lightingPreset": "暖色天井灯",
+      "audioPreset": "駆動音",
+      "primaryPortal": "elevator",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "何階を押しても同系部屋、内装差で正解階を判定。",
+      "mapShape": "単セル",
+      "dangerTag": 2,
+      "effectLabel": "接続先反復",
+      "modifiers": [
+        {
+          "id": "RepeatDestination",
+          "params": {
+            "repeatCount": 3
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "VerticalCore + Props[反復エレベーター] + Modifiers[RepeatDestination]",
+      "notes": null
+    },
+    {
+      "id": "U19",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "無人キッズスペース",
+      "category": "遊戯室",
+      "baseTemplate": "PlayArea",
+      "generator": "RoomGenerator",
+      "lightingPreset": "暖色+原色アクセント",
+      "audioPreset": "遠い笑い声",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "遊具トンネルが低確率Portal化。",
+      "mapShape": "有機形",
+      "dangerTag": 1,
+      "effectLabel": "音だけ存在",
+      "modifiers": [
+        {
+          "id": "AudioEvent",
+          "params": {
+            "mode": "oneShot",
+            "sound": "children",
+            "interval": 20
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "PlayArea + Props[無人キッズスペース] + Modifiers[AudioEvent]",
+      "notes": null
+    },
+    {
+      "id": "U20",
+      "rarity": "Uncommon",
+      "weight": 25,
+      "name": "屋内モーテル中庭",
+      "category": "中庭",
+      "baseTemplate": "AtriumLobby",
+      "generator": "AtriumGenerator",
+      "lightingPreset": "人工夕暮れ",
+      "audioPreset": "空調・水景",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "各客室と階段へ接続。",
+      "mapShape": "中庭リング",
+      "dangerTag": 1,
+      "effectLabel": "偽空天井",
+      "modifiers": [
+        {
+          "id": "FakeSky",
+          "params": {
+            "skyPreset": "dusk"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "AtriumLobby + Props[屋内モーテル中庭] + Modifiers[FakeSky]",
+      "notes": null
+    },
+    {
+      "id": "R01",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "浅水タイル回廊",
+      "category": "プール回廊",
+      "baseTemplate": "PoolCorridor",
+      "generator": "PoolGenerator",
+      "lightingPreset": "拡散白色+水面反射",
+      "audioPreset": "反響・水音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "水路交差点に出口。",
+      "mapShape": "曲線/直線混在",
+      "dangerTag": 2,
+      "effectLabel": "浅水で移動減速",
+      "modifiers": [
+        {
+          "id": "ShallowWater",
+          "params": {
+            "depth": 0.25,
+            "slow": 0.7
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "PoolCorridor + Props[浅水タイル回廊] + Modifiers[ShallowWater]",
+      "notes": null
+    },
+    {
+      "id": "R02",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "無電源アーケード",
+      "category": "アーケード",
+      "baseTemplate": "RetailGrid",
+      "generator": "GridGenerator",
+      "lightingPreset": "筐体光のみ",
+      "audioPreset": "電子音・ファン",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "特定筐体起動で裏口Portal。",
+      "mapShape": "矩形",
+      "dangerTag": 2,
+      "effectLabel": "無電源稼働",
+      "modifiers": [
+        {
+          "id": "LightingPhase",
+          "params": {
+            "mode": "unpowered"
+          }
+        }
+      ],
+      "layoutHints": [
+        "emissiveProps"
+      ],
+      "recipe": "RetailGrid + Props[無電源アーケード] + Modifiers[LightingPhase]",
+      "notes": null
+    },
+    {
+      "id": "R03",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "無限宴会場",
+      "category": "宴会場",
+      "baseTemplate": "LargeRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "暖色シャンデリア",
+      "audioPreset": "空調・食器音幻聴",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "一定距離ごとに同型出口。",
+      "mapShape": "反復グリッド",
+      "dangerTag": 2,
+      "effectLabel": "距離感錯誤",
+      "modifiers": [
+        {
+          "id": "PropRepetition",
+          "params": {
+            "propId": "banquetTable",
+            "density": 1.0
+          }
+        },
+        {
+          "id": "FogDepth",
+          "params": {
+            "color": "#e8e0d0",
+            "near": 15,
+            "far": 60
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "LargeRoom + Props[無限宴会場] + Modifiers[PropRepetition, FogDepth]",
+      "notes": null
+    },
+    {
+      "id": "R04",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "屋内住宅街",
+      "category": "住宅街",
+      "baseTemplate": "StreetGrid",
+      "generator": "StreetGenerator",
+      "lightingPreset": "オフィス天井蛍光灯",
+      "audioPreset": "室外機・遠い犬声",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "住宅玄関・路地・階段へ。",
+      "mapShape": "街区グリッド",
+      "dangerTag": 2,
+      "effectLabel": "屋内なのに街区",
+      "modifiers": [
+        {
+          "id": "FakeSky",
+          "params": {
+            "skyPreset": "dusk"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "StreetGrid + Props[屋内住宅街] + Modifiers[FakeSky]",
+      "notes": null
+    },
+    {
+      "id": "R05",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "空中連絡橋",
+      "category": "空中橋",
+      "baseTemplate": "Bridge",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "足元/天井ライン光",
+      "audioPreset": "風音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "両端固定、途中に低確率分岐。",
+      "mapShape": "細長直線",
+      "dangerTag": 3,
+      "effectLabel": "落下恐怖演出",
+      "modifiers": [
+        {
+          "id": "FogDepth",
+          "params": {
+            "color": "#0b0f1a",
+            "near": 5,
+            "far": 40
+          }
+        }
+      ],
+      "layoutHints": [
+        "voidBelow"
+      ],
+      "recipe": "Bridge + Props[空中連絡橋] + Modifiers[FogDepth]",
+      "notes": "床下は霧。Hole ソケットを任意で許可（落下先は 3.3 節）。"
+    },
+    {
+      "id": "R06",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "青い水族館通路",
+      "category": "水族館通路",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "青色拡散光",
+      "audioPreset": "低周波・水音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "曲がり角ごとに接続抽選。",
+      "mapShape": "蛇行",
+      "dangerTag": 2,
+      "effectLabel": "視界青化",
+      "modifiers": [
+        {
+          "id": "FogDepth",
+          "params": {
+            "color": "#1a4a8a",
+            "near": 6,
+            "far": 35
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[青い水族館通路] + Modifiers[FogDepth]",
+      "notes": null
+    },
+    {
+      "id": "R07",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "地下温室",
+      "category": "温室",
+      "baseTemplate": "OrganicZone",
+      "generator": "RoomGenerator",
+      "lightingPreset": "植物育成灯+天窓風",
+      "audioPreset": "滴水・虫音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "植生密度の低い方向へ出口。",
+      "mapShape": "有機枝分かれ",
+      "dangerTag": 2,
+      "effectLabel": "植物で経路変化",
+      "modifiers": [
+        {
+          "id": "InstanceOvergrowth",
+          "params": {
+            "density": 0.7,
+            "blocksPath": true
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "OrganicZone + Props[地下温室] + Modifiers[InstanceOvergrowth]",
+      "notes": null
+    },
+    {
+      "id": "R08",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "無書籍図書館",
+      "category": "図書館",
+      "baseTemplate": "ShelfGrid",
+      "generator": "GridGenerator",
+      "lightingPreset": "暖色読書灯",
+      "audioPreset": "遠いページ音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "空棚列が迷路、貸出機付近に出口。",
+      "mapShape": "棚グリッド",
+      "dangerTag": 2,
+      "effectLabel": "音イベント",
+      "modifiers": [
+        {
+          "id": "AudioEvent",
+          "params": {
+            "mode": "oneShot",
+            "sound": "pageTurn",
+            "interval": 12
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "ShelfGrid + Props[無書籍図書館] + Modifiers[AudioEvent]",
+      "notes": null
+    },
+    {
+      "id": "R09",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "監視映画館",
+      "category": "映画館",
+      "baseTemplate": "Theater",
+      "generator": "RoomGenerator",
+      "lightingPreset": "スクリーン光",
+      "audioPreset": "映写機・遅延音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "スクリーン映像が次部屋ヒント。",
+      "mapShape": "扇形",
+      "dangerTag": 2,
+      "effectLabel": "数秒遅延映像",
+      "modifiers": [
+        {
+          "id": "PastWindow",
+          "params": {
+            "mode": "screen",
+            "delaySec": 3,
+            "source": "theaterCamera"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "Theater + Props[監視映画館] + Modifiers[PastWindow]",
+      "notes": "v1.3 D21: 劇場内の固定カメラ映像に自分が 3 秒遅れて映る。スクリーンは低解像度 RenderTarget。Low Tier は 3 秒ごとの静止画。"
+    },
+    {
+      "id": "R10",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "ゲートのない空港",
+      "category": "空港",
+      "baseTemplate": "Terminal",
+      "generator": "AtriumGenerator",
+      "lightingPreset": "冷白色",
+      "audioPreset": "館内放送・空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "案内板の行先が実接続候補。",
+      "mapShape": "大直線+コンコース",
+      "dangerTag": 2,
+      "effectLabel": "存在しない便名",
+      "modifiers": [
+        {
+          "id": "FakeSignage",
+          "params": {
+            "mode": "misleading",
+            "target": "flightBoard"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "Terminal + Props[ゲートのない空港] + Modifiers[FakeSignage]",
+      "notes": null
+    },
+    {
+      "id": "R11",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "年代混在ホテル",
+      "category": "ホテル廊下",
+      "baseTemplate": "CorridorHotel",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "年代ごとに色温度変化",
+      "audioPreset": "空調・古いチャイム",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "扉ごとに年代テーマ別部屋へ。",
+      "mapShape": "リング",
+      "dangerTag": 2,
+      "effectLabel": "時代混在",
+      "modifiers": [
+        {
+          "id": "EraPreset",
+          "params": {
+            "eras": [
+              "1970s",
+              "1990s",
+              "2010s"
+            ],
+            "segmentLength": 8
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "CorridorHotel + Props[年代混在ホテル] + Modifiers[EraPreset]",
+      "notes": null
+    },
+    {
+      "id": "R12",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "日用品博物館",
+      "category": "博物館",
+      "baseTemplate": "Gallery",
+      "generator": "RoomGenerator",
+      "lightingPreset": "スポットライト",
+      "audioPreset": "静かな空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "展示ケースの配置が出口鍵。",
+      "mapShape": "展示回遊",
+      "dangerTag": 2,
+      "effectLabel": "普通物の展示",
+      "modifiers": [],
+      "layoutHints": [
+        "exhibitMundane"
+      ],
+      "recipe": "Gallery + Props[日用品博物館] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "R13",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "巨大児童遊園",
+      "category": "遊戯施設",
+      "baseTemplate": "PlayArea",
+      "generator": "RoomGenerator",
+      "lightingPreset": "柔らかい人工光",
+      "audioPreset": "遠い遊具音",
+      "primaryPortal": "tunnel",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "巨大チューブ・滑り台がPortal。",
+      "mapShape": "有機多層",
+      "dangerTag": 2,
+      "effectLabel": "縮尺3倍",
+      "modifiers": [
+        {
+          "id": "ScaleAnomaly",
+          "params": {
+            "mode": "room",
+            "scale": 3.0
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "PlayArea + Props[巨大児童遊園] + Modifiers[ScaleAnomaly]",
+      "notes": null
+    },
+    {
+      "id": "R14",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "浸水学校",
+      "category": "学校",
+      "baseTemplate": "GenericRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "窓光+蛍光灯",
+      "audioPreset": "水音・時計",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "廊下/教室床水位で通過可否。",
+      "mapShape": "教室グリッド",
+      "dangerTag": 2,
+      "effectLabel": "浅水浸水",
+      "modifiers": [
+        {
+          "id": "ShallowWater",
+          "params": {
+            "depth": 0.3,
+            "slow": 0.7
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericRoom + Props[浸水学校] + Modifiers[ShallowWater]",
+      "notes": null
+    },
+    {
+      "id": "R15",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "絨毯化する設備通路",
+      "category": "設備通路",
+      "baseTemplate": "CorridorService",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "白色→暖色へ遷移",
+      "audioPreset": "機械音→空調音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "進行につれホテル系テンプレへ接続確率増。",
+      "mapShape": "長直線",
+      "dangerTag": 2,
+      "effectLabel": "材質遷移",
+      "modifiers": [
+        {
+          "id": "MaterialGradient",
+          "params": {
+            "from": "concrete",
+            "to": "carpet",
+            "axis": "forward"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "CorridorService + Props[絨毯化する設備通路] + Modifiers[MaterialGradient]",
+      "notes": "v1.3: 「ホテル系への接続確率増」の抽選バイアスは拡張点（PickOptions.bias）のみ残し、v1 では実装しない。"
+    },
+    {
+      "id": "R16",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "縮尺異常オフィス",
+      "category": "オフィス",
+      "baseTemplate": "OfficeGrid",
+      "generator": "RoomGenerator",
+      "lightingPreset": "均一白色",
+      "audioPreset": "空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "小型扉（0.7×1.2 m）はしゃがんで通る抜け道。しゃがみ通路 Adapter 経由で通常の部屋へ（近道）。巨大扉は壁面の偽扉。",
+      "mapShape": "グリッド",
+      "dangerTag": 2,
+      "effectLabel": "局所縮尺異常",
+      "modifiers": [
+        {
+          "id": "ScaleAnomaly",
+          "params": {
+            "mode": "perProp",
+            "min": 0.5,
+            "max": 2.0,
+            "smallDoor": "crawl"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "OfficeGrid + Props[縮尺異常オフィス] + Modifiers[ScaleAnomaly]",
+      "notes": "v1.3 D24: 小型扉（0.7×1.2 m、sill 0）はしゃがんで通る抜け道。しゃがみ通路（'crawl'）Adapter 経由で通常の部屋へ（近道）。巨大扉は壁面の偽扉。"
+    },
+    {
+      "id": "R17",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "無限病棟",
+      "category": "病棟",
+      "baseTemplate": "CorridorHospital",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "冷白色",
+      "audioPreset": "モニター音・空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "病室番号が増え続ける。節目で分岐。",
+      "mapShape": "長直線反復",
+      "dangerTag": 2,
+      "effectLabel": "反復生成",
+      "modifiers": [
+        {
+          "id": "RepeatDestination",
+          "params": {
+            "repeatCount": 4
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "CorridorHospital + Props[無限病棟] + Modifiers[RepeatDestination]",
+      "notes": null
+    },
+    {
+      "id": "R18",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "密閉風洞廊下",
+      "category": "設備廊下",
+      "baseTemplate": "GenericRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "冷白色",
+      "audioPreset": "強風",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "風向と逆方向ほどレア出口率上昇。",
+      "mapShape": "直線",
+      "dangerTag": 3,
+      "effectLabel": "常時風力",
+      "modifiers": [
+        {
+          "id": "ExternalForce",
+          "params": {
+            "mode": "wind",
+            "speed": 2.5
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericRoom + Props[密閉風洞廊下] + Modifiers[ExternalForce]",
+      "notes": "v1.3: 「風向と逆方向ほどレア出口率上昇」の抽選バイアスは拡張点（PickOptions.bias）のみ残し、v1 では実装しない。"
+    },
+    {
+      "id": "R19",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "無人喫茶店",
+      "category": "喫茶店",
+      "baseTemplate": "RetailRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "暖色ペンダント",
+      "audioPreset": "コーヒーマシン・食器音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "厨房・裏口へ接続。",
+      "mapShape": "矩形",
+      "dangerTag": 2,
+      "effectLabel": "カップ再加熱",
+      "modifiers": [
+        {
+          "id": "ParticleDetail",
+          "params": {
+            "type": "steam",
+            "density": 0.2,
+            "respawn": true
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "RetailRoom + Props[無人喫茶店] + Modifiers[ParticleDetail]",
+      "notes": null
+    },
+    {
+      "id": "R20",
+      "rarity": "Rare",
+      "weight": 12,
+      "name": "巨大トランクルーム",
+      "category": "ストレージ",
+      "baseTemplate": "StorageGrid",
+      "generator": "GridGenerator",
+      "lightingPreset": "白色列灯",
+      "audioPreset": "空調・シャッター音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "一部シャッターがPortal。",
+      "mapShape": "長グリッド",
+      "dangerTag": 2,
+      "effectLabel": "大量反復扉",
+      "modifiers": [
+        {
+          "id": "PropRepetition",
+          "params": {
+            "propId": "storageDoor",
+            "density": 1.0
+          }
+        },
+        {
+          "id": "DuplicateNumber",
+          "params": {
+            "duplicateRate": 0.3
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "StorageGrid + Props[巨大トランクルーム] + Modifiers[PropRepetition, DuplicateNumber]",
+      "notes": null
+    },
+    {
+      "id": "E01",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "閉ループ廊下",
+      "category": "廊下",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "白色反復灯",
+      "audioPreset": "足音反響",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "直進で開始点へ戻る。特定扉だけループ外。",
+      "mapShape": "トーラス",
+      "dangerTag": 3,
+      "effectLabel": "位相ループ",
+      "modifiers": [
+        {
+          "id": "LoopTopology",
+          "params": {
+            "loopLength": 3
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[閉ループ廊下] + Modifiers[LoopTopology]",
+      "notes": "同一周期ジオメトリの境界で Seam 遷移（意図的 Seam）。周期ノードは別 RoomNode として発見数に数える。"
+    },
+    {
+      "id": "E02",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "年代階段",
+      "category": "階段室",
+      "baseTemplate": "VerticalCore",
+      "generator": "VerticalGenerator",
+      "lightingPreset": "年代別照明",
+      "audioPreset": "年代別環境音",
+      "primaryPortal": "stairs",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "1階ごとに年代テーマ変更。",
+      "mapShape": "縦スタック",
+      "dangerTag": 3,
+      "effectLabel": "年代遷移",
+      "modifiers": [
+        {
+          "id": "EraPreset",
+          "params": {
+            "eras": [
+              "1960s",
+              "1980s",
+              "2000s",
+              "2020s"
+            ],
+            "segmentLength": 1
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "VerticalCore + Props[年代階段] + Modifiers[EraPreset]",
+      "notes": null
+    },
+    {
+      "id": "E03",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "横向きホテル",
+      "category": "ホテル",
+      "baseTemplate": "CorridorHotel",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "壁面照明",
+      "audioPreset": "空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "見た目だけ横倒し（中身を 90° ロール生成）。床の扉は開くと下の通常の部屋へ落ちる（Hole 動作）。壁の扉は横長スロット（2.1×1.0 m、下端 0.6 m）でジャンプ + しゃがみで通過し、しゃがみ通路 Adapter を経て通常の部屋へ。",
+      "mapShape": "90度回転セル",
+      "dangerTag": 4,
+      "effectLabel": "重力軸回転",
+      "modifiers": [
+        {
+          "id": "GravityAxis",
+          "params": {
+            "mode": "fixed",
+            "upVector": [
+              1,
+              0,
+              0
+            ],
+            "visualOnly": true,
+            "rollDeg": 90,
+            "floorDoors": "hole",
+            "wallDoors": "slot"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "CorridorHotel + Props[横向きホテル] + Modifiers[GravityAxis]",
+      "notes": "v1.3 D12: 見た目だけ横倒し。廊下の中身（家具・照明・サイン・扉枠）を 90° ロールして生成。床の扉は hole ソケット + 扉パネルの見た目で、開くと下の通常の部屋へ落ちる。壁の扉は横長スロット（2.1×1.0 m、下端 0.6 m）でジャンプ + しゃがみで通過し、'crawl' Adapter（床 0.6 m → 段で 0 m、反対側は通常扉）を経て通常の部屋へ。真の重力回転はしない。"
+    },
+    {
+      "id": "E04",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "地下の昼光室",
+      "category": "地下室",
+      "baseTemplate": "LargeRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "光源不明の昼光",
+      "audioPreset": "微風・鳥声幻聴",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "日照方向と出口位置が連動。",
+      "mapShape": "大矩形",
+      "dangerTag": 3,
+      "effectLabel": "不可能昼光",
+      "modifiers": [
+        {
+          "id": "FakeSky",
+          "params": {
+            "skyPreset": "noonSun"
+          }
+        },
+        {
+          "id": "LightingPhase",
+          "params": {
+            "mode": "daylight"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "LargeRoom + Props[地下の昼光室] + Modifiers[FakeSky, LightingPhase]",
+      "notes": null
+    },
+    {
+      "id": "E06",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "逆影広間",
+      "category": "広間",
+      "baseTemplate": "LargeRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "強い単一光",
+      "audioPreset": "広い反響",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "影方向が正しい出口の逆を指す。",
+      "mapShape": "対称大空間",
+      "dangerTag": 3,
+      "effectLabel": "逆向き影",
+      "modifiers": [
+        {
+          "id": "InvertedShadow"
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "LargeRoom + Props[逆影広間] + Modifiers[InvertedShadow]",
+      "notes": null
+    },
+    {
+      "id": "E07",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "観測依存廊下",
+      "category": "廊下",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "低いハム",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "カメラ外になった扉の接続先を再抽選。",
+      "mapShape": "可変グラフ",
+      "dangerTag": 4,
+      "effectLabel": "非観測時再配線",
+      "modifiers": [
+        {
+          "id": "ObservationRewire",
+          "params": {
+            "rewireRate": 0.5
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[観測依存廊下] + Modifiers[ObservationRewire]",
+      "notes": "再配線は非観測時のみ。部屋ごとの決定論的乱数列で再抽選し stateDiff に保存。"
+    },
+    {
+      "id": "E08",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "内部拡張会議室",
+      "category": "会議室",
+      "baseTemplate": "SmallRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "普通照明",
+      "audioPreset": "空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "外寸より内部セル数が多い。",
+      "mapShape": "入口小/内部巨大",
+      "dangerTag": 3,
+      "effectLabel": "非ユークリッド容積",
+      "modifiers": [
+        {
+          "id": "NonEuclideanVolume",
+          "params": {
+            "interiorScale": 4.0
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "SmallRoom + Props[内部拡張会議室] + Modifiers[NonEuclideanVolume]",
+      "notes": "内部は Seam Portal 越しの別配置。外形と内部寸法の不一致を許容。"
+    },
+    {
+      "id": "E09",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "垂直水面オフィス",
+      "category": "オフィス",
+      "baseTemplate": "OfficeGrid",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色+水面青反射",
+      "audioPreset": "水圧低音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "水壁通過がPortal。",
+      "mapShape": "矩形+水壁",
+      "dangerTag": 4,
+      "effectLabel": "垂直水面",
+      "modifiers": [
+        {
+          "id": "WaterWall",
+          "params": {
+            "height": 3.0
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "OfficeGrid + Props[垂直水面オフィス] + Modifiers[WaterWall]",
+      "notes": "垂直水面は Portal(water) として扱う。"
+    },
+    {
+      "id": "E11",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "線路のないホーム",
+      "category": "駅",
+      "baseTemplate": "Terminal",
+      "generator": "AtriumGenerator",
+      "lightingPreset": "冷白色",
+      "audioPreset": "列車接近音",
+      "primaryPortal": "train",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "列車乗車で別ノードへ。線路メッシュなし。",
+      "mapShape": "長直線",
+      "dangerTag": 3,
+      "effectLabel": "浮遊列車",
+      "modifiers": [
+        {
+          "id": "VehicleRide",
+          "params": {
+            "vehicleType": "train",
+            "durationSec": 20,
+            "skipAfterSec": 5
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "Terminal + Props[線路のないホーム] + Modifiers[VehicleRide]",
+      "notes": "v1.3 D16（C 案）: 車内で durationSec 待つ。窓の流光 + 微振動、視点のみ操作可。5 秒経過後は E / タップで到着を早められる。到着先は 'platform' Adapter へ Seam 遷移。"
+    },
+    {
+      "id": "E12",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "過去窓回廊",
+      "category": "廊下",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "暖白色",
+      "audioPreset": "遠い過去音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "窓RenderTextureに過去ノード簡易表示。",
+      "mapShape": "直線",
+      "dangerTag": 3,
+      "effectLabel": "過去視界",
+      "modifiers": [
+        {
+          "id": "PastWindow",
+          "params": {
+            "mode": "window",
+            "historyDepthSec": 30,
+            "snapshotIntervalSec": 10,
+            "snapshotCount": 3
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[過去窓回廊] + Modifiers[PastWindow]",
+      "notes": "v1.3: 10 秒ごとの現在視点スナップショット 3 枚（30 秒）を窓に古い順で表示。Low Tier も静止画。"
+    },
+    {
+      "id": "E13",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "遠ざかる廊下",
+      "category": "廊下",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "一定間隔灯",
+      "audioPreset": "低いハム",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "プレイヤー速度に応じ廊下長を伸長。",
+      "mapShape": "伸縮直線",
+      "dangerTag": 4,
+      "effectLabel": "動的距離",
+      "modifiers": [
+        {
+          "id": "DynamicLength",
+          "params": {
+            "rate": 0.5,
+            "min": 8,
+            "max": 60
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[遠ざかる廊下] + Modifiers[DynamicLength]",
+      "notes": "v1.3: 配置は最大長で確定し、偽の突き当たりで見える長さのみ伸縮。外殻・出口は固定。床穴なし。"
+    },
+    {
+      "id": "E14",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "予測写真室",
+      "category": "展示室",
+      "baseTemplate": "Gallery",
+      "generator": "RoomGenerator",
+      "lightingPreset": "暖色スポット",
+      "audioPreset": "カメラシャッター音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "写真に次候補ノードを表示。",
+      "mapShape": "矩形",
+      "dangerTag": 3,
+      "effectLabel": "未来ヒント",
+      "modifiers": [
+        {
+          "id": "GraphReference",
+          "params": {
+            "mode": "adjacent",
+            "count": 4
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "Gallery + Props[予測写真室] + Modifiers[GraphReference]",
+      "notes": "入室時に確定した隣接ノード定義を写真として表示（予測ではない）。"
+    },
+    {
+      "id": "E15",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "小数階フロア",
+      "category": "エレベーターホール",
+      "baseTemplate": "VerticalCore",
+      "generator": "VerticalGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "昇降機音",
+      "primaryPortal": "elevator",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "4→4.1→4.11のような再帰分岐。",
+      "mapShape": "階層ツリー",
+      "dangerTag": 3,
+      "effectLabel": "小数階層",
+      "modifiers": [
+        {
+          "id": "FakeSignage",
+          "params": {
+            "mode": "fractional",
+            "target": "floorLabel"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "VerticalCore + Props[小数階フロア] + Modifiers[FakeSignage]",
+      "notes": null
+    },
+    {
+      "id": "E16",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "虚偽案内区域",
+      "category": "通路",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "館内放送",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "案内表示の一定割合を虚偽化。",
+      "mapShape": "分岐多",
+      "dangerTag": 3,
+      "effectLabel": "偽ナビ",
+      "modifiers": [
+        {
+          "id": "FakeSignage",
+          "params": {
+            "mode": "misleading",
+            "truthRatio": 0.3
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[虚偽案内区域] + Modifiers[FakeSignage]",
+      "notes": null
+    },
+    {
+      "id": "E17",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "音声認証扉",
+      "category": "扉前室",
+      "baseTemplate": "GenericRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "局所照明",
+      "audioPreset": "環境音レベル",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "音量帯により接続先カテゴリ変更。",
+      "mapShape": "小矩形",
+      "dangerTag": 3,
+      "effectLabel": "音量分岐",
+      "modifiers": [
+        {
+          "id": "NoiseGate",
+          "params": {
+            "thresholds": [
+              "still",
+              "walk",
+              "dash"
+            ],
+            "useMic": true
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericRoom + Props[音声認証扉] + Modifiers[NoiseGate]",
+      "notes": "v1.2: マイク入力の音量で分岐する扉。許可が無い場合は移動音量（静止 / 歩行 / ダッシュ / ジャンプ）で代替。"
+    },
+    {
+      "id": "E18",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "動く壁紙区画",
+      "category": "ホテル廊下",
+      "baseTemplate": "CorridorHotel",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "暖色",
+      "audioPreset": "壁の擦過音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "壁紙UV流動に合わせ壁セグメントをスライド。",
+      "mapShape": "可変蛇行",
+      "dangerTag": 3,
+      "effectLabel": "壁移動",
+      "modifiers": [
+        {
+          "id": "MovingWalls",
+          "params": {
+            "speed": 0.2
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "CorridorHotel + Props[動く壁紙区画] + Modifiers[MovingWalls]",
+      "notes": null
+    },
+    {
+      "id": "E19",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "温度座標迷宮",
+      "category": "迷路",
+      "baseTemplate": "MazeGrid",
+      "generator": "GridGenerator",
+      "lightingPreset": "寒色→暖色",
+      "audioPreset": "空調風",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "温度スカラー場が方角情報。",
+      "mapShape": "グリッド",
+      "dangerTag": 3,
+      "effectLabel": "温度ナビ",
+      "modifiers": [
+        {
+          "id": "TemperatureField"
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "MazeGrid + Props[温度座標迷宮] + Modifiers[TemperatureField]",
+      "notes": null
+    },
+    {
+      "id": "E20",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "色欠損フロア",
+      "category": "待合/廊下",
+      "baseTemplate": "GenericRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "欠損色なしの照明",
+      "audioPreset": "空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "特定色チャンネルを材質変換で除外。",
+      "mapShape": "通常",
+      "dangerTag": 3,
+      "effectLabel": "色域欠損",
+      "modifiers": [
+        {
+          "id": "ColorMissing",
+          "params": {
+            "channel": "red"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericRoom + Props[色欠損フロア] + Modifiers[ColorMissing]",
+      "notes": "Low Tier は Material 色変換で代替（ポスト処理を使わない）。"
+    },
+    {
+      "id": "L01",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "永久薄明都市",
+      "category": "都市",
+      "baseTemplate": "StreetGrid",
+      "generator": "StreetGenerator",
+      "lightingPreset": "青い薄明",
+      "audioPreset": "風・遠い都市音",
+      "primaryPortal": "street",
+      "minExits": 2,
+      "maxExits": 5,
+      "connectionRule": "街路交差点/建物入口がPortal。",
+      "mapShape": "街区グラフ",
+      "dangerTag": 3,
+      "effectLabel": "無限街区ストリーミング",
+      "modifiers": [
+        {
+          "id": "FogDepth",
+          "params": {
+            "color": "#2b2f4a",
+            "near": 10,
+            "far": 70
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked",
+        "xl"
+      ],
+      "recipe": "StreetGrid + Props[永久薄明都市] + Modifiers[FogDepth]",
+      "notes": "「無限」は有限の巨大街区。1 RoomNode 内部をチャンク分割。v1.3 D13: Street は 64 m から（xl は 80 m へ）。fog far は Tier の fogFar でクランプ。地図は Legendary 80 セル上限で実寸 + ゾーン線。"
+    },
+    {
+      "id": "L02",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "室内海洋",
+      "category": "海洋ホール",
+      "baseTemplate": "MegaHall",
+      "generator": "MegaStructureGenerator",
+      "lightingPreset": "天井灯+薄明",
+      "audioPreset": "波音",
+      "primaryPortal": "boat",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "桟橋・浮橋・水門で接続。",
+      "mapShape": "巨大セル",
+      "dangerTag": 4,
+      "effectLabel": "室内海面",
+      "modifiers": [
+        {
+          "id": "ShallowWater",
+          "params": {
+            "depth": 0.5,
+            "slow": 0.7,
+            "pier": true
+          }
+        },
+        {
+          "id": "VehicleRide",
+          "params": {
+            "vehicleType": "boat",
+            "durationSec": 25,
+            "skipAfterSec": 5
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked"
+      ],
+      "recipe": "MegaHall + Props[室内海洋] + Modifiers[ShallowWater, VehicleRide]",
+      "notes": "v1.3 D25: 深水は保留。膝下 0.5 m の浅水 + 入口と全出口を結ぶ桟橋。ボートは VehicleRide C 案（車内待機 + 5 秒後スキップ）。"
+    },
+    {
+      "id": "L03",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "倉庫内麦畑",
+      "category": "倉庫+畑",
+      "baseTemplate": "MegaHall",
+      "generator": "MegaStructureGenerator",
+      "lightingPreset": "高所灯",
+      "audioPreset": "風で揺れる麦",
+      "primaryPortal": "path",
+      "minExits": 2,
+      "maxExits": 5,
+      "connectionRule": "農道交差・倉庫扉へ。",
+      "mapShape": "大矩形",
+      "dangerTag": 3,
+      "effectLabel": "植生インスタンス大量",
+      "modifiers": [
+        {
+          "id": "InstanceOvergrowth",
+          "params": {
+            "propId": "wheat",
+            "density": 1.0
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked",
+        "xl"
+      ],
+      "recipe": "MegaHall + Props[倉庫内麦畑] + Modifiers[InstanceOvergrowth]",
+      "notes": null
+    },
+    {
+      "id": "L04",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "無限グランドホテル",
+      "category": "巨大ホテル",
+      "baseTemplate": "MegaAtrium",
+      "generator": "MegaStructureGenerator",
+      "lightingPreset": "暖色豪華照明",
+      "audioPreset": "空調・遠いピアノ",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "客室/宴会場/階段/EVをグラフ生成。",
+      "mapShape": "多層アトリウム",
+      "dangerTag": 3,
+      "effectLabel": "ホテル都市",
+      "modifiers": [],
+      "layoutHints": [
+        "chunked",
+        "multiZone",
+        "vertical"
+      ],
+      "recipe": "MegaAtrium + Props[無限グランドホテル] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "L05",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "屋内学園都市",
+      "category": "学校都市",
+      "baseTemplate": "MegaAtrium",
+      "generator": "MegaStructureGenerator",
+      "lightingPreset": "昼白色",
+      "audioPreset": "館内反響",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "校舎・体育館・プール・通路をゾーン接続。",
+      "mapShape": "キャンパスグラフ",
+      "dangerTag": 3,
+      "effectLabel": "複合ゾーン",
+      "modifiers": [
+        {
+          "id": "ZoneThemeShuffle",
+          "params": {
+            "zoneCount": 6,
+            "presetPool": "campus"
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked",
+        "multiZone"
+      ],
+      "recipe": "MegaAtrium + Props[屋内学園都市] + Modifiers[ZoneThemeShuffle]",
+      "notes": "v1.1: バイオーム廃止に伴い「複合ゾーン」へ改名。"
+    },
+    {
+      "id": "L06",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "地下鉄ショッピングシティ",
+      "category": "地下街",
+      "baseTemplate": "Terminal",
+      "generator": "AtriumGenerator",
+      "lightingPreset": "商業照明",
+      "audioPreset": "放送・換気",
+      "primaryPortal": "stairs",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "駅/店舗/食品売場をハブ化。",
+      "mapShape": "ネットワーク",
+      "dangerTag": 3,
+      "effectLabel": "複合用途",
+      "modifiers": [],
+      "layoutHints": [
+        "chunked",
+        "multiZone"
+      ],
+      "recipe": "Terminal + Props[地下鉄ショッピングシティ] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "L07",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "垂直オフィス世界",
+      "category": "巨大アトリウム",
+      "baseTemplate": "MegaAtrium",
+      "generator": "MegaStructureGenerator",
+      "lightingPreset": "冷白色",
+      "audioPreset": "昇降機・空調",
+      "primaryPortal": "elevator",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "壁面オフィスをEV/橋で接続。",
+      "mapShape": "縦グラフ",
+      "dangerTag": 4,
+      "effectLabel": "垂直都市",
+      "modifiers": [],
+      "layoutHints": [
+        "chunked",
+        "vertical"
+      ],
+      "recipe": "MegaAtrium + Props[垂直オフィス世界] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "L08",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "終着しない国際空港",
+      "category": "空港",
+      "baseTemplate": "Terminal",
+      "generator": "AtriumGenerator",
+      "lightingPreset": "高照度白色",
+      "audioPreset": "放送・空調",
+      "primaryPortal": "gate",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "ターミナルを区画ストリーミング。",
+      "mapShape": "長大コンコース",
+      "dangerTag": 3,
+      "effectLabel": "終点なし",
+      "modifiers": [
+        {
+          "id": "LoopTopology",
+          "params": {
+            "loopLength": 4
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked",
+        "xl"
+      ],
+      "recipe": "Terminal + Props[終着しない国際空港] + Modifiers[LoopTopology]",
+      "notes": null
+    },
+    {
+      "id": "L09",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "無限温浴施設",
+      "category": "温浴施設",
+      "baseTemplate": "MegaAtrium",
+      "generator": "MegaStructureGenerator",
+      "lightingPreset": "暖色+水面光",
+      "audioPreset": "水音・換気",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "浴場/更衣/休憩/プールを循環接続。",
+      "mapShape": "多室連結",
+      "dangerTag": 3,
+      "effectLabel": "湿度演出",
+      "modifiers": [
+        {
+          "id": "Wetness",
+          "params": {
+            "wetness": 0.7
+          }
+        },
+        {
+          "id": "ParticleDetail",
+          "params": {
+            "type": "mist",
+            "density": 0.5
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked",
+        "multiZone"
+      ],
+      "recipe": "MegaAtrium + Props[無限温浴施設] + Modifiers[Wetness, ParticleDetail]",
+      "notes": null
+    },
+    {
+      "id": "L10",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "夜間郊外住宅地",
+      "category": "郊外",
+      "baseTemplate": "StreetGrid",
+      "generator": "StreetGenerator",
+      "lightingPreset": "街灯+室内灯",
+      "audioPreset": "虫・遠い車",
+      "primaryPortal": "street",
+      "minExits": 2,
+      "maxExits": 5,
+      "connectionRule": "道路/住宅/公園を接続。",
+      "mapShape": "街区グリッド",
+      "dangerTag": 3,
+      "effectLabel": "全戸点灯",
+      "modifiers": [
+        {
+          "id": "LightingPhase",
+          "params": {
+            "mode": "allWindowsLit"
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked"
+      ],
+      "recipe": "StreetGrid + Props[夜間郊外住宅地] + Modifiers[LightingPhase]",
+      "notes": null
+    },
+    {
+      "id": "L11",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "環状モノレール都市",
+      "category": "交通都市",
+      "baseTemplate": "MegaAtrium",
+      "generator": "MegaStructureGenerator",
+      "lightingPreset": "都市夜景光",
+      "audioPreset": "列車音",
+      "primaryPortal": "train",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "環状線駅をハブ接続。",
+      "mapShape": "大リング",
+      "dangerTag": 4,
+      "effectLabel": "循環交通",
+      "modifiers": [
+        {
+          "id": "VehicleRide",
+          "params": {
+            "vehicleType": "monorail",
+            "durationSec": 30,
+            "skipAfterSec": 5
+          }
+        },
+        {
+          "id": "LoopTopology",
+          "params": {
+            "loopLength": 1
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked"
+      ],
+      "recipe": "MegaAtrium + Props[環状モノレール都市] + Modifiers[VehicleRide, LoopTopology]",
+      "notes": "v1.3 D16（C 案）: モノレール車内で durationSec 待つ。5 秒経過後は E / タップで到着を早められる。環状 footprint そのもので満たし、グラフ辺の自己接続は作らない。"
+    },
+    {
+      "id": "L12",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "設備大聖堂",
+      "category": "設備ホール",
+      "baseTemplate": "MegaHall",
+      "generator": "MegaStructureGenerator",
+      "lightingPreset": "高コントラスト",
+      "audioPreset": "機械低音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "配管橋・制御室・階段で接続。",
+      "mapShape": "大聖堂型",
+      "dangerTag": 3,
+      "effectLabel": "巨大設備",
+      "modifiers": [
+        {
+          "id": "ScaleAnomaly",
+          "params": {
+            "mode": "perProp",
+            "min": 3,
+            "max": 8
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked"
+      ],
+      "recipe": "MegaHall + Props[設備大聖堂] + Modifiers[ScaleAnomaly]",
+      "notes": null
+    },
+    {
+      "id": "L13",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "サーバー森林",
+      "category": "データセンター",
+      "baseTemplate": "ServerGrid",
+      "generator": "GridGenerator",
+      "lightingPreset": "LED+冷白色",
+      "audioPreset": "ファン群",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "保守通路・冷却室へ接続。",
+      "mapShape": "ラックグリッド",
+      "dangerTag": 3,
+      "effectLabel": "インスタンス密度高",
+      "modifiers": [
+        {
+          "id": "PropRepetition",
+          "params": {
+            "propId": "serverRack",
+            "density": 1.0
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked"
+      ],
+      "recipe": "ServerGrid + Props[サーバー森林] + Modifiers[PropRepetition]",
+      "notes": null
+    },
+    {
+      "id": "L14",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "温室都市",
+      "category": "温室モール",
+      "baseTemplate": "MegaAtrium",
+      "generator": "MegaStructureGenerator",
+      "lightingPreset": "自然光風+育成灯",
+      "audioPreset": "滴水・葉擦れ",
+      "primaryPortal": "path",
+      "minExits": 2,
+      "maxExits": 5,
+      "connectionRule": "橋・庭園・店舗跡を接続。",
+      "mapShape": "有機ネットワーク",
+      "dangerTag": 3,
+      "effectLabel": "植生侵食",
+      "modifiers": [
+        {
+          "id": "InstanceOvergrowth",
+          "params": {
+            "density": 0.9,
+            "blocksPath": true
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked",
+        "multiZone"
+      ],
+      "recipe": "MegaAtrium + Props[温室都市] + Modifiers[InstanceOvergrowth]",
+      "notes": null
+    },
+    {
+      "id": "L15",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "屋内高速道路",
+      "category": "高速道路",
+      "baseTemplate": "RoadGraph",
+      "generator": "StreetGenerator",
+      "lightingPreset": "ナトリウム/LED",
+      "audioPreset": "換気・道路音幻聴",
+      "primaryPortal": "ramp",
+      "minExits": 2,
+      "maxExits": 5,
+      "connectionRule": "ランプ分岐をPortalとして扱う。",
+      "mapShape": "ジャンクション",
+      "dangerTag": 4,
+      "effectLabel": "高速移動",
+      "modifiers": [
+        {
+          "id": "ExternalForce",
+          "params": {
+            "mode": "conveyor",
+            "speed": 6.0
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked"
+      ],
+      "recipe": "RoadGraph + Props[屋内高速道路] + Modifiers[ExternalForce]",
+      "notes": "高速移動は車線の動く床として表現。"
+    },
+    {
+      "id": "L16",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "空間博物館",
+      "category": "博物館",
+      "baseTemplate": "Gallery",
+      "generator": "RoomGenerator",
+      "lightingPreset": "展示灯",
+      "audioPreset": "静かな空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "展示室ごとに過去テンプレの縮小版。",
+      "mapShape": "回遊リング",
+      "dangerTag": 3,
+      "effectLabel": "既訪空間引用",
+      "modifiers": [
+        {
+          "id": "GraphReference",
+          "params": {
+            "mode": "past",
+            "count": 8
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "Gallery + Props[空間博物館] + Modifiers[GraphReference]",
+      "notes": null
+    },
+    {
+      "id": "L17",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "無限団地",
+      "category": "集合住宅群",
+      "baseTemplate": "StreetGrid",
+      "generator": "StreetGenerator",
+      "lightingPreset": "夜間共用灯",
+      "audioPreset": "室外機・風",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "棟/階段/住戸を再帰生成。",
+      "mapShape": "反復街区",
+      "dangerTag": 3,
+      "effectLabel": "反復巨大化",
+      "modifiers": [
+        {
+          "id": "PropRepetition",
+          "params": {
+            "propId": "apartmentBlock",
+            "density": 1.0
+          }
+        },
+        {
+          "id": "ScaleAnomaly",
+          "params": {
+            "mode": "room",
+            "scale": 1.5
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked",
+        "xl"
+      ],
+      "recipe": "StreetGrid + Props[無限団地] + Modifiers[PropRepetition, ScaleAnomaly]",
+      "notes": "「無限」は有限の巨大団地。1 RoomNode 内部をチャンク分割（v1.3 D13: 軸並行格子 24〜32 m、Mega 60〜160 m）。"
+    },
+    {
+      "id": "L18",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "駐車場メガストラクチャ",
+      "category": "駐車場",
+      "baseTemplate": "ParkingGrid",
+      "generator": "ParkingGenerator",
+      "lightingPreset": "列灯",
+      "audioPreset": "換気扇",
+      "primaryPortal": "ramp",
+      "minExits": 2,
+      "maxExits": 5,
+      "connectionRule": "上下スロープと階段を連結。",
+      "mapShape": "多層グリッド",
+      "dangerTag": 3,
+      "effectLabel": "巨大階層",
+      "modifiers": [],
+      "layoutHints": [
+        "chunked",
+        "multiLevel"
+      ],
+      "recipe": "ParkingGrid + Props[駐車場メガストラクチャ] + Modifiers[なし]",
+      "notes": null
+    },
+    {
+      "id": "L19",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "凍結リゾート",
+      "category": "リゾート",
+      "baseTemplate": "MegaAtrium",
+      "generator": "MegaStructureGenerator",
+      "lightingPreset": "青白色+暖色室内",
+      "audioPreset": "風・氷音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "ホテル/プール/雪面を接続。",
+      "mapShape": "複合地形",
+      "dangerTag": 4,
+      "effectLabel": "滑走・低温",
+      "modifiers": [
+        {
+          "id": "SurfaceFriction",
+          "params": {
+            "friction": 0.2
+          }
+        },
+        {
+          "id": "FogDepth",
+          "params": {
+            "color": "#dfe7ee",
+            "near": 10,
+            "far": 80
+          }
+        },
+        {
+          "id": "ParticleDetail",
+          "params": {
+            "type": "snow",
+            "density": 0.3
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked"
+      ],
+      "recipe": "MegaAtrium + Props[凍結リゾート] + Modifiers[SurfaceFriction, FogDepth, ParticleDetail]",
+      "notes": null
+    },
+    {
+      "id": "L20",
+      "rarity": "Legendary",
+      "weight": 2.5,
+      "name": "永久万博会場",
+      "category": "展示都市",
+      "baseTemplate": "StreetGrid",
+      "generator": "StreetGenerator",
+      "lightingPreset": "白色+展示カラー",
+      "audioPreset": "遠いアナウンス",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "各パビリオンをランダムテーマ化。",
+      "mapShape": "パビリオングラフ",
+      "dangerTag": 3,
+      "effectLabel": "テーマ乱択",
+      "modifiers": [
+        {
+          "id": "ZoneThemeShuffle",
+          "params": {
+            "zoneCount": 8,
+            "presetPool": "any"
+          }
+        }
+      ],
+      "layoutHints": [
+        "chunked",
+        "multiZone"
+      ],
+      "recipe": "StreetGrid + Props[永久万博会場] + Modifiers[ZoneThemeShuffle]",
+      "notes": null
+    },
+    {
+      "id": "M01",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "地図室",
+      "category": "制御室",
+      "baseTemplate": "SmallRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色作業灯",
+      "audioPreset": "紙擦れ・低い電子音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "壁マップが現在グラフを可視化。隠し接続も示唆。",
+      "mapShape": "矩形",
+      "dangerTag": 4,
+      "effectLabel": "自己参照マップ",
+      "modifiers": [
+        {
+          "id": "SelfMap"
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "SmallRoom + Props[地図室] + Modifiers[SelfMap]",
+      "notes": null
+    },
+    {
+      "id": "M02",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "未記録室",
+      "category": "空室",
+      "baseTemplate": "SmallRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "無音に近い",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "退出後、通常マップからノードを非表示化。",
+      "mapShape": "単セル",
+      "dangerTag": 4,
+      "effectLabel": "地図から消失",
+      "modifiers": [
+        {
+          "id": "MapErase",
+          "params": {
+            "hidePolicy": "self"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "SmallRoom + Props[未記録室] + Modifiers[MapErase]",
+      "notes": null
+    },
+    {
+      "id": "M03",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "移動座標室",
+      "category": "廊下",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "電子表示音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "一定条件でグラフ上の接続先を交換。",
+      "mapShape": "動的ノード",
+      "dangerTag": 5,
+      "effectLabel": "ノード移動",
+      "modifiers": [
+        {
+          "id": "DynamicMapNode",
+          "params": {
+            "swapIntervalSec": 45
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[移動座標室] + Modifiers[DynamicMapNode]",
+      "notes": "swap 対象は未探索エッジのみ。戻りエッジと開始点への到達可能性は不変。"
+    },
+    {
+      "id": "M04",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "偽帰還口",
+      "category": "前室",
+      "baseTemplate": "SmallRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "自然光",
+      "audioPreset": "屋外環境音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "出口風景は開始地点風だが別ノードへ戻す。",
+      "mapShape": "単セル",
+      "dangerTag": 4,
+      "effectLabel": "偽エンディング",
+      "modifiers": [
+        {
+          "id": "FakeExit",
+          "params": {
+            "returnDepth": 3,
+            "showEndingOverlay": true
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "SmallRoom + Props[偽帰還口] + Modifiers[FakeExit]",
+      "notes": "終了条件が無いため、偽エンディングは UI オーバーレイ演出のみ。"
+    },
+    {
+      "id": "M07",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "動くマップタイル",
+      "category": "可変床",
+      "baseTemplate": "DynamicGrid",
+      "generator": "DynamicGridGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "床駆動音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "床セルが移動し経路グラフも更新。",
+      "mapShape": "動的グリッド",
+      "dangerTag": 5,
+      "effectLabel": "ライブ再配線",
+      "modifiers": [
+        {
+          "id": "DynamicMapNode",
+          "params": {
+            "swapIntervalSec": 20
+          }
+        },
+        {
+          "id": "MovingWalls",
+          "params": {
+            "speed": 0.5
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "DynamicGrid + Props[動くマップタイル] + Modifiers[DynamicMapNode, MovingWalls]",
+      "notes": "v1.3 D25: 外殻・出口ソケットは固定し、内部の壁ブロックのみ可動。再配線は未構築・非観測の接続に限定（意図的 Seam）。"
+    },
+    {
+      "id": "M08",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "不可能なショートカット",
+      "category": "前室",
+      "baseTemplate": "SmallRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "接続先環境音混在",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "遠距離ノードへ直接接続。",
+      "mapShape": "ワームホール",
+      "dangerTag": 3,
+      "effectLabel": "距離無視",
+      "modifiers": [
+        {
+          "id": "FarLink",
+          "params": {
+            "minGraphDistance": 30
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "SmallRoom + Props[不可能なショートカット] + Modifiers[FarLink]",
+      "notes": "Seam Portal（FarLink。意図的 Seam、一方通行）。v1.3 D18: FarLink の使用部屋は M08 のみ。"
+    },
+    {
+      "id": "M11",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "多重扉室",
+      "category": "アトリウム",
+      "baseTemplate": "AtriumLobby",
+      "generator": "AtriumGenerator",
+      "lightingPreset": "暖色扉灯",
+      "audioPreset": "扉の軋み",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "見た目上複数扉だが同一Portal IDを共有。",
+      "mapShape": "多重エッジ",
+      "dangerTag": 4,
+      "effectLabel": "多重表現",
+      "modifiers": [
+        {
+          "id": "MultiEdge",
+          "params": {
+            "edgeCount": 4
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "AtriumLobby + Props[多重扉室] + Modifiers[MultiEdge]",
+      "notes": "主扉 1 枚を物理接続、他 3 枚は mirrorOf で開閉状態を共有する Seam（意図的 Seam）。"
+    },
+    {
+      "id": "M12",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "巨大Common",
+      "category": "巨大廊下",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "白色列灯",
+      "audioPreset": "巨大反響",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "Commonテンプレを10～30倍スケールで再構築。",
+      "mapShape": "巨大直線",
+      "dangerTag": 4,
+      "effectLabel": "スケール反転",
+      "modifiers": [
+        {
+          "id": "ScaleAnomaly",
+          "params": {
+            "mode": "room",
+            "scale": 4.0
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[巨大Common] + Modifiers[ScaleAnomaly]",
+      "notes": null
+    },
+    {
+      "id": "M13",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "未描画空間",
+      "category": "白空間",
+      "baseTemplate": "LargeRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "環境白色",
+      "audioPreset": "ほぼ無音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "視覚ランドマークを排除、出口だけ配置。",
+      "mapShape": "無境界",
+      "dangerTag": 4,
+      "effectLabel": "テクスチャ不在",
+      "modifiers": [
+        {
+          "id": "RenderStyle",
+          "params": {
+            "style": "untextured"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "LargeRoom + Props[未描画空間] + Modifiers[RenderStyle]",
+      "notes": null
+    },
+    {
+      "id": "M14",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "照明一本の虚空",
+      "category": "虚空歩廊",
+      "baseTemplate": "Bridge",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "単一蛍光灯",
+      "audioPreset": "蛍光灯ハム",
+      "primaryPortal": "bridge",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "一定区間ごとに照明/橋を生成・破棄。",
+      "mapShape": "細長直線",
+      "dangerTag": 5,
+      "effectLabel": "暗闇ストリーミング",
+      "modifiers": [
+        {
+          "id": "LightingPhase",
+          "params": {
+            "mode": "singleLight"
+          }
+        },
+        {
+          "id": "FogDepth",
+          "params": {
+            "color": "#000000",
+            "near": 2,
+            "far": 18
+          }
+        }
+      ],
+      "layoutHints": [
+        "voidBelow"
+      ],
+      "recipe": "Bridge + Props[照明一本の虚空] + Modifiers[LightingPhase, FogDepth]",
+      "notes": null
+    },
+    {
+      "id": "M16",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "没部屋博物館",
+      "category": "展示室",
+      "baseTemplate": "Gallery",
+      "generator": "RoomGenerator",
+      "lightingPreset": "展示灯",
+      "audioPreset": "静かな空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "通常生成から除外されたテンプレ候補を展示。",
+      "mapShape": "回遊",
+      "dangerTag": 4,
+      "effectLabel": "生成履歴引用",
+      "modifiers": [
+        {
+          "id": "GraphReference",
+          "params": {
+            "mode": "past",
+            "count": 12
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "Gallery + Props[没部屋博物館] + Modifiers[GraphReference]",
+      "notes": null
+    },
+    {
+      "id": "M17",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "旧バージョン階",
+      "category": "プロトタイプ",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "フラット白色",
+      "audioPreset": "古いSE風",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "低LOD/旧材質セットで生成。",
+      "mapShape": "簡素グリッド",
+      "dangerTag": 4,
+      "effectLabel": "旧版レンダリング",
+      "modifiers": [
+        {
+          "id": "RenderStyle",
+          "params": {
+            "style": "legacy"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[旧バージョン階] + Modifiers[RenderStyle]",
+      "notes": null
+    },
+    {
+      "id": "M18",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "天候記憶室",
+      "category": "観測室",
+      "baseTemplate": "SmallRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "前階の色調",
+      "audioPreset": "前階の天候音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "直前Legendary/Rareの環境パラメータをコピー。",
+      "mapShape": "矩形",
+      "dangerTag": 4,
+      "effectLabel": "環境記憶",
+      "modifiers": [
+        {
+          "id": "AmbientCarryover",
+          "params": {
+            "source": "lastVisited"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "SmallRoom + Props[天候記憶室] + Modifiers[AmbientCarryover]",
+      "notes": null
+    },
+    {
+      "id": "M19",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "方位破壊区画",
+      "category": "通路",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "空調",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "ミニマップ北とワールド北を回転ずらし。",
+      "mapShape": "向き不整合",
+      "dangerTag": 5,
+      "effectLabel": "座標系不一致",
+      "modifiers": [
+        {
+          "id": "MapRotation",
+          "params": {
+            "angle": 90,
+            "drift": true
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[方位破壊区画] + Modifiers[MapRotation]",
+      "notes": null
+    }
+  ],
+  "omitted": [
+    {
+      "id": "E10",
+      "rarity": "Epic",
+      "weight": 5,
+      "name": "天井エスカレーター",
+      "category": "エスカレーター",
+      "baseTemplate": "VerticalCore",
+      "generator": "VerticalGenerator",
+      "lightingPreset": "ライン光",
+      "audioPreset": "駆動音",
+      "primaryPortal": "escalator",
+      "minExits": 1,
+      "maxExits": 3,
+      "connectionRule": "床→壁→天井へ移動。",
+      "mapShape": "3軸曲線",
+      "dangerTag": 4,
+      "effectLabel": "重力追従経路",
+      "modifiers": [
+        {
+          "id": "GravityAxis",
+          "params": {
+            "mode": "pathFollow"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "VerticalCore + Props[天井エスカレーター] + Modifiers[GravityAxis]",
+      "notes": "v1.3 オミット（欠番として ID は保持）: 重力追従経路（pathFollow）は酔い対策と実装規模のためオミット。",
+      "status": "omitted",
+      "omitReason": "v1.3 オミット（欠番として ID は保持）: 重力追従経路（pathFollow）は酔い対策と実装規模のためオミット。"
+    },
+    {
+      "id": "M05",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "俯瞰記号フロア",
+      "category": "複合室",
+      "baseTemplate": "GraphMacro",
+      "generator": "GraphMacroGenerator",
+      "lightingPreset": "規則照明",
+      "audioPreset": "低周波",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "複数部屋配置そのものがシンボルを形成。",
+      "mapShape": "記号形グラフ",
+      "dangerTag": 4,
+      "effectLabel": "マクロ形状",
+      "modifiers": [],
+      "layoutHints": [],
+      "recipe": "GraphMacro + Props[俯瞰記号フロア] + Modifiers[なし]",
+      "notes": "v1.3 オミット（欠番として ID は保持）: 複数部屋の同時配置（記号形サブグラフ）が必要なためオミット。",
+      "status": "omitted",
+      "omitReason": "v1.3 オミット（欠番として ID は保持）: 複数部屋の同時配置（記号形サブグラフ）が必要なためオミット。"
+    },
+    {
+      "id": "M06",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "100%扉",
+      "category": "特別前室",
+      "baseTemplate": "SmallRoom",
+      "generator": "RoomGenerator",
+      "lightingPreset": "金色局所灯",
+      "audioPreset": "低い共鳴音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "探索率100%条件でのみ有効化。",
+      "mapShape": "単セル",
+      "dangerTag": 4,
+      "effectLabel": "完成度ゲート",
+      "modifiers": [
+        {
+          "id": "DiscoveryGate",
+          "params": {
+            "threshold": 100
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "SmallRoom + Props[100%扉] + Modifiers[DiscoveryGate]",
+      "notes": "v1.3 オミット（欠番として ID は保持）: 優先度によりオミット（DiscoveryGate は保留）。",
+      "status": "omitted",
+      "omitReason": "v1.3 オミット（欠番として ID は保持）: 優先度によりオミット（DiscoveryGate は保留）。"
+    },
+    {
+      "id": "M10",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "巻き戻しフロア",
+      "category": "廊下/待合",
+      "baseTemplate": "GenericCorridor",
+      "generator": "CorridorGenerator",
+      "lightingPreset": "白色灯",
+      "audioPreset": "逆再生環境音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "部屋状態を数分前のスナップショットへ戻す。",
+      "mapShape": "状態スナップショット",
+      "dangerTag": 5,
+      "effectLabel": "状態巻戻し",
+      "modifiers": [
+        {
+          "id": "RewindState",
+          "params": {
+            "seconds": 20
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "GenericCorridor + Props[巻き戻しフロア] + Modifiers[RewindState]",
+      "notes": "v1.3 オミット（欠番として ID は保持）: 優先度によりオミット（RewindState は保留）。",
+      "status": "omitted",
+      "omitReason": "v1.3 オミット（欠番として ID は保持）: 優先度によりオミット（RewindState は保留）。"
+    },
+    {
+      "id": "M15",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "壁の裏側",
+      "category": "構造裏",
+      "baseTemplate": "ServiceMaze",
+      "generator": "GridGenerator",
+      "lightingPreset": "作業灯",
+      "audioPreset": "配線・配管音",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "表側部屋の壁裏座標と対応。",
+      "mapShape": "細密迷路",
+      "dangerTag": 4,
+      "effectLabel": "世界の裏面",
+      "modifiers": [
+        {
+          "id": "RenderStyle",
+          "params": {
+            "style": "backside"
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "ServiceMaze + Props[壁の裏側] + Modifiers[RenderStyle]",
+      "notes": "v1.3 オミット（欠番として ID は保持）: 優先度によりオミット（RenderStyle backside は保留）。",
+      "status": "omitted",
+      "omitReason": "v1.3 オミット（欠番として ID は保持）: 優先度によりオミット（RenderStyle backside は保留）。"
+    },
+    {
+      "id": "M20",
+      "rarity": "Mythic",
+      "weight": 0.5,
+      "name": "中央接続室",
+      "category": "ハブ",
+      "baseTemplate": "HubRoom",
+      "generator": "HubGenerator",
+      "lightingPreset": "暖色荘厳灯",
+      "audioPreset": "複数環境音の混合",
+      "primaryPortal": "door",
+      "minExits": 1,
+      "maxExits": 4,
+      "connectionRule": "既発見Legendaryへ複数直結Portal。",
+      "mapShape": "スター型",
+      "dangerTag": 4,
+      "effectLabel": "メタハブ",
+      "modifiers": [
+        {
+          "id": "FarLink",
+          "params": {
+            "targetFilter": "discoveredLegendary",
+            "count": 4
+          }
+        }
+      ],
+      "layoutHints": [],
+      "recipe": "HubRoom + Props[中央接続室] + Modifiers[FarLink]",
+      "notes": "v1.3 オミット（欠番として ID は保持）: 優先度によりオミット（HubGenerator は不要。FarLink は M08 のみ）。",
+      "status": "omitted",
+      "omitReason": "v1.3 オミット（欠番として ID は保持）: 優先度によりオミット（HubGenerator は不要。FarLink は M08 のみ）。"
+    }
+  ]
+}

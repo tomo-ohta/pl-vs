@@ -1,0 +1,52 @@
+{
+  "surfaceRevision": "surface-environment-1",
+  "surfaceEnvironment": true,
+  "surfaceWear": true,
+  "surfaceVariation": true,
+  "revision": "corridor-material-lighting-1",
+  "room": "C02",
+  "seed": 42,
+  "variant": 0,
+  "view": "environment",
+  "quality": "high",
+  "doorsOpen": false,
+  "exposure": 1.25,
+  "diagnostic": "environment",
+  "time": 0,
+  "camera": {
+    "position": [
+      -0.3999999999999999,
+      0.85,
+      3.5
+    ],
+    "quaternion": [
+      -0.08312452768059209,
+      0.9050730564810376,
+      0.20818856651910447,
+      0.3613732088861481
+    ],
+    "fov": 72
+  },
+  "viewport": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "generationMs": 34,
+  "calls": 28,
+  "triangles": 4452,
+  "memoryCounts": {
+    "geometries": 23,
+    "textures": 20
+  },
+  "measurement": null,
+  "referenceRooms": [
+    "C02",
+    "C06",
+    "C13",
+    "C18",
+    "C20",
+    "U10"
+  ]
+}

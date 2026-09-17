@@ -1,0 +1,86 @@
+{
+  "props": {
+    "modelInstances": {
+      "metal_office_desk": 88,
+      "pachira_aquatica_01": 2
+    },
+    "modelPartInstances": {
+      "metal_office_desk": 88,
+      "pachira_aquatica_01": 4
+    },
+    "errors": [],
+    "vehicles": 0
+  },
+  "surfaceRevision": "surface-environment-1",
+  "surfaceEnvironment": true,
+  "surfaceWear": true,
+  "surfaceVariation": true,
+  "revision": "v01-v02-complete-1",
+  "room": "U14",
+  "seed": 42,
+  "variant": 0,
+  "view": "furniture",
+  "quality": "high",
+  "doorsOpen": false,
+  "exposure": 1.25,
+  "diagnostic": "beauty",
+  "time": 0,
+  "camera": {
+    "position": [
+      -11.424680494427411,
+      1.25,
+      4.525939884514075
+    ],
+    "quaternion": [
+      -0.1204934296360249,
+      0.41572025536873497,
+      0.05567245993920374,
+      0.8997547331884506
+    ],
+    "fov": 72
+  },
+  "imagingPreset": "off",
+  "mirroredUV": false,
+  "device": {
+    "platform": "MacIntel",
+    "cores": 10
+  },
+  "materialIds": [
+    "floorCarpetGrey",
+    "ceilingTile",
+    "wallWhite",
+    "columnConcrete",
+    "furnitureLight",
+    "furnitureDark",
+    "lightPanel",
+    "lightOff",
+    "bookshelfWood",
+    "wallDark",
+    "plant"
+  ],
+  "lighting": "scene",
+  "viewport": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "generationMs": 75,
+  "calls": 27,
+  "triangles": 554429,
+  "memoryCounts": {
+    "geometries": 40,
+    "textures": 99
+  },
+  "measurement": null,
+  "referenceRooms": [
+    "C02",
+    "C06",
+    "C13",
+    "C18",
+    "C20",
+    "U10",
+    "R01",
+    "R07"
+  ]
+}

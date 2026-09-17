@@ -1,0 +1,29 @@
+{
+  "name": "pro-liminal",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Liminal space exploration web game - Phase 1 vertical slice (TypeScript + Three.js + WebGL2)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "data": "python3 tools/xlsx_to_json.py",
+    "seamstats": "node tools/seam-stats.mjs",
+    "build:cc0": "node tools/build-cc0-materials.mjs --max 1024 --aux 512",
+    "build:cc0:models": "node tools/build-cc0-models.mjs",
+    "build:cc0:all": "npm run build:cc0 && npm run build:cc0:models",
+    "build:pages": "BASE_PATH=/pl-vs/ vite build && cp public/robots.txt dist/robots.txt && touch dist/.nojekyll",
+    "deploy:pages": "npm run build:pages && gh-pages -d dist --dotfiles -m \"deploy: GitHub Pages\""
+  },
+  "dependencies": {
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "gh-pages": "^6.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}
