@@ -1,0 +1,53 @@
+{
+  "tool": "built-in image_gen",
+  "assets": [
+    {
+      "name": "wallpaper",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR base-color texture for a photorealistic liminal-space exploration game. Create a full-frame orthographic flat scan of aged pale ivory vinyl wallpaper, fine woven embossed fibers and very faint vertical hairline bands, understated 1980s commercial office wall covering. Neutral desaturated warm off-white, exceptionally realistic microscopic material detail, restrained age discoloration, no large stains. Uniform diffuse cross-polarized lighting, NO shadows, NO specular highlights, no perspective, no objects, no borders, no text, no watermark. Seamlessly tileable on all four edges, consistent brightness across entire image. Square 1024x1024 texture, not a room render."
+    },
+    {
+      "name": "carpet",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR albedo texture for a realistic liminal-space game. Desaturated warm gray commercial loop-pile carpet, fine densely woven mottled wool and nylon fibers, subtle irregular wear, no ornamental pattern. Represents a 1 meter square. Full-frame orthographic cross-polarized photographic material scan. Perfectly even neutral diffuse lighting, no baked directional shadows or highlights, no perspective, no objects, text, border or watermark. Fine authentic physical detail, not an illustration. All four edges must tile seamlessly, brightness uniform edge to edge. 1024x1024 square."
+    },
+    {
+      "name": "concrete",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR albedo texture for a realistic liminal-space game. Neutral warm gray smooth poured concrete, fine sand aggregate, tiny pinholes, faint trowel marks and soft mottling, clean maintained old institutional building, no cracks or large damage. Represents a 2 meter square. Full-frame orthographic cross-polarized photographic material scan. Perfectly even neutral diffuse lighting, no baked directional shadows or highlights, no perspective, no objects, text, border or watermark. Fine authentic physical detail, not an illustration. All four edges must tile seamlessly, brightness uniform edge to edge. 1024x1024 square."
+    },
+    {
+      "name": "wood",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR albedo texture for a realistic liminal-space game. Pale honey brown straight-grained oak veneer, long very fine vertical wood grain, subtle natural variation, old commercial furniture and flush door veneer, no planks, no seams, no knots. Represents a 1 meter square. Full-frame orthographic cross-polarized photographic material scan. Perfectly even neutral diffuse lighting, no baked directional shadows or highlights, no perspective, no objects, text, border or watermark. Fine authentic physical detail, not an illustration. All four edges must tile seamlessly, brightness uniform edge to edge. 1024x1024 square."
+    },
+    {
+      "name": "ceiling",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR albedo texture for a realistic liminal-space game. Off-white mineral fiber acoustic ceiling tile material, fine irregular pinholes and fissures, flat matte surface, maintained old office, no grid bars, no tile borders. Represents a 60 centimeter square. Full-frame orthographic cross-polarized photographic material scan. Perfectly even neutral diffuse lighting, no baked directional shadows or highlights, no perspective, no objects, text, border or watermark. Fine authentic physical detail, not an illustration. All four edges must tile seamlessly, brightness uniform edge to edge. 1024x1024 square."
+    },
+    {
+      "name": "tile",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR base-color texture for a photoreal liminal-space game. Neutral ivory white ceramic glazed square tiles, exact 4 by 4 regular grid of equally sized tiles with thin muted gray grout, each tile softly mottled but mostly uniform off-white, realistic tiny surface imperfections. Tiles continue across image borders, grout centered on the image edges. Represents 1.2 meters square. Full-frame orthographic flat photographic scan, cross polarized evenly lit material, NO perspective, no directional light, shadows, specular highlights, border, watermark, or text. Authentic subtle surface detail, tileable on all 4 edges. Square 1024x1024."
+    },
+    {
+      "name": "metal",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR base-color texture for a photoreal liminal-space game. Neutral light gray satin brushed stainless steel sheet, very fine straight vertical brushing, microscopic scattered hairline scratches, no major scratches, no rust, no seams, no rivets. Full-frame orthographic flat photographic scan, cross polarized evenly lit material, NO perspective, no directional light, shadows, specular highlights, border, watermark, or text. Authentic subtle surface detail, tileable on all 4 edges. Square 1024x1024."
+    },
+    {
+      "name": "linoleum",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR base-color texture for a photoreal liminal-space game. Pale warm gray commercial vinyl linoleum floor with tiny randomly distributed beige gray mineral flecks, subtle cloudy marbling, old institutional flooring maintained and clean, no seams. Full-frame orthographic flat photographic scan, cross polarized evenly lit material, NO perspective, no directional light, shadows, specular highlights, border, watermark, or text. Authentic subtle surface detail, tileable on all 4 edges. Square 1024x1024."
+    },
+    {
+      "name": "cardboard",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR base-color texture for a photoreal liminal-space game. Brown kraft cardboard surface, fine realistic recycled paper fibers, faint vertical corrugation showing through paper, restrained wear, no tape, printing, text, seams or package borders. Full-frame orthographic flat photographic scan, cross polarized evenly lit material, NO perspective, no directional light, shadows, specular highlights, border, watermark, or text. Authentic subtle surface detail, tileable on all 4 edges. Square 1024x1024."
+    },
+    {
+      "name": "foliage",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR base-color texture for a photoreal liminal-space game. Dense small overlapping dark green ficus leaves viewed straight down, realistic leaf veins and varied green tones, fills entire image, no pot, no background, very soft even diffuse lighting with minimal occlusion. Full-frame orthographic flat photographic scan, cross polarized evenly lit material, NO perspective, no directional light, shadows, specular highlights, border, watermark, or text. Authentic subtle surface detail, tileable on all 4 edges. Square 1024x1024."
+    },
+    {
+      "name": "diffuser",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless square PBR base-color texture for a photoreal liminal-space game. Off-white translucent prismatic fluorescent lighting diffuser plastic, tiny regular pyramidal lens pattern, neutral photographic material scan, unlit surface with subtle translucent texture, no fixture or border. Full-frame orthographic flat photographic scan, cross polarized evenly lit material, NO perspective, no directional light, shadows, specular highlights, border, watermark, or text. Authentic subtle surface detail, tileable on all 4 edges. Square 1024x1024."
+    },
+    {
+      "name": "water",
+      "prompt": "Use case: photorealistic-natural. Asset type: tileable square texture of very gentle shallow pool water ripples, straight-down orthographic full frame, extremely subtle small overlapping undulations, neutral pale gray low contrast surface to tint in a PBR shader. No pool edges, objects, deep dark waves, dramatic highlights, horizon, text or border. Uniform lighting and brightness across image, seamless edges. Fine photographic detail, 1024x1024."
+    }
+  ]
+}

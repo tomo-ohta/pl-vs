@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+# CC0 素材（tools/fetch-cc0-assets.py と npm run build:cc0:all で再生成）
+assets/cc0/models/
+assets/cc0/materials/
+public/cc0/
+assets/cc0/textures/
+.DS_Store

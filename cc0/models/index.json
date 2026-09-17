@@ -1,0 +1,63 @@
+{
+ "dining_table": {
+  "gltf": "models/dining_table/dining_table_1k.gltf",
+  "group": "tables/desks",
+  "size": [
+   2.256,
+   0.877,
+   1.39
+  ],
+  "min": [
+   -1.133,
+   -0.004,
+   -0.678
+  ],
+  "max": [
+   1.123,
+   0.873,
+   0.712
+  ],
+  "triangles": 1048
+ },
+ "metal_office_desk": {
+  "gltf": "models/metal_office_desk/metal_office_desk_1k.gltf",
+  "group": "tables/desks",
+  "size": [
+   2,
+   0.788,
+   0.947
+  ],
+  "min": [
+   -1,
+   0,
+   -0.469
+  ],
+  "max": [
+   1,
+   0.788,
+   0.478
+  ],
+  "triangles": 6898
+ },
+ "pachira_aquatica_01": {
+  "gltf": "models/pachira_aquatica_01/pachira_aquatica_01_1k.gltf",
+  "group": "waste/plants",
+  "size": [
+   0.744,
+   1.302,
+   0.647
+  ],
+  "min": [
+   -2.309,
+   -0.018,
+   -0.276
+  ],
+  "max": [
+   -1.565,
+   1.284,
+   0.37
+  ],
+  "triangles": 23167,
+  "part": "_a$"
+ }
+}
