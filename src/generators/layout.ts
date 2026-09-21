@@ -154,8 +154,10 @@ export interface DynamicSpec {
 
 /** 材質・描画の部屋別上書き。RoomBuilder が MaterialLibrary.variant に渡す */
 export interface RenderOverrides {
-  /** 濡れ（0..1）。roughness を下げ envMap を強める */
+  /** 濡れ（0..1）。roughness を下げ envMap を強める（壁・天井・家具にも掛かる） */
   wetness?: number;
+  /** 床だけの濡れ（0..1）。床材（floor* / marbleFloor）にだけ掛かる（E01 / E07 / E09 の艶床）。wetness と併用時は強い方 */
+  floorWetness?: number;
   /** 色欠損（ColorMissing）。乗算マスク */
   colorMask?: [number, number, number];
   /** untextured: 白無地（扉パネルは通常材質）/ legacy: 低解像度 NearestFilter + 量子化陰影 */
@@ -226,7 +228,12 @@ export interface RoomLayout {
   shellCount?: number;
   zones?: Zone[];
   instances?: InstanceSpec[];
-  particles?: ParticleSpec;
+  /**
+   * パーティクル。単一（従来）または複数スロット（L09 の浴槽ごとの湯気 + 全体の mist など）。
+   * 読むときは `particleList(L)`（generators/particles.ts）で配列に正規化する。RoomBuilder はスロットごとに Points を作り、
+   * 粒数の合計を Tier の particleCap に収める（超えるときは各スロットを比例で削る）。
+   */
+  particles?: ParticleSpec | ParticleSpec[];
   signs?: SignSpec[];
   decals?: DecalSpec[];
   dynamics?: DynamicSpec[];

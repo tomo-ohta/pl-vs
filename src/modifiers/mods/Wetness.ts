@@ -6,7 +6,7 @@
  *   - L.render.wetness = w。RoomBuilder が MaterialLibrary.wetnessOverrides（roughness ↓ / 色 ↓ / envMap ↑。uniform 差のみ）を全材質に掛ける。
  *   - 水たまり: 床上 0.004 m の 'water' 箔を decals に（面積/25 個、上限 40。ソケット・家具の足元を避ける）。Tier の decals=false なら RoomBuilder が省く。
  *   - 壁の濡れ跡: 外壁の内面 y 0〜(0.15+0.15w) の 'wallDark' 帯を decals に（開口は除く）。
- *   - 雨域連動（U07）: 同じ担当の ParticleDetail(rain) が L.particles.aabb に出した雨域があれば、その AABB 内だけを濡らす:
+ *   - 雨域連動（U07）: 同じ担当の ParticleDetail(rain) が L.particles（rain スロット）の aabb に出した雨域があれば、その AABB 内だけを濡らす:
  *     部屋全体の render.wetness は付けず、雨域の床に 'water' の水溜まり箔（箱。Tier に依らず出す）と、雨域 + 1.5 m の範囲に水たまり decals。
  *     rooms.json の順序が ParticleDetail → Wetness なので雨域を読める（逆順なら雨域なしとして部屋全体を濡らす）。
  * 足音の wet 判定は Game.enterRoom が render.wetness / hasModifier で行う（既存配線）。
@@ -15,6 +15,7 @@ import type { Socket } from '../../core/types';
 import type { Rng } from '../../core/rng';
 import { clearOfSockets, inFootprint, inner, rect, type Rect } from '../../generators/footprint';
 import { box, WALL_T, type Box, type DecalSpec, type RoomLayout } from '../../generators/layout';
+import { particleList } from '../../generators/particles';
 import type { ModifierImpl } from '../types';
 import { bool, num } from '../util';
 import { footprintOrBounds, insideInteriorSolid, rectArea2, rectIntersect, rectOfAabb, wallBandSegments, type WallBandSegment } from './ShallowWater.geom';
@@ -30,7 +31,8 @@ const Wetness: ModifierImpl = {
     const rects = footprintOrBounds(L);
     const sockets = L.sockets;
     const decals: DecalSpec[] = [];
-    const rain = L.particles?.type === 'rain' && L.particles.aabb ? rectOfAabb(L.particles.aabb) : null;
+    const rainSlot = particleList(L).find((s) => s.type === 'rain' && s.aabb);
+    const rain = rainSlot?.aabb ? rectOfAabb(rainSlot.aabb) : null;
 
     if (rain) {
       // 雨域だけ濡らす: 漏水の真下に水溜まりの箔（常に出す）+ 周囲に水たまり

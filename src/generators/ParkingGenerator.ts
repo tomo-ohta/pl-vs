@@ -107,7 +107,7 @@ export function generateParking(p: GenParams): RoomLayout {
         const yb = h - 0.5;
         B.push(box([x - hx, yb - 0.04, z - hz], [x + hx, yb, z + hz], off ? 'lightOff' : 'lightPanel', false));
         B.push(box([x - 0.015, yb, z - 0.015], [x + 0.015, h, z + 0.015], 'metalDark', false));
-        if (!off && li % 2 === 0) L.lights.push({ pos: [x, yb - 0.25, z], color: 0xdfe8ff, intensity: 0.9, distance: 14 });
+        if (!off && li % 2 === 0) L.lights.push({ pos: [x, yb - 0.25, z], color: L.palette.lightColor, intensity: 0.9, distance: 14 });
         li++;
       }
     }

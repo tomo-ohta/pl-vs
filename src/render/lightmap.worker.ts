@@ -21,6 +21,8 @@ export const LIGHT_TUNING = {
   falloffC: 0.5,
   /** 器具の中心 1 点で近似してよい距離: d > nearFactor × 器具の最大辺 なら 1 点 */
   nearFactor: 3,
+  /** 発光面積（m²）がこれ未満の器具は距離に関わらず中心 1 点でサンプルする（モニター・扉灯・小さな壁灯。担当 P3） */
+  smallEmitterArea: 0.2,
   /** palette.ambient に掛ける係数（従来 .75）。器具から遠い所は bounceFloor 倍まで下がる */
   ambientScale: 0.7,
   /** 環境光のうち器具位置に依らず残す割合（廊下の突き当たりの床）*/
@@ -224,11 +226,21 @@ export function hemiWeight(ny: number): number {
   return LIGHT_TUNING.hemiBase + (1 - LIGHT_TUNING.hemiBase) * Math.max(0, ny);
 }
 
-/** 器具 i を面サンプルで扱うか（近い / 大きい器具） */
+/** 器具 i の発光面積（m²。法線軸の半径は 0 なので、大きい 2 軸の半径の積 × 4） */
+export function fixtureArea(fx: Float32Array, i: number): number {
+  const o = i * FIXTURE_STRIDE;
+  const hx = fx[o + F_HX], hy = fx[o + F_HX + 1], hz = fx[o + F_HX + 2];
+  const mx = Math.max(hx, hy, hz), mn = Math.min(hx, hy, hz);
+  const mid = hx + hy + hz - mx - mn;
+  return 4 * mx * mid;
+}
+
+/** 器具 i を面サンプルで扱うか（近い / 大きい器具）。面積 smallEmitterArea 未満の小発光体は常に中心 1 点 */
 export function fixtureIsNear(fx: Float32Array, i: number, px: number, py: number, pz: number): boolean {
   const o = i * FIXTURE_STRIDE;
   const size = 2 * Math.max(fx[o + F_HX], fx[o + F_HX + 1], fx[o + F_HX + 2]);
   if (size < 0.2) return false;
+  if (fixtureArea(fx, i) < LIGHT_TUNING.smallEmitterArea) return false;
   const dx = fx[o + F_CX] - px, dy = fx[o + F_CX + 1] - py, dz = fx[o + F_CX + 2] - pz;
   const lim = LIGHT_TUNING.nearFactor * size;
   return dx * dx + dy * dy + dz * dz < lim * lim;

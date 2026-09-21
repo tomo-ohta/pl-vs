@@ -358,21 +358,44 @@ export class SurfaceLighting {
  * - ロール（E03）は全て中心 1 点の全方向放射
  * - 発光箱が無ければ layout.lights を全方向放射の点光源として使う
  */
+/**
+ * 見た目だけ光る発光箔か（担当 P3）。`kind === 'glowOnly'` または `kind` が `glow:` で始まる箔は器具（面光源）に数えない。
+ * emissive はそのまま描かれる。M11 の扉灯 122 枚のように、器具に数えると焼き込みが重くなる装飾の発光体に付ける。
+ * 器具の収集は buildFixtures だけなので、頂点焼き込み（SurfaceLighting.bake / sample）と Worker（packed 器具を受け取る）は自動的に同じ判定になる
+ */
+export function isGlowOnly(b: Box): boolean {
+  const k = b.kind;
+  return k === 'glowOnly' || (typeof k === 'string' && k.startsWith('glow:'));
+}
+
+/** 色温度（palette.lightColor）を掛ける発光材質（器具の管・パネル・LED・ナトリウム灯）。スクリーン・サイン・窓は対象外 */
+export function isLightFixtureMat(mat: MatId): boolean {
+  return /^light(Panel|Warm|Cool|Yellow|Green)$/.test(mat) || mat === 'ledBlue' || mat === 'sodiumLight';
+}
+
 function buildFixtures(layout: RoomLayout, roll: boolean, areaEmitters: boolean): Float32Array {
   const out: number[] = [];
   const bounds = layout.bounds;
   const center = [(bounds.min[0] + bounds.max[0]) / 2, (bounds.min[2] + bounds.max[2]) / 2];
   const push = (cx: number, cy: number, cz: number, hx: number, hy: number, hz: number, nx: number, ny: number, nz: number, color: THREE.Color, power: number, beam: number) => {
     const half = [hx, hy, hz].sort((a, b) => b - a);
-    const [nu, nv] = beam === 0 ? [1, 1] : fixtureSampleGrid(half[0], half[1]);
+    // 面積の小さい発光体（モニター・扉灯・小さな壁灯 < smallEmitterArea）は中心 1 点（fixtureIsNear も同じ閾値で false を返す）
+    const small = 4 * half[0] * half[1] < LIGHT_TUNING.smallEmitterArea;
+    const [nu, nv] = beam === 0 || small ? [1, 1] : fixtureSampleGrid(half[0], half[1]);
     out.push(cx, cy, cz, hx, hy, hz, nx, ny, nz, color.r, color.g, color.b, power * LIGHT_TUNING.powerScale, beam, nu, nv);
   };
+  // 器具の光の色 = 材質色 × 色温度（P1 の palette.lightColor。generateLayout の先頭で決まり、Modifier が上書きする部屋もある。
+  // kelvinToLightColor が白バランス済みなのでそのまま掛ける）。スクリーン・サイン・窓などの発光体は材質色のまま。
+  // Worker へはこの packed 器具（色込み）がそのまま渡るので、頂点焼き込みとライトマップは同じ色になる。
+  // 区画ごとに器具色を差し替える Modifier（EraPreset / ZoneThemeShuffle の recolorLights）の区画別の色は未対応（palette は部屋に 1 つ）
+  const tint = new THREE.Color(layout.palette?.lightColor ?? 0xffffff);
   for (const b of layout.boxes) {
     const s = SURFACES[b.mat];
-    if (!s.emission) continue;
+    if (!s.emission || isGlowOnly(b)) continue;
     const size = [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]];
     const c = [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
     const color = new THREE.Color(s.color);
+    if (isLightFixtureMat(b.mat)) color.multiply(tint);
     const emis = (s.emission ?? 2.5) / 2.5;
     let thin = 0;
     if (size[1] <= size[0] && size[1] <= size[2]) thin = 1; else if (size[0] <= size[2]) thin = 0; else thin = 2;

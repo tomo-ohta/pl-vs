@@ -1,11 +1,12 @@
 /**
  * FakeSignage — 接続先とサイン表示を別抽選する（U04 / U05 / U06 / U17 / R10 / E15 / E16）。
- * params: mode('misleading' | 'blank' | 'fixedTime' | 'fractional')、target、truthRatio（misleading。既定 0.5）、time（fixedTime。既定 '3:17'）。
+ * params: mode('misleading' | 'blank' | 'fixedTime' | 'fractional')、target、truthRatio（misleading。既定 0.5）、time（fixedTime。既定 '3:17'）、
+ *         fakeDoor（exitSign。既定 true。false なら EXIT サインの下に偽扉を置かず、サインが何も無い壁を指す = U05「出口の無い非常口」）。
  *
  * サインは L.signs（SignAtlas。部屋あたり 48 枚）。任意文字列の CanvasTexture は R10 の案内板 1 枚と U06 の文字盤だけ。
  * ジオメトリは layout フックで確定し、build / update は Mesh の追加（構築時 1 回）と回転・テクスチャ更新だけ。
  *  - misleading / exitSign（U05）: 廊下の end ソケットを末端セグメントの側壁へ移してシェルを組み直し、元の末端壁に
- *    EXIT サイン（発光）+ 開かない偽扉（箔 + 枡）を置く。末端へ向かう天井の「↑ EXIT」も偽。移せなければ空き壁に置く（サインは常に壁を指す）。
+ *    EXIT サイン（発光）+ 開かない偽扉（箔 + 枡。fakeDoor=false なら省く）を置く。末端へ向かう天井の「↑ EXIT」も偽。移せなければ空き壁に置く（サインは常に壁を指す）。
  *  - misleading / flightBoard（R10）: ゲートカウンター上の発光パネルに GATE A / B / C …（出口順）。コンコース中央に両面の出発案内板
  *    （行先は truthRatio で実接続先の部屋名、残りは無関係な部屋名。便名は全て架空。FakeSignage.build が描く）。
  *  - misleading 既定（E16）: 各セグメント中央の天井に両面の案内板（→ 出口 / ← 階段 / ↑ EV）。矢印は truthRatio の確率で実出口の向き、
@@ -21,7 +22,7 @@ import type { AABB } from '../../core/aabb';
 import { across, along, buildShell, spanForSocket, wallSpans, type Rect } from '../../generators/footprint';
 import { box, snap, WALL_T, type Box, type GenParams, type MatId, type RoomLayout, type SignSpec } from '../../generators/layout';
 import type { ModifierImpl } from '../types';
-import { num, str } from '../util';
+import { bool, num, str } from '../util';
 import {
   blankWallSlots, canPlaceSolid, centerOf, dominantDir, dist2D, entrySocket, exitSockets, fakeDoorBoxes, innerBand, insideWall, interiorSolids,
   isZWall, opposite, outerPosAt, overlapsAABB, pushSigns, signBesideSocket, sizeOf, socketOnWallNear, wallSign,
@@ -206,7 +207,7 @@ function outwardSign(d: Dir): number {
   return d === 0 || d === 1 ? 1 : -1;
 }
 
-function fakeExit(L: RoomLayout, p: GenParams, rng: Rng): void {
+function fakeExit(L: RoomLayout, p: GenParams, rng: Rng, fakeDoor: boolean): void {
   const end = L.sockets.find((s) => s.id === 'end' && s.type === 'door');
   const doorMat = L.palette.door;
   let target: { pos: Vec3; dir: Dir; rect: Rect | null } | null = null;
@@ -244,8 +245,8 @@ function fakeExit(L: RoomLayout, p: GenParams, rng: Rng): void {
     const far = slots.reduce((best, s) => (!entry || dist2D(s.pos, entry.pos) > dist2D(best.pos, entry.pos) ? s : best), slots[0]);
     target = { pos: far.pos, dir: far.dir, rect: null };
   }
-  // 偽扉 + EXIT サイン + 緑の非常灯
-  L.boxes.push(...fakeDoorBoxes(target.pos, target.dir, doorMat));
+  // （偽扉 +）EXIT サイン + 緑の非常灯。fakeDoor=false（U05）ではサインだけが何も無い壁を指す
+  if (fakeDoor) L.boxes.push(...fakeDoorBoxes(target.pos, target.dir, doorMat));
   const signs: SignSpec[] = [wallSign(target.pos, target.dir, Math.min(L.height - 0.2, 2.42), 0.72, 'EXIT', { id: 'fs:exit', sub: '非常口', kind: 'emissive' })];
   const inner = insideWall(target.pos, target.dir, WALL_T + 0.3);
   L.lights.push({ pos: [inner[0], Math.min(L.height - 0.3, 2.3), inner[2]], color: 0x4cff80, intensity: 0.35, distance: 5 });
@@ -435,7 +436,7 @@ function blankExisting(L: RoomLayout): void {
 
 const FakeSignage: ModifierImpl = {
   id: 'FakeSignage',
-  defaults: { mode: 'misleading', truthRatio: 0.5, time: '3:17' },
+  defaults: { mode: 'misleading', truthRatio: 0.5, time: '3:17', fakeDoor: true },
   layout(L, p, params, rng) {
     const mode = str(params.mode, 'misleading');
     const target = str(params.target, '');
@@ -453,7 +454,7 @@ const FakeSignage: ModifierImpl = {
         fractionalFloors(L, p, rng);
         break;
       default:
-        if (target === 'exitSign') fakeExit(L, p, rng);
+        if (target === 'exitSign') fakeExit(L, p, rng, bool(params.fakeDoor, true));
         else if (target === 'flightBoard') flightBoardLayout(L);
         else directionSigns(L, rng, truthRatio);
         break;

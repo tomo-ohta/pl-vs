@@ -1,5 +1,5 @@
 /**
- * 設定パネル（音量 3 本 + 視点感度のスライダー）。DOM を生成して #settings-slot に入れる。
+ * 設定パネル（音量 3 本 + 視点感度のスライダー、描画効果・カメラ挙動の選択）。DOM を生成して #settings-slot に入れる。
  * #settings-slot が無ければ #menu .panel の .buttons の直前に自分で作る。
  *
  * 統合担当向け: 呼び出し方
@@ -8,11 +8,16 @@
  *   panel.refresh();                                  // 外部から settings を変えた後に表示を合わせる（onChange で自動追従するので通常不要）
  * 値の反映先は Settings.onChange で購読する（AudioEngine は自分で購読する。視点感度は InputController 側で
  * pcSensitivity / mobileSensitivity に lookSensitivity を掛ける配線が必要 → phase1-requests.md 参照）。
+ * カメラ挙動（手持ち感 / 視線の遅れ / 表示 fps / REC 表示）は Game.applyCameraSettings が購読する（docs/film-camera.md）。
  */
 import type { Settings, SettingsData } from '../core/Settings';
 
+type SliderKey = keyof Pick<SettingsData, 'masterVolume' | 'ambientVolume' | 'sfxVolume' | 'lookSensitivity' | 'handheld'>;
+type SelectKey = keyof Pick<SettingsData, 'postfx' | 'frameHold' | 'toneMapping' | 'cameraLag' | 'recOverlay'>;
+
 interface SliderDef {
-  key: keyof Pick<SettingsData, 'masterVolume' | 'ambientVolume' | 'sfxVolume' | 'lookSensitivity'>;
+  kind: 'slider';
+  key: SliderKey;
   label: string;
   min: number;
   max: number;
@@ -20,33 +25,51 @@ interface SliderDef {
   format: (v: number) => string;
 }
 
-const SLIDERS: SliderDef[] = [
-  { key: 'masterVolume', label: '全体音量', min: 0, max: 1, step: 0.01, format: (v) => `${Math.round(v * 100)}%` },
-  { key: 'ambientVolume', label: '環境音', min: 0, max: 1, step: 0.01, format: (v) => `${Math.round(v * 100)}%` },
-  { key: 'sfxVolume', label: '効果音', min: 0, max: 1, step: 0.01, format: (v) => `${Math.round(v * 100)}%` },
-  { key: 'lookSensitivity', label: '視点感度', min: 0.3, max: 3, step: 0.05, format: (v) => `×${v.toFixed(2)}` },
-];
-
-/** 選択式の設定（描画効果 = V07 の撮像プリセット / トーンマップ = 開発用の切替） */
+/** 選択式の設定。bool: true なら選択肢は 'on' / 'off' で、Settings には boolean として書く */
 interface SelectDef {
-  key: keyof Pick<SettingsData, 'postfx' | 'toneMapping'>;
+  kind: 'select';
+  key: SelectKey;
   label: string;
-  options: { value: SettingsData['postfx'] | SettingsData['toneMapping']; label: string }[];
+  options: { value: string; label: string }[];
   /** 右列の注記 */
   note?: string;
+  bool?: boolean;
 }
 
-const SELECTS: SelectDef[] = [
+type RowDef = SliderDef | SelectDef;
+
+const ON_OFF = [{ value: 'on', label: 'オン' }, { value: 'off', label: 'オフ' }];
+const pct = (v: number): string => `${Math.round(v * 100)}%`;
+
+/** 表示順。音 → 視点 → 描画効果とカメラ挙動 → 開発用 */
+const ROWS: RowDef[] = [
+  { kind: 'slider', key: 'masterVolume', label: '全体音量', min: 0, max: 1, step: 0.01, format: pct },
+  { kind: 'slider', key: 'ambientVolume', label: '環境音', min: 0, max: 1, step: 0.01, format: pct },
+  { kind: 'slider', key: 'sfxVolume', label: '効果音', min: 0, max: 1, step: 0.01, format: pct },
+  { kind: 'slider', key: 'lookSensitivity', label: '視点感度', min: 0.3, max: 3, step: 0.05, format: (v) => `×${v.toFixed(2)}` },
   {
-    key: 'postfx', label: '描画効果',
+    kind: 'select', key: 'postfx', label: '描画効果',
     options: [
       { value: 'off', label: 'オフ（直接描画）' },
       { value: 'clean', label: 'クリーン' },
-      { value: 'archival', label: 'アーカイブ（古い撮像）' },
+      { value: 'homeVideo', label: 'ホームビデオ' },
+      { value: 'tape', label: 'テープ（走査線・揺れ）' },
     ],
   },
+  { kind: 'slider', key: 'handheld', label: '手持ち感', min: 0, max: 1, step: 0.05, format: (v) => (v <= 0 ? 'オフ' : pct(v)) },
+  { kind: 'select', key: 'cameraLag', label: '視線の遅れ', options: ON_OFF, bool: true, note: '50 ms' },
   {
-    key: 'toneMapping', label: 'トーンマップ',
+    kind: 'select', key: 'frameHold', label: '表示 fps',
+    options: [
+      { value: 'off', label: 'プリセットに従う' },
+      { value: '30', label: '30 fps に間引く' },
+      { value: '24', label: '24 fps に間引く' },
+    ],
+    note: 'テープ向け',
+  },
+  { kind: 'select', key: 'recOverlay', label: 'REC 表示', options: ON_OFF, bool: true },
+  {
+    kind: 'select', key: 'toneMapping', label: 'トーンマップ',
     options: [
       { value: 'agx', label: 'AgX' },
       { value: 'aces', label: 'ACES Filmic' },
@@ -59,7 +82,7 @@ export class SettingsPanel {
   readonly el: HTMLElement;
   private readonly settings: Settings;
   private readonly inputs = new Map<string, { range: HTMLInputElement; value: HTMLElement; def: SliderDef }>();
-  private readonly selects = new Map<string, HTMLSelectElement>();
+  private readonly selects = new Map<string, { select: HTMLSelectElement; def: SelectDef }>();
   private readonly unsubscribe: () => void;
 
   constructor(settings: Settings, opts: { slot?: HTMLElement | null } = {}) {
@@ -71,8 +94,7 @@ export class SettingsPanel {
     title.className = 'settings-title';
     title.textContent = '設定';
     this.el.appendChild(title);
-    for (const def of SLIDERS) this.el.appendChild(this.makeRow(def));
-    for (const def of SELECTS) this.el.appendChild(this.makeSelectRow(def));
+    for (const def of ROWS) this.el.appendChild(def.kind === 'slider' ? this.makeRow(def) : this.makeSelectRow(def));
 
     const reset = document.createElement('button');
     reset.type = 'button';
@@ -124,14 +146,15 @@ export class SettingsPanel {
     select.setAttribute('aria-label', def.label);
     for (const o of def.options) select.add(new Option(o.label, o.value));
     select.addEventListener('change', () => {
-      this.settings.set({ [def.key]: select.value } as Partial<SettingsData>);
+      const v: string | boolean = def.bool ? select.value === 'on' : select.value;
+      this.settings.set({ [def.key]: v } as Partial<SettingsData>);
     });
     for (const ev of ['pointerdown', 'touchstart', 'touchmove', 'keydown'] as const) select.addEventListener(ev, (e) => e.stopPropagation());
     const note = document.createElement('span');
     note.className = 'settings-value mono';
     note.textContent = def.note ?? '';
     row.append(name, select, note);
-    this.selects.set(def.key, select);
+    this.selects.set(def.key, { select, def });
     return row;
   }
 
@@ -159,8 +182,9 @@ export class SettingsPanel {
       if (parseFloat(range.value) !== v) range.value = String(v);
       value.textContent = def.format(v);
     }
-    for (const [key, select] of this.selects) {
-      const v = String(d[key as SelectDef['key']]);
+    for (const { select, def } of this.selects.values()) {
+      const cur = d[def.key];
+      const v = def.bool ? (cur ? 'on' : 'off') : String(cur);
       if (select.value !== v) select.value = v;
     }
     const q = document.getElementById('quality') as HTMLSelectElement | null;

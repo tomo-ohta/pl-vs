@@ -1496,75 +1496,14 @@ function dressR19(c: Ctx): void {
 
 // ---------------------------------------------------------------- R20 巨大トランクルーム（GridGenerator StorageGrid + PropRepetition storageDoor + DuplicateNumber）
 /**
- * PropRepetition(storageDoor) は後で金属ブロックの長い面に doorMetal の扉板（面から 0.02〜0.07）・枡（0〜0.08）・横筋（〜0.095）・取手（0.07〜0.13）を置き、
- * DuplicateNumber がその扉板の 0.012 手前（≈0.082）に番号を貼る。ここでは同じ規則（pitch max(1.2, 2.4/density)、幅 min(pitch-0.2, 2.3)、
- * 中央寄せ）で扉の位置を先に求め、その手前 0.10〜0.116 に redShutter の扉板を置いて灰色の扉・枡・番号を隠す（取手だけが手前に出る）。
- * 番号 A-1xx は 0.13 の位置に自前で貼る（DuplicateNumber の duplicateRate で重複）。Modifier 側の箔は残る（隠れるだけ）。
- * 通路上の器具は蛍光灯のライン（長いストリップ）に置き換える
+ * 扉は PropRepetition(storageDoor) が後で金属ブロックの長い面に置く（rooms.json の params.doorMat 'redShutter' で赤いシャッターの化粧板、
+ * 取手、枡）。番号板は DuplicateNumber。ここでは扉の規則を二重に持たず、空間の印象だけを補う: 通路上の器具を蛍光灯のライン（長いストリップ）に
+ * 置き換え、環境光を灰に落とす。以前の redShutter のソリッド箔（最大 260）と自前の番号板は Modifier 側の params 対応で不要になったので外した
  */
 function dressR20(c: Ctx): void {
-  const { L, h, rng } = c;
+  const { L, h } = c;
   const blocks = interior(L).filter((b) => b.solid && b.mat === 'metal' && b.max[1] - b.min[1] >= 2.0 && Math.min(b.max[0] - b.min[0], b.max[2] - b.min[2]) >= 1.4 && Math.max(b.max[0] - b.min[0], b.max[2] - b.min[2]) >= 1.2);
   if (blocks.length === 0) return;
-  const prm = modParams(c.p, 'PropRepetition');
-  const density = Math.min(3, Math.max(0.25, num(prm.density, 1)));
-  const scale = Math.min(3, Math.max(0.5, num(prm.scale, 1)));
-  const pitch = Math.max(1.2, (2.4 * scale) / density);
-  const doorW = Math.min(pitch - 0.2, 2.3 * scale);
-  const dupRate = Math.min(1, Math.max(0, num(modParams(c.p, 'DuplicateNumber').duplicateRate, 0.5)));
-  interface Door { b: Box; center: Vec3; face: Dir; row: number; t: number; y0: number; doorH: number }
-  const doors: Door[] = [];
-  for (const b of blocks) {
-    const doorH = Math.min(2.4 * scale, b.max[1] - b.min[1] - 0.3);
-    if (doorH < 1.6) continue;
-    const alongX = b.max[0] - b.min[0] >= b.max[2] - b.min[2];
-    const a0 = alongX ? b.min[0] : b.min[2];
-    const a1 = alongX ? b.max[0] : b.max[2];
-    const n = Math.floor((a1 - a0 - 0.1) / pitch);
-    if (n < 1) continue;
-    const start = a0 + ((a1 - a0) - n * pitch) / 2 + pitch / 2;
-    const facesOf: { at: number; sign: 1 | -1; face: Dir }[] = alongX
-      ? [{ at: b.max[2], sign: 1, face: 0 }, { at: b.min[2], sign: -1, face: 2 }]
-      : [{ at: b.max[0], sign: 1, face: 1 }, { at: b.min[0], sign: -1, face: 3 }];
-    for (const f of facesOf) {
-      for (let k = 0; k < n; k++) {
-        const a = start + k * pitch;
-        const lo = f.at + f.sign * 0.10, hi = f.at + f.sign * 0.116;
-        const y0 = b.min[1] + 0.02;
-        // ソリッドにする: PropRepetition.removeFills はブロックの 0.15 m 以内の非ソリッド箔を全て捨てる（薄い当たり判定が壁面に 1 枚増えるだけ）
-        const shutter = alongX ? box([a - doorW / 2, y0, lo], [a + doorW / 2, y0 + doorH, hi], 'redShutter', true) : box([lo, y0, a - doorW / 2], [hi, y0 + doorH, a + doorW / 2], 'redShutter', true);
-        const center: Vec3 = alongX ? [a, y0 + doorH / 2, f.at + f.sign * 0.108] : [f.at + f.sign * 0.108, y0 + doorH / 2, a];
-        doors.push({ b: shutter, center, face: f.face, row: Math.round(f.at * 2) / 2, t: a, y0, doorH });
-      }
-    }
-  }
-  const entry = entryOf(L);
-  const origin: Vec3 = entry?.pos ?? [0, 0, 0];
-  doors.sort((a, b) => dist2(a.center, origin) - dist2(b.center, origin));
-  const kept = doors.slice(0, 260);
-  for (const d of kept) L.boxes.push(d.b);
-  // 番号: 列（面の座標 + 向き）ごとに A / B / C …、列内は 101 から。DuplicateNumber と同じ重複規則
-  const ordered = [...kept].sort((a, b) => a.row - b.row || a.face - b.face || a.t - b.t);
-  const codes = new Map<Door, string>();
-  let rowKey = '', rowIdx = -1, k = 0;
-  for (const d of ordered) {
-    const key = `${d.row}:${d.face}`;
-    if (key !== rowKey) { rowKey = key; rowIdx++; k = 0; }
-    codes.set(d, `${String.fromCharCode(65 + (rowIdx % 26))}-${(rowIdx % 9 + 1) * 100 + 1 + k}`);
-    k++;
-  }
-  const original = ordered.map((d) => codes.get(d)!);
-  ordered.forEach((d, i) => {
-    if (ordered.length < 2 || !rng.chance(dupRate)) return;
-    let j = rng.int(0, ordered.length - 2);
-    if (j >= i) j++;
-    codes.set(d, original[j]);
-  });
-  for (const d of kept.slice(0, 40)) {
-    const n = dirVec(d.face);
-    const y = Math.min(d.y0 + d.doorH - 0.25, 1.95);
-    pushSign(L, { text: codes.get(d)!, pos: [d.center[0] + n[0] * 0.024, y, d.center[2] + n[2] * 0.024], dir: d.face, width: 0.7, kind: 'plate' });
-  }
   // 蛍光灯のライン: 通路の中心線に長いストリップ（元のパネルは外す）
   const alongX = blocks[0].max[0] - blocks[0].min[0] >= blocks[0].max[2] - blocks[0].min[2];
   removeInterior(L, (b) => isPanel(b, h));

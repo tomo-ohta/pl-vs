@@ -18,7 +18,8 @@ import { inner, rect, rectArea, type Rect } from '../footprint';
 import { alongFace, doorZones, freeRuns, hitsZone, innerFaces, insideRects, signAt, signOnWall, type Face } from '../furniture';
 import { car } from '../StreetGenerator.facade';
 import { courtyardEdges } from '../MegaStructureGenerator.common';
-import { box, snap, WALL_T, type Box, type GenParams, type InstanceSpec, type LightSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
+import { box, snap, WALL_T, type Box, type GenParams, type InstanceSpec, type LightSpec, type MatId, type ParticleSpec, type RoomLayout, type SignSpec } from '../layout';
+import { addParticles } from '../particles';
 
 const FLOOR = 3.6;
 const MAX_SIGNS = 46;
@@ -1001,7 +1002,7 @@ function airplane(c: Ctx, main: Rect): void {
 }
 
 // ---------------------------------------------------------------- L09 無限温浴施設（MegaAtrium bath）
-// 浴槽の縁を石に、湯を琥珀色に（水面下の箔）、植栽、暖色、「ゆ」のサイン。湯気は ParticleDetail（mist）が後段で敷く。
+// 浴槽の縁を石に、湯を琥珀色に（水面下の箔）、植栽、暖色、「ゆ」のサイン。浴槽ごとの湯気（steam スロット）。床の薄い mist は ParticleDetail が後段で足す。
 
 function dressL09(c: Ctx): void {
   const { L } = c;
@@ -1031,6 +1032,20 @@ function dressL09(c: Ctx): void {
       planted++;
     }
   }
+  // 湯気: 浴槽（大浴場 + 小さな浴槽。40 m² 超の区画プールは冷水として除く）ごとに水面直上 0〜1.3 m の steam スロット。
+  // 後段の ParticleDetail(mist) は別 type なので残る（generators/particles.ts）。粒数の合計は RoomBuilder が Tier の particleCap に収める
+  const steam: ParticleSpec[] = [];
+  for (const wb of waters) {
+    if (wb !== grand && areaOf(wb) > 40) continue;
+    if (steam.length >= 12) break;
+    const a = areaOf(wb);
+    // 大浴場は最大 320 粒（seed 7 の 128 × 79 m でも薄く広がる）、小浴槽（3 × 4 m）は 18〜40 粒。合計 + mist 120 が Tier high の上限 1000 に収まる
+    const count = wb === grand ? Math.min(320, Math.max(24, Math.round(a * 0.5))) : Math.min(40, Math.max(18, Math.round(a * 1.6)));
+    const aabb: AABB = { min: [wb.min[0] + 0.2, wb.max[1], wb.min[2] + 0.2], max: [wb.max[0] - 0.2, wb.max[1] + 1.3, wb.max[2] - 0.2] };
+    const vol = Math.max(0.1, (aabb.max[0] - aabb.min[0]) * (aabb.max[1] - aabb.min[1]) * (aabb.max[2] - aabb.min[2]));
+    steam.push({ type: 'steam', density: count / vol, aabb, size: 0.8, color: 0xfff1e2 });
+  }
+  addParticles(L, ...steam);
   // 「ゆ」（入口側の壁に赤い発光サイン）
   signOnWall(L, innerFaces(c.rects), L.sockets, 'ゆ', { y: 2.6, width: 1.3, kind: 'emissive', color: 0xffffff, background: 0xa8302c, prefer: [2, 1, 3, 0] });
   for (const l of L.lights) l.color = 0xffc890;

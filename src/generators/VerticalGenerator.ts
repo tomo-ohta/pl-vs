@@ -93,8 +93,8 @@ export function generateVertical(p: GenParams): RoomLayout {
   // 照明
   lightPanel(L.boxes, 0.5, 0, 1.2, 0.6, upperY, 'lightPanel');
   lightPanel(L.boxes, 0.5, 0, 1.2, 0.6, h, 'lightPanel');
-  L.lights.push({ pos: [0.5, upperY - 0.4, 0], color: 0xdfe8ff, intensity: 0.8, distance: 9 });
-  L.lights.push({ pos: [0.5, h - 0.4, 0], color: 0xdfe8ff, intensity: 0.8, distance: 9 });
+  L.lights.push({ pos: [0.5, upperY - 0.4, 0], color: L.palette.lightColor, intensity: 0.8, distance: 9 });
+  L.lights.push({ pos: [0.5, h - 0.4, 0], color: L.palette.lightColor, intensity: 0.8, distance: 9 });
   if (p.label) L.labels.push({ pos: [1.0, 2.35, -hd + 0.01], dir: 0, text: p.label.text, sub: p.label.sub, width: 2.0 });
   return L;
 }

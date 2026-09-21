@@ -26,6 +26,7 @@ import type { Rng } from '../../core/rng';
 import { clearDoorways } from '../../generators/common';
 import { buildShell, footprintAABB, inRect, pickSpanPosition, wallSpans, type Rect } from '../../generators/footprint';
 import { box, CRAWL_DOOR_H, CRAWL_DOOR_W, HOLE_SIZE, WALL_T, type Box, type RoomLayout } from '../../generators/layout';
+import { particleList } from '../../generators/particles';
 import type { GenParams } from '../../generators/layout';
 import type { ModifierImpl, ModifierParams } from '../types';
 import { num, str } from '../util';
@@ -94,7 +95,7 @@ function scaleRoom(L: RoomLayout, p: GenParams, s: number): void {
   if (L.signs) for (const sg of L.signs) { sg.pos = mul(sg.pos, s); sg.width *= s; }
   if (L.zones) for (const z of L.zones) z.aabb = scaleAABB(z.aabb, s);
   if (L.instances) for (const inst of L.instances) { inst.size = mul(inst.size, s); for (const t of inst.transforms) t.pos = mul(t.pos, s); }
-  if (L.particles?.aabb) L.particles.aabb = scaleAABB(L.particles.aabb, s);
+  for (const ps of particleList(L)) if (ps.aabb) ps.aabb = scaleAABB(ps.aabb, s);
   if (L.decals) for (const d of L.decals) { d.pos = mul(d.pos, s); d.size = [d.size[0] * s, d.size[1] * s]; }
   if (L.dynamics) for (const d of L.dynamics) { d.box = { ...d.box, min: mul(d.box.min, s), max: mul(d.box.max, s) }; d.motion.amplitude *= d.motion.kind === 'rotate' ? 1 : s; }
   if (L.path) L.path = L.path.map((v) => mul(v, s));

@@ -11,16 +11,17 @@
  *    shellCount、L.lights）は壊さない。
  *  - Modifier と表示を揃えるために、その Modifier が使う乱数列（p.rng.fork('mod:<Id>') の先頭）を読むだけの箇所がある
  *    （E02 の年代、E15 の階数 n、E19 の温度勾配の向き）。fork は状態を進めないので他の乱数列には影響しない。
- *  - E08 は NonEuclideanVolume が L.boxes を丸ごと組み直すため保留（docs/reference-epic.md）。E05 / E10 は欠番。
+ *  - E08 は NonEuclideanVolume が L.boxes を丸ごと組み直すが、kind が 'dress:' で始まる箱は残す契約（PropRepetition.shared.isDress）になったので、
+ *    内部ノード（p.node.role 'interior'）に限り「拡大後に置きたい位置 ÷ s」に dress:* の箔を置く（dressE08）。殻ノードには何も置かない。E05 / E10 は欠番。
  *
  * 検証用: globalThis.__epicDressingOff が true のときは何もしない（ブラウザで構築時間・箱数の増分を比べるためのスイッチ。通常は未定義）。
  */
 import type { Rng } from '../../core/rng';
-import type { Dir, Socket, Vec3 } from '../../core/types';
+import { addDir, type Dir, type Socket, type Vec3 } from '../../core/types';
 import type { AABB } from '../../core/aabb';
-import { along, across, wallSpans, type Rect, type WallSpan } from '../footprint';
+import { along, across, inner, wallSpans, type Rect, type WallSpan } from '../footprint';
 import { alongFace, chair, doorZones, freeRuns, hitsZone, innerFaces, insideRects, lineFace, longTable, signAt, signOnWall, type Face } from '../furniture';
-import { box, DOOR_W, WALL_T, type Box, type GenParams, type InstanceSpec, type LightSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
+import { box, DOOR_W, kinded, WALL_T, type Box, type GenParams, type InstanceSpec, type LightSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
 
 /** 部屋あたりの追加予算（docs/reference-rarities-analysis.md「軽量化の規則」） */
 const MAX_BOXES = 300;
@@ -40,7 +41,7 @@ export function dressEpic(L: RoomLayout, p: GenParams, rng: Rng): void {
     case 'E04': dressE04(ctx); break;
     case 'E06': dressE06(ctx); break;
     case 'E07': dressE07(ctx); break;
-    case 'E08': break; // 保留: NonEuclideanVolume が殻 / 内部の両方で L.boxes を組み直す（docs/reference-epic.md）
+    case 'E08': dressE08(ctx); break;
     case 'E09': dressE09(ctx); break;
     case 'E11': dressE11(ctx); break;
     case 'E12': dressE12(ctx); break;
@@ -277,8 +278,9 @@ function mirrorDoors(ctx: Ctx, segs: Seg[]): { seg: Seg; t: number }[] {
   return pairs;
 }
 
-function setWetness(L: RoomLayout, w: number): void {
-  L.render = { ...(L.render ?? {}), wetness: Math.max(L.render?.wetness ?? 0, w) };
+/** 床だけの濡れ（艶床）。壁・天井・家具は変えない（E01 / E07 / E09。全材質の wetness は E06 / E08 / E11 / E19 が直接 L.render に書く） */
+function setFloorWetness(L: RoomLayout, w: number): void {
+  L.render = { ...(L.render ?? {}), floorWetness: Math.max(L.render?.floorWetness ?? 0, w) };
 }
 
 /** 天井付近の薄いパネル灯を暖色にし、点光源・パレットの色も揃える（E12 暖白色） */
@@ -343,13 +345,13 @@ function dressE01(ctx: Ctx): void {
       }
     }
   }
-  setWetness(L, 0.25);
+  setFloorWetness(L, 0.25);
 }
 
 /** 見た目は普通の廊下が正解。扉列だけ両側に揃え、床を少し艶にする */
 function dressE07(ctx: Ctx): void {
   mirrorDoors(ctx, corridorSegs(ctx));
-  setWetness(ctx.L, 0.18);
+  setFloorWetness(ctx.L, 0.18);
 }
 
 // ---------------------------------------------------------------- E02 年代階段（VerticalCore + EraPreset）
@@ -649,6 +651,170 @@ function dressE06(ctx: Ctx): void {
   }
 }
 
+// ---------------------------------------------------------------- E08 内部拡張会議室（SmallRoom + NonEuclideanVolume）
+
+/**
+ * NonEuclideanVolume は殻・内部の両方で L.boxes を組み直すが、kind が 'dress:' で始まる箱は残す（内部では中心 × s に写し、寸法はそのまま。
+ * NonEuclideanVolume.mapDressBox）。ここでは内部ノード（role 'interior'）に限り、NEV が置く大会議室の家具を同じ式で先読みし、
+ * 「拡大後に置きたい位置 ÷ s」に箔を置く（pre）:
+ *  - 会議机（NEV の長机。内法 1.6 m の矩形の中央、長さ min(辺 − 3, 14)）の上にノート PC（銀の台 + 液晶。1 台おきに点灯 screenLcd / 消灯 screenDark）
+ *  - NEV のホワイトボード（入口の対面の壁、幅 min(3.6, 壁 × 0.4)、キャビネット壁なら 0.45 手前）に枠とマーカートレイ
+ *  - 側壁（入口・ホワイトボードの壁を除く。キャビネットの無い壁を優先）にガラス窓: 黒い void の奥板 + 遠くの点灯（windowLit の小箔）+ glass + 桟 + 窓台
+ * キャビネットの壁は NEV と同じ fork（p.rng.fork('mod:NonEuclideanVolume').fork('cabinets')、辺 0 → 1 → 3 の順に chance(0.35) で省く）で先読みする。
+ * 発光箔は液晶 ≤ 4 + 遠景の灯 ≤ 9（焼き込みの器具に数えられるので抑える。12 灯では構築時間 +27% だった）。殻ノード（role 無し）には何も置かない。
+ */
+function dressE08(ctx: Ctx): void {
+  const { L, p, rng } = ctx;
+  const role = p.node?.role ?? p.role;
+  if (role !== 'interior') return;
+  const main = L.footprint[0];
+  if (!main) return;
+  const prm = (p.def.modifiers.find((m) => m.id === 'NonEuclideanVolume')?.params ?? {}) as Record<string, unknown>;
+  const is = typeof prm.interiorScale === 'number' && Number.isFinite(prm.interiorScale) ? prm.interiorScale : 4.0;
+  const s = Math.sqrt(Math.max(1, is));
+  const h0 = L.height; // 内部の天井は round(min(4, h0 × 1.3) × 2) / 2 になるが、置くものは h0 − 0.4 より下に限るので使わない
+  // 拡大後の座標（NEV.expandInterior と同じ）
+  const M: Rect = { x0: main.x0 * s, z0: main.z0 * s, x1: main.x1 * s, z1: main.z1 * s };
+  const ir = inner(M, 1.6);
+  const w = ir.x1 - ir.x0, d = ir.z1 - ir.z0;
+  const alongX = w >= d;
+  const tableLen = Math.min(alongX ? w - 3.0 : d - 3.0, 14);
+  const tableW = 1.6;
+  const tcx = (ir.x0 + ir.x1) / 2, tcz = (ir.z0 + ir.z1) / 2;
+  const entry = L.sockets.find((x) => x.id === 'entry');
+  const entryDir: Dir | -1 = entry && entry.type !== 'hole' ? entry.dir : -1;
+  // 拡大後の箱 → 拡大前（NEV が中心 × s で戻す。寸法はそのまま。天井から 0.35 m 以内は h1 − h0 だけ上がるので、そこには置かない）
+  const pre = (b: Box): Box => {
+    const cx = (b.min[0] + b.max[0]) / 2 / s, cz = (b.min[2] + b.max[2]) / 2 / s;
+    const hx = (b.max[0] - b.min[0]) / 2, hz = (b.max[2] - b.min[2]) / 2;
+    return { ...b, min: [cx - hx, b.min[1], cz - hz], max: [cx + hx, b.max[1], cz + hz] };
+  };
+  const yCap = h0 - 0.4;
+  const put = (...boxes: Box[]): boolean => push(ctx, ...boxes.filter((b) => b.max[1] <= yCap).map(pre));
+  let lit = 0;
+
+  // ---- ノート PC（机の両側、1.8 m ピッチ、最大 8 台。画面は座る側の反対 = 机の中心側に立つ）
+  if (tableLen >= 2.4) {
+    const top = 0.79; // NEV の天板箔（0.75〜0.79）の上
+    const n = Math.min(4, Math.floor(tableLen / 1.8));
+    for (let i = 0; i < n; i++) {
+      const a = -tableLen / 2 + (tableLen - (n - 1) * 1.8) / 2 + i * 1.8;
+      for (const side of [-1, 1] as const) {
+        const off = side * (tableW / 2 - 0.45); // 天板の縁から 0.45 内側
+        const cx = alongX ? tcx + a : tcx + off;
+        const cz = alongX ? tcz + off : tcz + a;
+        const kind = 'dress:laptop';
+        const mat: MatId = lit < 4 && (i + (side > 0 ? 1 : 0)) % 2 === 0 ? 'screenLcd' : 'screenDark';
+        if (mat === 'screenLcd') lit++;
+        // 台 0.32 × 0.22 × 0.02（銀）。画面は台の机中心側の縁に立つ 0.30 × 0.20（厚 0.012）
+        const back = -side * 0.105; // 机の中心側
+        const base = alongX ? kinded([cx - 0.16, top, cz - 0.11], [cx + 0.16, top + 0.02, cz + 0.11], 'stainless', kind, false)
+          : kinded([cx - 0.11, top, cz - 0.16], [cx + 0.11, top + 0.02, cz + 0.16], 'stainless', kind, false);
+        const sz0 = alongX ? cz + back - 0.006 : cx + back - 0.006;
+        const screen = alongX ? kinded([cx - 0.15, top + 0.02, sz0], [cx + 0.15, top + 0.22, sz0 + 0.012], mat, kind, false)
+          : kinded([sz0, top + 0.02, cz - 0.15], [sz0 + 0.012, top + 0.22, cz + 0.15], mat, kind, false);
+        const lid = alongX ? kinded([cx - 0.16, top + 0.02, sz0 - 0.012], [cx + 0.16, top + 0.23, sz0], 'stainless', kind, false)
+          : kinded([sz0 - 0.012, top + 0.02, cz - 0.16], [sz0, top + 0.23, cz + 0.16], 'stainless', kind, false);
+        if (!put(base, screen, lid)) return;
+      }
+    }
+  }
+
+  // ---- NEV のキャビネット壁の先読み（同じ fork・同じ順）
+  const cr = p.rng.fork('mod:NonEuclideanVolume').fork('cabinets');
+  const cabinetWalls = new Set<Dir>();
+  for (const dir of [0, 1, 3] as Dir[]) {
+    if (dir === entryDir) continue;
+    if (cr.chance(0.35)) continue;
+    cabinetWalls.add(dir);
+  }
+  const wallLen = (dir: Dir) => (dir === 0 || dir === 2 ? M.x1 - M.x0 : M.z1 - M.z0) - 2 * WALL_T;
+  /** 壁 dir の内面上の箱（at: 壁に沿った座標、d: 内面からの距離、y） */
+  const onWall = (dir: Dir, a0: number, a1: number, d0: number, d1: number, y0: number, y1: number, mat: MatId, kind: string): Box => {
+    const lo = Math.min(a0, a1), hi = Math.max(a0, a1);
+    switch (dir) {
+      case 0: return kinded([lo, y0, M.z1 - WALL_T - d1], [hi, y1, M.z1 - WALL_T - d0], mat, kind, false);
+      case 2: return kinded([lo, y0, M.z0 + WALL_T + d0], [hi, y1, M.z0 + WALL_T + d1], mat, kind, false);
+      case 1: return kinded([M.x1 - WALL_T - d1, y0, lo], [M.x1 - WALL_T - d0, y1, hi], mat, kind, false);
+      default: return kinded([M.x0 + WALL_T + d0, y0, lo], [M.x0 + WALL_T + d1, y1, hi], mat, kind, false);
+    }
+  };
+  const wallMid = (dir: Dir) => (dir === 0 || dir === 2 ? (M.x0 + M.x1) / 2 : (M.z0 + M.z1) / 2);
+
+  // ---- ホワイトボードの枠とトレイ（NEV: 入口の対面、幅 min(3.6, 壁 × 0.4)、y 0.95〜2.05、d0 = WALL_T + cab + 0.02 から 0.04）
+  let wd: Dir | -1 = -1;
+  if (entryDir !== -1) {
+    wd = addDir(entryDir, 2);
+    const bw = Math.min(3.6, (wd === 0 || wd === 2 ? M.x1 - M.x0 : M.z1 - M.z0) * 0.4);
+    const d0 = (cabinetWalls.has(wd) ? 0.45 : 0) + 0.02; // 内面から（NEV の d0 − WALL_T）
+    const m = wallMid(wd);
+    const K = 'dress:whiteboard';
+    put(
+      onWall(wd, m - bw / 2 - 0.03, m + bw / 2 + 0.03, d0, d0 + 0.045, 2.05, 2.08, 'stainless', K),
+      onWall(wd, m - bw / 2 - 0.03, m - bw / 2, d0, d0 + 0.045, 0.95, 2.05, 'stainless', K),
+      onWall(wd, m + bw / 2, m + bw / 2 + 0.03, d0, d0 + 0.045, 0.95, 2.05, 'stainless', K),
+      onWall(wd, m - bw / 2 - 0.03, m + bw / 2 + 0.03, d0, d0 + 0.09, 0.90, 0.95, 'stainless', K),
+      // マーカー 2 本（青・赤）
+      onWall(wd, m - 0.4, m - 0.27, d0 + 0.05, d0 + 0.065, 0.95, 0.965, 'plasticBlue', K),
+      onWall(wd, m - 0.1, m + 0.03, d0 + 0.05, d0 + 0.065, 0.95, 0.965, 'plasticRed', K),
+    );
+  }
+
+  // ---- ガラス窓と奥の暗い大空間（側壁。キャビネットの無い壁を優先、次に長い壁）
+  const sides = ([0, 1, 2, 3] as Dir[]).filter((dir) => dir !== entryDir && dir !== wd);
+  sides.sort((a, b) => (cabinetWalls.has(a) ? 1 : 0) - (cabinetWalls.has(b) ? 1 : 0) || wallLen(b) - wallLen(a));
+  for (const dir of sides) {
+    const horizontal = dir === 0 || dir === 2;
+    const a0 = (horizontal ? M.x0 : M.z0) + WALL_T, a1 = (horizontal ? M.x1 : M.z1) - WALL_T;
+    // その壁の開口（通常ソケットは × s、直結ソケット x* は拡大後座標で来る）を ±1.2 避けた最長区間
+    const extraIds = new Set(p.extraSockets.map((x) => x.id));
+    const cuts: [number, number][] = [];
+    for (const so of L.sockets) {
+      if (so.type === 'hole' || so.dir !== dir) continue;
+      const k = extraIds.has(so.id) ? 1 : s;
+      const at = horizontal ? so.pos[0] * k : so.pos[2] * k;
+      cuts.push([at - so.width / 2 - 1.2, at + so.width / 2 + 1.2]);
+    }
+    cuts.sort((q, r) => q[0] - r[0]);
+    let best: [number, number] = [a0, a0];
+    let cur = a0;
+    for (const [c0, c1] of cuts) { if (c0 - cur > best[1] - best[0]) best = [cur, c0]; cur = Math.max(cur, c1); }
+    if (a1 - cur > best[1] - best[0]) best = [cur, a1];
+    const run = best[1] - best[0];
+    if (run < 3.2) continue;
+    const len = Math.min(run - 1.6, 9.0);
+    const mid = (best[0] + best[1]) / 2;
+    const w0 = mid - len / 2, w1 = mid + len / 2;
+    const y0 = cabinetWalls.has(dir) ? 1.25 : 0.95;
+    const y1 = Math.min(2.45, yCap - 0.05);
+    if (y1 - y0 < 0.8) continue;
+    const K = 'dress:window';
+    const boxes: Box[] = [];
+    // 奥板（黒）と遠くの点灯（小さな窓明かり。上下 2 段、rng で欠けさせる）
+    boxes.push(onWall(dir, w0, w1, 0.005, 0.02, y0, y1, 'void', K));
+    const dots = Math.min(9, Math.floor(len / 0.9));
+    for (let i = 0; i < dots; i++) {
+      if (!rng.chance(0.7)) continue;
+      const at = w0 + 0.4 + ((len - 0.8) * i) / Math.max(1, dots - 1) + rng.float(-0.15, 0.15);
+      const y = y0 + 0.35 + (i % 2) * ((y1 - y0) * 0.35) + rng.float(-0.08, 0.08);
+      boxes.push(onWall(dir, at - 0.08, at + 0.08, 0.02, 0.035, y, y + 0.1, 'windowLit', K));
+    }
+    // ガラス、桟（1.5 m ピッチ）、枠、窓台
+    boxes.push(onWall(dir, w0, w1, 0.05, 0.06, y0, y1, 'glass', K));
+    const panes = Math.max(1, Math.round(len / 1.5));
+    for (let k = 1; k < panes; k++) {
+      const at = w0 + (len * k) / panes;
+      boxes.push(onWall(dir, at - 0.02, at + 0.02, 0.03, 0.075, y0, y1, 'stainless', K));
+    }
+    boxes.push(onWall(dir, w0 - 0.04, w1 + 0.04, 0.03, 0.075, y1, y1 + 0.04, 'stainless', K));
+    boxes.push(onWall(dir, w0 - 0.04, w0, 0.03, 0.075, y0, y1, 'stainless', K));
+    boxes.push(onWall(dir, w1, w1 + 0.04, 0.03, 0.075, y0, y1, 'stainless', K));
+    boxes.push(onWall(dir, w0 - 0.04, w1 + 0.04, 0.0, 0.12, y0 - 0.04, y0, 'stainless', K));
+    put(...boxes);
+    break;
+  }
+}
+
 // ---------------------------------------------------------------- E09 垂直水面オフィス（OfficeGrid + WaterWall）
 
 /**
@@ -694,7 +860,7 @@ function dressE09(ctx: Ctx): void {
     }
   }
   if (stands.length) (L.instances ??= []).push({ mat: 'metalDark', size: [0.08, 0.1, 0.16], transforms: stands, solid: false });
-  setWetness(L, 0.3);
+  setFloorWetness(L, 0.3);
 }
 
 // ---------------------------------------------------------------- E11 線路のないホーム（Terminal + VehicleRide）

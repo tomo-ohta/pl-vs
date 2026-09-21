@@ -1038,7 +1038,7 @@ function u10(c: Ctx): void {
   c.note(`U10: facing ${facing}, shelf ${shelf}`);
 }
 
-// ---- U11 手荷物受取所: 中央のターンテーブル（段付きのステンレスの環 + 段状の島）とスーツケース 1 つ、「3」の吊り看板、案内板
+// ---- U11 手荷物受取所: 中央のターンテーブル（段付きのステンレスの環 + 黒ゴムのベルト + 段状の島）とスーツケース数個、「3」の吊り看板、案内板
 
 function u11(c: Ctx): void {
   const { L } = c;
@@ -1047,7 +1047,7 @@ function u11(c: Ctx): void {
   recolorShell(L, 'floor', 'floorTile');
   L.palette.lightColor = 0xe9f0ff;
   // 汎用パターンの家具は PropRepetition（luggage）が後で捨てる（FURNITURE_MATS）ので、先に外して置き場を空ける。
-  // ここで足す箱はその材質集合（metal / rubber / upholstery …）を避ける（stainless / metalDark / seatRed / void）
+  // ここで足す箱は kind 'dress:carousel' を付ける（PropRepetition.shared.removeInterior はその印の箱を捨てない）ので材質は自由（rubber のベルトなど）
   removeInterior(c, (b) => b.solid && PROP_FURNITURE.has(b.mat));
   const w = r.x1 - r.x0, d = r.z1 - r.z0;
   const alongX = w >= d;
@@ -1069,56 +1069,73 @@ function u11(c: Ctx): void {
   if (north) wallSignAt(c, north, (north.a0 + north.a1) / 2, Math.min(c.h - 0.45, 2.45), 2.2, '3  手荷物受取所', { sub: 'Baggage Claim', color: 0x151515, background: 0xf2c94c });
 }
 
-/** PropRepetition.shared.FURNITURE_MATS と同じ集合（U11 で後段の Modifier が捨てる家具材質） */
+/** PropRepetition.shared.FURNITURE_MATS と同じ集合（U11 で後段の Modifier luggage が捨てる Generator の家具材質。先に外して置き場を空ける） */
 const PROP_FURNITURE: ReadonlySet<string> = new Set(['furnitureDark', 'furnitureLight', 'shelfMetal', 'boxCardboard', 'upholstery', 'metal', 'doorMetal', 'ledBlue', 'rubber', 'carPaint', 'carGlass', 'screenGlow']);
-/** ベルト面の材質（rubber は PropRepetition が家具として捨てるので metalDark） */
-const BELT: MatId = 'metalDark';
+/** ターンテーブルの箱の印（PropRepetition の removeInterior / removeFills が捨てない） */
+const DRESS_CAROUSEL = 'dress:carousel';
+/** ベルト面の材質（黒ゴム） */
+const BELT: MatId = 'rubber';
+/** スーツケースの材質（順に使う） */
+const BAG_MATS: MatId[] = ['plasticRed', 'furnitureDark', 'seatRed'];
 
-/** ターンテーブル: 段付き（角を 1 m の段で落とした）ステンレスの台座 0.72 m + 暗いベルト面 + 段状の島 + 投入口。台座はソリッド */
+/** ターンテーブル: 段付き（角を 1 m の段で落とした）ステンレスの台座 0.72 m + 黒ゴムのベルト面 + 段状の島 + 投入口 + スーツケース 2〜3 個。台座はソリッド */
 function carousel(c: Ctx, cx: number, cz: number, len: number, wid: number, alongX: boolean): boolean {
   const hx = alongX ? len / 2 : wid / 2, hz = alongX ? wid / 2 : len / 2;
   const x0 = cx - hx, x1 = cx + hx, z0 = cz - hz, z1 = cz + hz;
   const cut = 1.0, H = 0.72, bw = 0.9, e = 0.05;
   const skirt: MatId = 'stainless';
+  const K = DRESS_CAROUSEL;
   const tmp: Box[] = [];
-  tmp.push(box([x0 + cut, 0, z0], [x1 - cut, H, z1], skirt));
-  tmp.push(box([x0, 0, z0 + cut], [x0 + cut, H, z1 - cut], skirt));
-  tmp.push(box([x1 - cut, 0, z0 + cut], [x1, H, z1 - cut], skirt));
+  tmp.push(kinded([x0 + cut, 0, z0], [x1 - cut, H, z1], skirt, K));
+  tmp.push(kinded([x0, 0, z0 + cut], [x0 + cut, H, z1 - cut], skirt, K));
+  tmp.push(kinded([x1 - cut, 0, z0 + cut], [x1, H, z1 - cut], skirt, K));
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as [number, number][]) {
     // 外側の角 (ox, oz) から内側へ ix / iz。角の 1 m 角のうち最外の 0.5 m 角だけを落とす（L 字 = 2 箱）
     const ox = sx < 0 ? x0 : x1, oz = sz < 0 ? z0 : z1;
     const ix = -sx, iz = -sz;
-    tmp.push(box([ox + ix * cut / 2, 0, oz], [ox + ix * cut, H, oz + iz * cut], skirt));
-    tmp.push(box([ox, 0, oz + iz * cut / 2], [ox + ix * cut / 2, H, oz + iz * cut], skirt));
+    tmp.push(kinded([ox + ix * cut / 2, 0, oz], [ox + ix * cut, H, oz + iz * cut], skirt, K));
+    tmp.push(kinded([ox, 0, oz + iz * cut / 2], [ox + ix * cut / 2, H, oz + iz * cut], skirt, K));
     // 角のベルト面（L 字）
-    tmp.push(box([ox + ix * cut / 2, H, oz + iz * e], [ox + ix * cut, H + 0.04, oz + iz * cut], BELT, false));
-    tmp.push(box([ox + ix * e, H, oz + iz * cut / 2], [ox + ix * cut / 2, H + 0.04, oz + iz * cut], BELT, false));
+    tmp.push(kinded([ox + ix * cut / 2, H, oz + iz * e], [ox + ix * cut, H + 0.04, oz + iz * cut], BELT, K, false));
+    tmp.push(kinded([ox + ix * e, H, oz + iz * cut / 2], [ox + ix * cut / 2, H + 0.04, oz + iz * cut], BELT, K, false));
   }
-  tmp.push(box([x0 + cut, H, z0 + e], [x1 - cut, H + 0.04, z0 + e + bw], BELT, false));
-  tmp.push(box([x0 + cut, H, z1 - e - bw], [x1 - cut, H + 0.04, z1 - e], BELT, false));
-  tmp.push(box([x0 + e, H, z0 + cut], [x0 + e + bw, H + 0.04, z1 - cut], BELT, false));
-  tmp.push(box([x1 - e - bw, H, z0 + cut], [x1 - e, H + 0.04, z1 - cut], BELT, false));
+  tmp.push(kinded([x0 + cut, H, z0 + e], [x1 - cut, H + 0.04, z0 + e + bw], BELT, K, false));
+  tmp.push(kinded([x0 + cut, H, z1 - e - bw], [x1 - cut, H + 0.04, z1 - e], BELT, K, false));
+  tmp.push(kinded([x0 + e, H, z0 + cut], [x0 + e + bw, H + 0.04, z1 - cut], BELT, K, false));
+  tmp.push(kinded([x1 - e - bw, H, z0 + cut], [x1 - e, H + 0.04, z1 - cut], BELT, K, false));
   // 島（段状のステンレス）と投入口（暗い開口 + 黒い庇）
   const ix0 = x0 + e + bw + 0.1, ix1 = x1 - e - bw - 0.1, iz0 = z0 + e + bw + 0.1, iz1 = z1 - e - bw - 0.1;
   if (ix1 - ix0 > 0.8 && iz1 - iz0 > 0.8) {
-    tmp.push(box([ix0, H, iz0], [ix1, H + 0.35, iz1], skirt, false));
+    tmp.push(kinded([ix0, H, iz0], [ix1, H + 0.35, iz1], skirt, K, false));
     const in2 = Math.min(0.45, (ix1 - ix0) / 4, (iz1 - iz0) / 4);
-    tmp.push(box([ix0 + in2, H + 0.35, iz0 + in2], [ix1 - in2, H + 0.7, iz1 - in2], skirt, false));
+    tmp.push(kinded([ix0 + in2, H + 0.35, iz0 + in2], [ix1 - in2, H + 0.7, iz1 - in2], skirt, K, false));
     const mx = (ix0 + ix1) / 2, mz = (iz0 + iz1) / 2;
     if (alongX) {
-      tmp.push(box([mx - 0.6, H + 0.04, iz0 - 0.005], [mx + 0.6, H + 0.6, iz0 + 0.01], 'void', false));
-      tmp.push(box([mx - 0.7, H + 0.6, iz0 - 0.15], [mx + 0.7, H + 0.7, iz0 + 0.3], 'metalDark', false));
+      tmp.push(kinded([mx - 0.6, H + 0.04, iz0 - 0.005], [mx + 0.6, H + 0.6, iz0 + 0.01], 'void', K, false));
+      tmp.push(kinded([mx - 0.7, H + 0.6, iz0 - 0.15], [mx + 0.7, H + 0.7, iz0 + 0.3], 'metalDark', K, false));
     } else {
-      tmp.push(box([ix0 - 0.005, H + 0.04, mz - 0.6], [ix0 + 0.01, H + 0.6, mz + 0.6], 'void', false));
-      tmp.push(box([ix0 - 0.15, H + 0.6, mz - 0.7], [ix0 + 0.3, H + 0.7, mz + 0.7], 'metalDark', false));
+      tmp.push(kinded([ix0 - 0.005, H + 0.04, mz - 0.6], [ix0 + 0.01, H + 0.6, mz + 0.6], 'void', K, false));
+      tmp.push(kinded([ix0 - 0.15, H + 0.6, mz - 0.7], [ix0 + 0.3, H + 0.7, mz + 0.7], 'metalDark', K, false));
     }
   }
   if (!placeUnit(c, tmp, { margin: 0.4 })) return false;
-  // スーツケース 1 つ（入口側のベルトの上）
-  const bx = alongX ? cx - len * 0.2 : x0 + e + bw / 2;
-  const bz = alongX ? z0 + e + bw / 2 : cz - len * 0.2;
-  c.L.boxes.push(box([bx - 0.35, H + 0.04, bz - 0.22], [bx + 0.35, H + 0.32, bz + 0.22], 'seatRed', false));
-  c.L.boxes.push(box([bx - 0.15, H + 0.32, bz - 0.02], [bx + 0.15, H + 0.36, bz + 0.02], 'metalDark', false));
+  // スーツケース 2〜3 個（参考は 1 つなので疎に）: ベルトの中心線上の候補 4 か所（長辺 2 × 短辺 2）から seed で選ぶ
+  const cands: { x: number; z: number; alongX: boolean }[] = [
+    { x: x0 + cut + (x1 - x0 - 2 * cut) * 0.3, z: z0 + e + bw / 2, alongX: true },
+    { x: x0 + cut + (x1 - x0 - 2 * cut) * 0.7, z: z1 - e - bw / 2, alongX: true },
+    { x: x0 + e + bw / 2, z: z0 + cut + (z1 - z0 - 2 * cut) * 0.5, alongX: false },
+    { x: x1 - e - bw / 2, z: z0 + cut + (z1 - z0 - 2 * cut) * 0.5, alongX: false },
+  ];
+  const n = c.rng.int(2, 3);
+  const picked = c.rng.shuffle(cands).slice(0, n);
+  picked.forEach((q, i) => {
+    const mat = BAG_MATS[i % BAG_MATS.length];
+    const hl = q.alongX ? 0.35 : 0.22, hs = q.alongX ? 0.22 : 0.35;
+    c.L.boxes.push(kinded([q.x - hl, H + 0.04, q.z - hs], [q.x + hl, H + 0.32, q.z + hs], mat, K, false));
+    const gl = q.alongX ? 0.15 : 0.02, gs = q.alongX ? 0.02 : 0.15;
+    c.L.boxes.push(kinded([q.x - gl, H + 0.32, q.z - gs], [q.x + gl, H + 0.36, q.z + gs], 'metalDark', K, false));
+  });
+  c.note(`U11: bags ${n}`);
   return true;
 }
 
@@ -1290,7 +1307,7 @@ function u14(c: Ctx): void {
   c.note(`U14: desks ${desks.length}, stations ${stations}, shelves ${shelves}`);
 }
 
-// ---- U15 単一商品スーパー: 白い高照度、棚の縁の値札レール、全通路に同じ「5 日用品」の吊り看板（商品は PropRepetition）
+// ---- U15 単一商品スーパー: 白い高照度、棚の縁の値札レール（dress:rail）、全通路に同じ「5 日用品」の吊り看板（商品 = 白いボトルは PropRepetition の params）
 
 function u15(c: Ctx): void {
   const { L } = c;
@@ -1304,8 +1321,26 @@ function u15(c: Ctx): void {
   L.palette.lightColor = 0xf4f7ff;
   L.palette.lightIntensity *= 1.2;
   const blocks = L.boxes.slice(c.start).filter((b) => b.solid && b.mat === 'shelfMetal' && b.max[1] - b.min[1] >= 1.3 && Math.max(b.max[0] - b.min[0], b.max[2] - b.min[2]) >= 1.2);
-  // 棚の縁の値札レールは置かない: PropRepetition が非ソリッドの箔を捨てるためソリッドで 250 個置くと、構築時間が +45%（焼き込み・コライダ）になり
-  // 見た目の寄与（縁の細い帯）が小さかった。商品（PropRepetition）と看板・高照度で「スーパーの通路」を出す
+  // 棚の縁の値札レール: 非ソリッドの薄い白箔（kind 'dress:rail'。PropRepetition.removeFills はこの印の箔を捨てない。
+  // ソリッド 250 個で置いた版は構築時間 +45% だったので非ソリッドで）。棚板（ArchitecturalDetails: level = 0.25 + k·max(0.9, h/3)、厚 0.05）の
+  // 前縁に高 0.05・出 12 mm。長い面 2 面 × 段（最上段は除く）。上限 260 箔
+  let rails = 0;
+  for (const b of blocks) {
+    if (rails >= 260) break;
+    const bh = b.max[1] - b.min[1];
+    const alongX = b.max[0] - b.min[0] >= b.max[2] - b.min[2];
+    const step = Math.max(0.9, bh / 3);
+    for (let level = b.min[1] + 0.25; level < b.max[1] - 0.3 && rails < 260; level += step) {
+      for (const sign of [1, -1] as const) {
+        const face = alongX ? (sign > 0 ? b.max[2] : b.min[2]) : (sign > 0 ? b.max[0] : b.min[0]);
+        const d0 = Math.min(face, face + sign * 0.012), d1 = Math.max(face, face + sign * 0.012);
+        L.boxes.push(alongX
+          ? kinded([b.min[0] + 0.06, level - 0.005, d0], [b.max[0] - 0.06, level + 0.045, d1], 'signPlate', 'dress:rail', false)
+          : kinded([d0, level - 0.005, b.min[2] + 0.06], [d1, level + 0.045, b.max[2] - 0.06], 'signPlate', 'dress:rail', false));
+        rails++;
+      }
+    }
+  }
   // 通路の吊り看板: 列（across 座標）の間の通路中央、入口側の端
   let signs = 0;
   if (blocks.length) {
@@ -1324,7 +1359,7 @@ function u15(c: Ctx): void {
       signs++;
     }
   }
-  c.note(`U15: blocks ${blocks.length}, aisle signs ${signs}`);
+  c.note(`U15: blocks ${blocks.length}, rails ${rails}, aisle signs ${signs}`);
 }
 
 // ---- U16 番号異常駐車場: 柱の階表示を矛盾させる（B3 / B1 / 101 …）、車 2〜3 台、床の矢印（区画コードは DuplicateNumber）

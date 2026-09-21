@@ -609,7 +609,8 @@
           "id": "FakeSignage",
           "params": {
             "mode": "misleading",
-            "target": "exitSign"
+            "target": "exitSign",
+            "fakeDoor": false
           }
         }
       ],
@@ -799,7 +800,7 @@
           "id": "PropRepetition",
           "params": {
             "propId": "luggage",
-            "density": 0.8
+            "density": 0.3
           }
         }
       ],
@@ -926,7 +927,13 @@
           "id": "PropRepetition",
           "params": {
             "propId": "sameProduct",
-            "density": 1.0
+            "density": 1.0,
+            "mat": "signPlate",
+            "size": [
+              0.08,
+              0.24,
+              0.08
+            ]
           }
         }
       ],
@@ -1689,7 +1696,8 @@
           "id": "PropRepetition",
           "params": {
             "propId": "storageDoor",
-            "density": 1.0
+            "density": 1.0,
+            "doorMat": "redShutter"
           }
         },
         {
@@ -1826,7 +1834,8 @@
         {
           "id": "FakeSky",
           "params": {
-            "skyPreset": "noonSun"
+            "skyPreset": "noonSun",
+            "beams": false
           }
         },
         {

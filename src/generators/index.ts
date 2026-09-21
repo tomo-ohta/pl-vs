@@ -23,6 +23,7 @@ import { applyLayoutModifiers } from '../modifiers';
 import { applyWearLayout } from './wear';
 import { applyDressing } from './dressing';
 import { applyDecalRules } from './decals';
+import { applyLightKelvin } from './presets';
 
 /** Generator ごとのバリアント数（既存 6 種は layout.ts の既定値と同じ。Phase 3 で各ファイルが variants を export したらここで参照する） */
 export const GENERATOR_VARIANTS: Record<string, number> = {
@@ -59,6 +60,9 @@ function generateRaw(p: GenParams, fallback: boolean): RoomLayout {
 /** Generator クラス名 → レイアウト生成 + Modifier の layout post-pass。
  *  レイアウトは (definitionId, seed, variant, extraSockets, removedSockets, mainRect, holeLocal) の決定論的関数のまま */
 export function generateLayout(p: GenParams, fallback: boolean): RoomLayout {
+  // 色温度（V04 手順 9。担当 P1）: テンプレート別の範囲から部屋 seed で 1 値を選び palette.lightColor / ambient を決める。
+  // Generator の前に行い、専用 fork で他の乱数列を消費しない（paletteFor を呼ぶ側 = WorldManager / GraphReference / VisualReview は変えない）
+  applyLightKelvin(p.palette, p.def, p.template, p.rng.fork('kelvin'));
   const L = generateRaw(p, fallback);
   // 部屋別ドレッシング（参考画像に合わせた大物・サイン・照明色。Modifier より前）
   applyDressing(L, p);

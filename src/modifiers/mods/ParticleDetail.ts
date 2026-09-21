@@ -2,10 +2,12 @@
  * ParticleDetail — 少数のスプライトパーティクル（U07 rain 0.5 / U12 steam 0.3 / R19 steam 0.2 / L09 mist 0.5 / L19 snow 0.3）。
  * params: type('steam'|'mist'|'rain'|'snow'|'dust'), density(0..1 の強さ), respawn(無視。全 type ループ再生), size(m), color
  *
- * layout フックで L.particles（ParticleSpec）を決めるだけ。RoomBuilder が 1 部屋 = 1 Points（頂点シェーダで移動・領域内ラップ）を作り、
- * Tier の particleCap で粒数を切る。ParticleSpec.density は「1 m³ あたりの粒数」なので、ここで目標粒数 / 発生領域の体積 に換算する。
+ * layout フックで L.particles にスロット（ParticleSpec）を 1 つ入れるだけ。同じ type の既存スロットは置き換え、別 type（Generator / ドレッシングが
+ * 足した L09 の浴槽ごとの steam など）は残す（generators/particles.ts の replaceParticles）。RoomBuilder がスロットごとに Points
+ * （頂点シェーダで移動・領域内ラップ）を作り、部屋合計の粒数を Tier の particleCap に収める。ParticleSpec.density は「1 m³ あたりの粒数」なので、
+ * ここで目標粒数 / 発生領域の体積 に換算する。
  *   - rain: 天井の漏水域。最大矩形の内側から 1 か所（辺 3 + 6·density m、3〜8 m）を rng で選び、床〜天井を落下。
- *           雨域は L.particles.aabb に残り、同じ担当の Wetness が読んで床をその範囲だけ濡らす。
+ *           雨域は rain スロットの aabb に残り、同じ担当の Wetness が particleList(L) から読んで床をその範囲だけ濡らす。
  *   - steam: 発生源 = 内装のソリッド箱で天板が 0.7〜1.3 m のもの（カウンター / 卓 / カップ）。rng で 1 つ選び 5 m 以内の同類をまとめた
  *            天板から +1.2 m の領域。無ければ主矩形中央の 2×2 m。粒数 20〜60。
  *   - mist: 床上 0〜0.6 m を漂う大きな柔らかい粒（size 2.2）。粒数 40〜120。
@@ -16,6 +18,7 @@ import type { AABB } from '../../core/aabb';
 import type { Rng } from '../../core/rng';
 import { inner, rect, rectArea, type Rect } from '../../generators/footprint';
 import { box, type Box, type ParticleSpec, type ParticleType, type RoomLayout } from '../../generators/layout';
+import { replaceParticles } from '../../generators/particles';
 import type { ModifierImpl } from '../types';
 import { interiorBoxes, num, parseColor, str } from '../util';
 import { footprintOrBounds, rectIntersect } from './ShallowWater.geom';
@@ -87,7 +90,7 @@ const ParticleDetail: ModifierImpl = {
     const sz = num(params.size, size ?? NaN);
     if (Number.isFinite(sz) && sz > 0) spec.size = sz;
     if (params.color !== undefined) spec.color = parseColor(params.color, 0xffffff);
-    L.particles = spec;
+    replaceParticles(L, type, spec);
   },
 };
 

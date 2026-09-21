@@ -13,6 +13,19 @@ import type { Rng } from '../core/rng';
 import { across, along, wallSpans, type Rect } from './footprint';
 import { box, WALL_T, type Box, type MatId, type RoomLayout, type SignSpec } from './layout';
 
+// ---------------------------------------------------------------- 表示用の意味タグ
+
+/**
+ * ヘルパが push した箱（from 以降）に表示用グループ id（Box.propGroup）を付け、主箱（primary）に kind を付ける。
+ * RoomBuilder → ArchitecturalDetails（props/FurnitureShapes）がグループ単位で専用形状に描き替える。当たり判定・乱数・セーブ形式は変えない。
+ */
+export function tagGroup(B: Box[], from: number, group: string, kind: string, primary = from): void {
+  for (let i = from; i < B.length; i++) B[i].propGroup = group;
+  if (primary >= from && primary < B.length) B[primary].kind = kind;
+}
+
+const gid = (kind: string, ...v: number[]): string => `${kind}@${v.map((x) => x.toFixed(2)).join(',')}`;
+
 // ---------------------------------------------------------------- 壁の室内面
 
 /** 壁の室内面。dir は壁の外向き（footprint の Edge.dir）、face は室内面の座標（horizontal なら z、縦なら x）、inward は室内向きの符号 */
@@ -137,6 +150,7 @@ export function lockerBank(B: Box[], f: Face, a0: number, n: number, standoff = 
   if (n <= 0) return;
   const w = n * 0.4;
   const front = standoff + depth;
+  const from = B.length;
   B.push(alongFace(f, a0, w, standoff, front, 0, height, 'lockerGreen', true));
   // 台輪（暗い足元）と天板の縁
   B.push(alongFace(f, a0, w, front - 0.01, front + 0.004, 0, 0.08, 'metalDark', false));
@@ -152,6 +166,8 @@ export function lockerBank(B: Box[], f: Face, a0: number, n: number, standoff = 
     // 取っ手（右寄り）
     B.push(alongFace(f, a + 0.31, 0.03, front, front + 0.02, 0.98, 1.1, 'metalDark', false));
   }
+  // 表示用タグ: 本体（from）が kind 'lockers'。描画側は本体の寸法と前面（取っ手の側）から扉・通気口・取っ手を描き直し、ここの薄箔は重ねない
+  tagGroup(B, from, gid('lockers', f.dir, a0, f.face), 'lockers');
 }
 
 /** ロッカーを a0..a1 に 0.4 単位で並べる。禁止領域に掛かる台は飛ばし、連続する台をまとめて 1 列にする。置いた台数を返す */
@@ -179,6 +195,7 @@ export function lockersAlong(B: Box[], f: Face, a0: number, a1: number, zones: A
 /** 木のベンチ: 天板 handrailWood 0.35 幅 × 高 0.45（ソリッド）、metalDark の脚（非ソリッド） */
 export function bench(B: Box[], alongX: boolean, cx: number, cz: number, len: number): void {
   const hw = 0.175;
+  const from = B.length;
   const top = alongX ? box([cx - len / 2, 0.4, cz - hw], [cx + len / 2, 0.45, cz + hw], 'handrailWood') : box([cx - hw, 0.4, cz - len / 2], [cx + hw, 0.45, cz + len / 2], 'handrailWood');
   B.push(top);
   const legs = Math.max(2, Math.ceil(len / 1.5) + 1);
@@ -189,6 +206,7 @@ export function bench(B: Box[], alongX: boolean, cx: number, cz: number, len: nu
     if (alongX) B.push(box([lx - 0.02, 0, lz - hw + 0.03], [lx + 0.02, 0.4, lz + hw - 0.03], 'metalDark', false));
     else B.push(box([lx - hw + 0.03, 0, lz - 0.02], [lx + hw - 0.03, 0.4, lz + 0.02], 'metalDark', false));
   }
+  tagGroup(B, from, gid('bench', cx, cz), 'bench');
 }
 
 /** 長机 1.8 × 0.75 × 高 0.72: 天板 3 cm（ソリッド）+ 幕板（非ソリッド）+ metalDark の脚 5 cm（ソリッド） */
@@ -207,6 +225,7 @@ export function longTable(B: Box[], cx: number, cz: number, alongX: boolean, len
 /** 椅子: 座 0.45 × 0.45 高 0.45 + 背 0.4（seatBlue、ソリッド）、metalDark の脚（非ソリッド）。facing は座った人が向く方向 */
 export function chair(B: Box[], cx: number, cz: number, facing: Dir): void {
   const s = 0.225;
+  const from = B.length;
   B.push(box([cx - s, 0.41, cz - s], [cx + s, 0.45, cz + s], 'seatBlue'));
   const back = (): Box => {
     switch (facing) {
@@ -222,6 +241,8 @@ export function chair(B: Box[], cx: number, cz: number, facing: Dir): void {
     const lz = cz + sz * (s - 0.04);
     B.push(box([lx - 0.015, 0, lz - 0.015], [lx + 0.015, 0.41, lz + 0.015], 'metalDark', false));
   }
+  // 表示用タグ: 座（from）が kind 'chair'。向きは背の箱の位置から描画側が読む
+  tagGroup(B, from, gid('chair', cx, cz), 'chair');
 }
 
 /** 連結椅子（待合ベンチ）: n 席 × 0.5 ピッチ。座 0.45 × 0.45 高 0.45 + 背 0.4、metalDark の梁と脚。facing は座った人が向く方向 */
@@ -229,6 +250,7 @@ export function linkedSeats(B: Box[], cx: number, cz: number, n: number, facing:
   const len = n * 0.5;
   const alongX = facing === 0 || facing === 2; // 列は facing と直交
   const s = 0.225;
+  const from = B.length;
   // 梁（床上 0.33〜0.38）と両端の脚
   if (alongX) B.push(box([cx - len / 2 + 0.05, 0.33, cz - 0.03], [cx + len / 2 - 0.05, 0.38, cz + 0.03], 'metalDark', false));
   else B.push(box([cx - 0.03, 0.33, cz - len / 2 + 0.05], [cx + 0.03, 0.38, cz + len / 2 - 0.05], 'metalDark', false));
@@ -249,16 +271,21 @@ export function linkedSeats(B: Box[], cx: number, cz: number, n: number, facing:
       default: B.push(box([ux + s - 0.06, 0.45, uz - s], [ux + s, 0.85, uz + s], 'seatBlue')); break;
     }
   }
+  // 表示用タグ: 梁（from）が kind 'linkedSeats'。席数は列の長さ / 0.5、向きは背の箱の位置から描画側が読む
+  tagGroup(B, from, gid('linkedSeats', cx, cz), 'linkedSeats');
 }
 
 /** 自販機 0.9 × 0.8 × 1.85: 暗い筐体（ソリッド）+ 前面の発光箔 + 下部の取り出し口 */
 export function vending(B: Box[], f: Face, at: number, glow: MatId = 'lightPanel'): void {
   const d0 = 0.05, d1 = 0.85;
+  const from = B.length;
   B.push(alongFace(f, at, 0.9, d0, d1, 0, 1.85, 'metalDark', true));
   B.push(alongFace(f, at + 0.08, 0.66, d1, d1 + 0.012, 0.78, 1.72, glow, false));
   B.push(alongFace(f, at + 0.08, 0.66, d1, d1 + 0.01, 0.55, 0.72, 'shelfMetal', false));
   B.push(alongFace(f, at + 0.16, 0.5, d1, d1 + 0.012, 0.18, 0.42, 'metal', false));
   B.push(alongFace(f, at + 0.76, 0.1, d1, d1 + 0.018, 1.0, 1.35, 'shelfMetal', false));
+  // 表示用タグ（kind 'vending'。前面の箔は既に方向付きなので描画側はそのまま描く）
+  tagGroup(B, from, gid('vending', f.dir, at, f.face), 'vending');
 }
 
 /** カウンター（返却台・受付）: 本体（ソリッド）+ 天板 3 cm */

@@ -1,5 +1,5 @@
 /**
- * ユーザー設定（音量 3 種・視点感度・品質 Tier）の永続化。localStorage 'liminal.settings.v1'。
+ * ユーザー設定（音量 3 種・視点感度・品質 Tier・撮像プリセット・カメラ挙動）の永続化。localStorage 'liminal.settings.v1'。
  *
  * 統合担当向け: 呼び出し方
  *   const settings = Settings.load();                      // 起動時に 1 回
@@ -7,11 +7,18 @@
  *   settings.set({ masterVolume: 0.5 });                   // 変更 → 即 save + onChange 通知
  *   settings.data.tier                                      // 'auto' | 'low' | 'mid' | 'high'（Game.bindMenu の #quality と同期させる）
  * DOM / Web Audio に依存しない（Node でも import できる）。
+ *
+ * カメラ挙動（担当 F2。docs/film-camera.md）: postfx は撮像プリセット（FilmPreset）、handheld / cameraLag は PlayerController の
+ * 表示カメラだけに効く（判定・移動方向・保存される yaw / pitch は変わらない）。recOverlay は REC・タイムコードの DOM 表示、
+ * frameHold は VideoPass の表示フレームレートの間引き（'off' = プリセット値のまま。tape 以外でも指定できる）。
  */
 import type { QualityTierId } from './types';
+import { isFilmPreset, type FilmPreset } from '../render/FilmPreset';
 
-/** 描画効果（V07）: off = 直接描画（composer 無し）/ clean = Tier の GTAO・bloom・MSAA だけ / archival = clean + 控えめな古い撮像表現 */
-export type PostFxPreset = 'off' | 'clean' | 'archival';
+/** 描画効果（撮像プリセット）。旧値 'archival' は sanitize で 'homeVideo' に読み替える */
+export type PostFxPreset = FilmPreset;
+/** 表示フレームレートの間引き（VideoPass.params.frameHold）。'off' = プリセット値のまま */
+export type FrameHoldId = 'off' | '30' | '24';
 /** トーンマップ（開発用の切替。既定は docs/postfx.md の比較で採用したもの） */
 export type ToneMappingId = 'aces' | 'agx';
 
@@ -28,6 +35,14 @@ export interface SettingsData {
   tier: 'auto' | QualityTierId;
   /** 描画効果（ポスト処理 / 撮像プリセット。Tier とは独立） */
   postfx: PostFxPreset;
+  /** 手持ち感（0〜1。0 で歩行の上下動・ロール・呼吸・ふらつき・ズームのゆらぎが完全に無効） */
+  handheld: number;
+  /** 視線の遅れ（マウス / スワイプ入力に対する表示 yaw / pitch の 50 ms の追従） */
+  cameraLag: boolean;
+  /** REC・タイムコード表示 */
+  recOverlay: boolean;
+  /** 表示フレームレートの間引き */
+  frameHold: FrameHoldId;
   /** トーンマップ */
   toneMapping: ToneMappingId;
 }
@@ -40,7 +55,11 @@ export const DEFAULT_SETTINGS: Readonly<SettingsData> = {
   sfxVolume: 1.0,
   lookSensitivity: 1.0,
   tier: 'auto',
-  postfx: 'clean',
+  postfx: 'homeVideo',
+  handheld: 0.6,
+  cameraLag: true,
+  recOverlay: false,
+  frameHold: 'off',
   toneMapping: 'agx',
 };
 
@@ -119,10 +138,20 @@ function clamp01(v: unknown, fallback: number): number {
   return Math.min(1, Math.max(0, n));
 }
 
+function bool(v: unknown, fallback: boolean): boolean {
+  return typeof v === 'boolean' ? v : fallback;
+}
+
+/** 撮像プリセット。旧設定 'archival'（v1.3 第5回の「アーカイブ」）は homeVideo へ */
+function filmPreset(v: unknown): FilmPreset {
+  if (v === 'archival') return 'homeVideo';
+  return isFilmPreset(v) ? v : DEFAULT_SETTINGS.postfx;
+}
+
 function sanitize(d: SettingsData): SettingsData {
   const sens = typeof d.lookSensitivity === 'number' && Number.isFinite(d.lookSensitivity) ? d.lookSensitivity : DEFAULT_SETTINGS.lookSensitivity;
   const tier = d.tier === 'low' || d.tier === 'mid' || d.tier === 'high' || d.tier === 'auto' ? d.tier : 'auto';
-  const postfx = d.postfx === 'off' || d.postfx === 'clean' || d.postfx === 'archival' ? d.postfx : DEFAULT_SETTINGS.postfx;
+  const frameHold: FrameHoldId = d.frameHold === 'off' || d.frameHold === '30' || d.frameHold === '24' ? d.frameHold : DEFAULT_SETTINGS.frameHold;
   const toneMapping = d.toneMapping === 'aces' || d.toneMapping === 'agx' ? d.toneMapping : DEFAULT_SETTINGS.toneMapping;
   return {
     masterVolume: clamp01(d.masterVolume, DEFAULT_SETTINGS.masterVolume),
@@ -130,7 +159,11 @@ function sanitize(d: SettingsData): SettingsData {
     sfxVolume: clamp01(d.sfxVolume, DEFAULT_SETTINGS.sfxVolume),
     lookSensitivity: Math.min(3, Math.max(0.3, sens)),
     tier,
-    postfx,
+    postfx: filmPreset(d.postfx),
+    handheld: clamp01(d.handheld, DEFAULT_SETTINGS.handheld),
+    cameraLag: bool(d.cameraLag, DEFAULT_SETTINGS.cameraLag),
+    recOverlay: bool(d.recOverlay, DEFAULT_SETTINGS.recOverlay),
+    frameHold,
     toneMapping,
   };
 }

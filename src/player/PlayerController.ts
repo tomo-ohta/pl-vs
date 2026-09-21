@@ -15,11 +15,90 @@
  * - `player.external`（動く床・風の恒常速度）は従来どおり外部から設定できる。ゾーンによる外力は毎フレーム再計算し、
  *   ゾーン外では自動的に 0 になる（`player.zoneForce` で参照可）。
  * - 乗車中は `PlayerRide.update` を呼び、`player.update` は呼ばない（PlayerRide.ts を参照）。
+ *
+ * カメラ挙動（担当 F2。docs/film-camera.md）: 手持ち感（歩調に同期した上下動・ロール、呼吸、ふらつき、ズームのゆらぎ）と
+ * 視線の遅れは **表示カメラだけ** に掛ける（`syncCamera` で合成）。`pos` / 当たり判定 / `yaw` `pitch` の入力値、PlayerProxy、
+ * セーブ、移動方向は変わらない。設定は `player.feel`（Game が Settings から写す。handheld 0 で揺れ・ロール・ズームが完全に無効）、
+ * 乗車中と E03（layout.roll）は Game が `cameraFeelSuppressed = true` にして入力値どおりのカメラにする。
  */
 import * as THREE from 'three';
 import type { AABB } from '../core/aabb';
 import type { Vec3 } from '../core/types';
 import type { InputState } from '../input/InputController';
+import type { FilmPreset } from '../render/FilmPreset';
+
+const DEG = Math.PI / 180;
+const TAU = Math.PI * 2;
+
+/**
+ * 手持ちカメラの挙動の数値（設定 handheld 0〜1 でスケール。すべて見た目だけ）。
+ * 酔いの原因になるので弱く: 上下動 1.5 cm・ロール 0.3°・呼吸 3 mm / 0.1°・ふらつき 0.08°・FOV ±0.5°
+ */
+export const CAMERA_FEEL = {
+  /** 歩行の上下動の振幅（m）。1 歩 1 周期、足音（strideAcc）の位相に同期 */
+  bobY: 0.015,
+  /** 歩行のロール（rad）。左右の足で交互（2 歩 1 周期） */
+  bobRoll: 0.3 * DEG,
+  /** 歩行の揺れの立ち上がり / 収まり / 出力の平滑（s。平滑の減衰は歩調の周波数で掛け戻す） */
+  bobAttackSec: 0.2,
+  bobReleaseSec: 0.3,
+  bobSmoothSec: 0.05,
+  /** しゃがみ / ダッシュの振幅倍率 */
+  crouchMul: 0.6,
+  dashMul: 1.4,
+  /** 呼吸: 上下（m）とロール（rad）。周期は 4〜5 s（ロールは非整数比でずらす） */
+  breathSec: 4.5,
+  breathY: 0.003,
+  breathRollSec: 6.3,
+  breathRoll: 0.1 * DEG,
+  /** 手持ちのふらつき（yaw / pitch の rad。非整数比の 2 周期の合成 × 2 軸） */
+  wobble: 0.08 * DEG,
+  wobbleSec: [3.1, 1.3, 2.3, 0.9] as const,
+  /** 静止（移動・視線入力なし）が stillAfterSec 以上続いたら揺れを stillMul 倍へ（呼吸は残す）。落とすのに fall 秒、戻すのに rise 秒 */
+  stillAfterSec: 3,
+  stillMul: 0.3,
+  stillFallSec: 1.0,
+  stillRiseSec: 0.5,
+  /** 視線の遅れの時定数（s）。表示 yaw / pitch を入力値へ指数追従 */
+  lagSec: 0.05,
+  /** ズームのゆらぎ: FOV の振幅（deg）と周期の範囲（s。起点はランダム） */
+  zoomDeg: 0.5,
+  zoomSecMin: 7,
+  zoomSecMax: 11,
+};
+
+/**
+ * 撮像プリセットごとのカメラ挙動の倍率（LensPass.LENS_PRESETS / VideoPass.VIDEO_PRESETS と対）。
+ * wobble: ふらつきの倍率 / zoom: ズームのゆらぎの倍率（0 = 無し。off / clean はレンズのサーボの癖を付けない）
+ */
+export const CAMERA_PRESETS: Record<FilmPreset, { wobble: number; zoom: number }> = {
+  off: { wobble: 1, zoom: 0 },
+  clean: { wobble: 1, zoom: 0 },
+  homeVideo: { wobble: 1, zoom: 1 },
+  tape: { wobble: 1.2, zoom: 1.2 },
+};
+
+/** カメラ挙動の設定（Game が Settings から写す） */
+export interface CameraFeelSettings {
+  /** 手持ち感 0〜1（0 で完全無効） */
+  handheld: number;
+  /** 視線の遅れ */
+  lag: boolean;
+  /** 撮像プリセット（CAMERA_PRESETS の倍率） */
+  preset: FilmPreset;
+}
+
+/** 表示カメラに足しているオフセット（デバッグ HUD 用）。yaw / pitch は表示値（遅れ + ふらつき） */
+export interface CameraFeelOut {
+  /** 視点高さへの加算（m） */
+  y: number;
+  /** ロール（rad） */
+  roll: number;
+  yaw: number;
+  pitch: number;
+  /** FOV への加算（deg） */
+  fov: number;
+}
 
 export const PLAYER = {
   height: 1.7,
@@ -80,20 +159,49 @@ export class PlayerController {
   /** ジャンプ開始 */
   onJump: (() => void) | null = null;
 
+  /** カメラ挙動の設定（Game が Settings から写す。docs/film-camera.md） */
+  readonly feel: CameraFeelSettings = { handheld: 0.6, lag: true, preset: 'homeVideo' };
+  /** true の間は揺れ・ロール・遅れ・ズームを掛けず、カメラを入力値どおりにする（乗車中・E03。Game が毎フレーム設定） */
+  cameraFeelSuppressed = false;
+  /** ズームのゆらぎの中心 FOV（deg）。他が FOV を変えるときはここも更新する */
+  baseFov: number;
+  /** teleport のたびに増える（Game が回転ブラーの入力をそのフレームだけ 0 にする） */
+  teleportSerial = 0;
+  /** 表示カメラのオフセット（デバッグ HUD 用。毎フレーム更新） */
+  readonly cameraFeel: CameraFeelOut = { y: 0, roll: 0, yaw: 0, pitch: 0, fov: 0 };
+
   private readonly camera: THREE.PerspectiveCamera;
   private lastCollisionCount = 0;
   private _crouching = false;
   private eyeNow = PLAYER.eye;
   private _moveRank: MoveRank = 'still';
   private strideAcc = 0;
+  /** 足音の通算歩数（ロールの左右交互に使う） */
+  private strideCount = 0;
   private wasOnGround = false;
   /** ゾーン合成結果（デバッグ・HUD 用） */
   private zoneSlow = 1;
   private zoneFriction = 1;
   private inWater = false;
+  // --- カメラ挙動の内部状態（見た目だけ。乱数は位相の起点にのみ使い、世界生成には関与しない）
+  private dispYaw = 0;
+  private dispPitch = 0;
+  private feelTime = 0;
+  private feelWasSuppressed = false;
+  private stillSec = 0;
+  private stillScale = 1;
+  private bobEnv = 0;
+  private gaitPhase = 0;
+  private gaitStep = 0;
+  private bobY = 0;
+  private bobRoll = 0;
+  private fovOffsetNow = 0;
+  private readonly feelPhase = [0, 1, 2, 3, 4].map(() => Math.random() * TAU);
+  private readonly zoomPeriod = CAMERA_FEEL.zoomSecMin + Math.random() * (CAMERA_FEEL.zoomSecMax - CAMERA_FEEL.zoomSecMin);
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
+    this.baseFov = camera.fov;
   }
 
   /** しゃがみ中か */
@@ -134,12 +242,124 @@ export class PlayerController {
     this.pitch = 0;
     this.eyeNow = this._crouching ? PLAYER.crouchEye : PLAYER.eye;
     this.strideAcc = 0;
+    this.teleportSerial++;
+    // 視線の遅れを跨がせない（遷移先で視点が滑らない）
+    this.snapCameraFeel();
     this.syncCamera();
   }
 
+  /**
+   * カメラを現在の姿勢に合わせる。手持ち感（上下動・ロール・呼吸・ふらつき）と視線の遅れは表示値（cameraFeel）で合成し、
+   * 抑制中（乗車 / E03）は入力値どおり。rotation は 'YXZ'（Y = yaw, X = pitch, Z = roll）
+   */
   syncCamera(): void {
-    this.camera.position.set(this.pos.x, this.pos.y + this.eyeNow, this.pos.z);
-    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    if (this.cameraFeelSuppressed) {
+      this.camera.position.set(this.pos.x, this.pos.y + this.eyeNow, this.pos.z);
+      this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+      this.applyFov(0);
+      return;
+    }
+    const o = this.cameraFeel;
+    this.camera.position.set(this.pos.x, this.pos.y + this.eyeNow + o.y, this.pos.z);
+    this.camera.rotation.set(o.pitch, o.yaw, o.roll, 'YXZ');
+    this.applyFov(o.fov);
+  }
+
+  /** 静止（移動・視線入力なし）の継続秒数（Game が毎フレーム渡す）。3 s 以上で揺れを弱める（呼吸は残す） */
+  setStillness(sec: number): void {
+    this.stillSec = Math.max(0, sec);
+  }
+
+  /** 表示 yaw / pitch を入力値に一致させる（テレポート・抑制の解除時） */
+  private snapCameraFeel(): void {
+    this.dispYaw = this.yaw;
+    this.dispPitch = this.pitch;
+    this.cameraFeel.yaw = this.yaw;
+    this.cameraFeel.pitch = this.pitch;
+  }
+
+  /** FOV のオフセット（deg）を写す。変化があるときだけ updateProjectionMatrix */
+  private applyFov(offsetDeg: number): void {
+    if (offsetDeg === this.fovOffsetNow) return;
+    this.fovOffsetNow = offsetDeg;
+    this.camera.fov = this.baseFov + offsetDeg;
+    this.camera.updateProjectionMatrix();
+  }
+
+  /**
+   * 手持ち感と視線の遅れの表示値を更新する（update の末尾、syncCamera の前）。
+   * - 視線の遅れ: 表示 yaw / pitch を入力値へ時定数 50 ms で指数追従（off なら即時）
+   * - 歩行: 位相 = strideAcc / 歩幅（足音と同期）。上下 -cos（足音の瞬間が最下点）、ロールは 2 歩 1 周期で左右交互。
+   *   立ち上がり 0.2 s / 収まり 0.3 s の包絡、60 ms の平滑で停止・再開の段差を消す。しゃがみ ×0.6、ダッシュ ×1.4
+   * - 静止 3 s 以上で歩行の揺れとふらつきを 0.3 倍へ（1 s で落とし、動けば 0.5 s で戻す）。呼吸は残す
+   * - 呼吸（常時）とふらつき（yaw / pitch）は非整数比の正弦の合成。ズームは FOV ±0.5°・周期 7〜11 s
+   */
+  private updateCameraFeel(dt: number): void {
+    const F = CAMERA_FEEL;
+    const suppressed = this.cameraFeelSuppressed;
+    // 表示 yaw / pitch
+    if (suppressed || this.feelWasSuppressed || !this.feel.lag) {
+      this.dispYaw = this.yaw;
+      this.dispPitch = this.pitch;
+    } else {
+      const k = 1 - Math.exp(-dt / F.lagSec);
+      this.dispYaw += (this.yaw - this.dispYaw) * k;
+      this.dispPitch += (this.pitch - this.dispPitch) * k;
+    }
+    this.feelWasSuppressed = suppressed;
+    this.feelTime += dt;
+    const t = this.feelTime;
+    const amp = suppressed ? 0 : Math.max(0, Math.min(1, this.feel.handheld));
+    const preset = CAMERA_PRESETS[this.feel.preset] ?? CAMERA_PRESETS.homeVideo;
+
+    // 静止で弱める
+    const stillTarget = this.stillSec >= F.stillAfterSec ? F.stillMul : 1;
+    const stillRate = (1 - F.stillMul) / (stillTarget < this.stillScale ? F.stillFallSec : F.stillRiseSec);
+    this.stillScale = approach(this.stillScale, stillTarget, stillRate * dt);
+
+    // 歩行の上下動とロール（足音の位相に同期。停止中は最後の位相を保って包絡だけ落とす）
+    const moving = this.onGround && this._moveRank !== 'still';
+    let stepsPerSec = 0;
+    if (moving) {
+      const stride = this._moveRank === 'dash' ? PLAYER.strideDash : PLAYER.strideWalk;
+      this.gaitPhase = this.strideAcc / stride;
+      this.gaitStep = this.strideCount;
+      stepsPerSec = this.horizontalSpeed / stride; // 歩行 3 m/s / 0.75 m = 4 歩/s、ダッシュ 5 歩/s
+      this.bobEnv += (1 - this.bobEnv) * Math.min(1, dt / F.bobAttackSec);
+    } else {
+      this.bobEnv -= this.bobEnv * Math.min(1, dt / F.bobReleaseSec);
+    }
+    const posture = (this._crouching ? F.crouchMul : 1) * (moving && this._moveRank === 'dash' ? F.dashMul : 1);
+    const bobA = amp * this.bobEnv * posture * this.stillScale;
+    // 出力の平滑（1 次ローパス）は停止・再開・歩幅切替（strideAcc / 歩幅の位相の飛び）の段差を消すためのもの。
+    // 歩調の周波数での減衰 1/√(1+(ωτ)²) をあらかじめ掛け戻して、振幅を CAMERA_FEEL の値に保つ（上下動は 1 歩 1 周期、ロールは 2 歩 1 周期）
+    const ks = Math.min(1, dt / F.bobSmoothSec);
+    const gainY = Math.min(2.5, Math.sqrt(1 + (TAU * stepsPerSec * F.bobSmoothSec) ** 2));
+    const gainRoll = Math.min(2.5, Math.sqrt(1 + (Math.PI * stepsPerSec * F.bobSmoothSec) ** 2));
+    this.bobY += (-F.bobY * gainY * bobA * Math.cos(TAU * this.gaitPhase) - this.bobY) * ks;
+    this.bobRoll += (F.bobRoll * gainRoll * bobA * Math.sin(Math.PI * (this.gaitStep + this.gaitPhase)) - this.bobRoll) * ks;
+
+    // 呼吸（常時。しゃがみで 0.6 倍。静止でも残す）
+    const breathMul = amp * (this._crouching ? F.crouchMul : 1);
+    const breathY = F.breathY * breathMul * Math.sin((TAU * t) / F.breathSec);
+    const breathRoll = F.breathRoll * breathMul * Math.sin((TAU * t) / F.breathRollSec + this.feelPhase[4]);
+
+    // 手持ちのふらつき（yaw / pitch。静止で 0.3 倍）
+    const p = this.feelPhase;
+    const w = F.wobble * amp * preset.wobble * this.stillScale;
+    const wobYaw = w * (0.6 * Math.sin((TAU * t) / F.wobbleSec[0] + p[0]) + 0.4 * Math.sin((TAU * t) / F.wobbleSec[1] + p[1]));
+    const wobPitch = w * (0.6 * Math.sin((TAU * t) / F.wobbleSec[2] + p[2]) + 0.4 * Math.sin((TAU * t) / F.wobbleSec[3] + p[3]));
+
+    // ズームのゆらぎ（handheld 0 / off・clean プリセットでは 0 → applyFov が基準 FOV に戻す）
+    const zoom = F.zoomDeg * amp * preset.zoom;
+    const fov = zoom > 0 ? zoom * Math.sin((TAU * t) / this.zoomPeriod + p[0]) : 0;
+
+    const o = this.cameraFeel;
+    o.y = this.bobY + breathY;
+    o.roll = this.bobRoll + breathRoll;
+    o.yaw = this.dispYaw + wobYaw;
+    o.pitch = this.dispPitch + wobPitch;
+    o.fov = fov;
   }
 
   get feet(): [number, number, number] {
@@ -245,6 +465,8 @@ export class PlayerController {
 
     // 移動ランクと足音
     this.updateStride(start, dt);
+    // 表示カメラ（手持ち感・視線の遅れ）。pos / yaw / pitch は変えない
+    this.updateCameraFeel(dt);
     this.syncCamera();
   }
 
@@ -303,6 +525,7 @@ export class PlayerController {
     const stride = this._moveRank === 'dash' ? PLAYER.strideDash : PLAYER.strideWalk;
     if (this.strideAcc >= stride) {
       this.strideAcc -= stride;
+      this.strideCount++;
       this.onStride?.(this._moveRank);
     }
   }
@@ -391,4 +614,11 @@ export class PlayerController {
     this.pos.set(p[0], p[1], p[2]);
     return hit;
   }
+}
+
+/** v を target へ最大 step だけ近づける */
+function approach(v: number, target: number, step: number): number {
+  if (v < target) return Math.min(target, v + step);
+  if (v > target) return Math.max(target, v - step);
+  return v;
 }
