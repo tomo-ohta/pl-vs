@@ -20,6 +20,11 @@
  *
  * 決定論: layout フックの乱数は渡された rng のみ。onNodeCreated で role を modifierState に記録する（保存・再生成で同じ扱い）。
  * Tier 差なし（描画量は元の SmallRoom と同程度）。build / update は持たない（入室後に部屋は変わらない）。
+ *
+ * ドレッシング（generators/dressing/epic.ts の E08。Modifier より前に走る）の箱は `kind` が 'dress:' で始まる（PropRepetition.shared.isDress）。
+ * 殻・内部とも L.boxes を組み直すが、その箱だけは残す: 内部では拡大後の座標に写す（mapDressBox: XZ の中心 × s、寸法はそのまま、
+ * 天井付きのものは天井の高さの差だけ上げる）。殻ではそのまま。いずれも殻の内側（壁の内面 × 床〜天井）に clip し、潰れたものは捨てる。
+ * ドレッシング側は「拡大後に置きたい位置 ÷ s」に置く（epic.ts dressE08 の pre()）。
  */
 import { aabbFromCenter, type AABB } from '../../core/aabb';
 import type { Dir, RoomInstance, Socket, Vec3 } from '../../core/types';
@@ -30,6 +35,7 @@ import { buildShell, footprintAABB, inner as innerRect, rect, rectArea, type Rec
 import { box, DOOR_H, DOOR_W, HOLE_SIZE, lightPanel, socket, WALL_T, type Box, type GenParams, type RoomLayout, type SignSpec } from '../../generators/layout';
 import type { ModifierImpl } from '../types';
 import { num } from '../util';
+import { isDress } from './PropRepetition.shared';
 
 export const NEV_ID = 'NonEuclideanVolume';
 /** 殻の内側の扉（Seam）。この id を onConnect が見る */
@@ -57,6 +63,44 @@ function wallSign(id: string, wallPos: Vec3, wallDir: Dir, y: number, width: num
   };
 }
 
+// ---------------------------------------------------------------- ドレッシングの箱を残す
+
+/** シェル以降のドレッシングの箱（kind 'dress:*'）。組み直しの前に取り出す */
+function dressBoxesOf(L: RoomLayout): Box[] {
+  return L.boxes.slice(L.shellCount ?? 0).filter(isDress);
+}
+
+/** 内部の拡大に合わせて写す: XZ は中心を × s（寸法はそのまま）、天井付近（天井から 0.35 m 以内）のものは天井の高さの差だけ上げる */
+function mapDressBox(b: Box, s: number, h0: number, h1: number): Box {
+  const cx = ((b.min[0] + b.max[0]) / 2) * s;
+  const cz = ((b.min[2] + b.max[2]) / 2) * s;
+  const hx = (b.max[0] - b.min[0]) / 2;
+  const hz = (b.max[2] - b.min[2]) / 2;
+  const dy = b.max[1] > h0 - 0.35 ? h1 - h0 : 0;
+  return { ...b, min: [cx - hx, b.min[1] + dy, cz - hz], max: [cx + hx, b.max[1] + dy, cz + hz] };
+}
+
+/** 箱を殻の内側（footprint の矩形の壁の内面 × 床〜天井）に clip する。中心を含む矩形が無ければ最も重なる矩形で切る。潰れたら null */
+function clipDressBox(b: Box, rects: Rect[], h: number): Box | null {
+  const cx = (b.min[0] + b.max[0]) / 2;
+  const cz = (b.min[2] + b.max[2]) / 2;
+  const inside = (r: Rect) => cx > r.x0 && cx < r.x1 && cz > r.z0 && cz < r.z1;
+  const r = rects.find(inside) ?? rects.find((q) => b.min[0] < q.x1 - WALL_T && b.max[0] > q.x0 + WALL_T && b.min[2] < q.z1 - WALL_T && b.max[2] > q.z0 + WALL_T);
+  if (!r) return null;
+  const min: Vec3 = [Math.max(b.min[0], r.x0 + WALL_T), Math.max(b.min[1], 0), Math.max(b.min[2], r.z0 + WALL_T)];
+  const max: Vec3 = [Math.min(b.max[0], r.x1 - WALL_T), Math.min(b.max[1], h), Math.min(b.max[2], r.z1 - WALL_T)];
+  if (max[0] - min[0] < 0.004 || max[1] - min[1] < 0.004 || max[2] - min[2] < 0.004) return null;
+  return { ...b, min, max };
+}
+
+/** 組み直した L.boxes（殻の直後）にドレッシングの箱を戻す */
+function restoreDress(L: RoomLayout, dress: Box[], map: (b: Box) => Box): void {
+  for (const b of dress) {
+    const m = clipDressBox(map(b), L.footprint, L.height);
+    if (m) L.boxes.push(m);
+  }
+}
+
 // ---------------------------------------------------------------- ① 殻
 
 function buildShellRoom(L: RoomLayout, p: GenParams, size: number): void {
@@ -65,6 +109,7 @@ function buildShellRoom(L: RoomLayout, p: GenParams, size: number): void {
     console.warn(`[${NEV_ID}] ${p.def.id}: entry が無いので殻を組めない`);
     return;
   }
+  const dress = dressBoxesOf(L);
   const extraIds = new Set(p.extraSockets.map((x) => x.id));
   const h = L.height;
   const half = size / 2;
@@ -106,6 +151,8 @@ function buildShellRoom(L: RoomLayout, p: GenParams, size: number): void {
   buildShell(shell, [fp], h, sockets, { floor: L.palette.floor, wall: L.palette.wall, ceiling: L.palette.ceiling, floorHoles: [], ceilingHoles });
   L.boxes = shell;
   L.shellCount = shell.length;
+  // ドレッシングの箱は殻の内側に収まるものだけ残す（E08 のドレッシングは殻ノードには何も置かない。汎用の安全策）
+  restoreDress(L, dress, (b) => b);
   if (entry.type === 'hole') {
     const c = ceilingHoles[0];
     L.boxes.push(box([c.min[0] - 0.2, 0.001, c.min[2] - 0.2], [c.max[0] + 0.2, 0.012, c.max[2] + 0.2], 'furnitureDark', false));
@@ -136,7 +183,9 @@ function expandInterior(L: RoomLayout, p: GenParams, s: number, rng: Rng): void 
     return;
   }
   const extraIds = new Set(p.extraSockets.map((x) => x.id));
+  const h0 = L.height;
   const h = Math.round(Math.min(4.0, L.height * 1.3) * 2) / 2;
+  const dress = dressBoxesOf(L);
 
   // 足跡・高さ
   L.footprint = L.footprint.map((r) => ({ x0: r.x0 * s, z0: r.z0 * s, x1: r.x1 * s, z1: r.z1 * s }));
@@ -158,6 +207,8 @@ function expandInterior(L: RoomLayout, p: GenParams, s: number, rng: Rng): void 
   buildShell(shell, L.footprint, h, L.sockets, { floor: L.palette.floor, wall: L.palette.wall, ceiling: L.palette.ceiling, floorHoles: [], ceilingHoles });
   L.boxes = shell;
   L.shellCount = shell.length;
+  // ドレッシングの箱（dress:*）を拡大後の座標に写して残す（机上のノート PC・ガラス窓など。epic.ts dressE08）
+  restoreDress(L, dress, (b) => mapDressBox(b, s, h0, h));
   if (entry && entry.type === 'hole') {
     const c = ceilingHoles[0];
     L.boxes.push(box([c.min[0] - 0.2, 0.001, c.min[2] - 0.2], [c.max[0] + 0.2, 0.012, c.max[2] + 0.2], 'furnitureDark', false));

@@ -29,7 +29,8 @@
   "U05": {
     "FakeSignage": {
       "mode": "misleading",
-      "target": "exitSign"
+      "target": "exitSign",
+      "fakeDoor": false
     }
   },
   "U06": {
@@ -69,7 +70,7 @@
   "U11": {
     "PropRepetition": {
       "propId": "luggage",
-      "density": 0.8
+      "density": 0.3
     }
   },
   "U12": {
@@ -97,7 +98,13 @@
   "U15": {
     "PropRepetition": {
       "propId": "sameProduct",
-      "density": 1.0
+      "density": 1.0,
+      "mat": "signPlate",
+      "size": [
+        0.08,
+        0.24,
+        0.08
+      ]
     }
   },
   "U16": {
@@ -253,7 +260,8 @@
   "R20": {
     "PropRepetition": {
       "propId": "storageDoor",
-      "density": 1.0
+      "density": 1.0,
+      "doorMat": "redShutter"
     },
     "DuplicateNumber": {
       "duplicateRate": 0.3
@@ -291,7 +299,8 @@
   },
   "E04": {
     "FakeSky": {
-      "skyPreset": "noonSun"
+      "skyPreset": "noonSun",
+      "beams": false
     },
     "LightingPhase": {
       "mode": "daylight"

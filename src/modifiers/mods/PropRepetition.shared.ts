@@ -141,13 +141,24 @@ export function isFurniture(b: Box): boolean {
   return FURNITURE_MATS.has(b.mat);
 }
 
-/** シェル以降の箱から pred に合うものを取り除き、取り除いた箱を返す（shellCount より前は触らない） */
+/**
+ * 部屋別ドレッシング（generators/dressing。Modifier より前に走る）が置いた箱の印。`kind` が 'dress:' で始まる箱は
+ * Modifier の家具差し替え・詰め物除去（removeInterior / PropRepetition.removeFills / NonEuclideanVolume の組み直し）で捨てない。
+ * ドレッシング側は Modifier が後で置くものと重ならない位置・材質で置く責任を持つ（docs/visual-requests.md「A1 → 各担当」）
+ */
+export const DRESS_KIND_PREFIX = 'dress:';
+
+export function isDress(b: Box): boolean {
+  return typeof b.kind === 'string' && b.kind.startsWith(DRESS_KIND_PREFIX);
+}
+
+/** シェル以降の箱から pred に合うものを取り除き、取り除いた箱を返す（shellCount より前と、ドレッシングの箱 `dress:*` は触らない） */
 export function removeInterior(L: RoomLayout, pred: (b: Box) => boolean): Box[] {
   const from = L.shellCount ?? 0;
   const keep = L.boxes.slice(0, from);
   const removed: Box[] = [];
   for (const b of L.boxes.slice(from)) {
-    if (pred(b)) removed.push(b);
+    if (!isDress(b) && pred(b)) removed.push(b);
     else keep.push(b);
   }
   L.boxes = keep;

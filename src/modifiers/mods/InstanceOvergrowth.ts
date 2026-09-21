@@ -6,10 +6,14 @@
  *  - 密度場: 内側を 0.5 m セルに切り、density × ソケットからの距離減衰（1.8 m 以内 0、6.3 m で 1.0）× 壁際ブースト × rng ノイズ。
  *    「出口方向ほど疎」（R07 の接続ルール）が自動で成立する。
  *  - 通路: ソケット前 ±1.6 m と入口→各出口の直線帯（植生 1.4 m / 麦 2.0 m = 農道）にはインスタンスも生垣も置かない。
- *  - 小片（葉の塊 'plant'、下草 'grass'、麦の茎 'grass' + 穂 'boxCardboard'）は L.instances（InstancedMesh、非 solid）。
+ *  - 小片（葉の塊 'plant'、下草 'grass'、麦の茎 + 穂）は L.instances（InstancedMesh、非 solid）。
+ *    麦は茎 = plasticYellow の薄い箔（幅 0.14 m × 高 1.05 m × 厚 0.04 m、yaw ランダム）、穂 = plasticYellow の小箱。遠目に「黄金色の面」として
+ *    読ませるため（legendary.ts dressL03 が地面を yellowLine、高所灯を lightWarm にしている）。緑の 'grass' 茎（132 三角形 / 本）から
+ *    箱（12 三角形 / 本）に変えたので三角形は 9,000 本で 1.2M → 0.16M に減る。他の propId（foliage）の草は変えない。
  *    RoomBuilder が tier.instanceScale で等間隔に間引くので transforms はシャッフル済み。
  *  - 大きな植栽ユニット（生垣の株・プランター）は solid な 'plant' 箱（RoomBuilder が球体に描く）。数と位置は Tier に依らない。
- *  - 麦畑（L03）は既存家具を捨てて全面を 0.35 m 間隔の茎で埋め、農道（直線帯）を空ける。
+ *  - 麦畑（L03）は既存家具を捨てて全面を茎で埋め、農道（直線帯）を空ける。間隔は 0.35 m を基本に、上限 MAX_WHEAT 本で畑全体が埋まる値まで広げる
+ *    （巨大な倉庫で最初の帯だけが埋まらないように）。Tier の間引き（RoomBuilder）と rng の消費順（セルごと 4 回）は従来どおり。
  */
 import type { Vec3 } from '../../core/types';
 import type { Rng } from '../../core/rng';
@@ -23,6 +27,8 @@ import {
 
 /** 1 spec あたりのインスタンス上限（巨大 footprint での暴走防止。Tier 間引きはこの後で RoomBuilder が行う） */
 const MAX_PER_SPEC = 9000;
+/** 麦の茎の上限。箱 12 三角形 / 本なので 9,000 本の草（132 三角形 / 本 = 1.2M）より少ない三角形で 3 倍以上置ける。畑全体に行き渡らせるため間隔を面積から決める */
+const MAX_WHEAT = 30000;
 const CELL = 0.5;
 
 const InstanceOvergrowth: ModifierImpl = {
@@ -186,9 +192,15 @@ function layoutWheat(L: RoomLayout, density: number, rng: Rng): void {
   removeInterior(L, (b) => isFurniture(b));
   const c: Clearance = clearanceOf(L, 1.0); // 農道 2 m
   const solids = interiorBoxesOf(L).filter((b) => b.solid);
-  const pitch = 0.35 / Math.sqrt(clamp(density, 0.2, 2.5));
-  const stalks: InstanceSpec = { mat: 'grass', size: [0.07, 1.05, 0.07], transforms: [], solid: false };
-  const heads: InstanceSpec = { mat: 'boxCardboard', size: [0.1, 0.13, 0.1], transforms: [], solid: false };
+  // 間隔: 既定 0.35 m。巨大な倉庫（seed 7 の L03 は 197 × 113 m）では上限 MAX_WHEAT 本で畑全体を埋める間隔まで広げる
+  // （以前は 9,000 本で最初の 10 m 幅の帯だけが埋まり、入口からは畑が見えなかった）
+  const area = L.footprint.reduce((a, r) => a + rectArea(innerRect(r, 0.35)), 0);
+  const pitch = Math.max(0.35 / Math.sqrt(clamp(density, 0.2, 2.5)), Math.sqrt((area * 1.02) / MAX_WHEAT));
+  // 茎: 黄金色の薄い箔（yaw ランダムなので遠目には面として重なる。間隔が広いときは幅 0.16 m）。穂: 少し幅広の小箱を茎の上端に載せる
+  const stalkW = pitch > 0.4 ? 0.16 : 0.14;
+  const stalks: InstanceSpec = { mat: 'plasticYellow', size: [stalkW, 1.05, 0.04], transforms: [], solid: false };
+  const heads: InstanceSpec = { mat: 'plasticYellow', size: [0.12, 0.16, 0.09], transforms: [], solid: false };
+  const headEvery = pitch > 0.5 ? 1 : 2; // 疎な畑では全ての茎に穂（目線の高さの黄色を増やす）
   // 農道の縁（土手）: 直線帯の両側に低い solid 'furnitureDark' の畦は置かない（通路は完全に空ける）。麦だけ
   let cellIndex = 0;
   for (const r of L.footprint) {
@@ -200,11 +212,11 @@ function layoutWheat(L: RoomLayout, density: number, rng: Rng): void {
         const jz = rng.float(-0.12, 0.12);
         const s = rng.float(0.8, 1.2);
         const yaw = rng.float(0, Math.PI * 2);
-        if (stalks.transforms.length >= MAX_PER_SPEC) continue;
+        if (stalks.transforms.length >= MAX_WHEAT) continue;
         if (pointBlocked(c, x + jx, z + jz, 0.02)) continue;
         if (solids.some((b) => pointInBoxXZ(b, x + jx, z + jz, 0.1))) continue;
         stalks.transforms.push({ pos: [x + jx, 0, z + jz], yaw, scale: s });
-        if (cellIndex % 2 === 0) heads.transforms.push({ pos: [x + jx, 0.98 * s, z + jz], yaw, scale: s });
+        if (cellIndex % headEvery === 0) heads.transforms.push({ pos: [x + jx, 0.96 * s, z + jz], yaw, scale: s });
       }
     }
   }

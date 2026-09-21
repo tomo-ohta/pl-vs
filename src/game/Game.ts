@@ -8,6 +8,9 @@
  * - 環境: 入室時に fog / background / hemi を 0.8 s 補間（BuiltRoom.fog → layout.render.fog → palette.fog）。部屋別 fog（材質 variant）は RoomBuilder 側
  * - 音: AudioEngine（unlock は開始クリック、setRoom は入室、setListener / update は毎フレーム、扉・足音・着地・エレベーター）
  * - 設定: Settings / SettingsPanel（音量・視点感度・Tier の復元）
+ * - カメラ挙動（担当 F2。docs/film-camera.md）: 設定 handheld / cameraLag / postfx を PlayerController.feel に写し、乗車中と E03 では
+ *   cameraFeelSuppressed で揺れを止める。毎フレーム 表示カメラの回転速度 → postfx.setCameraMotion、静止秒数 → setStillness /
+ *   player.setStillness、環境音の大きさ → setAudioNoise、入室 → notifyRoomEnter、REC 表示（RecOverlay）の表示切替と update
  * - 地図: mapView（MapViewState。Modifier が rotation / hiddenRoomIds を書く）を Minimap / MapPanel へ
  * - Seam: `portal.seam && type === 'door'` は全て意図的 Seam（緊急 Seam は廃止）。置けない進行用扉は施錠（dead-end lock）
  *
@@ -16,7 +19,7 @@
  */
 import * as THREE from 'three';
 import { aabbContains } from '../core/aabb';
-import { QUALITY_TIERS, dirVec, toWorld, type QualityTier, type QualityTierId, type RoomDefinition, type RoomInstance, type Portal, type Vec3 } from '../core/types';
+import { QUALITY_TIERS, dirVec, toWorld, type QualityTier, type QualityTierId, type Rarity, type RoomDefinition, type RoomInstance, type Portal, type Vec3 } from '../core/types';
 import { randomWorldSeed } from '../core/rng';
 import { ROOM_BY_ID } from '../data';
 import { InputController, type InputState } from '../input/InputController';
@@ -25,7 +28,11 @@ import { PlayerRide } from '../player/PlayerRide';
 import { PlayerProxy } from '../player/PlayerProxy';
 import { MaterialLibrary, L2_FLAGS } from '../render/MaterialLibrary';
 import { PostFX, TONE_MAPPINGS, DEFAULT_EXPOSURE, type PostFXConfig } from '../render/PostFX';
+import { VIDEO_PRESETS } from '../render/VideoPass';
+import type { FilmPreset } from '../render/FilmPreset';
+import { RecOverlay } from '../ui/RecOverlay';
 import { RoomBuilder, type BuiltRoom } from '../render/RoomBuilder';
+import { DoorLeakSystem, SEAM_CLOSED_RANGE, CLOSED_RANGE, type DoorLeakEntry, type LeakStyle } from '../render/DoorLeak';
 import { SnapshotService, SNAPSHOT_EXCLUDE_LAYER } from '../render/SnapshotService';
 import { SaveManager } from '../save/SaveManager';
 import { RoomStreamingManager } from '../streaming/RoomStreamingManager';
@@ -56,6 +63,12 @@ interface EnvTarget {
 
 const ENV_LERP_SEC = 0.8;
 const PLAYER_ZONE_KINDS = new Set(['water', 'friction', 'force', 'lane']);
+
+/** 角度差を (-π, π] に畳む（camera.rotation の差分から回転速度を取るとき用） */
+function wrapAngle(a: number): number {
+  const t = (a + Math.PI) % (2 * Math.PI);
+  return (t < 0 ? t + 2 * Math.PI : t) - Math.PI;
+}
 
 /**
  * 部屋切り替え（入室 / 開扉）1 回分の計測（担当 L2。docs/perf-room-switch.md）。
@@ -209,8 +222,27 @@ export class Game {
   readonly settingsPanel: SettingsPanel;
   /** ポスト処理（GTAO / bloom / 撮像 pass / OutputPass）と描画時間の計測。Tier と設定 postfx から applyPostFxConfig が組む */
   readonly postfx: PostFX;
+  /** REC・タイムコード表示（DOM。設定 recOverlay。playing / riding / transition の間だけ見せる） */
+  readonly recOverlay = new RecOverlay(document.body);
   /** 地図の表示状態（MapRotation / MapErase が書く。参照は固定） */
   readonly mapView: MapViewState = { rotation: 0 };
+  // --- カメラ挙動 → 撮像 pass への入力（担当 F2）
+  /** 移動入力も視線入力も無い（かつ実速度がほぼ 0）時間（s）。postfx.setStillness / player.setStillness へ */
+  private stillSec = 0;
+  /** 表示カメラの回転速度（rad/s。前フレームの camera.rotation との差。デバッグ HUD 用に保持） */
+  private camRates: [number, number] = [0, 0];
+  private prevCamYaw = 0;
+  private prevCamPitch = 0;
+  private camMotionValid = false;
+  private lastTeleportSerial = 0;
+  /** このフレーム（または次のフレーム）に入室した: 回転ブラーの入力を 0 にする */
+  private roomEnteredFrame = false;
+  /** 現在部屋が E03（layout.roll）: カメラ揺れとロールを掛けない */
+  private roomHasRoll = false;
+  /** 開いた扉の光漏れ（加算合成クワッド。担当 P1。PointLight は増やさない）。updateVisibility の末尾で同期し、毎フレーム update */
+  readonly doorLeaks = new DoorLeakSystem(this.scene);
+  /** 閉じた Seam 扉の漏れは距離で出し入れするので、扉イベントが無くても 0.25 s ごとに同期する */
+  private leakSyncAcc = 0;
   world!: WorldManager;
   streaming!: RoomStreamingManager;
   currentRoomId: string | null = null;
@@ -294,7 +326,9 @@ export class Game {
     this.input.sensitivityScale = this.settings.data.lookSensitivity;
     this.settings.onChange((d, changed) => {
       this.input.sensitivityScale = d.lookSensitivity;
+      // postfx は composer を組み直す（末尾で applyCameraSettings も呼ぶ）。カメラ挙動だけの変更は pass を作り直さない
       if (changed.includes('postfx') || changed.includes('toneMapping')) this.applyPostFxConfig();
+      else if (changed.some((k) => k === 'handheld' || k === 'cameraLag' || k === 'recOverlay' || k === 'frameHold')) this.applyCameraSettings();
     });
     this.postfx = new PostFX(this.renderer, this.scene, this.camera);
     this.player.onStride = (rank) => {
@@ -378,6 +412,7 @@ export class Game {
 
   private teardownWorld(): void {
     if (this.streaming) this.streaming.clear();
+    this.doorLeaks.clear();
     this.materials.dropPrefetch(new Set());
     if (this.ride.riding) this.ride.cancel();
     this.rideSound?.stop(0.2);
@@ -467,6 +502,12 @@ export class Game {
     const layout = this.world.layoutFor(node);
     this.applyEnvironment(built, layout, prev === null);
     this.postfx.setAoSuppressed(layout.render?.style === 'untextured');
+    // 撮像: 入室直後のオートフォーカスの迷い（部屋が変わるときだけ）。回転ブラーの入力はこのフレーム 0。E03 では手持ち揺れを止める
+    if (prev !== roomId) {
+      this.postfx.notifyRoomEnter();
+      this.roomEnteredFrame = true;
+    }
+    this.roomHasRoll = !!layout.roll;
     const wet = !!layout.render?.wetness || !!layout.zones?.some((z) => z.kind === 'water') || hasModifier(def, 'ShallowWater') || hasModifier(def, 'Wetness');
     this.audio.setRoom(def, layout, this.tier, { roomId, hints: def?.layoutHints, wet });
     // 入室フック
@@ -688,6 +729,65 @@ export class Game {
         d.root.visible = visible.has(id) || (!!other && visible.has(other));
       }
     }
+    this.syncDoorLeaks();
+  }
+
+  /**
+   * 開いた扉の光漏れの目標状態を DoorLeakSystem に渡す（updateVisibility の末尾 = 扉の開閉・自動閉扉・入室・後回し構築の完了）。
+   * 見えている構築済み部屋 X の開いた door Portal ごとに、X 側の床・壁へ「向こうの部屋 Y のレア度」の色で 1 件。
+   * Y 側は Y 自身の戻り Portal を辿ったときに作られる。Seam 扉は 'seam'。E03（layout.roll）の部屋は位置がずれるので置かない
+   */
+  private syncDoorLeaks(): void {
+    const entries: DoorLeakEntry[] = [];
+    const feet = this.player.feet;
+    this.leakSyncAcc = 0;
+    for (const [id, b] of this.streaming.built) {
+      if (!b.group.visible || !this.world.graph.has(id)) continue;
+      const node = this.world.graph.get(id);
+      if (!node.placement) continue;
+      let layout: RoomLayout;
+      try { layout = this.world.layoutFor(node); } catch { continue; }
+      if (layout.roll) continue;
+      for (const p of node.portals) {
+        if (p.type !== 'door' || !p.targetRoomId || !this.world.graph.has(p.targetRoomId)) continue;
+        const s = layout.sockets.find((x) => x.id === p.socketId);
+        if (!s) continue;
+        const target = this.world.graph.get(p.targetRoomId);
+        let style: LeakStyle;
+        let lightColor = layout.palette.lightColor;
+        const open = this.world.portalOpen(node, p);
+        if (p.seam) {
+          // Seam 扉は toggleDoor で開かず遷移するので、閉じたままでもパネル下端の隙間の漏れを置く（プレイヤーが 6 m 以内のときだけ）
+          if (open) style = 'seam';
+          else {
+            const w = toWorld(node.placement, s.pos);
+            if (Math.hypot(feet[0] - w[0], feet[2] - w[2]) > SEAM_CLOSED_RANGE) continue;
+            style = 'seamClosed';
+          }
+        } else {
+          if (!target.placement) continue;
+          if (!open) {
+            // 閉じた通常扉: 隙間から僅かに漏れる帯（レア度の色）。近い扉だけ
+            const w = toWorld(node.placement, s.pos);
+            if (Math.hypot(feet[0] - w[0], feet[2] - w[2]) > CLOSED_RANGE) continue;
+          }
+          style = this.leakRarityOf(target) ?? 'Common';
+          try { lightColor = this.world.layoutFor(target).palette.lightColor; } catch { /* 向こうの layout が作れなければこの部屋の器具色 */ }
+        }
+        const sw = this.world.socketWorld(node, p.socketId);
+        const closed = !open && !p.seam;
+        entries.push({ key: `${id}/${p.portalId}${closed ? '/c' : ''}`, roomId: id, pos: sw.pos, dir: sw.dir, width: s.width, height: s.height, sill: s.sill ?? 0, style, lightColor, closed });
+      }
+    }
+    this.doorLeaks.sync(entries, (roomId) => this.streaming.built.has(roomId));
+  }
+
+  /** 光漏れの色に使うレア度。アダプタ（前室・階段）はパレットを借りている部屋のレア度（その部屋へ続く扉として見せる） */
+  private leakRarityOf(node: RoomInstance): Rarity | null {
+    if (!node.isAdapter) return this.defOf(node)?.rarity ?? null;
+    const from = node.adapter?.paletteFrom;
+    if (from && this.world.graph.has(from)) return this.defOf(this.world.graph.get(from))?.rarity ?? null;
+    return null;
   }
 
   /** プレイヤーの足元を含む部屋（現在 → 隣接の順） */
@@ -897,6 +997,8 @@ export class Game {
     const path = opts.path ?? (spec && spec.path.length > 0 ? spec.path.map((p) => toWorld(placement, p)) : [this.player.feet]);
     const durationSec = opts.durationSec ?? spec?.durationSec ?? 25;
     this.state = 'riding';
+    // 乗車中の微振動は PlayerRide が担当。手持ち揺れ・ロール・視線の遅れは止める（stepBody でも毎フレーム同期）
+    this.player.cameraFeelSuppressed = true;
     this.input.resetCrouchToggle();
     this.rideSound?.stop(0.2);
     this.rideSound = this.audio.play(spec?.vehicle === 'boat' ? 'waterFlow' : 'distantTrain', { loop: true, gain: 0.7 });
@@ -1073,6 +1175,7 @@ export class Game {
     this.camera.updateProjectionMatrix();
     this.builder.setTier(this.tier);
     this.materials.setTier(this.tier);
+    this.doorLeaks.setTier(this.tier);
     this.audio.setTier(this.tier);
     this.snapshots.setTier(this.tier);
   }
@@ -1091,18 +1194,89 @@ export class Game {
 
   /**
    * 設定（描画効果 / トーンマップ）と Tier からポスト処理を組む。
-   * off = 直接描画 / clean = Tier の gtao・bloom・msaa / archival = clean + 撮像 pass。low は Tier 側が全部 false なので直接描画
+   * off = 直接描画 / clean = Tier の gtao・bloom・msaa / homeVideo・tape = clean + 撮像 pass（LensPass / VideoPass）。
+   * low は Tier 側が全部 false なので直接描画（low の 'clean' は composer を組む価値が無いので film も off）
    */
   private applyPostFxConfig(): void {
     const d = this.settings.data;
     this.renderer.toneMapping = TONE_MAPPINGS[d.toneMapping];
     const t = this.tier.postfx;
+    let film: FilmPreset = d.postfx;
+    if (this.tier.id === 'low' && film === 'clean') film = 'off';
     const cfg: PostFXConfig = d.postfx === 'off'
-      ? { gtao: false, bloom: false, msaa: 0, gtaoScale: t.gtaoScale, analog: false }
-      : { gtao: t.gtao, bloom: t.bloom, msaa: t.msaa, gtaoScale: t.gtaoScale, analog: d.postfx === 'archival' };
+      ? { gtao: false, bloom: false, msaa: 0, gtaoScale: t.gtaoScale, film: 'off' }
+      : { gtao: t.gtao, bloom: t.bloom, msaa: t.msaa, gtaoScale: t.gtaoScale, film };
     this.postfx.configure(cfg);
+    // 光漏れの加算強度は描画経路（composer の有無）で揃える
+    this.doorLeaks.setDirectRender(!this.postfx.active);
     // DPR 上限が composer の有無で変わるので寸法を作り直す
     this.resize();
+    // プリセットに連動するカメラ挙動と、pass の数値の設定による上書き（frameHold）
+    this.applyCameraSettings();
+  }
+
+  /**
+   * 設定（手持ち感 / 視線の遅れ / REC 表示 / 表示 fps）をカメラ挙動・撮像 pass に写す（担当 F2。docs/film-camera.md）。
+   * composer は作り直さない。REC 表示の実際の表示切替は state を見て stepBody（updateRecOverlay）が行う
+   */
+  private applyCameraSettings(): void {
+    const d = this.settings.data;
+    this.player.feel.handheld = d.handheld;
+    this.player.feel.lag = d.cameraLag;
+    this.player.feel.preset = this.postfx.config.film;
+    // 表示フレームレートの間引き: 'off' はプリセット値（configure / applyPreset が写した値）に戻す。'30' / '24' はプリセットに関係なく上書き
+    const video = this.postfx.videoPass;
+    if (video) {
+      const preset = VIDEO_PRESETS[this.postfx.config.film];
+      video.params.frameHold = d.frameHold === 'off' ? preset.frameHold : Number(d.frameHold);
+      // 設定で間引きを強制したときは残像のブレンドも入れる（プリセットが 0 のままだと保持フレームが硬く切り替わる。担当 F1b の依頼）
+      video.params.frameBlend = video.params.frameHold > 0 ? Math.max(preset.frameBlend, 0.3) : preset.frameBlend;
+    }
+    this.updateRecOverlay(0);
+  }
+
+  /** REC・タイムコード表示: 設定 recOverlay かつ playing / riding / transition のときだけ見せる。毎フレーム update */
+  private updateRecOverlay(dt: number): void {
+    const on = this.settings.data.recOverlay && (this.state === 'playing' || this.state === 'riding' || this.state === 'transition');
+    if (on !== this.recOverlay.isVisible) this.recOverlay.setVisible(on);
+    if (dt > 0) this.recOverlay.update(dt);
+  }
+
+  /**
+   * 静止（移動入力も視線入力も無く、実速度もほぼ 0）の継続秒数。playing / riding の間だけ数え、メニュー中は保持する。
+   * VideoPass（時間停止感）と PlayerController（手持ち揺れを 3 s で弱める）へ
+   */
+  private updateStillness(dt: number, input: InputState): void {
+    if (this.state === 'playing' || this.state === 'riding') {
+      const moving = Math.abs(input.moveX) > 0.01 || Math.abs(input.moveY) > 0.01 || input.jump || (this.state === 'playing' && this.player.horizontalSpeed > 0.3);
+      const looking = input.lookDX !== 0 || input.lookDY !== 0;
+      this.stillSec = moving || looking ? 0 : this.stillSec + dt;
+    }
+    this.postfx.setStillness(this.stillSec);
+    this.player.setStillness(this.stillSec);
+  }
+
+  /**
+   * 表示カメラ（遅れ・揺れを含む camera.rotation）の回転速度を LensPass の回転ブラーへ渡す（rad/s）。
+   * テレポート（player.teleportSerial）と入室のフレームは 0（座標遷移を「振り向き」と誤認させない）
+   */
+  private updateCameraMotion(dt: number): void {
+    const rot = this.camera.rotation;
+    const jumped = this.player.teleportSerial !== this.lastTeleportSerial || this.roomEnteredFrame;
+    this.lastTeleportSerial = this.player.teleportSerial;
+    this.roomEnteredFrame = false;
+    let yawRate = 0;
+    let pitchRate = 0;
+    if (!jumped && this.camMotionValid && dt > 0) {
+      yawRate = wrapAngle(rot.y - this.prevCamYaw) / dt;
+      pitchRate = wrapAngle(rot.x - this.prevCamPitch) / dt;
+    }
+    this.prevCamYaw = rot.y;
+    this.prevCamPitch = rot.x;
+    this.camMotionValid = true;
+    this.camRates[0] = yawRate;
+    this.camRates[1] = pitchRate;
+    this.postfx.setCameraMotion(yawRate, pitchRate);
   }
 
   /**
@@ -1181,6 +1355,9 @@ export class Game {
       else if (this.state === 'menu') this.closeMenu();
     }
     const now = performance.now() / 1000;
+    // 手持ち揺れ・ロール・視線の遅れは乗車中（PlayerRide が微振動を担当）と E03（layout.roll）では掛けない
+    this.player.cameraFeelSuppressed = this.state === 'riding' || this.roomHasRoll;
+    this.updateStillness(dt, input);
     if (this.state === 'riding' && this.currentRoomId) {
       // 乗車中: 視点のみ。部屋判定・穴・Seam はスキップ（車内位置は部屋境界の外に出ることがある）
       // スマホのタップ（input.tap）も E と同じ「到着を早める」要求として扱う
@@ -1217,6 +1394,9 @@ export class Game {
       this.streaming.updateChunks(this.camera.position, this.tier.fogFar);
       this.streaming.updateLights(this.camera.position, this.tier, dt);
       this.updateEnvironment(dt);
+      this.leakSyncAcc += dt;
+      if (this.leakSyncAcc >= 0.25 && this.state === 'playing') this.syncDoorLeaks();
+      this.doorLeaks.update(dt, now);
       this.hud.setCount(this.world.graph.visitedCount);
       // ミニマップは現在いるフロアだけ（左上にフロア名）
       drawMap(this.minimap, this.world, this.currentRoomId, { x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw }, {
@@ -1233,6 +1413,10 @@ export class Game {
     const cam = this.camera.position;
     this.audio.setListener([cam.x, cam.y, cam.z], this.player.yaw, this.player.pitch);
     this.audio.update(dt);
+    // 撮像 pass への入力: 表示カメラの回転速度（回転ブラー）・環境音の大きさ（暗部ノイズ）。REC 表示の更新
+    this.updateCameraMotion(dt);
+    this.postfx.setAudioNoise(this.audio.ambientLevel);
+    this.updateRecOverlay(dt);
     // 読込済みテクスチャの先行アップロード（1 フレームに数枚。更新に余裕があるフレームだけ。docs/perf-room-switch.md）
     this.materials.uploads.flush(this.renderer, performance.now() - stepStart);
     this.renderFrame();
@@ -1304,9 +1488,12 @@ export class Game {
       `fps ${(1 / Math.max(dt, 1e-4)).toFixed(0)}  tier ${this.tierId}${this.autoTier ? ' (auto)' : ''}  state ${this.state}\n` +
       `calls ${info.render.calls}  tris ${info.render.triangles}\n` +
       `render cpu ${ms(p.cpu)} ms  gpu ${ms(p.gpu)} ms  ${p.pipeline}  shadows ${p.shadows}  tm ${this.settings.data.toneMapping} exp ${this.renderer.toneMappingExposure}\n` +
-      `rooms built ${st.rooms}  chunks ${st.chunks}  effects ${st.effects}  nodes ${this.world.graph.nodes.size}\n` +
+      `rooms built ${st.rooms}  chunks ${st.chunks}  effects ${st.effects}  nodes ${this.world.graph.nodes.size}  leaks ${this.doorLeaks.count} (${this.doorLeaks.triangles} tris)\n` +
       `colliders near ${this.player.debugColliders}  crouch ${this.player.crouching ? 'yes' : 'no'}  h ${this.player.heightNow.toFixed(2)}\n` +
       `room ${this.currentRoomId}  pos ${this.player.pos.x.toFixed(1)} ${this.player.pos.y.toFixed(1)} ${this.player.pos.z.toFixed(1)}\n` +
+      `cam bob ${(this.player.cameraFeel.y * 1000).toFixed(1)} mm  roll ${(this.player.cameraFeel.roll * 180 / Math.PI).toFixed(2)}°  fov ${this.camera.fov.toFixed(2)}  ` +
+      `rate ${this.camRates[0].toFixed(2)} ${this.camRates[1].toFixed(2)} rad/s  still ${this.stillSec.toFixed(1)} s  noise ${this.audio.ambientLevel.toFixed(2)}  ` +
+      `lens exp ${this.postfx.lensPass ? this.postfx.lensPass.exposureGain.toFixed(2) : '-'}${this.player.cameraFeelSuppressed ? '  (feel off)' : ''}\n` +
       `audio ${this.audio.context?.state ?? 'none'}  preset ${this.audio.currentPreset}\n` +
       (this.world.log.length ? `log ${this.world.log[this.world.log.length - 1]}` : ''),
     );

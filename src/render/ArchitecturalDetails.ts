@@ -1,9 +1,19 @@
 import { box, type Box, type RoomLayout } from '../generators/layout';
+import { facePlanes, furnitureDetails } from './props/FurnitureShapes';
 
 /** Render-only details. Never changes the layout's collision/portal contract. */
 export function detailedBoxes(layout: RoomLayout, template = ''): Box[] {
   const out: Box[] = [];
+  // 部屋の中心（x, z）: 向きの読めない 1 箱家具（自販機・単箱の椅子・収納の前面）を中心へ向ける
+  const bounds = layout.bounds;
+  const center: [number, number] = bounds && bounds.max[0] > bounds.min[0]
+    ? [(bounds.min[0] + bounds.max[0]) / 2, (bounds.min[2] + bounds.max[2]) / 2]
+    : [0, 0];
+  // タグ付きの家具（椅子・連結椅子・ベンチ・ロッカー・机上のモニター）は専用形状へ。置き換えた元の箔は描かない
+  const skip = new Set<Box>();
+  furnitureDetails(layout.boxes, center, out, skip);
   for (const b of layout.boxes) {
+    if (skip.has(b)) continue;
     const [x, y, z] = b.min, [X, Y, Z] = b.max;
     const w = X - x, h = Y - y, d = Z - z;
     const furniture = b.mat === 'furnitureDark' || b.mat === 'furnitureLight';
@@ -19,8 +29,26 @@ export function detailedBoxes(layout: RoomLayout, template = ''): Box[] {
           out.push(box([px, y, pz], [px + .055, Y, pz + .055], 'shelfMetal', false));
         }
       }
-      for (let level = y + .25; level < Y; level += Math.max(.9, h / 3)) out.push(box([x, level, z], [X, level + .05, Z], b.mat, false));
-      out.push(box([x, Y - .05, z], [X, Y, Z], b.mat, false));
+      // 段板は 3 cm の板 + 両長辺の縁（4.5 cm）: 縁の厚みが読める（5 cm の一様なスラブに見えない）。
+      // 上面は従来どおり level + .05（GridGenerator の商品箔・rack() の段ボールが段に接する高さ）
+      const lipT = .012; // 縁の高さは level + .005 〜 level + .05（4.5 cm）
+      for (let level = y + .25; level < Y - .1; level += Math.max(.9, h / 3)) {
+        out.push(box([x, level + .02, z], [X, level + .05, Z], b.mat, false));
+        if (alongX) out.push(box([x, level + .005, z], [X, level + .05, z + lipT], b.mat, false), box([x, level + .005, Z - lipT], [X, level + .05, Z], b.mat, false));
+        else out.push(box([x, level + .005, z], [x + lipT, level + .05, Z], b.mat, false), box([X - lipT, level + .005, z], [X, level + .05, Z], b.mat, false));
+      }
+      out.push(box([x, Y - .04, z], [X, Y, Z], b.mat, false));
+      // 売場の棚（2 m 未満）は両端の側板と中央の背板を持つ（倉庫のラックは開放のまま）
+      if (h < 2.0) {
+        const t = .015;
+        if (alongX) {
+          out.push(box([x, y, z], [x + t, Y, Z], b.mat, false), box([X - t, y, z], [X, Y, Z], b.mat, false));
+          out.push(box([x, y + .1, z + d / 2 - t / 2], [X, Y - .04, z + d / 2 + t / 2], b.mat, false));
+        } else {
+          out.push(box([x, y, z], [X, Y, z + t], b.mat, false), box([x, y, Z - t], [X, Y, Z], b.mat, false));
+          out.push(box([x + w / 2 - t / 2, y + .1, z], [x + w / 2 + t / 2, Y - .04, Z], b.mat, false));
+        }
+      }
       continue;
     }
     // A mezzanine trim is a perimeter band, not a solid slab across the atrium.
@@ -34,13 +62,18 @@ export function detailedBoxes(layout: RoomLayout, template = ''): Box[] {
       out.push(box([x + .08, Y - .23, z + .08], [X - .08, Y - .06, z + .12], b.mat, false));
       for (const lx of [x + .08, X - .13]) for (const lz of [z + .08, Z - .13]) out.push(box([lx, y, lz], [lx + .05, Y - .06, lz + .05], 'shelfMetal', false));
     } else out.push(b);
-    // Cabinet fronts with fine reveals and metal pulls.
-    if (furniture && y < .05 && h >= .86 && h < 2.3 && w > .5 && d > .25) {
-      const count = Math.max(1, Math.round(w / .6));
-      for (let k = 0; k < count; k++) {
-        const a = x + k * w / count + .012, e = x + (k + 1) * w / count - .012;
-        out.push(box([a, y + .09, z - .015], [e, Y - .018, z + .005], b.mat, false));
-        out.push(box([e - .06, Math.min(Y - .15, y + 1.05), z - .045], [e - .035, Math.min(Y - .05, y + 1.2), z - .015], 'metal', false));
+    // Cabinet fronts with fine reveals and metal pulls. The front faces the room centre (the back of a wall cabinet stays blank).
+    if (furniture && y < .05 && h >= .86 && h < 2.3 && w > .5 && d > .25 && b.kind !== 'vending') {
+      const alongX = w >= d;
+      const k: 0 | 2 = alongX ? 2 : 0, a = alongX ? 0 : 2;
+      const sign: 1 | -1 = center[k === 0 ? 0 : 1] >= (b.min[k] + b.max[k]) / 2 ? 1 : -1;
+      const S = facePlanes(k, sign, sign > 0 ? b.max[k] : b.min[k]);
+      const len = alongX ? w : d, A0 = b.min[a];
+      const count = Math.max(1, Math.round(len / .6));
+      for (let i = 0; i < count; i++) {
+        const a0 = A0 + i * len / count + .012, a1 = A0 + (i + 1) * len / count - .012;
+        out.push(S(a0, a1, -.015, .005, y + .09, Y - .018, b.mat));
+        out.push(S(a1 - .06, a1 - .035, .015, .045, Math.min(Y - .15, y + 1.05), Math.min(Y - .05, y + 1.2), 'metal'));
       }
     }
     // Skirting follows actual wall segments, so openings remain unobstructed.

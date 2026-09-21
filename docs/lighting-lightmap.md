@@ -150,18 +150,172 @@ Worker（`built.lightmap.workerMs`、1 job あたり）: C02 5.1k テクセル 2
 | 5 焼き込みと動的光の役割 | 対応（本書）。動的光の拡散を材質側で落とす uniform は担当 M へ依頼 |
 | 6 頂点密度 | テクセル（0.25 / 0.5 m）で置き換え。頂点分割は変えない |
 | 7 ライト選択のヒステリシス | 担当 P（LightBudget） |
-| 8 扉開閉の光漏れ | 未対応（扉パネルは遮蔽体に入れていない。開閉で焼き込みは変わらない） |
-| 9 色温度・明滅 | 未対応（担当 W / P） |
+| 8 扉開閉の光漏れ | 対応（担当 P1、2026-09-21）: 焼き込みは変えず、加算合成クワッド `src/render/DoorLeak.ts` で開いた扉の床・壁に落とす（本書 8 章） |
+| 9 色温度・明滅 | 色温度は対応（担当 P1、2026-09-21）: テンプレート別の色温度範囲から部屋 seed で選ぶ（本書 9 章）。明滅は担当 W の wear |
 
 V05「接地」: 家具の足元・壁の入隅は AO レイと接触陰影で暗くなる。浮いて見える家具の位置そのものは対象外。
 
 ## 7. 未対応・既知の制約
 
-- glTF プロップ（PropCatalog）と InstancedMesh はインスタンスごとの一定値（`sample`）のまま。ライトマップは箱のみ。
-- 到着時にクロスフェードは無い（頂点 → テクセルへ 1 フレームで切り替わる）。
+- glTF プロップ（PropCatalog）と InstancedMesh は到着前はインスタンスごとの一定値（`sample`）、到着後は足元の床のライトマップ値（第 8 節。頂点単位のライトマップは無い）。
+- 到着時は 0.5 s のクロスフェード（第 8 節）。見えていない部屋は最初の描画前に確定する。
 - 隠れ面の判定はヒューリスティック（bounds の外 / footprint の外 / 外殻の中）。多層の Mega では中間スラブの両面を焼く。
 - 面の縁のテクセルは 5 mm 内側で評価し、壁の下に埋まるテクセルは近傍で埋める。壁と床の入隅の暗さは AO 由来（接触陰影は頂点焼き込みのみ）。
 - 頂点焼き込みの遮蔽は箱の近傍だけ（遠い壁を透過し得る）。ライトマップ到着後は Worker の結果で置き換わるが、low Tier では残る。
 - 部屋あたりの材質 clone は「ライトマップ対象を含む材質」の数（4〜25）。プログラムは `-lm` 族で共有。
 - 巨大部屋（Mega）のテクセルは 0.33〜0.5 m まで粗くなる。AO レイ 24 本は 3×3 ぼかし前提。
 - `src/generators/decals.ts` の未使用 import（担当 D）で `tsc` に 1 件エラーが出る（本作業と無関係）。
+
+## 8. 扉の光漏れ（V04 手順 8。担当 P1、2026-09-21）
+
+ファイル: `src/render/DoorLeak.ts`（新規）、配線は `src/game/Game.ts`（`doorLeaks` / `syncDoorLeaks` / `leakRarityOf`）。
+
+### 8.1 方式
+
+- **PointLight は増やさない**（可視ライト本数は `padVisibleLights` で Tier 固定、影は 1 灯のまま）。焼き込み（頂点 / ライトマップ）も変えない。
+- 開いた扉ごとに、**その床がある部屋 X の側**へ 1 件の Leak を置く（キー `X/portalId`）。向こうの部屋 Y の側は Y 自身の戻り Portal を辿ったときに作られる
+  （両側の部屋がそれぞれ「向こうの色」を受ける。片側にしか Portal が無い直結は片側だけ）。
+- 形状（socket のローカル座標。+Z 外向き、部屋の内側は -Z、壁の内面 z = -0.15）:
+  - 床の扇形: 台形 3×2 分割 = 12 三角形。扉側 z = -0.16、奥へ L = clamp(2.5 + (幅 - 1)·0.8, 2.5, 3.5) m、半幅は 幅/2 + 0.1 → 幅/2 + 0.9 L（約 42° の広がり）。床から 1.2 cm。
+  - 壁の洗い: 開口の両脇（枡の見付の外側 12 cm から）0.4 m 幅 × 開口高 + 0.25 m の縦の帯 2 枚 = 4 三角形。壁面から 2 cm。
+  - Seam 扉: 洗い 4 + 縦枡の流れ 8（開口内側の枡面 2 枚 + 見付の室内側の縦帯 2 枚）+ 床の乗算 12 = 24 三角形。
+  - 予算: 扉 1 枚（片側）16 三角形、Seam 24、同時 ≤ 24 枚（`MAX_LEAKS`）。Legendary の火花は Points 16 点（三角形数に含めない）。
+- テクスチャ: 共有 CanvasTexture 1 枚（256×128 のアトラス。左半分 = 扇形の alpha: 横は余弦窓^1.4、奥行きは (1 - v)^1.9。右半分 = 洗い: 枡側から (1 - u)^2.2 × (0.12 + 0.88 (1 - v)^1.5)）、
+  Seam の流れ用 32×128（縦に繰り返し）、火花用 32×32。
+- 材質: 小さな `ShaderMaterial`（uMap / uColor / uAlpha / uOffset、頂点色で左右 2 色）。加算は `AdditiveBlending` + `tonemapping_fragment` / `colorspace_fragment`
+  （composer の RenderTarget 描画中は three が無効化するので、線形 RT に加算 → まとめてトーンマップ。直接描画のときは `setDirectRender(true)` で強度 ×0.6）。
+  床の乗算（Seam）は `MultiplyBlending` + `premultipliedAlpha`（r186 は `out = dst × (src.rgb + 1 - src.a)` なので src = (color·m, m)）。
+- **GTAO からの除外**: GTAOPass は Points / Line だけを隠し Mesh は `scene.overrideMaterial` で不透明に描くため、床から 1 cm 浮いたクワッドが AO に「面」として写り、硬い縁の明るい矩形が出た。
+  `onBeforeRender` で渡された material が自分のものでない（override 中）ときだけ `geometry.setDrawRange(0, 0)` にして描かず、`onAfterRender` で戻す（PostFX は触らない）。
+- 開閉との同期: `Game.updateVisibility` の末尾で `syncDoorLeaks()`（扉の開閉 `toggleDoor`、自動閉扉 → `refreshStreaming`、入室、後回し構築の完了、Modifier が開けた扉 → `doorsChanged` の全経路）。
+  0.3 s（`FADE_SEC`、smoothstep）でフェードイン / アウト。部屋が dispose された（`streaming.built` に無い）Leak は即座に消す。`newWorld` / `loadWorld` は `clear()`。
+- 置かない条件: 閉じた扉（`world.portalOpen` false）、Seam 以外で向こうが未配置、E03（`layout.roll` のある部屋）、door 以外の Portal（穴・階段・street は開口が常に開いていて向こうも描かれる）。
+- アダプタ（前室・階段）の向こうは、そのアダプタがパレットを借りている部屋（`adapter.paletteFrom`）のレア度で色を決める。Legendary の前室へ続く Common の扉が金色に光る。
+
+### 8.2 レア度別の色と動き（`LEAK_STYLE`。alpha = 扇形中心の加算強度、洗いはテクスチャ側で同じ最大値）
+
+| 向こうの部屋 | 色 | alpha | 動き |
+|---|---|---|---|
+| Common | 向こうの `palette.lightColor`（最大チャンネルを 1 に正規化） | 0.14 | なし |
+| Uncommon | 0xe4ffcc（わずかに黄緑がかった白） | 0.20 | なし |
+| Rare | 0x58ecff（澄んだシアン） | 0.28 | なし |
+| Epic | 0x8f4dff ↔ 0xff4fd6（紫〜マゼンタ） | 0.34 | 6 s で色を往復、3 s の弱い脈動（0.9〜1.0） |
+| Legendary | 0xffc548（金） | 0.42 | 2 s の脈動（0.7〜1.0）+ 床の光の中に漂う金の火花（Points 16、0.1〜0.24 m/s で上昇、0.4〜0.7 m で再生成） |
+| Mythic | HSL(hue, 1, 0.62) | 0.48 | 4 s 周期で色相が 1 周 + 1.2 s の強い脈動（0.55〜1.0） |
+| Seam 扉（開） | 左 0x3ae6ff シアン / 右 0xff3ad2 マゼンタ（部屋の内側から見て） | 流れ 0.42 / 洗い 0.25 | 縦枡を上へ流れる（UV 0.9 /s）、30 Hz の時刻 hash フリッカー（0.55〜1.0、8% で 0.15 へ落ちる）。床は乗算で暗く（色 (0.35, 0.4, 0.55)、強さ 0.6 × (0.75 + 0.25 フリッカー)） |
+| Seam 扉（閉、6 m 以内） | 同じ 2 色 | 床の帯 0.31 / 流れ 0.14 | 8.5 節。パネル下端の隙間から床へ 0.25 m の 2 色の帯 + 枡に沿う幅 4 cm の細い流れ（開いた Seam の 1/3）。同じフリッカー |
+
+- Low Tier（`tier.flicker` false）: 脈動は中央値で固定、火花なし。色相回転と Seam の流れは uniform だけなので残す。
+- 上限の目安: Legendary の扇形中心で +0.42 × 金（線形）。器具直下の床（焼き込み 0.5〜0.8）より少し明るい程度で、飽和はしない（composer では bloom が少し乗る）。
+
+### 8.3 確認（2026-09-21、MacBook / Chrome、high Tier `gtao×0.4+bloom+msaa2`）
+
+- seed 7: `?force=E06` / `L16` / `M01` で開始部屋 C02 の扉の先を Epic / Legendary（前室）/ Mythic にして開扉。マゼンタ / 金 + 火花 / 色相回転を確認。探索で見つけた Rare（R06）はシアン。
+- Seam: `r1.portals.find(p => p.seam).open = true` で強制して確認（実プレイでは Seam 扉は開けた瞬間に遷移するので open にならない。8.4）。
+- 掃除: 閉扉 → 30 フレームで Leak 0、`newWorld` → 0、scene に `leak:*` の残りなし。
+- perf（120 フレーム中央値）: 漏れ 2 枚あり cpu 5.4 ms / gpu 9.09 ms、なし cpu 5.4 ms / gpu 9.09 ms。差なし。コンソールエラー 0。
+
+### 8.4 残課題
+
+- 開いた Seam 扉の演出（8.2 の「開」）は Modifier が `portal.open = true` にした Seam 扉にしか出ない（`toggleDoor` は開けずに遷移。現状その Modifier は無い）。本編で見えるのは 8.5 の閉じた Seam 扉の漏れ。
+- 火花・脈動は Points / uniform のみで、床の焼き込みに動きは入れていない。
+- 扉パネル自体の面（開いたパネルの裏面）に落ちる光は未対応。
+
+### 8.5 閉じた Seam 扉の漏れ（統合の仕様判断、2026-09-21）
+
+閉じた扉に漏れを置くのは Seam 扉（`portal.seam`、door 型）だけ。他のレア度の閉じた扉には何も置かない。
+
+- 形状（8 三角形）: パネル下端の隙間から床へ漏れる 2 色の帯 2 枚（左半分シアン / 右半分マゼンタ。幅 = 扉幅の半分ずつ、扉側 z = -0.16 から奥行き 0.25 m。アトラスの扇形の片側を使い、中央が明るく外側と奥へフェード）+
+  枡の見付に沿う縦の細い流れ 2 枚（幅 0.04 m = 開いた Seam の 1/3、開口高 + 0.05 m、既存の流れテクスチャを上へ流す）。`createSeamClosed` / `updateSeamClosed`。
+- 強度: 床の帯 0.14 × 2.2 = 0.31、流れ 0.14（開いた Seam の 1/3）。30 Hz の時刻 hash フリッカーは開いた Seam と同じ式。
+- 表示条件: プレイヤーの足元から socket まで水平 6 m 以内（`SEAM_CLOSED_RANGE`）。扉イベントが無くても近づく / 離れるで出し入れするため、`Game.stepBody` が 0.25 s ごとに `syncDoorLeaks()` を呼ぶ（範囲外になった Leak は 0.3 s でフェードアウト）。
+  同期は可視の構築済み部屋の Portal を舐めるだけ（seed 7 で cpu 中央値に差なし）。
+- 確認（seed 7 `?force=L16`、開始部屋 r1 の `entry` が Legendary 遠方配置の Seam 扉）: 8 m → Leak 0、2.4 m → `r1/entry seamClosed` 1 件（8 tri）、7.5 m へ離れて 45 フレーム → 0。
+  スクリーンショット: 閉じたパネルの両脇に細いシアン / マゼンタの縦の筋、パネル下端の床にシアン | マゼンタの短い帯。コンソールに P1 由来のエラー無し。
+
+## 9. 色温度（V04 手順 9。担当 P1、2026-09-21）
+
+ファイル: `src/generators/presets.ts`（`KELVIN_RANGE` / `blackbodyRgb` / `kelvinToLightColor` / `kelvinRangeFor` / `applyLightKelvin`）、呼び出しは `src/generators/index.ts` の `generateLayout`（Generator の前）。
+
+- テンプレートごとに色温度範囲 [Kmin, Kmax] を持ち、部屋 seed の専用 fork `p.rng.fork('kelvin')` で 1 値（10 K 刻み）を選ぶ。既存の乱数列は消費しないので他の生成結果は変わらない
+  （`node tools/seam-stats.mjs --seeds 3 --rooms 40`: deterministic true / overlap 0 / loadMismatch 0）。
+- 黒体近似は Tanner Helland の式。**白バランス 4,600 K**（その色温度が無彩色の白）で割り、最大チャンネルを 1 に正規化（明るさは色温度で変えない）。
+  既存パレットの「病院 0xf3f6ff がわずかに青、ホテル 0xffc98a が電球色」に一致する。
+- `palette.lightColor` を置き換え、`palette.ambient` は輝度を保ったまま色味を 45% 器具色へ寄せる（焼き込みの環境光 = `palette.ambient` と半球光が追従する）。
+- 対象外（色温度化しない）: lightingPreset が 青 / 水族 / 水中、器具が lightPanel / lightWarm 以外（ledBlue / sodium など）。
+  lightingPreset の語が範囲を上書き: 暖色 / 電球 / 橙 / 夕 / 琥珀 → 2,700〜3,100、冷白 / 均一 → 4,200〜4,800、蛍光 / 白色 → 3,900〜4,500。
+- 順序は 生成（ここで決定）→ dressing → Modifier。FakeSky / LightingPhase / EraPreset / ZoneThemeShuffle / MaterialGradient / Mythic・Legendary のドレッシングの上書きはそのまま残る。
+
+| テンプレート | K 範囲 | 目安の色（4,600 K 白バランス） |
+|---|---|---|
+| CorridorOffice / OfficeGrid / Restroom / PoolCorridor | 4,000〜4,600 | 0xffefdd〜0xffffff |
+| CorridorSchool / Classroom / LockerRoom / GenericRoom / DynamicGrid | 3,800〜4,400 | 0xffe9d1〜0xfffaf4 |
+| CorridorHospital | 4,300〜5,000 | 0xfff7ef〜0xedf6ff |
+| ServerGrid | 4,200〜4,800 | 0xfff5eb〜0xf5faff |
+| CorridorHotel / Theater | 2,700〜3,100 | 0xffc174〜0xffd19b |
+| CorridorEntertainment | 2,700〜3,000 | 0xffc174〜0xffce92 |
+| ApartmentCorridor（住居） | 2,800〜3,200 | 0xffc67f〜0xffd5a4 |
+| CorridorService / Bridge / StorageGrid / ServiceMaze / VerticalCore / StreetGrid / RoadGraph（地下・設備） | 3,400〜4,000 | 0xffdcb4〜0xffefdd |
+| RetailRoom / RetailGrid / WarehouseGrid / MazeGrid / OrganicZone（店舗・倉庫） | 3,600〜4,200 | 0xffe3c3〜0xfff4e9 |
+| ParkingGrid / TransitCorridor / Terminal / LargeRoom | 3,900〜4,500 | 0xffecd7〜0xfffcfa |
+| GenericCorridor / SmallRoom | 3,700〜4,300 | 0xffe6ca〜0xfff7ef |
+| AtriumLobby | 3,400〜4,000 | 0xffdcb4〜0xffefdd |
+| Gallery | 3,200〜3,800 | 0xffd5a4〜0xffe9d1 |
+| ShelfGrid | 3,300〜3,900 | 0xffd9ac〜0xffecd7 |
+| PlayArea | 3,000〜3,600 | 0xffce92〜0xffe3c3 |
+| （未定義） | 3,800〜4,400 | |
+
+確認（seed 7）: C02 0xfffefc、C06 0xfff2e4 と 0xfffbf7（同じテンプレートで異なる）、C16 0xfff8f1、C15 0xfff3e6、C17（ホテル系）0xffcd92。
+
+**制約**: 焼き込み（`SurfaceGeometry.buildFixtures`）は発光箔の色を `SURFACES[mat].color`（lightPanel 0xedf0d9 固定）から取り、器具の面の色も材質側で固定なので、
+色温度が効くのは動的 PointLight（鏡面反射）・`palette.ambient` 由来の環境光・半球光・光漏れ（Common の色）まで。焼き込みと器具面を `palette.lightColor` に追従させる依頼を `docs/visual-requests.md`「P1 → 各担当」に記載。
+
+
+## 8. 第 7 回（2026-09-21、担当 P3）: クロスフェード / インスタンス照明 / glowOnly / 色温度
+
+### 8.1 到着前後のクロスフェード（`Lightmap.ts: startLightmapCrossfade`, `LIGHTMAP_FADE_MS = 500`）
+
+- 到着（`apply`）時に対象頂点の bakedLight を 0 埋めせず、材質の `lightMapIntensity` を 0 にしてから、見えているメッシュの `onBeforeRender` で
+  `lightMapIntensity = t`・対象頂点の `bakedLight = 元の値 × (1 − t)`（t: 0 → 1、0.5 s）を書く。両方とも indirectDiffuse に線形に足されるので明るさの合計は一定。
+- シェーダ注入は不要（`lightMapIntensity` は three の標準 uniform）。頂点属性の GPU 反映は書いた次のフレームなので、uniform には前フレームに書いた t を使う（`renderer.info.render.frame` で 1 フレーム 1 回進める）。
+- 完了で対象頂点を 0 埋め・intensity 1・フックを外す。見えていない間に完了時刻を過ぎたメッシュは最初の描画前に確定（共有材質の intensity を巻き戻さない）。
+- コスト: フェード中の 0.5 s だけ、見えている対象メッシュの bakedLight 属性を毎フレーム再アップロード（M11 で CPU median 1.4 ms、変化なし）。
+- 計測（M11 を `game.streaming.rebuild` で見ながら再構築、rAF で `lightMapIntensity` を記録）: 到着 599 ms → 606 ms 0.009 → 652 ms 0.105 → 766 ms 0.332（0.5 s の直線）。
+  同時にインスタンスの値も 0.0577 → 0.0536 → 0.0452（目標）へ補間。到着前 / 途中 / 後のスクリーンショットに段差なし。
+- 検証用: `RoomLightmap.fadeMs / appliedAt`、対象メッシュの `userData.lightmapFadeDoneAt`。
+
+### 8.2 InstancedMesh / glTF プロップの照明（`Lightmap.ts: LightmapSampler, InstanceLighting`）
+
+- 反復配置（`buildInstances`）と glTF プロップ（`installProps`）の `bakedLight`（InstancedBufferAttribute、インスタンスごとの一様値）を部屋の `InstanceLighting` に登録する。
+  登録時に [x, 底面 y, z, 半幅 x, 半幅 z] のプローブを持つ。
+- 到着時: `LightmapSampler`（atlas.faces の上向き面 = 床・大きな家具の天板を CPU で双一次サンプル）で「底面中心 + 足跡の外周 4 点（半幅 + 0.25 m）」の床の値の平均を目標にする。
+  真下だけでなく周囲を見ることで、器具の間 / 隅 / 大きな遮蔽の影は拾い、自分の接地 AO で全体が沈むのは避ける。
+- 目標値には「旧値（`sample` の定数）の平均輝度 / 床の値の平均輝度」（0.5〜1.2 にクランプ）を掛け、部屋全体の明るさは変えずに位置による濃淡だけを足す。
+  E09（seed 11）: 96/96 インスタンスが床を拾い、比 1.01。机の値が 0.185〜0.334（到着前 0.14〜0.31）。M11: 511 中 135（1 階の扉のみ。上階の扉は真下 2.5 m 以内に床が無い）、比 1.2（クランプ）。
+- 到着後の登録（遅延読込の glTF）は目標値を即書く。フェードは 8.1 と同じ 0.5 s（各 InstancedMesh の onBeforeRender）。
+- 注意: `BakeRequest.faces` は Worker へ転送されて元配列が空になるので、RoomBuilder は `atlas.faces.slice()` を渡す（サンプラは元の atlas を使う）。
+- 検証用: `RoomLightmap.instances = { ratio, sampled, total }`。
+
+### 8.3 見た目だけ光る発光箔（`SurfaceGeometry.ts: isGlowOnly`）と小発光体の間引き
+
+- `Box.kind === 'glowOnly'` または `kind` が `glow:` で始まる発光箔は器具（面光源）に数えない（emissive はそのまま）。器具の収集は `buildFixtures` だけなので、
+  頂点焼き込み（`bake` / `sample`）と Worker（packed 器具を受け取る）は自動的に同じ判定になる。`PropCatalog.candidates` は未知の kind を空で返すので planProps に影響なし。
+- M11（`mythic.ts: dressM11`）の扉灯を InstancedMesh から 122〜139 枚の glowOnly 箔に戻した（faceRuns に影響しないよう全段の配置後にまとめて `add`）。
+  構築時間（seed 7、bake / total ms、初回 + rebuild ×2）: 箔なし（旧 InstancedMesh 相当）98/170, 66/104, 65/103 → glowOnly 139 枚 117/200, 82/130, 70/108 → 同じ 139 枚を器具に数えると 353/444, 233/290, 211/256、Worker 155〜194 → 387〜416 ms。
+  glowOnly は箔なしとほぼ同じ（+5〜15 ms は 139 箱のジオメトリ分）。
+- 発光面積 < 0.2 m²（`LIGHT_TUNING.smallEmitterArea`）の器具は距離に関わらず中心 1 点でサンプル（`buildFixtures` の nu/nv と `fixtureIsNear` が同じ閾値）。
+  E09 のモニター（screenLcd 0.52 × 0.32 = 0.17 m²、16 枚）が 2 → 1 サンプルになる。E09 の計測は 16 枚では差がノイズ（bake 47〜60 ms、Worker 231〜238 ms、レイ数同じ）。小発光体が多い部屋（サイン列・LED）向け。
+
+### 8.4 器具の光の色 = 材質色 × palette.lightColor（P1 の色温度）
+
+- `buildFixtures` で器具材質（lightPanel / lightWarm / lightCool / lightYellow / lightGreen / ledBlue / sodiumLight。`isLightFixtureMat`）の色に
+  `layout.palette.lightColor`（`kelvinToLightColor` で白バランス済み）を掛ける。スクリーン・サイン・窓は材質色のまま。packed 器具が Worker へ渡るのでライトマップも同じ色。
+- 確認（seed 7、ライトマップの上位 20 テクセルの R/B）: C02 fffefc 1.18（材質のみの期待 1.22）、C06 fff2e4 1.55（期待 1.57）、C07 fffbf7 1.28（期待 1.31）、C08 ffc47c + lightWarm 10.2（材質のみ 3.1）。
+- 未対応: 区画ごとに器具色を差し替える Modifier（EraPreset / ZoneThemeShuffle の recolorLights）の区画別の色（palette は部屋に 1 つ）。
+  ParkingGenerator / VerticalGenerator の LightSpec は 0xdfe8ff 固定なので、C06 では動的光（冷）と焼き込み（palette の暖）の色が合わない → P1 へ依頼（docs/visual-requests.md）。
+
+### 8.6 変更（2026-09-22）: 閉じた扉の隙間の漏れ / 開いた扉は向こうの器具色
+
+- 閉じた通常扉（8 m 以内）: パネル下端の隙間から床へ 0.25 m の帯を置き、レア度の色（8.2 の表の色・動き）で僅かに光る（alpha は表の 1/2、火花なし。`DoorLeak.createClosedRarity`、`CLOSED_LEAK_SCALE` / `CLOSED_RANGE`）。
+- 開いた扉: 扇形と壁の洗いは残すが、色は向こうの部屋の `palette.lightColor`、強度は `OPEN_LEAK_ALPHA` 0.08 の一定（脈動・色相回転・火花なし）。レア度の演出は閉じた扉の隙間だけに残る。
+- Seam 扉（開・閉）は 8.5 のまま。エントリのキーは開閉で分け（`…/c`）、状態が変わると 0.3 s でフェードして入れ替わる。

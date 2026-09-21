@@ -174,3 +174,54 @@ diffuseColor.rgb = max(0, liminalTone * diffuseColor.rgb)     （map_fragment �
 - POM は自己遮蔽（影）無し。両面材質・legacy・生成テクスチャでは無効。DOUBLE_SIDED の裏面は法線を反転して扱う。
 - 天井の器具入りセット（OfficeCeiling002/003/005/006）は Emission / マスクを作れば照明パネルの見た目に使える（未着手）。
 - KTX2（GPU メモリ 1/8）は未着手（`docs/cc0-pipeline.md` 今後）。
+
+## 11. V06 手順 2〜5: 部屋別 envMap・艶床の clearcoat・床だけの濡れ・水面の透過（担当 P2、2026-09-21）
+
+所有: `src/render/MaterialLibrary.ts`（`roomEnvironment` / `bakeRoomEnvironment` / `roomEnvKey` / `ROOM_ENV_SIZE`、`GlossSpec` / `WaterSpec`、`isFloorMat` / `resolveOverrides`）、
+`src/generators/layout.ts`（`RenderOverrides.floorWetness`）、`src/generators/dressing/epic.ts`（`setFloorWetness`。E01 / E07 / E09）。RoomBuilder は `forRoom` に `palette` / `height` を渡す 1 箇所と `overridesFor` の `floorWetness` 1 行だけ。
+
+### 11.1 部屋別 envMap（手順 3〜4）
+
+- `forRoom(id, { …, palette, height })` が `roomEnvironment(roomId, palette, height)` を呼び、返ったテクスチャをその部屋の材質 clone の `envMap` にする（lightMap 付き clone はそのまま、lightMap 無しでも palette があれば `cloneShared` で部屋専用 clone）。共有 variant（扉・枠・小箱・水面・`variant()` 経由）と glTF（`adoptExternal`）は共有の RoomEnvironment のまま。
+- 焼き方（`bakeRoomEnvironment`）: CubeCamera でシーンを描くのではなく、**パレットの色で塗った箱部屋を JS で解析的にキューブマップへ書く**（6 面 × 128² HalfFloat。目の高さ 1.6 m、天井 = `layout.height`、壁 4 m 先。床 = `SURFACES[palette.floor].color` × 器具色 × 0.5、壁 = 壁色 × 0.6〜0.9 の縦勾配、天井 = 天井色 × 0.7 + 器具色 × 6 の 0.6 × 1.2 m 面が 4 m 格子（(±2, ±2) の 4 灯）+ 弱い滲み、環境色 `palette.ambient` × 0.1〜0.15 を加算）→ `PMREMGenerator.fromCubemap`。未ロード部屋・自身・再帰の映り込みは構造上起きない。
+- 費用: JS 1〜2 ms + PMREM 十数 draw で **1 枚 3.3〜3.6 ms**（`envStats.ms`。初回は cubemap 変換シェーダのコンパイルで 30〜40 ms かかっていたので `configure` で `compileCubemapShader()` を先に呼ぶ）。GPU メモリは PMREM 384 × 512 HalfFloat ≈ 1.5 MB / 枚。
+- キャッシュ: `roomEnvKey` = 床 / 壁 / 天井の MatId + 器具色・環境色を各チャンネル 5 段階 + 高さ 0.5 m 刻み。LRU **8 枚**、ただし参照中（`rooms` が空でない）のものは捨てない。`releaseRoom` で参照を外す。10 部屋の踏破で built 6〜7 / hits 50〜60。
+- **重要（プログラム数）**: three は PMREM の高さ（`envMapCubeUVHeight`）をプログラムキーに入れるので、共有 envMap と部屋別 envMap は同じ立方体サイズで焼く必要がある。共有 RoomEnvironment も `fromScene(room, .06, .1, 100, { size: ROOM_ENV_SIZE = 128 })`（旧 256）にした。envMap の差替えでプログラムは増えない（確認: envMap を差した lightMap clone と共有 variant のプログラム数は同じ）。
+- low Tier（`materialQuality = 0`）/ legacy / untextured / `flat` / envMap を持たない材質は null（共有のまま）。
+
+### 11.2 艶床の clearcoat（手順 2）
+
+- `Surface.gloss: { clearcoat, roughness }` を床材に付ける（`MeshPhysicalMaterial` になる。全材質は Physical にしない）: floorLino .35 / .25、floorTile .45 / .2、floorWood .3 / .3、marbleFloor .6 / .15、marbleWhite .4 / .2。
+- 濡れ（`roughnessScale` から `wetnessOf` で逆算）で `clearcoat += .35 × wet`、`clearcoatRoughness × (1 − .5 × wet)`。
+- プログラム族: `customProgramCacheKey` の末尾に `-gloss` / `-water` / `-water-depth` / `-glass` / `-coat`（three 側のキーでも clearcoat / transmission の有無で分かれる）。床は同じ CC0 族の壁とプログラムを共有していたので、gloss 床の分だけ族が増える（C05 で 68 → 77。R01 は 87 → 同数程度）。
+
+### 11.3 床だけの濡れ `floorWetness`（手順 2 の補助。E01 / E07 / E09）
+
+- `RenderOverrides.floorWetness`（0..1）→ `MaterialOverrides.floorWetness` → `resolveOverrides(id, o)` が **床材（`isFloorMat`: `floor*` と marbleFloor）にだけ** `wetnessOverrides` を畳む（既存の `wetness` と強い方）。床以外はキーから消えるので共有 variant のまま（E01 で確認: 床 `floorCarpetGrey|r0.8|c0.95|e1.75#…`、壁 `wallCream#v1t1`、天井 `ceilingWhite#v1t0`）。
+- epic.ts の E01 .25 / E07 .18 / E09 .3 を `setFloorWetness` に切替。E06 .6 / E08 .35 / E11 .25 / E19 .3 は全材質の `wetness` のまま（意図が壁を含むか未確認なので触っていない）。
+
+### 11.4 水面（手順 5: R01 / R14 / E09）
+
+- `Surface.water: WaterSpec` で `MeshPhysicalMaterial`: transmission（水面 .9 / 浅水 .88 / 水壁 .85）、ior 1.33、roughness .05〜.08、`attenuationColor` / `attenuationDistance`（水 0x3f8a80 / 1.2 m、浅水 0x5aa39a / 1.0 m、水壁 0x2f7a74 / 0.6 m）、反射は envMapIntensity × reflect（1.4〜1.8）でフレネルは PBR 側。金属度 0、opacity 1、depthWrite false、水平の水面は FrontSide（箱の底面が二重に描かれない）、水壁は DoubleSide。
+- 水深: `depthFromFloor` の材質は onBeforeCompile で three の `transmission_fragment` を展開し、`material.thickness = thickness × clamp(vRoomPos.y, 0.003, 4)`（部屋座標の y = 床 0 からの高さ = 水深）、`material.transmission = mix(1, transmission, smoothstep(0, .3, vRoomPos.y))`（岸際 = 透明）に置き換える。ShallowWater の水面 y = depth（R01 .25 / R14 .3 / L02 .5）、WaterWall の濡れ箔 y = .008、床の水たまりデカール y = .004 はほぼ透明な反射面になる。
+- 透過光に掛かる拡散色（水色 × 波紋 map）は `albedoMix`（.5〜.65）だけ効かせる（`material.diffuseContribution = mix(1, diffuseContribution, albedoMix)`）。そのままだと床が波紋の模様に埋もれて不透明に見えた。
+- 調整の経緯: 仕様の transmission .5〜.7 では (1 − transmission) の拡散が乳白色の膜になり床が見えなかった（R14 で確認）。.88〜.92 + 減衰色で「床が見え、深いほど青緑、遠くは天井を映す」になる。白飛びは envMapIntensity（wetness の e1.75 が掛かる）を reflect 1.4〜1.8 に下げて解消。
+- 費用: three の透過は不透明物を transmission RT にもう 1 回描く（`transmissionResolutionScale` 1.0）。ガラス（窓・扉）が見える部屋では既に払っているコスト。水だけの部屋（R14）では GPU 中央値 13.8 ms（変更後）vs 19.8 ms（変更前。別タブと同時計測のため参考値）。
+- 既知: 水壁（DoubleSide）は three が透過パスで裏面を RT に描く（`renderTransmissionPass`）ので、裏側から見ると 2 重の減衰になる。水中の物（柱の根元）は減衰と波紋で見えにくい。
+
+### 11.5 夜景の位相（`docs/night-parallax.md` 残課題）
+
+- `windowNight` は共有 variant（ライトマップ対象外）なので uniform ではなく、頂点で `vNightPhase = hash(floor(modelMatrix[3].xz × 0.5))`（部屋グループの world 位置を 2 m 格子に丸めたハッシュ）を出し、遠景の u に `+phase`、近景の u に `+1.7 × phase` を足す。隣室の窓は別の街並みになる（C01 で変更前と配置が変わることを確認）。同じ部屋の窓は同じ位相（連続した街並み）。
+
+### 11.6 確認（2026-09-21、seed 7、Tier high、変更前は HEAD の worktree を 5174 で並走）
+
+- `npx tsc --noEmit -p .` 0（他担当の DoorLeak.ts の未使用変数は別）。`node tools/seam-stats.mjs --seeds 3 --rooms 40` deterministic true。
+- R01: 近くの水は床タイルが透けて青緑、遠くは天井を映す灰。R14: 木床が透け、柱の根元が見える。E09: 水壁は青緑の波紋越しに隣室が見える。E01: 床だけ艶、壁は共有 variant。C05: リノリウムに器具の映り込みの筋。C01 / M18: 夜景の位相が変わり、雨（Points）は夜景の手前に重なる。
+- 部屋別 envMap: `envStats` built 6〜7 / hits 52〜57 / 1 枚 3.3〜3.6 ms。プログラム数は envMap の差替えで増えない。
+- 残: 器具の実位置を反映しない（4 m 格子の代表）。CubeCamera 版（実シーン）は費用対効果を見て未採用。water の `map`（波紋）は生成テクスチャのままで法線の波は弱い。
+
+### 11.7 器具の発光面を palette.lightColor に追従（P1 依頼、2026-09-21）
+
+- `MaterialOverrides.lightTint`（sRGB hex）。RoomBuilder の `overridesFor` が `layout.palette.lightColor` を入れ、`resolveOverrides` が **器具材質（`isFixtureMat`: lightPanel / lightWarm / lightTube* / lightGreen / lightYellow で emission 付き）だけ**に残す（サイン・画面・空箔・ネオン・街灯・他の材質はキーから落ちて共有材質のまま）。
+- `createMaterial` で `emissive = 材質の発光色 × normalizedTint(lightColor)`（最大チャンネル 1 に正規化した線形色。明るさは変えない）。legacy は対象外。キーは `t` + 1/16 刻みの 3 桁 hex（白 'fff' は落とす）。
+- 確認: R01（lightColor 0xfff2e4）で `lightWarm|tfdc` emissive #ffc789（変更前 #ffd29a）。器具材質の variant が部屋の色温度ごとに 1 つ増える（LRU 256 の範囲）。

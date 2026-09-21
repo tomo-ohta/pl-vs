@@ -664,10 +664,11 @@ function dressM11(c: Ctx): void {
   const panel = inst(c, 'doorWood', [0.9, 2.05, 0.03]);
   const frame = inst(c, 'trim', [1.03, 2.14, 0.05]);
   const knob = inst(c, 'metal', [0.1, 0.03, 0.05]);
-  // 扉灯: 発光箔は SurfaceLighting の面光源（器具）になり、吹抜では 1 枚あたり焼き込みが約 2.5 ms 増える（122 灯で構築 37 → 112 ms、
-  // 6 灯でも +15 ms）。そこで扉灯は全部 InstancedMesh（発光材質で光って見えるだけ。器具には数えない）にし、壁の暖色は下の点光源 2 灯に任せる。
-  // 上階の足元の床線も箱ではなく扉ごとの InstancedMesh（長い箔は 1.25 m 刻みの頂点が増えて焼き込みが重い）
-  const lampInst = inst(c, 'lightWarm', [0.14, 0.24, 0.06]);
+  // 扉灯: 発光箔は SurfaceLighting の面光源（器具）になり、吹抜では 1 枚あたり焼き込みが約 2.5 ms 増える（122 灯で構築 37 → 112 ms）。
+  // そこで扉灯は `kind: 'glowOnly'`（担当 P3。SurfaceGeometry.isGlowOnly）の箔にして器具に数えず、見た目だけ光らせる。
+  // 壁の暖色は下の点光源 2 灯に任せる。faceRuns（面の手前 0.5 m の箱で区間を切る）に影響しないよう、箔は全ての段を置いた後にまとめて足す。
+  // 上階の足元の床線は箱ではなく扉ごとの InstancedMesh（長い箔は 1.25 m 刻みの頂点が増えて焼き込みが重い）
+  const lamps: Box[] = [];
   const pitch = 3.0;
   const ledge = inst(c, 'trim', [pitch, 0.06, 0.14]);
   let numbers = 0;
@@ -691,7 +692,8 @@ function dressM11(c: Ctx): void {
           knob.transforms.push({ pos: facePos(f, t + 0.35, 0.105, y0 + 1.0), yaw });
           // 上階の扉の足元に床線
           if (ti > 0) ledge.transforms.push({ pos: facePos(f, t, 0.07, y0 - 0.06), yaw });
-          lampInst.transforms.push({ pos: facePos(f, t - 0.45 - 0.065 - 0.23, 0.06, y0 + 1.76), yaw });
+          // 扉灯（旧 InstancedMesh の位置 = 底面中心 t − 0.745、面から 0.06、高さ 1.76 と同じ箔 0.14 × 0.24 × 0.06）
+          lamps.push({ ...alongFace(f, t - 0.45 - 0.065 - 0.23 - 0.07, 0.14, 0.03, 0.09, y0 + 1.76, y0 + 2.0, 'lightWarm', false), kind: 'glowOnly' });
           // 番号札は 1 階だけ、1 枚おき（SignAtlas 1 枚 = 16 セルに収める）
           if (ti === 0 && i % 2 === 1 && numbers < 16) {
             if (sign(c, f, t, y0 + 2.31, 0.3, `${ti + 2}${String(seq).padStart(2, '0')}`, { offset: 0.03 })) numbers++;
@@ -701,6 +703,8 @@ function dressM11(c: Ctx): void {
       }
     }
   });
+  // 扉灯の箔をまとめて足す（非ソリッド。予算を超える分は落とす）
+  if (lamps.length) add(c, lamps.slice(0, Math.max(0, c.budget.boxes)));
   // 上階の扉灯の温もり（2 灯）
   if (tiers.length > 1) {
     for (const f of faces.slice(0, 2)) {

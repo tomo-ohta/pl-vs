@@ -6,9 +6,13 @@
  * - `materials.variant(id, overrides)`: 部屋別の材質差替え（RoomBuilder が RoomLayout.render から呼ぶ。Game 側は通常呼ばない）。
  *   uniform 値だけ違うもの（wetness / colorMask / roomFog の色距離）は同じシェーダプログラムを共有し、量子化キー + LRU（上限 MAX_VARIANTS）で管理する。
  *   プログラムが増えるのは style 'untextured' / 'legacy'、gradient、roomFog（有無）、視差（cc0 の pom）の族だけ。
- * - `materials.forRoom(id, { roomId, seed, overrides, lightMap })`: 部屋単位の材質。seed から CC0 セットのバリエーションと色相・明度のトーンを
+ * - `materials.forRoom(id, { roomId, seed, overrides, lightMap, palette, height })`: 部屋単位の材質。seed から CC0 セットのバリエーションと色相・明度のトーンを
  *   決定論的に選ぶ（同じテンプレートの隣室で床・壁が別の実測素材になる）。材質は (MatId, 上書き, バリエーション, トーン) で共有し、
- *   lightMap 付きだけ部屋専用の clone を返す。RoomBuilder.dispose から `releaseRoom(roomId)` を呼ぶこと。
+ *   lightMap 付き、または palette 付き（部屋別 envMap。V06 手順 3〜4）だけ部屋専用の clone を返す。RoomBuilder.dispose から `releaseRoom(roomId)` を呼ぶこと。
+ * - `materials.roomEnvironment(roomId, palette, height)`: パレットの色で焼いた部屋別 envMap（PMREM 128 px 立方体。量子化キーで LRU 24 枚、
+ *   参照中は捨てない）。forRoom が呼ぶ。low Tier / legacy / untextured は共有の RoomEnvironment のまま。
+ * - 上書き `floorWetness`（RoomLayout.render.floorWetness）: 床材（isFloorMat）だけに wetnessOverrides を畳む（壁・天井は共有 variant のまま）。
+ * - SURFACES の `gloss`（艶床の clearcoat）/ `water`（透過 + 水深減衰 + フレネル反射）は MeshPhysicalMaterial になる（glass / carPaint と同じ扱い）。
  * - `materials.setTier(tier)`: 品質 Tier（high: 視差 + 2 層混合 / mid: 2 層混合 / low: 無し）。Game.setTier から呼ぶ（uniform だけ変わる。再コンパイル無し）。
  * - `materials.precompile(renderer, scene, camera, overrides)`: Rare 以上の部屋が 2 hop 先で確定した時点に呼ぶと、その variant 族を先にコンパイルできる（任意）。
  * - `materials.update(dt)`: 毎フレーム（水面 UV の流れ・明滅の時間 uniform）。従来どおり。
@@ -26,7 +30,7 @@ import { addSurfaceAppearance, usesSurfaceVariation, usesSurfaceWear, SURFACE_VA
 import { createSurfaceMaps, hasAuthoredDetail, type DetailKind } from './SurfaceDetail';
 import { CC0_INDEX_URL, CC0_MATERIALS_URL, CC0_VARIANTS, DEFAULT_BLEND, TONE_TABLE, variantHash, type Cc0Index, type Cc0IndexEntry, type Cc0Variant } from './cc0Materials';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import type { MatId } from '../generators/layout';
+import type { MatId, Palette } from '../generators/layout';
 import type { QualityTier, QualityTierId, Vec3 } from '../core/types';
 
 export type TextureId = 'wallpaper' | 'carpet' | 'concrete' | 'wood' | 'ceiling' | 'tile' | 'metal' | 'linoleum' | 'cardboard' | 'foliage' | 'diffuser' | 'water' | 'sky' | 'night';
@@ -38,6 +42,30 @@ export interface GlassSpec {
   thickness: number;
   /** 反射の強さ（共有 envMap の envMapIntensity 倍率。フレネルは PBR 側） */
   reflect: number;
+}
+/** 艶のある床（V06 手順 2）: MeshPhysicalMaterial の clearcoat で器具の映り込みが床に伸びる。濡れ（wetness）で clearcoat が増える */
+export interface GlossSpec {
+  /** clearcoat 0..1（.3〜.6） */
+  clearcoat: number;
+  /** clearcoatRoughness（.15〜.3） */
+  roughness: number;
+}
+/** 水面（V06 手順 5）: 透過 + フレネル反射 + 水深による色の減衰（MeshPhysicalMaterial の transmission / attenuation） */
+export interface WaterSpec {
+  /** 透過 .5〜.7（深さ 0 の岸際は 1 に寄せる） */
+  transmission: number;
+  ior: number;
+  /** 減衰色（sRGB hex。深いほどこの色へ）と減衰距離（m） */
+  attenuationColor: number;
+  attenuationDistance: number;
+  /** 反射の強さ（envMapIntensity の倍率） */
+  reflect: number;
+  /** 水深の基準（m）。depthFromFloor のとき厚みは部屋座標の y（床 0 からの高さ）= 実際の水深 */
+  thickness: number;
+  /** 水平の水面: 厚み = 部屋座標の y（床までの深さ）。縦の水壁は一定の thickness */
+  depthFromFloor?: boolean;
+  /** 透過光に掛ける拡散色（水色 × 波紋 map）の割合 0..1（1 でそのまま。0 で無色。既定 .5。低いほど床がはっきり見える） */
+  albedoMix?: number;
 }
 interface Surface {
   detail?: DetailKind; albedo?: boolean;
@@ -55,15 +83,20 @@ interface Surface {
   decal?: boolean;
   /** 水面と同じ UV 流れアニメーション */
   flow?: number;
+  /** 艶床（clearcoat。MeshPhysicalMaterial になる） */
+  gloss?: GlossSpec;
+  /** 水面（透過 + 反射 + 水深減衰。MeshPhysicalMaterial になる） */
+  water?: WaterSpec;
 }
 /** Exhaustive shared material table. Pattern dimensions are measured in meters. */
 export const SURFACES: Record<MatId, Surface> = {
   floorCarpetRed: { texture: 'carpet', color: 0x805349, meters: 1, roughness: .98, bump: .004 },
   floorCarpetGrey: { texture: 'carpet', color: 0x91938e, meters: 1, roughness: .98, bump: .004 },
-  floorLino: { texture: 'linoleum', color: 0xb6c0a2, meters: 1.2, roughness: .3, bump: .002 },
+  // 艶床（gloss）: リノリウム・タイル・大理石・板張りは clearcoat で器具の映り込みが床に伸びる（V06 手順 2）
+  floorLino: { texture: 'linoleum', color: 0xb6c0a2, meters: 1.2, roughness: .3, bump: .002, gloss: { clearcoat: .35, roughness: .25 } },
   floorConcrete: { texture: 'concrete', color: 0xb8b6ad, meters: 2, roughness: .45, bump: .007 },
-  floorTile: { texture: 'tile', color: 0xe0e4db, meters: 1.2, roughness: .29, bump: .005 },
-  floorWood: { texture: 'wood', color: 0xc5aa81, meters: 1.2, roughness: .48, bump: .004, grid: [.15, 1.2] },
+  floorTile: { texture: 'tile', color: 0xe0e4db, meters: 1.2, roughness: .29, bump: .005, gloss: { clearcoat: .45, roughness: .2 } },
+  floorWood: { texture: 'wood', color: 0xc5aa81, meters: 1.2, roughness: .48, bump: .004, grid: [.15, 1.2], gloss: { clearcoat: .3, roughness: .3 } },
   wallBeige: { texture: 'wallpaper', color: 0xd3bc87, meters: 1, roughness: .88, bump: .006 },
   wallWhite: { texture: 'wallpaper', color: 0xe2e3d8, meters: 1, roughness: .88, bump: .0012 },
   wallCream: { texture: 'wallpaper', color: 0xe1d4ae, meters: 1, roughness: .9, bump: .004 },
@@ -110,14 +143,17 @@ export const SURFACES: Record<MatId, Surface> = {
   carPaint: { detail: 'paint', albedo: false, texture: 'metal', color: 0x6c787b, meters: 1, roughness: .28, bump: .0002, metalness: 0 },
   rubber: { detail: 'rubber', albedo: false, texture: 'linoleum', color: 0x242624, meters: .4, roughness: .96, bump: .002 },
   upholstery: { texture: 'carpet', color: 0x76514a, meters: .45, roughness: .98, bump: .006 },
-  water: { texture: 'water', color: 0x69938c, meters: 3, roughness: .12, bump: .002, opacity: .72, flow: 1 },
+  // 水面（V06 手順 5）: 透過（床が見える）+ フレネル反射（envMap。視線が寝るほど強い）+ 水深による色の減衰（厚み = 床からの高さ）。
+  // color は透過光と（1 − transmission）の拡散に掛かるので明るめの水色にし、深さの色は attenuationColor が付ける
+  // transmission は .9 前後（.5〜.7 では (1 − transmission) の拡散が乳白色の膜になり床が見えない。V06 手順 5 の確認で調整）
+  water: { texture: 'water', color: 0xd8e6e2, meters: 3, roughness: .08, bump: .002, flow: 1, water: { transmission: .9, ior: 1.33, attenuationColor: 0x3f8a80, attenuationDistance: 1.2, reflect: 1.4, thickness: 1, depthFromFloor: true } },
   // ---- v1.3 追加（Modifier / 新 Generator 用）----
   lightGreen: { texture: 'diffuser', color: 0xc8f0c0, meters: .24, roughness: .45, bump: .001, emission: 2.4 },
   lightYellow: { texture: 'diffuser', color: 0xe8dcb0, meters: .24, roughness: .45, bump: .001, emission: 2.1 }, // 古い管の黄ばみ（灰色寄り）
   /** 停電時の筐体・モニタの青白い発光（LightingPhase unpowered） */
   screenGlow: { texture: 'diffuser', color: 0x9fd0ff, meters: .5, roughness: .3, bump: .0005, emission: 1.6 },
   // ---- 部屋別ドレッシング（参考画像 Uncommon〜Mythic）----
-  marbleFloor: { texture: 'tile', color: 0xd9d6cf, meters: 1.2, roughness: .18, bump: .001 },
+  marbleFloor: { texture: 'tile', color: 0xd9d6cf, meters: 1.2, roughness: .18, bump: .001, gloss: { clearcoat: .6, roughness: .15 } },
   woodPanel: { texture: 'wood', color: 0x5a4535, meters: 1.1, roughness: .4, bump: .002, grid: [.6, 2.4] },
   bookshelfWood: { texture: 'wood', color: 0x6e4f36, meters: 1.1, roughness: .45, bump: .002 },
   carpetPattern: { texture: 'carpet', color: 0x6b2a2a, meters: .9, roughness: .98, bump: .005 },
@@ -137,7 +173,7 @@ export const SURFACES: Record<MatId, Surface> = {
   // 机上の液晶（E09）。screenGlow は白い板に見えるため青白く弱い発光にした
   screenLcd: { texture: 'diffuser', color: 0x9fc8ff, meters: .5, roughness: .3, bump: .0005, emission: 0.9 },
   // 像・胸像の白大理石（E06）。単一光でもシルエットにならない明るい白 + 低い粗さ
-  marbleWhite: { texture: 'tile', color: 0xefece4, meters: 1.2, roughness: .22, bump: .001 },
+  marbleWhite: { texture: 'tile', color: 0xefece4, meters: 1.2, roughness: .22, bump: .001, gloss: { clearcoat: .4, roughness: .2 } },
   // 塗装の白（電車の車体 E11・自販機など）。リノリウム地の signPlate ではなく塗装ディテール
   paintWhite: { detail: 'paint', albedo: false, texture: 'metal', color: 0xe8e9e4, meters: .7, roughness: .38, bump: .001, metalness: 0 },
   seatRed: { texture: 'carpet', color: 0x7a1f2a, meters: .45, roughness: .95, bump: .005 },
@@ -148,10 +184,10 @@ export const SURFACES: Record<MatId, Surface> = {
   skyOvercast: { texture: 'sky', color: 0xb9c0c8, meters: 40, roughness: 1, bump: 0, emission: 1.1, doubleSide: true },
   skyDusk: { texture: 'sky', color: 0xd28a5a, meters: 40, roughness: 1, bump: 0, emission: 1.0, doubleSide: true },
   skyNoon: { texture: 'sky', color: 0x8fb8ea, meters: 40, roughness: 1, bump: 0, emission: 1.4, doubleSide: true },
-  /** 浅水（ShallowWater）。床の上に貼る半透明の水面 */
-  waterShallow: { texture: 'water', color: 0x86b7b0, meters: 2.5, roughness: .1, bump: .0015, opacity: .5, flow: 1.4 },
-  /** 水の壁（WaterWall）。開口を塞ぐ縦の水面 */
-  waterWall: { texture: 'water', color: 0x4f8a86, meters: 2, roughness: .08, bump: .002, opacity: .62, flow: 2.2, doubleSide: true },
+  /** 浅水（ShallowWater）。床の上に貼る水面（透過。水深 = 部屋座標 y。岸際は透明） */
+  waterShallow: { texture: 'water', color: 0xdce9e6, meters: 2.5, roughness: .05, bump: .0015, flow: 1.4, water: { transmission: .88, ior: 1.33, attenuationColor: 0x5aa39a, attenuationDistance: 1.0, reflect: 1.8, thickness: 1, depthFromFloor: true, albedoMix: .65 } },
+  /** 水の壁（WaterWall）。開口を塞ぐ縦の水面（両面。厚みは一定 0.3 m） */
+  waterWall: { texture: 'water', color: 0xc4dcd8, meters: 2, roughness: .05, bump: .002, flow: 2.2, doubleSide: true, water: { transmission: .85, ior: 1.33, attenuationColor: 0x2f7a74, attenuationDistance: .6, reflect: 1.8, thickness: .3, albedoMix: .6 } },
   /** ブロブ影デカール（InvertedShadow） */
   shadowDecal: { texture: 'concrete', color: 0x000000, meters: 2, roughness: 1, bump: 0, opacity: .5, decal: true },
   /** 白無地（RenderStyle untextured） */
@@ -185,6 +221,17 @@ export interface MaterialOverrides {
   gradient?: { from: MatId; to: MatId; axis: Vec3; range: [number, number] };
   /** 部屋固有の霧（scene.fog を無視。色は sRGB hex、距離は m） */
   fog?: { color: number; near: number; far: number };
+  /**
+   * 床だけの濡れ（0..1。E01 / E07 / E09）。床材（isFloorMat: `floor*` と marbleFloor）にだけ wetnessOverrides を適用し、
+   * 壁・天井・家具はこの値を無視する（キーにも入らないので共有 variant のまま）。wetness（全材質）と併用可（強い方）
+   */
+  floorWetness?: number;
+  /**
+   * 器具の発光面の色（palette.lightColor。sRGB hex）。lightPanel / lightWarm など emission 付きの器具材質（isFixtureMat）だけ、
+   * emissive を「材質の発光色 × 最大チャンネル 1 に正規化した lightColor」にする（P1 のテンプレート別色温度に発光面を追従させる）。
+   * サイン・画面・空箔・ネオンは対象外。キーは 1/16 刻みで量子化
+   */
+  lightTint?: number;
 }
 
 /** forRoom の引数（部屋単位の材質） */
@@ -196,6 +243,13 @@ export interface RoomMaterialContext {
   /** Worker で焼いたライトマップ（uv1）。無ければ頂点の bakedLight だけ */
   lightMap?: THREE.Texture | null;
   lightMapIntensity?: number;
+  /**
+   * 部屋のパレット（V06 手順 3〜4: 部屋別 envMap）。あれば palette の床・壁・天井の色と器具色で焼いた小さな PMREM を
+   * この部屋の材質（clone）の envMap にする。無い / low Tier / legacy・untextured は共有の RoomEnvironment のまま
+   */
+  palette?: Palette;
+  /** 部屋の高さ（m。envMap の天井の高さ。既定 3） */
+  height?: number;
 }
 
 /** 外部（glTF）材質に施す部屋別上書き（adoptExternal）。値だけ違うものは同じプログラムを共有する */
@@ -231,6 +285,57 @@ interface CommonInjection {
 export function wetnessOverrides(w: number): MaterialOverrides {
   const t = Math.max(0, Math.min(1, w));
   return { roughnessScale: 1 - .7 * t, colorScale: 1 - .25 * t, envMapIntensity: 1 + 2.5 * t };
+}
+
+/** 床に使う材質か（render.floorWetness の対象。`floor*` と大理石床） */
+export function isFloorMat(id: MatId): boolean {
+  return /^floor/.test(id) || id === 'marbleFloor';
+}
+
+/**
+ * floorWetness を材質ごとの実効上書きに畳む: 床材なら wetnessOverrides を（既存の wetness と強い方で）合成し、
+ * 床以外は floorWetness を落とす。variant のキーは畳んだ後の値で作るので、床以外は共有 variant を使う
+ */
+function resolveOverrides(id: MatId, o: MaterialOverrides): MaterialOverrides {
+  if (o.floorWetness === undefined && o.lightTint === undefined) return o;
+  const { floorWetness, lightTint, ...rest } = o;
+  let r: MaterialOverrides = rest;
+  if (floorWetness && isFloorMat(id)) {
+    const w = wetnessOverrides(floorWetness);
+    r = {
+      ...r,
+      roughnessScale: Math.min(r.roughnessScale ?? 1, w.roughnessScale!),
+      colorScale: Math.min(r.colorScale ?? 1, w.colorScale!),
+      envMapIntensity: Math.max(r.envMapIntensity ?? 1, w.envMapIntensity!),
+    };
+  }
+  // 器具の発光色: 器具材質だけに残す（白に近い tint は落として共有材質を使う）
+  if (lightTint !== undefined && isFixtureMat(id) && quantizeTint(lightTint) !== 'fff') r = { ...r, lightTint };
+  return r;
+}
+
+/** 器具の発光面（palette.lightColor に追従させる材質）。サイン・画面・空箔・ネオン・街灯は含めない */
+export function isFixtureMat(id: MatId): boolean {
+  return /^light(Panel|Warm|Tube|Green|Yellow)/.test(id) && !!SURFACES[id]?.emission;
+}
+
+/** lightColor（sRGB hex）を最大チャンネル 1 に正規化した線形色（白バランス済みの色味）。白なら (1,1,1) */
+function normalizedTint(hex: number): THREE.Color {
+  const c = new THREE.Color(hex);
+  const m = Math.max(c.r, c.g, c.b, 1e-4);
+  return c.multiplyScalar(1 / m);
+}
+
+/** 正規化した tint を 1/16 刻みの 3 桁 hex に（キー用。白は 'fff'） */
+function quantizeTint(hex: number): string {
+  const c = normalizedTint(hex);
+  const qn = (v: number) => Math.min(15, Math.round(v * 15)).toString(16);
+  return `${qn(c.r)}${qn(c.g)}${qn(c.b)}`;
+}
+
+/** roughnessScale から濡れの強さ（0..1）を逆算する（wetnessOverrides の逆。clearcoat の増分に使う） */
+function wetnessOf(o: MaterialOverrides): number {
+  return o.roughnessScale === undefined ? 0 : Math.max(0, Math.min(1, (1 - o.roughnessScale) / .7));
 }
 
 /** 選ばれたバリエーション（CC0_VARIANTS[id] の添字。-1 は CC0 無し）とトーン（TONE_TABLE の添字） */
@@ -347,14 +452,72 @@ export class MaterialLibrary {
     this.anisotropy = anisotropy;
     for (const t of [...this.textures.values(), ...this.dataTextures.values(), ...this.normalTextures.values(), ...this.aoTextures.values()]) { t.anisotropy = anisotropy; if (t.image) t.needsUpdate = true; }
     for (const set of this.cc0Sets.values()) set.setAnisotropy(anisotropy);
-    const pmrem = new THREE.PMREMGenerator(renderer);
+    this.renderer = renderer;
+    this.pmrem?.dispose();
+    this.pmrem = new THREE.PMREMGenerator(renderer);
     const room = new RoomEnvironment();
-    this.environment = pmrem.fromScene(room, .06);
-    room.dispose(); pmrem.dispose();
+    // 共有 envMap と部屋別 envMap（bakeRoomEnvironment）は同じ立方体サイズ（ROOM_ENV_SIZE）で焼く: PMREM の高さ（envMapCubeUVHeight）は
+    // three のプログラムキーに入るので、サイズが違うと部屋別 envMap を差した材質が別プログラムになる
+    this.environment = this.pmrem.fromScene(room, .06, .1, 100, { size: ROOM_ENV_SIZE });
+    room.dispose();
+    // 部屋別 envMap（fromCubemap）が使うキューブマップ変換シェーダを先にコンパイルする（初回の焼きが 30〜40 ms → 3〜4 ms になる）
+    this.pmrem.compileCubemapShader();
   }
 
   /** 共有の環境マップ（configure 後。PropCatalog など外部材質が envMap に使う） */
   get environmentTexture(): THREE.Texture | null { return this.environment?.texture ?? null; }
+
+  // ---------------------------------------------------------------- 部屋別 envMap（V06 手順 3〜4）
+
+  private renderer: THREE.WebGLRenderer | null = null;
+  private pmrem: THREE.PMREMGenerator | null = null;
+  /** 量子化キー → 部屋別 envMap（LRU: 参照時に末尾へ。rooms が空のものだけ evict できる） */
+  private readonly roomEnvs = new Map<string, RoomEnv>();
+  /** 部屋別 envMap の上限（参照中のものは数えず残す） */
+  // 8 枚では見えている部屋 + 先読みの部屋で LRU が回転し（seed 7 の 13 部屋踏破で 104 枚焼き直し ≈ 390 ms）、入室フレームに焼き直しが乗る。
+  // 1 枚 ≈ 1.5 MB（128 px HalfFloat PMREM）なので 24 枚 ≈ 36 MB を上限にする（2026-09-21 統合）
+  static MAX_ROOM_ENVS = 24;
+  /** 部屋別 envMap の統計（built: 焼いた枚数 / hits: キャッシュ命中 / ms: 焼きの CPU 時間合計） */
+  readonly envStats = { built: 0, hits: 0, evicted: 0, ms: 0 };
+
+  /**
+   * 部屋のパレットから envMap を得る（キャッシュ。無ければ焼く: 数 ms）。roomId を参照に記録し、releaseRoom で外す。
+   * renderer 未設定（Node）/ low Tier では null（共有 RoomEnvironment を使う）
+   */
+  roomEnvironment(roomId: string, palette: Palette, height = 3): THREE.Texture | null {
+    if (!this.renderer || !this.pmrem || this.materialQuality.value === 0) return null;
+    const key = roomEnvKey(palette, height);
+    let env = this.roomEnvs.get(key);
+    if (env) {
+      this.roomEnvs.delete(key); this.roomEnvs.set(key, env); // LRU: 末尾へ
+      this.envStats.hits++;
+    } else {
+      const t0 = performance.now();
+      const target = bakeRoomEnvironment(this.pmrem, palette, height);
+      env = { key, target, rooms: new Set() };
+      this.roomEnvs.set(key, env);
+      this.envStats.built++;
+      this.envStats.ms += performance.now() - t0;
+      this.evictRoomEnvs();
+    }
+    env.rooms.add(roomId);
+    return env.target.texture;
+  }
+
+  /** 参照の無い部屋別 envMap を、古い順に上限まで捨てる */
+  private evictRoomEnvs(): void {
+    if (this.roomEnvs.size <= MaterialLibrary.MAX_ROOM_ENVS) return;
+    for (const [key, env] of this.roomEnvs) {
+      if (env.rooms.size) continue;
+      this.roomEnvs.delete(key);
+      env.target.dispose();
+      this.envStats.evicted++;
+      if (this.roomEnvs.size <= MaterialLibrary.MAX_ROOM_ENVS) return;
+    }
+  }
+
+  /** 部屋別 envMap の枚数（デバッグ） */
+  get roomEnvCount(): number { return this.roomEnvs.size; }
 
   /** テクスチャのアップロード回数を数える（onUpdate。既存の onUpdate があれば続けて呼ぶ）。戻り値は同じテクスチャ */
   track<T extends THREE.Texture>(t: T): T {
@@ -399,13 +562,17 @@ export class MaterialLibrary {
       const set = this.cc0Sets.get(CC0_VARIANTS[id]![pick.variant].set);
       if (set) this.retain(ctx.roomId, set);
     }
-    if (!ctx.lightMap) return base;
-    const key = `${base.name || id}|lm:${ctx.lightMap.uuid}`;
+    // 部屋別 envMap（legacy / untextured・無地・envMap を持たない材質は共有のまま）
+    const env = ctx.palette && !o.style && !SURFACES[id].flat && base.envMap ? this.roomEnvironment(ctx.roomId, ctx.palette, ctx.height) : null;
+    if (!ctx.lightMap && !env) return base;
+    const key = `${base.name || id}|lm:${ctx.lightMap?.uuid ?? '-'}|env:${env?.uuid ?? '-'}`;
     let perRoom = this.roomMaterials.get(ctx.roomId);
     if (!perRoom) this.roomMaterials.set(ctx.roomId, perRoom = new Map());
     let m = perRoom.get(key);
     if (m) return m;
-    m = cloneWithLightMap(base, ctx.lightMap, ctx.lightMapIntensity ?? 1);
+    // envMap の差替えはプログラムを変えない（同じ CubeUV・同じサイズ）。lightMap 付きだけ `-lm` 族
+    m = ctx.lightMap ? cloneWithLightMap(base, ctx.lightMap, ctx.lightMapIntensity ?? 1) : cloneShared(base);
+    if (env) m.envMap = env;
     m.name = `${base.name || id}@${ctx.roomId}`;
     perRoom.set(key, m);
     return m;
@@ -418,6 +585,10 @@ export class MaterialLibrary {
       for (const m of perRoom.values()) m.dispose();
       this.roomMaterials.delete(roomId);
     }
+    // 部屋別 envMap の参照を外す（上限を超えていれば参照の無いものから捨てる）
+    let envReleased = false;
+    for (const env of this.roomEnvs.values()) if (env.rooms.delete(roomId)) envReleased = true;
+    if (envReleased) this.evictRoomEnvs();
     const sets = this.roomSets.get(roomId);
     if (!sets) return;
     this.roomSets.delete(roomId);
@@ -580,6 +751,7 @@ export class MaterialLibrary {
   /** (MatId, 上書き, バリエーション, トーン) で共有する材質。上書き無し・先頭候補・トーン 0 は get() と同じ */
   private material(id: MatId, o: MaterialOverrides, vi: number, tone: number): THREE.MeshStandardMaterial {
     const s = SURFACES[id];
+    o = resolveOverrides(id, o); // floorWetness は床材だけに畳む（床以外はキーに残らない）
     const plainStyle = s.flat || o.style === 'untextured' || o.style === 'legacy';
     const first = this.firstVariant(id);
     if (plainStyle) { vi = first; tone = 0; } // 無地 / 旧版風は CC0 もトーンも使わない
@@ -685,7 +857,10 @@ export class MaterialLibrary {
     // CC0 の Roughness はそのまま roughnessMap に（係数 1 × 部屋別の倍率）。生成側は従来の s.roughness × 倍率
     const roughness = Math.max(.04, Math.min(1, (cc0 ? 1 : s.roughness) * (o.roughnessScale ?? 1)));
     const fogSpec = o.fog;
-    const physical = !legacy && !flat && (!!s.glass || id === 'carPaint');
+    // MeshPhysicalMaterial はガラス（transmission）・水面（transmission + 減衰）・艶床（clearcoat）・車体（clearcoat）だけ
+    // （シェーダ族が増えるので全材質を Physical にはしない。three のプログラムキーは clearcoat / transmission の有無で分かれる）
+    const physical = !legacy && !flat && (!!s.glass || !!s.water || !!s.gloss || id === 'carPaint');
+    const waterSpec = physical ? s.water : undefined;
     const cc0NormalScale = cc0Bind?.normalScale ?? 1;
     // 2 層タイリング混合と視差（CC0 のみ。生成テクスチャは従来どおり）
     const blendParams = cc0Bind ? (cc0Bind.blend === false ? null : cc0Bind.blend ?? DEFAULT_BLEND) : null;
@@ -707,6 +882,8 @@ export class MaterialLibrary {
       polygonOffset: !!s.decal, polygonOffsetFactor: s.decal ? -2 : 0, polygonOffsetUnits: s.decal ? -2 : 0,
     });
     if (fogSpec) m.fog = false; // 部屋固有の霧を材質側で計算する（scene.fog を無視）
+    // 器具の発光面を部屋の器具色（palette.lightColor。P1 の色温度）に合わせる: 発光色 × 正規化 tint（明るさは変えない）
+    if (o.lightTint !== undefined && s.emission && !legacy) m.emissive.multiply(normalizedTint(o.lightTint));
     const gradient = o.gradient;
     const gradFrom = gradient ? new THREE.Color(SURFACES[gradient.from].color) : null;
     const gradTo = gradient ? new THREE.Color(SURFACES[gradient.to].color) : null;
@@ -722,6 +899,24 @@ export class MaterialLibrary {
         m.envMapIntensity = .24 * g.reflect * (o.envMapIntensity ?? 1);
       }
       if (id === 'carPaint') { m.clearcoat = .85; m.clearcoatRoughness = .16; }
+      const w = s.water;
+      if (w) {
+        // 水面: 透過（床が見える。減衰色で深さの色）+ envMap 反射（フレネルは PBR 側: 視線が寝るほど強い）。金属度 0、拡散は (1 − transmission) だけ。
+        // 厚み（水深）は depthFromFloor のとき onBeforeCompile で部屋座標の y に置き換える（岸際 = 透明）
+        m.transmission = w.transmission; m.ior = w.ior; m.thickness = w.thickness;
+        m.attenuationColor.set(w.attenuationColor); m.attenuationDistance = w.attenuationDistance;
+        m.opacity = 1; m.transparent = true; m.depthWrite = false; m.metalness = 0;
+        // 水平の水面は上面だけ（箱の底面が二重に描かれて反射が重ならない）。水壁は両面
+        m.side = s.doubleSide ? THREE.DoubleSide : THREE.FrontSide;
+        m.envMapIntensity = .24 * w.reflect * (o.envMapIntensity ?? 1);
+      }
+      const gloss = s.gloss;
+      if (gloss) {
+        // 艶床: clearcoat の鏡面が器具の映り込みを床に伸ばす。濡れ（roughnessScale から逆算）で clearcoat が増え、上層の粗さが下がる
+        const wet = wetnessOf(o);
+        m.clearcoat = Math.min(1, gloss.clearcoat + .35 * wet);
+        m.clearcoatRoughness = Math.max(.05, gloss.roughness * (1 - .5 * wet));
+      }
     }
     const authored = hasAuthoredDetail(s.texture);
     const varied = !flat && !legacy && usesSurfaceVariation(id);
@@ -740,7 +935,7 @@ export class MaterialLibrary {
       if (s.flow && !flat) {
         shader.uniforms.surfaceTime = this.clock;
         shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float surfaceTime;');
-        shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>\nvMapUv += vec2(surfaceTime * ${(0.006 * s.flow).toFixed(4)}, surfaceTime * ${(0.003 * s.flow).toFixed(4)});\n#ifdef USE_NORMALMAP\nvNormalMapUv += vec2(surfaceTime * ${(0.006 * s.flow).toFixed(4)}, surfaceTime * ${(0.003 * s.flow).toFixed(4)});\n#endif`);
+        shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>\n#ifdef USE_MAP\nvMapUv += vec2(surfaceTime * ${(0.006 * s.flow).toFixed(4)}, surfaceTime * ${(0.003 * s.flow).toFixed(4)});\n#endif\n#ifdef USE_NORMALMAP\nvNormalMapUv += vec2(surfaceTime * ${(0.006 * s.flow).toFixed(4)}, surfaceTime * ${(0.003 * s.flow).toFixed(4)});\n#endif`);
       }
       // トーン / 2 層混合 / 視差の宣言。injectCommon より先に置く（後から置換したものほど #include の直後に入るので、
       // vRoomPos などの varying 宣言（injectCommon）がこの関数群より前に来る）
@@ -765,10 +960,29 @@ export class MaterialLibrary {
         const layers = this.nightLayers();
         shader.uniforms.nightFar = layers.far;
         shader.uniforms.nightNear = layers.near;
-        shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vNightWorld; varying vec3 vNightNormal;');
-        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvNightWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvNightNormal = normalize(mat3(modelMatrix) * objectNormal);');
+        // 部屋ごとの位相 vNightPhase: 部屋グループの world 位置（modelMatrix の平行移動。2 m 格子に丸める）のハッシュ。
+        // windowNight は共有 variant（ライトマップ対象外）なので uniform ではなく頂点で決める → 隣の部屋の窓に同じ街並みが並ばない
+        shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vNightWorld; varying vec3 vNightNormal; varying float vNightPhase;');
+        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+vNightWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
+vNightNormal = normalize(mat3(modelMatrix) * objectNormal);
+vec2 nightCell = floor(modelMatrix[3].xz * 0.5);
+vNightPhase = fract(sin(dot(nightCell, vec2(12.9898, 78.233))) * 43758.5453);`);
         shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${NIGHT_PARS_GLSL}`);
         shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= liminalNight();');
+      }
+      if (waterSpec) {
+        // 透過光に掛かる拡散色（水色 × 波紋の map）は 4 割だけ効かせる（そのままだと床が波紋の模様に埋もれて不透明に見える）。
+        // 表面の拡散（1 − transmission）には従来どおり全部掛かる
+        let chunk = (THREE.ShaderChunk as Record<string, string>).transmission_fragment
+          .replace('vec4 transmitted = getIBLVolumeRefraction(', `material.diffuseContribution = mix(vec3(1.0), material.diffuseContribution, ${(waterSpec.albedoMix ?? .5).toFixed(3)});\n\tvec4 transmitted = getIBLVolumeRefraction(`);
+        if (waterSpec.depthFromFloor) {
+          // 水深 = 部屋座標の y（床は y 0）。厚み（減衰の距離）を水深にし、深さ 0 に近い岸際は透過を 1 に寄せて透明にする
+          chunk = chunk
+            .replace('material.thickness = thickness;', 'float waterDepth = clamp(vRoomPos.y, 0.003, 4.0);\n\tmaterial.thickness = thickness * waterDepth;')
+            .replace('material.transmission = transmission;', 'material.transmission = mix(1.0, transmission, smoothstep(0.0, 0.3, vRoomPos.y));');
+        }
+        shader.fragmentShader = shader.fragmentShader.replace('#include <transmission_fragment>', chunk);
       }
       // bakedLight / colorMask / 診断 / 部屋別の霧（adoptExternal と共通）
       this.injectCommon(shader, common);
@@ -810,7 +1024,9 @@ export class MaterialLibrary {
     };
     // uniform 値はキーに含めない（同じプログラムを共有する）
     const family = flat ? 'flat' : legacy ? 'legacy' : cc0 ? (cc0Albedo ? 'cc0' : 'cc0paint') : authored ? 'authored' : 'plain';
-    m.customProgramCacheKey = () => `liminal-pbr-v4-${varied || worn ? SURFACE_VARIATION_KEY : 'plain'}-${varied ? 'macro' : 'nomacro'}-${family}-${blendParams ? 'tile' : 'notile'}-${pom ? 'pom' : 'nopom'}-${s.flow && !flat ? 'flow' : 'static'}-${s.grid && !flat && !legacy && !cc0 ? s.grid.join(',') : 'nogrid'}-${gradient ? 'grad' : 'nograd'}-${fogSpec ? 'roomfog' : 'scenefog'}${night ? '-night' : ''}`;
+    // physical の種類（glass / water / gloss / carPaint）は three 側のキー（clearcoat / transmission の有無）で分かれるが、可読性のため明示する
+    const phys = !physical ? '' : waterSpec ? (waterSpec.depthFromFloor ? '-water-depth' : '-water') : s.glass ? '-glass' : s.gloss ? '-gloss' : '-coat';
+    m.customProgramCacheKey = () => `liminal-pbr-v4-${varied || worn ? SURFACE_VARIATION_KEY : 'plain'}-${varied ? 'macro' : 'nomacro'}-${family}-${blendParams ? 'tile' : 'notile'}-${pom ? 'pom' : 'nopom'}-${s.flow && !flat ? 'flow' : 'static'}-${s.grid && !flat && !legacy && !cc0 ? s.grid.join(',') : 'nogrid'}-${gradient ? 'grad' : 'nograd'}-${fogSpec ? 'roomfog' : 'scenefog'}${night ? '-night' : ''}${phys}`;
     return m;
   }
 
@@ -953,8 +1169,126 @@ export class MaterialLibrary {
     for (const t of [...this.textures.values(), ...this.dataTextures.values(), ...this.normalTextures.values(), ...this.aoTextures.values(), ...this.legacyTextures.values()]) t.dispose();
     for (const set of this.cc0Sets.values()) set.dispose();
     this.cc0Sets.clear(); this.roomSets.clear(); this.setRooms.clear(); this.roomMaterials.clear();
+    for (const env of this.roomEnvs.values()) env.target.dispose();
+    this.roomEnvs.clear();
+    this.pmrem?.dispose(); this.pmrem = null;
     this.environment?.dispose(); this.cache.clear(); this.variants.clear();
   }
+}
+
+// ---------------------------------------------------------------- 部屋別 envMap の焼き込み（V06 手順 3〜4）
+
+/** 共有 / 部屋別 envMap の立方体サイズ（px / 面）。PMREM は 384 × 512 HalfFloat（1.5 MB）。両方同じサイズにする（プログラムキーに入る） */
+export const ROOM_ENV_SIZE = 128;
+
+/** 部屋別 envMap のキャッシュ項目。rooms は参照している部屋（releaseRoom で外す。空のものだけ evict） */
+interface RoomEnv { key: string; target: THREE.WebGLRenderTarget; rooms: Set<string>; }
+
+/** RGB を各チャンネル 5 段階に丸めた文字列（envMap の量子化キー） */
+function quantizeColor(hex: number, levels = 5): string {
+  const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
+  const qn = (v: number) => Math.round((v / 255) * (levels - 1));
+  return `${qn(r)}${qn(g)}${qn(b)}`;
+}
+
+/** 部屋別 envMap の量子化キー: 床・壁・天井の MatId（色はそこから）+ 器具色 / 環境色（5 段階）+ 高さ（0.5 m 刻み） */
+export function roomEnvKey(p: Palette, height: number): string {
+  // 高さは 1 m 刻み（0.5 m 刻みだと同じ廊下でもキーが割れて命中率が下がる）
+  return `${p.floor}|${p.wall}|${p.ceiling}|l${quantizeColor(p.lightColor)}|a${quantizeColor(p.ambient)}|h${Math.round(height)}`;
+}
+
+/**
+ * パレットの色で塗った箱部屋（床 / 壁 / 天井 + 天井の器具 4 灯）を目の高さ 1.6 m から見た放射輝度を 6 面 ROOM_ENV_SIZE² の
+ * HalfFloat キューブマップに JS で書き（1〜3 ms）、PMREMGenerator.fromCubemap で粗さ別のミップに焼く（GPU、十数 draw）。
+ * 明るさは共有 RoomEnvironment と同程度（壁 ≈ 0.6〜0.9、器具 ≈ 6）にして、IBL 拡散（liminalIblDiffuse）の寄与が変わらないようにする。
+ * 器具の位置は 4 m 格子（lightGrid と同じピッチ）の代表で、実際の器具位置は反映しない（視点に依存しない envMap の近似）
+ */
+function bakeRoomEnvironment(pmrem: THREE.PMREMGenerator, p: Palette, height: number): THREE.WebGLRenderTarget {
+  const N = ROOM_ENV_SIZE;
+  const lin = (hex: number) => new THREE.Color(hex); // setHex は sRGB → 線形
+  const floorC = lin(SURFACES[p.floor]?.color ?? 0x888888);
+  const wallC = lin(SURFACES[p.wall]?.color ?? 0xbbbbbb);
+  const ceilC = lin(SURFACES[p.ceiling]?.color ?? 0xdddddd);
+  const light = lin(p.lightColor);
+  const lmax = Math.max(light.r, light.g, light.b, 1e-3);
+  const tint = new THREE.Color(light.r / lmax, light.g / lmax, light.b / lmax); // 器具色の色味（最大 1）
+  const amb = lin(p.ambient);
+  const eye = 1.6;
+  const up = Math.max(0.6, height - eye), down = eye, wallD = 4.0;
+  const faces: Uint16Array[] = [];
+  const out = [0, 0, 0];
+  const toHalf = THREE.DataUtils.toHalfFloat;
+  // 器具: 天井に 0.6 × 1.2 m の面が 4 m ピッチ（(±2, ±2) の 4 灯）。縁は 0.1 m のスムーズステップ。器具の周りに弱い滲み
+  const fixture = (x: number, z: number): number => {
+    const fx = Math.abs(((x + 2 + 2) % 4 + 4) % 4 - 2), fz = Math.abs(((z + 2 + 2) % 4 + 4) % 4 - 2);
+    const inX = 1 - THREE.MathUtils.smoothstep(fx, 0.3, 0.4), inZ = 1 - THREE.MathUtils.smoothstep(fz, 0.6, 0.7);
+    const core = inX * inZ;
+    const halo = Math.exp(-(fx * fx + fz * fz) * 1.2) * 0.35;
+    return core * 6 + halo;
+  };
+  for (let face = 0; face < 6; face++) {
+    const data = new Uint16Array(N * N * 4);
+    for (let j = 0; j < N; j++) {
+      const v = ((j + 0.5) / N) * 2 - 1;
+      for (let i = 0; i < N; i++) {
+        const u = ((i + 0.5) / N) * 2 - 1;
+        // OpenGL のキューブマップ規約（+X, −X, +Y, −Y, +Z, −Z）
+        let dx: number, dy: number, dz: number;
+        switch (face) {
+          case 0: dx = 1; dy = -v; dz = -u; break;
+          case 1: dx = -1; dy = -v; dz = u; break;
+          case 2: dx = u; dy = 1; dz = v; break;
+          case 3: dx = u; dy = -1; dz = -v; break;
+          case 4: dx = u; dy = -v; dz = 1; break;
+          default: dx = -u; dy = -v; dz = -1; break;
+        }
+        // 目の位置から箱部屋の面へ: 天井（y = up）/ 床（y = −down）/ 壁（|x| = |z| = wallD）のうち最初に当たるもの
+        const tCeil = dy > 1e-4 ? up / dy : Infinity;
+        const tFloor = dy < -1e-4 ? -down / dy : Infinity;
+        const tWall = Math.min(Math.abs(dx) > 1e-4 ? wallD / Math.abs(dx) : Infinity, Math.abs(dz) > 1e-4 ? wallD / Math.abs(dz) : Infinity);
+        const t = Math.min(tCeil, tFloor, tWall);
+        if (t === tCeil) {
+          const f = fixture(dx * t, dz * t);
+          out[0] = ceilC.r * tint.r * 0.7 + amb.r * 0.12 + tint.r * f;
+          out[1] = ceilC.g * tint.g * 0.7 + amb.g * 0.12 + tint.g * f;
+          out[2] = ceilC.b * tint.b * 0.7 + amb.b * 0.12 + tint.b * f;
+        } else if (t === tFloor) {
+          // 床: 器具の直下が少し明るい
+          const f = fixture(dx * t, dz * t) * 0.04;
+          out[0] = floorC.r * tint.r * (0.5 + f) + amb.r * 0.1;
+          out[1] = floorC.g * tint.g * (0.5 + f) + amb.g * 0.1;
+          out[2] = floorC.b * tint.b * (0.5 + f) + amb.b * 0.1;
+        } else {
+          // 壁: 天井寄りが明るく床寄りが暗い
+          const y = dy * t; // −down .. up
+          const k = 0.6 + 0.3 * THREE.MathUtils.clamp((y + down) / (up + down), 0, 1);
+          out[0] = wallC.r * tint.r * k + amb.r * 0.15;
+          out[1] = wallC.g * tint.g * k + amb.g * 0.15;
+          out[2] = wallC.b * tint.b * k + amb.b * 0.15;
+        }
+        const o = (j * N + i) * 4;
+        data[o] = toHalf(out[0]); data[o + 1] = toHalf(out[1]); data[o + 2] = toHalf(out[2]); data[o + 3] = toHalf(1);
+      }
+    }
+    faces.push(data);
+  }
+  const images = faces.map((d) => { const t = new THREE.DataTexture(d, N, N, THREE.RGBAFormat, THREE.HalfFloatType); return t; });
+  const cube = new THREE.CubeTexture(images, THREE.CubeReflectionMapping, THREE.RepeatWrapping, THREE.RepeatWrapping, THREE.LinearFilter, THREE.LinearFilter, THREE.RGBAFormat, THREE.HalfFloatType);
+  cube.colorSpace = THREE.LinearSRGBColorSpace;
+  cube.generateMipmaps = false;
+  cube.needsUpdate = true;
+  const target = pmrem.fromCubemap(cube);
+  cube.dispose();
+  for (const t of images) t.dispose();
+  return target;
+}
+
+/** envMap だけ差し替える部屋専用 clone（同じプログラム）。onBeforeCompile / customProgramCacheKey は clone に写らないので引き継ぐ */
+function cloneShared(base: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+  const m = base.clone();
+  m.onBeforeCompile = base.onBeforeCompile;
+  m.customProgramCacheKey = base.customProgramCacheKey.bind(base);
+  return m;
 }
 
 /**
@@ -1466,7 +1800,7 @@ function createSkyTexture(): THREE.Texture {
  * 遠景: 45 m 奥・80 m × 40 m、近景: 12 m 奥・40 m × 40 m（アルファで遠景に重ねる）。sRGB → 線形は pow 2.2 の近似
  */
 const NIGHT_PARS_GLSL = `
-varying vec3 vNightWorld; varying vec3 vNightNormal;
+varying vec3 vNightWorld; varying vec3 vNightNormal; varying float vNightPhase;
 uniform sampler2D nightFar; uniform sampler2D nightNear;
 vec3 liminalNight() {
   vec3 D = normalize(vNightWorld - cameraPosition);
@@ -1475,11 +1809,12 @@ vec3 liminalNight() {
   float denom = max(-dot(D, N), 0.08);
   vec3 T = abs(N.y) > 0.9 ? vec3(1.0, 0.0, 0.0) : normalize(cross(vec3(0.0, 1.0, 0.0), N));
   float horizon = cameraPosition.y - 0.2;
+  // 部屋ごとの位相（u オフセット）。遠景と近景で別の量ずらすと建物の重なりも変わる
   vec3 pf = vNightWorld + D * (45.0 / denom);
-  vec2 uvf = vec2(dot(pf, T) / 80.0, clamp((pf.y - horizon) / 40.0 + 0.5, 0.002, 0.998));
+  vec2 uvf = vec2(dot(pf, T) / 80.0 + vNightPhase, clamp((pf.y - horizon) / 40.0 + 0.5, 0.002, 0.998));
   vec3 col = texture2D(nightFar, uvf).rgb;
   vec3 pn = vNightWorld + D * (12.0 / denom);
-  vec2 uvn = vec2(dot(pn, T) / 40.0, clamp((pn.y - horizon) / 40.0 + 0.5, 0.002, 0.998));
+  vec2 uvn = vec2(dot(pn, T) / 40.0 + vNightPhase * 1.7, clamp((pn.y - horizon) / 40.0 + 0.5, 0.002, 0.998));
   vec4 nearL = texture2D(nightNear, uvn);
   col = mix(col, nearL.rgb, nearL.a);
   return pow(col, vec3(2.2));
@@ -1629,6 +1964,7 @@ function variantKey(id: MatId, o: MaterialOverrides): string | null {
   if (o.colorMask && o.colorMask.some((v) => Math.abs(v - 1) > .01)) parts.push(`m${o.colorMask.map((v) => q(v, .05).toFixed(2)).join(',')}`);
   if (o.envMapIntensity !== undefined && Math.abs(o.envMapIntensity - 1) > .01) parts.push(`e${q(o.envMapIntensity, .25).toFixed(2)}`);
   if (o.style) parts.push(`s${o.style}`);
+  if (o.lightTint !== undefined) { const t = quantizeTint(o.lightTint); if (t !== 'fff') parts.push(`t${t}`); }
   if (o.gradient) parts.push(`g${o.gradient.from}>${o.gradient.to}@${o.gradient.axis.map((v) => q(v, .05).toFixed(2)).join(',')}:${o.gradient.range.map((v) => q(v, .5).toFixed(1)).join(',')}`);
   if (o.fog) parts.push(`f${o.fog.color.toString(16)}:${q(o.fog.near, .5).toFixed(1)}:${q(o.fog.far, 1).toFixed(0)}`);
   if (!parts.length) return null;

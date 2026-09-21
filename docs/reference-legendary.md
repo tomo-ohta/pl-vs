@@ -36,6 +36,9 @@ Generator（MegaStructure / Street / Atrium / Grid / Parking / Room）と Modifi
 - 見えたもの（`L03-s7-close.jpg`）: 茎（InstanceOvergrowth の grass 0.07 m）+ 穂（boxCardboard）が畑を埋め、地面は黄土色、天井は暖色。遠景では茎が細くて暗緑の面に見える。
 - 参考との差: 茎が緑で「黄金」に読めない。茎の色は Modifier 側（ドレッシングは前段）なので変えられない。
 - 保留: 麦の色（visual-requests: InstanceOvergrowth の wheat を plasticYellow の幅 0.12〜0.16 m に）。自前で黄色い茎を足す案は 9,000 本に対して三角形予算内（≤ 3,000 本）では点描にしかならず不採用。
+- **2026-09-21（A2・InstanceOvergrowth 側で解消）**: 茎を plasticYellow の薄い箔（幅 0.14 / 0.16 m × 高 1.05 m × 厚 0.04 m、yaw ランダム）、穂を plasticYellow の小箱に変更。
+  茎が箱（12 三角形）になったので上限を 9,000 → 30,000 本にし、間隔を「上限本数で畑全体が埋まる値」まで広げた（seed 7 の 197 × 113 m では 0.86 m。以前は 9,000 本で
+  西端の 10 m 幅の帯だけが埋まり、入口からは畑が見えなかった）。入口から見ると黄金色の箔の列が奥まで続き、中央に農道が抜ける。三角形は 1.2M → 0.67M（茎 + 穂 55,800 本）。
 
 ### L04 無限グランドホテル（MegaAtrium hotel）
 
@@ -76,6 +79,10 @@ Generator（MegaStructure / Street / Atrium / Grid / Parking / Room）と Modifi
 - 見えたもの（`L09-s7-bath2.jpg` / `L09-s7-tub2.jpg`）: 石縁の浴槽、木の格子の間仕切り、暖色の吊り灯の列。
 - 参考との差: 湯は薄い緑灰で「暖色の湯」までは行かない（水面材質の色は変えられない）。湯気は ParticleDetail の mist が `L.particles`（単一スロット）を使うため足せない。
 - 保留: 湯気（particles の複数領域対応待ち）、湯の色（水面材質側）。
+- **2026-09-21（A2）**: `RoomLayout.particles` を `ParticleSpec | ParticleSpec[]` にし（`generators/particles.ts` の particleList / addParticles / replaceParticles）、
+  dressL09 が浴槽ごと（大浴場 + 40 m² 以下の小浴槽、最大 12 基）の水面直上 0〜1.3 m に steam スロットを足す（大浴場 24〜320 粒、小浴槽 18〜40 粒、size 0.8、暖白 0xfff1e2）。
+  後段の ParticleDetail(mist) は同 type だけ置き換えるので mist 120 粒は残る。RoomBuilder はスロットごとに Points を作り、合計（seed 7: 320 + 9 × 19 + 120 = 611）を Tier の
+  particleCap（high 1000 / mid 400 / low 150）に比例で収める。小浴槽の上に白い柔らかい塊が立ち上る。大浴場は広すぎて 320 粒では薄い（意図どおり「遠くに漂う」程度）。
 
 ### L10 夜間郊外住宅地（StreetGrid suburb）
 
@@ -211,11 +218,27 @@ L01〜L20 × seed {1, 42, 777} × variant {0, 最終（最小）} = 120 ケー�
 | 部屋 | 保留 | 理由 |
 |---|---|---|
 | L01 | 20〜40 m の塔、青い霧 | 室高 12 m。FogDepth の near/far はデータ側 |
-| L03 | 麦の黄金色 | 茎は InstanceOvergrowth（後段）の grass。visual-requests に依頼 |
+| L03 | ~~麦の黄金色~~（2026-09-21 解消） | InstanceOvergrowth の wheat を plasticYellow の箔に変更 |
 | L07 | 見上げの縦穴 | MegaAtrium の階数上限（最大 6 層 23.4 m）に依存 |
 | L08 | 飛行機の造形 | 箔・箱のみで曲面が作れない。18 × 40 × 8.4 m 未満の変種では置かない |
-| L09 | 湯気、湯の色 | `L.particles` は単一スロット（mist が使用）。水面材質の色は共有 |
+| L09 | ~~湯気~~（2026-09-21 解消）、湯の色 | particles を複数スロット化し浴槽ごとの steam を追加。水面材質の色は共有（未解消） |
 | L10 | 俯瞰、地平の都市 | プレイヤー視点固定。windowNight の地平線は y 1〜2.8 m 帯限定 |
 | L11 | 中庭側の立体の塔 | 中庭は footprint 外で壁は暗いガラス |
 | L14 / L17 / L05 / L01 | 植栽が黒い球 | plant 材質の照明（材質側。visual-requests） |
 | L20 | 曲面のドーム | 段状の箱で近似 |
+
+## A2 の追記（2026-09-21・Modifier 側の対応: L03 麦 / L09 湯気 / U05 偽扉 / E04 梁）
+
+- 編集: `src/modifiers/mods/InstanceOvergrowth.ts`（layoutWheat）、`src/modifiers/mods/FakeSignage.ts`（fakeExit に `fakeDoor`）、`src/modifiers/mods/FakeSky.ts`（addBeams が天窓の真下を抜く）、
+  `src/modifiers/mods/ParticleDetail.ts`（replaceParticles）、`src/generators/layout.ts`（`particles` の型）、`src/generators/particles.ts`（新規ヘルパ）、`src/render/RoomBuilder.ts`（particles の読み取りのみ）、
+  `src/modifiers/mods/Wetness.ts` / `ScaleAnomaly.ts`（particleList で読む）、`src/generators/dressing/legendary.ts`（dressL09 の steam）。
+- 確認: `npx tsc --noEmit -p .` 0 エラー、`node tools/seam-stats.mjs --seeds 3 --rooms 40` deterministic true / overlap 0。ブラウザ（Tier high、seed 7）で U05 / L03 / E04 / L09 の `world.log` ERROR 0、コンソール error 0。
+- 構築時間 A/B（`window.__buildProfile` total、seed 7、同条件の 1 回ずつ。±30% のばらつきあり）:
+
+| 部屋 | 変更前 | 変更後 | 備考 |
+|---|---|---|---|
+| U05 | 9 ms（28 箱） | 8 ms（24 箱） | 偽扉 4 箔が無くなった |
+| L03 | 366 ms（instances 9,000 + 4,500） | 236〜318 ms（instances 27,884 + 27,884。instances 段 37 ms） | 草ジオメトリ（132 三角形 / 本）→ 箱（12）で bake / geo が軽くなった |
+| E04 | 45 ms（47 箱） | 57 ms（47 箱） | beams=false はデータ側で既に有効。差はばらつき |
+| L09 | 929 ms（1524 箱、Points 1） | 580〜764 ms（1524 箱、Points 11） | particles 段 0.6 ms。差はばらつき |
+

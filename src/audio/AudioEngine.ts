@@ -49,7 +49,7 @@ import type { QualityTier, RoomDefinition, Vec3 } from '../core/types';
 import { QUALITY_TIERS } from '../core/types';
 import type { RoomLayout } from '../generators/layout';
 import type { Settings, SettingsData } from '../core/Settings';
-import { AmbientMixer, makeVoice, type AmbientVoice } from './AmbientMixer';
+import { AmbientMixer, CROSSFADE_SEC, makeVoice, type AmbientVoice } from './AmbientMixer';
 import { AssetManifest, playSample } from './AssetManifest';
 import { EventLog } from './EventLog';
 import { LoudnessSource, type MovementRank } from './LoudnessSource';
@@ -132,7 +132,9 @@ export class AudioEngine {
   private stepSide = 1;
   /** 効果音の稼働ボイス（終了時刻） */
   private sfxActive: number[] = [];
-  private loops = new Set<{ voice: AmbientVoice; handle: SoundHandle }>();
+  private loops = new Set<{ voice: AmbientVoice; handle: SoundHandle; gain: number }>();
+  /** 環境音バスの大きさの推定値（0〜1。update で追従。ambientLevel） */
+  private ambientLevelNow = 0;
   private listenerPos: Vec3 = [0, 0, 0];
   private listenerYaw = 0;
   private listenerPitch = 0;
@@ -328,6 +330,8 @@ export class AudioEngine {
   /** 毎フレーム（Game.step の末尾） */
   update(dt: number): void {
     this.loudness.update(dt);
+    // 環境音の大きさの推定はクロスフェード（1.2 s）と同じ時定数で追従（VideoPass の暗部ノイズの入力）
+    this.ambientLevelNow += (this.estimateAmbientLevel() - this.ambientLevelNow) * Math.min(1, dt / CROSSFADE_SEC);
     const ctx = this.ctx;
     if (!ctx) return;
     const now = ctx.currentTime;
@@ -498,7 +502,7 @@ export class AudioEngine {
         setGain: (v, fade) => voice.setGain(v, fade),
         setPos: (pos) => { if (voice instanceof Object && 'setPosition' in voice) (voice as { setPosition(p: Vec3): void }).setPosition(pos); },
       };
-      const entry = { voice, handle };
+      const entry = { voice, handle, gain: opts.gain ?? 1 };
       this.loops.add(entry);
       if (!opts.loop) setTimeout(() => voice.stop(1.0), 3000);
       return handle;
@@ -523,6 +527,37 @@ export class AudioEngine {
   /** 定常音源（誘導音）。pos に PannerNode（equalpower）で置く。kind はレイヤー id（phoneRing 等）またはアセットキー */
   beacon(kind: string, pos: Vec3, gain = 1): SoundHandle {
     return this.play(kind, { pos, loop: true, gain });
+  }
+
+  // ---------------------------------------------------------------- 環境音の大きさ（撮像 pass の暗部ノイズ用。担当 F2）
+  /**
+   * 環境音バスの現在の大きさの推定（0〜1）。解析ノードは使わず、稼働中の環境音レイヤー（プリセットの gain 上位 budget 本、
+   * 幻聴を除く）とループ再生（play(loop) の gain）の gain の二乗和の平方根 bus を `1 - exp(-bus / 1.4)` で 0〜1 に写し、
+   * 環境音・全体音量（線形）を掛けたもの。非表示（ambientBus 0）・ctx 未生成 / 停止中は 0。入室のクロスフェードと同じ 1.2 s で追従。
+   * 目安（既定音量 0.8）: 「無音に近い」（subRumble -30 dB）≈ 0.02 / hvac 1 本（gain 0.5）≈ 0.24 / レイヤー 1 本 gain 1 ≈ 0.41 /
+   * 空調 + ハム + PC ファンの 3 本 ≈ 0.57 / 乗車のループ音（gain 0.7）が重なると +0.1 前後
+   */
+  get ambientLevel(): number {
+    return this.ambientLevelNow;
+  }
+
+  private estimateAmbientLevel(): number {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running' || this.hidden || !this.mixer) return 0;
+    let sum = 0;
+    const mix = this.mixer.currentMix;
+    if (mix) {
+      const specs = mix.followUp ? [...mix.layers, ...mix.followUp.layers] : mix.layers;
+      for (const id of this.mixer.layerIds()) {
+        const spec = specs.find((l) => l.id === id);
+        if (!spec || spec.phantom) continue;
+        sum += spec.gain * spec.gain;
+      }
+    }
+    for (const l of this.loops) if (l.handle.active) sum += l.gain * l.gain;
+    const bus = Math.sqrt(sum);
+    const vol = this.volumes.ambientVolume * this.volumes.masterVolume;
+    return Math.max(0, Math.min(1, (1 - Math.exp(-bus / 1.4)) * vol));
   }
 
   // ---------------------------------------------------------------- E17 マイク / 音量

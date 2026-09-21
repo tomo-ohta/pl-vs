@@ -5,6 +5,7 @@ import type { Dir, PortalType, Socket, Vec3 } from '../core/types';
 import type { Rng } from '../core/rng';
 import { buildShell, footprintAABB, rect, rectsOverlap, rectArea, wallSpans, along, across, type Rect } from './footprint';
 import { dropRemovedHole, labelAtEntry, makeEntry, placeExits, placeHole, wallBands } from './common';
+import { tagGroup } from './furniture';
 import { box, bonusExits, emptyLayout, lightPanel, snap, WALL_T, WIDE_W, DOOR_W, DOOR_H, type Box, type GenParams, type MatId, type RoomLayout, type SignSpec } from './layout';
 
 type Shape = 'straight' | 'L' | 'Z' | 'U';
@@ -350,9 +351,12 @@ function wallSign(c: DecorCtx, w: Wall, t: number, y: number, off: number, width
 /** 装飾扉（開かない）: 枡（frameMat）の上に 5 cm 浮かせた扉箔 + レバーハンドル。番号 / 室名は呼び出し側 */
 function decorDoor(c: DecorCtx, w: Wall, t: number, mat: MatId, dw = 0.9, dh = 2.05, frameMat: MatId = 'trim'): void {
   const B = c.L.boxes;
+  const from = B.length;
   B.push(plate(w, t - dw / 2 - 0.065, t + dw / 2 + 0.065, 0, dh + 0.065, 0, 0.05, frameMat));
   B.push(plate(w, t - dw / 2, t + dw / 2, 0.01, dh, 0.05, 0.03, mat));
   B.push(plate(w, t + dw / 2 - 0.16, t + dw / 2 - 0.05, 0.99, 1.02, 0.08, 0.05, 'metal'));
+  // 表示用タグ（扉箔が kind 'decorDoor'。描画側は現状そのまま描く。将来の扉モデル差し替えの目印）
+  tagGroup(B, from, `decorDoor@${w.dir},${t.toFixed(2)},${w.face.toFixed(2)}`, 'decorDoor', from + 1);
 }
 
 /** 番号 / 室名プレート（扉の脇、高さ 1.55 m） */
@@ -369,9 +373,12 @@ function board(c: DecorCtx, w: Wall, t: number, bw: number, y0: number, y1: numb
 /** 連結椅子（3 人掛け 1.6 m。座面 seatBlue、脚梁 metalDark）。壁付き。ソリッド */
 function bench(c: DecorCtx, w: Wall, t: number): void {
   const B = c.L.boxes;
+  const from = B.length;
   B.push(plate(w, t - 0.8, t + 0.8, 0.42, 0.48, 0.12, 0.45, 'seatBlue', true));
   B.push(plate(w, t - 0.8, t + 0.8, 0.48, 0.86, 0.08, 0.08, 'seatBlue', true));
   B.push(plate(w, t - 0.7, t + 0.7, 0.0, 0.42, 0.26, 0.08, 'metalDark', true));
+  // 表示用タグ: furniture.linkedSeats と同じ kind。描画側が 3 席の座・背・梁・脚に描き替える（当たり判定は上の 3 箱のまま）
+  tagGroup(B, from, `linkedSeats@${w.dir},${t.toFixed(2)},${w.face.toFixed(2)}`, 'linkedSeats');
 }
 
 const DIRV: Record<Dir, [number, number]> = { 0: [0, 1], 1: [1, 0], 2: [0, -1], 3: [-1, 0] };

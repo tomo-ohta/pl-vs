@@ -191,3 +191,204 @@
 - **鏡（MirrorOffset）の菱形**: 全幅 11.7 m の暗いガラス帯を、stainless の枡付き長方形パネル（0.7 m 幅・1.0 m ピッチ、カウンター範囲）に分割。斜めから見ても個々の鏡は長方形に読める。
 - **扉上の黒枠（C03 など）**: 入口の部屋名ラベル（`RoomBuilder.buildLabel`）が焼き込みの対象外で動的光だけでは黒く見えていた。板サインと同じ弱い自己発光（emissiveMap × .28）を持たせた。
 - **夜景の視差**: `windowNight` を層別の視差サンプリング（遠景 45 m / 近景 12 m）に変更。`docs/night-parallax.md` 参照。
+
+## A2 → 各担当（Modifier: FakeSignage / InstanceOvergrowth / FakeSky / ParticleDetail・2026-09-21）
+
+処理したもの（所有ファイル内で完結）:
+
+- **U05 FakeSignage exitSign の偽扉省略**: params `fakeDoor`（既定 true）を追加。`data/rooms.json` / `tools/modifier_params.json` の U05 は統合担当が `fakeDoor: false` を入れ済みで、EXIT サイン + 緑の非常灯だけが何も無い末端壁を指す。
+- **L03 InstanceOvergrowth の麦**: 茎 = plasticYellow の箔（0.14 / 0.16 × 1.05 × 0.04 m）、穂 = plasticYellow。上限 9,000 → 30,000 本、間隔は畑全体が埋まる値に自動で広がる（以前は巨大倉庫で西端の帯しか埋まらなかった）。三角形は 1.2M → 0.67M。
+- **E04 FakeSky の梁**: `beams: false` はデータ側で有効。加えて beams=true でも天井の一部だけが空（被覆 90% 未満 = 天窓）のときは、空箔の真下を横切る桁・梁を省く（seed 7 の E04 で確認: 6 × 6 m の天窓を横切る梁 2 本 + 大梁 1 本が抜け、ring と他の梁は残る）。全面が空の天井（U20 / R04）は従来どおり。契約「palette.ceiling の箔を差し替える / 無ければ全面」は維持。
+- **`particles` の複数スロット**: `RoomLayout.particles: ParticleSpec | ParticleSpec[]`。ヘルパは `src/generators/particles.ts`（`particleList(L)` / `addParticles(L, ...specs)` / `replaceParticles(L, type, spec)`）。RoomBuilder はスロットごとに Points を作り、粒数の合計を Tier の particleCap に比例で収める。ParticleDetail は同 type だけ置き換える（別 type のスロットは残す）。dressL09 が浴槽ごとの steam を足した。
+
+各担当への要望・周知:
+
+- **A1（rare.ts / NonEuclideanVolume）・mythic.ts・PoolGenerator の担当**: 単一代入（`L.particles = {...}` / `= undefined`）はそのまま型が通るので変更不要。ただし `if (!L.particles) L.particles = {...}`（rare.ts 622 行）は「既にスロットがあれば足さない」の意味になる。複数スロットを共存させたいときは `addParticles(L, spec)` を使ってほしい。`L.particles.type` / `.aabb` の直接読み取りは配列だと壊れるので `particleList(L)` で読む（Wetness / ScaleAnomaly は A2 が直した）。
+- **データ / 資料（統合担当）**: xlsx の 03_Modifier に U05 `fakeDoor: false`、E04 `beams: false` を反映（JSON 側は済）。
+- **B（ArchitecturalDetails / 家具形状）**: 麦の茎は plasticYellow の薄い箔で、`detailedBoxes` の対象になる材質ではない（InstancedMesh は surfaceBox）。plasticYellow に面取りや装飾を足す予定があれば InstancedMesh 側（RoomBuilder.buildInstances）は影響を受けない点だけ周知。
+- **MaterialLibrary の担当（任意）**: plasticYellow（roughness .35）は高所灯の下で少し艶が出る。麦らしい乾いた質感が欲しければ roughness .6 前後の黄金色（例: `strawYellow`）があると茎に使いたい。現状は plasticYellow で「黄金色の面」として読めているので必須ではない。
+
+## A1（Modifier: PropRepetition / NonEuclideanVolume + dressing U11 / U15 / R20 / E08）→ 各担当（2026-09-21）
+
+反映したもの（所有ファイル: `src/modifiers/mods/PropRepetition.ts` / `PropRepetition.shared.ts` / `NonEuclideanVolume.ts`、`src/generators/dressing/uncommon.ts` / `rare.ts` / `epic.ts`）:
+
+- **契約: `Box.kind` が `'dress:'` で始まる箱は Modifier が捨てない**（`PropRepetition.shared.isDress` / `DRESS_KIND_PREFIX`）。`removeInterior`（PropRepetition / InstanceOvergrowth / PropOrientation が共用）と `PropRepetition.removeFills` はその箱を残す。NonEuclideanVolume は殻・内部の組み直し後に戻す（内部は中心 × s に写して殻の内側に clip）。ドレッシングは U11 `dress:carousel`、U15 `dress:rail`、E08 `dress:laptop` / `dress:whiteboard` / `dress:window` を付けた。RoomBuilder の kind → glTF 置換は `catalog.candidates` が空を返すので `dress:*` は素通り（確認済み）。
+- **PropRepetition sameProduct**: params `mat`（MatId）/ `size`（[w, h, d]。scale を掛ける）。w < 0.12 は箔 2 枚を 45° ずらした 8 角柱近似（同じ順序の transforms なので Tier の等間隔間引きで 2 枚が同じ個体に残る）。上限は合計 12,000（6,000 × 2）。
+- **PropRepetition storageDoor**: params `doorMat`。doorMetal 以外のときは doorMetal の裏板（0.02〜0.068）の手前に doorMat の化粧板（0.069〜0.074）。番号板の規則は変えていない（DuplicateNumber は doorMetal の非 solid 箱を扉と見る。番号板は 0.080 = 化粧板の 6 mm 手前）。横筋（ribs）は化粧板のときは省く。
+
+依頼（所有外）:
+
+- **DuplicateNumber（M-sign 担当）**: storage モードの扉検出が `mat === 'doorMetal'` 固定のため、storageDoor は doorMat のとき裏板の doorMetal 箱を 1 枚余分に出している（R20 で 200 箔）。扉板に `kind: 'storageDoor'` を付けて検出する契約にしてもらえれば裏板を外せる（PropRepetition 側はすぐ対応できる）。
+- **データ（U11）**: 参考ボードは「スーツケース 1 つ」。PropRepetition luggage の `density: 0.8` のままだと周囲のリングに 80 個並ぶ。`density: 0.3` 程度に下げると疎になる（Modifier の変更は不要）。
+- **データ / RoomBuilder（U15）**: 値札レールは signPlate（白）で棚板 shelfMetal（明灰）とのコントラストが低い。レールに使える細い赤帯（`plasticRed`）にするか、`signPlate` より白い材質があれば差し替える。現状は白のまま。
+- **RoomBuilder（任意・InstanceSpec）**: 円柱形状の InstanceSpec（`shape: 'cylinder'` など）があれば、U15 のボトルを 1 枚で描け、6,000 × 2 の上限を 12,000 × 1 に戻せる。
+- **統合担当**: `docs/reference-uncommon/U11-s7-after.jpg` / `U15-s7-after.jpg`、`docs/reference-rare/R20-s7-after.jpg`、`docs/reference-epic/E08-s7-after-table.jpg` / `E08-s7-after-window.jpg` を追加した（seed 7、Tier high）。構築時間（`__buildProfile.total`、同 seed、変更前 = 自分の 6 ファイルだけ HEAD に戻したコピー）: U15 209 → 237 ms、R20 125 → 95 ms、U11 103 → 89〜132 ms、E08 内部 56 → 71 ms（遠景の灯 12）→ 9 灯に減らして再計測 43 ms。
+
+## B（造形: 残る家具 / `src/render/props/FurnitureShapes.ts`）→ RoomBuilder（2026-09-21）
+
+第 2 段で椅子・連結椅子・ベンチ・ロッカー・机上モニターを `detailedBoxes` の箱の組に描き替えた（`docs/visual-v05/README.md` 第 2 段）。
+箱しか渡せないので「背の傾き」「鋼管の円柱」「CRT 前面の膨らみ」はまだ出ない。次の 3 点を RoomBuilder 側で受けてほしい。
+
+1. **家具ジオメトリのフック（車と同じ経路）**: `vehicleSurfaces` と並べて、propGroup 単位の任意ジオメトリを受ける。B は
+   `src/render/props/FurnitureGeometry.ts` に `furnitureSurfaces(boxes: Box[]): { box: Box; geometry: THREE.BufferGeometry; members: Box[] }[]`
+   を用意する（`box` は材質と AABB、`members` は置き換えた元の箔）。パッチ（`RoomBuilder.build`）:
+   ```ts
+   // const vehicles = ... の直後
+   const shaped = !legacy && !roll ? furnitureSurfaces(work.boxes) : [];
+   cleanup.push(() => shaped.forEach((s) => s.geometry.dispose()));
+   // const replaced = ... の直後
+   for (const s of shaped) for (const m of s.members) replaced.add(m);
+   // for (const v of vehicles) parts.push(...) の直後
+   for (const s of shaped) parts.push({ b: s.box, special: true, target: -1, geometry: s.geometry });
+   ```
+   `bake` の遮蔽体は `replaced` を足しているので追加変更は不要。フックが入ったら B は椅子の背を 8° 傾け、脚を 8 角の円柱にし、
+   CRT 前面を RoundedBox の膨らみにする（三角形は 1 台 400 以下を維持）。
+2. **propGroup の glTF 置換で消す箔**: `replaced` の構築（`pp.box.propGroup ? propGroups.get(...).filter(b => b.mat === 'plant') : [pp.box]`）は
+   鉢植え前提で、`plant` 以外のグループ（`chair` など）に将来モデルが入ると元の箔と二重描きになる。
+   `.filter(b => pp.box.kind === 'plant' ? b.mat === 'plant' : true)` にしてほしい（現状 chair モデルは配布されていないので影響なし）。
+3. **`special = !!themed.propGroup`**: propGroup 付きの箱を全てチャンク分割・ライトマップの対象外にしている。B の detailedBoxes は
+   置き換えた箱から propGroup を外して出すので今は影響しないが、グループが欠けて元の箔を描くときだけ special になる。
+   `themed.kind === 'plant'` に限定するのが安全。
+
+B が付けた kind（`Box.kind`）: `chair`（座）/ `linkedSeats`（梁）/ `bench`（天板）/ `lockers`（本体）/ `vending`（本体）/ `decorDoor`（廊下の装飾扉の扉箔）。
+`PropCatalog.candidates` は既知の 7 kind 以外を空で返すので、planProps には影響しない。
+
+## 統合担当の処理記録（第7回・2026-09-21: Modifier 契約変更 + 家具の輪郭）
+
+反映済み:
+- **データ**（統合が事前に変更。xlsx の 03_Modifier へ反映待ち）: U15 PropRepetition `mat: 'signPlate'`, `size: [0.08, 0.24, 0.08]`／R20 PropRepetition `doorMat: 'redShutter'`／U05 FakeSignage `fakeDoor: false`／E04 FakeSky `beams: false`／U11 PropRepetition `density: 0.3`（A1 の依頼。参考は「スーツケース 1 つ」）。
+- **A1**: PropRepetition `mat` / `size` / `doorMat`、`kind: 'dress:*'` の箔を removeFills / removeInterior / NonEuclideanVolume で保持、U11 / U15 / R20 / E08 のドレッシング追従。E08 は保留を解除。
+- **A2**: FakeSignage `fakeDoor`、InstanceOvergrowth の麦を黄色 + 上限 3 万本、FakeSky の天窓下の梁省略、`particles` の複数スロット（`src/generators/particles.ts`）、L09 の浴槽ごとの湯気。
+- **B**: `src/render/props/FurnitureShapes.ts`（椅子・連結椅子・ベンチ・ロッカー・LCD/CRT・売場棚）と `furniture.ts` / `CorridorGenerator.ts` の kind 付与。部屋の三角形は最大 1.2 倍。
+- **統合**: 劇場の側通路に段床に沿う階段（RoomGenerator）、鏡の反射側にも枡（MirrorOffset）。「植栽が球」は V05 の葉群ジオメトリで既に解消していることを R07 で確認。
+
+未対応（次回へ）:
+- DuplicateNumber の storage 扉検出を `kind: 'storageDoor'` に（R20 の裏板 200 箔を外せる）。
+- RoomBuilder: propGroup 単位の任意ジオメトリを受けるフック（B の要望 1〜3。背の傾斜・8 角柱の脚・CRT の膨らみ・円柱 InstanceSpec はこれ待ち）。
+- ソファ（L04 / furnishGeneric）、背なし座席列（U11 / L08）、U14 の CRT インスタンスの専用形状。
+- 大浴場（L09）の湯気は cap 内で薄い。麦用の艶の低い黄金色材質。U15 値札レールの色（白 → 赤帯）は判断待ち。
+
+## P1 → 各担当（第7回・2026-09-21: 色温度と扉の光漏れ）
+
+P1 の変更: `src/generators/presets.ts`（`KELVIN_RANGE` / `applyLightKelvin`）、`src/generators/index.ts`（generateLayout の先頭で呼ぶ）、`src/render/DoorLeak.ts`（新規）、`src/game/Game.ts`（配線）。記録は `docs/lighting-lightmap.md` 8・9 章。
+
+1. **P3（`SurfaceGeometry.buildFixtures` / lightmap.worker）: 焼き込みの器具色を `palette.lightColor` に追従させてほしい。**
+   現状は `const color = new THREE.Color(s.color)`（`SURFACES[b.mat].color`。lightPanel 0xedf0d9 / lightWarm 0xffd29a 固定）なので、部屋ごとに選んだ色温度が床・壁の焼き込みに出ない
+   （効くのは動的 PointLight の鏡面反射・`palette.ambient`・半球光だけ）。案: `b.mat === 'lightPanel' || b.mat === 'lightWarm'` のとき
+   `color.setHex(layout.palette.lightColor)`（lightPanel の輝度 0xedf0d9 との比を保つなら `color.setHex(layout.palette.lightColor).multiplyScalar(lum(s.color) / lum(lightColor))`）。
+   ledBlue / lightGreen / lightYellow / sodiumLight / screenGlow は材質の色のまま。EraPreset / ZoneThemeShuffle の `recolorLights` は L.lights の色を変えるが発光箔の材質は差し替えるので、そちらは現状どおり材質色で良い。
+2. **P2（`MaterialLibrary` / `layout.ts` の render 型）: 器具の面（lightPanel / lightWarm の発光色）を部屋の `palette.lightColor` に寄せる仕組み。**
+   案: `RenderOverrides.lightTint?: number`（P1 が generateLayout で `L.render.lightTint = palette.lightColor` を入れる）を variant のキーに含め、
+   lightPanel / lightWarm の `emissive` を `SURFACES.color × lightTint / 0xffffff` に。1 部屋あたり発光材質 1〜2 個の clone。これが入るまでは器具面は白のまま（色温度は床の反射と漏れ光でしか分からない）。
+3. **PostFX（担当未定 / 統合）: GTAOPass の法線 / 深度パスから「加算 / 乗算の装飾クワッド」を外す共通手段。**
+   P1 は `mesh.onBeforeRender` で override 中だけ `geometry.setDrawRange(0, 0)` にして回避した（`DoorLeak.ts` の `excludeFromOverridePasses`）。
+   同種の透明箔（水面・デカール・ガラス）にも AO の縁が出ているなら、`RoomGTAOPass._overrideVisibility` を拡張して `material.transparent && material.depthWrite === false` の Mesh を隠す方が一括で済む。
+4. **統合: Seam 扉の open。** `Game.toggleDoor` は Seam 扉を開けずに遷移するので、`DoorLeak` の Seam 演出（2 色の流れ + 暗い床）は Modifier が `portal.open = true` にした Seam 扉にしか出ない（現状その Modifier は無い）。
+   「閉じた Seam 扉の下端 2 cm に細い 2 色の漏れを出す」か「遷移のフェード前 0.3 s だけ開けて見せる」かは仕様判断待ち。
+
+
+## P2（材質: 部屋別 envMap / clearcoat / floorWetness / 水面 / 夜景位相）→ 各担当（2026-09-21）
+
+反映したもの（所有: `src/render/MaterialLibrary.ts`、`src/render/cc0Materials.ts`、`src/generators/layout.ts` の `RenderOverrides.floorWetness`、`src/generators/dressing/epic.ts` の E01 / E07 / E09。RoomBuilder は `forRoom` に `palette: layout.palette, height: layout.height` を渡す 1 箇所と `overridesFor` の `floorWetness` 1 行）: `docs/material-variation.md` 11、`docs/night-parallax.md`、`docs/postfx.md` 12。
+
+依頼（所有外）:
+
+- **Game（P1）`prefetchAhead`**: 2 hop 先の先読みで `this.materials.roomEnvironment(id, layout.palette, layout.height)` を 1 回呼ぶと、部屋別 envMap（1 枚 3〜4 ms）を構築フレームから外せる。参照は `releaseRoom` で外れるが、先読みだけで構築されなかった部屋の参照は残るので、`dropPrefetch` と同じタイミングで `materials.releaseRoom(id)` を呼ぶか、`roomEnvironment` に `retain: false` を足す（P2 側で対応可。要望があれば実装する）。
+- **PropCatalog（P1 / P3）`adoptExternal`**: glTF プロップは共有の RoomEnvironment のまま。部屋別にするなら `adoptExternal(m, overrides, envMap)` の引数を足して `materials.roomEnvironment(...)` の戻りを渡す（P2 側で引数追加は可）。
+- **RoomBuilder（P3）**: 水面の材質は `variant()` 経由（ライトマップ対象外）なので部屋別 envMap を受けない。水面に部屋の色を映すなら、`materialFor` で `/^water/` の MatId だけ `forRoom(..., { palette, height })`（lightMap 無し）に流してほしい（プログラムは増えない）。
+- **DoorLeak（P1）**: E09 の水壁の扉（Portal が常時開）で、隣室 C07 の床に紫（マゼンタ）の光漏れが出る（変更前の HEAD では無し。水面材質を隠しても残るので P2 の変更ではない）。水壁の Portal は `portal.open = true` を毎フレーム維持するので、漏れの色が「向こうの部屋のレア度」なら E09 側の色が正しいか確認をお願いしたい。
+- **Lightmap / lightmap.worker（P3）**: 水面（`water*`）は `isLightmapTarget` で除外のまま。透過になったので水面下の床のライトマップがそのまま見える（問題なし）。
+- **データ（統合）**: E06 .6 / E08 .35 / E11 .25 / E19 .3 の `render.wetness` は壁・天井にも掛かる。床だけの意図なら `floorWetness` に切り替える（epic.ts の該当行を `setFloorWetness` に変えるだけ。P2 で対応可）。
+- **Tier（P1）**: 部屋別 envMap は `materials.setTier('low')` で無効（共有 1 枚）。clearcoat / 透過は Tier で切っていない（uniform 化できないため。low で重ければ `gloss` / `water` を Standard に落とす分岐を P2 が足す）。
+- **P1 依頼の器具色追従は実装済み**（`docs/material-variation.md` 11.7）: `overridesFor` が `palette.lightColor` を `overrides.lightTint` に写し、器具材質の emissive に正規化 tint を掛ける。`wearEffects`（明滅 / 黄ばみ）が器具材質を clone する経路があれば、clone は variant の emissive を引き継ぐので追加対応は不要のはず（未確認）。
+- **Game（P1）**: 作業中の Game.ts で `ReferenceError: isLightFixtureMat is not defined`（Game.ts:453）がコンソールに出る（2026-09-21 01:50 時点。P2 の変更とは無関係）。
+
+## P3 → 各担当（第 7 回・2026-09-21: ライトマップ）
+
+- **P1（ParkingGenerator / VerticalGenerator / dressing の LightSpec 色）**: 焼き込み・ライトマップの器具色を「材質色 × palette.lightColor」にした（`SurfaceGeometry.buildFixtures`）。
+  `ParkingGenerator.ts:110`・`VerticalGenerator.ts:96-97`・`legendary.ts:1307`・`rare.ts:586` の LightSpec は `0xdfe8ff` 固定なので、C06（seed 7、palette fff2e4）では
+  動的 PointLight（冷）と焼き込み（暖）の色が合わない。LightSpec の color を `L.palette.lightColor` にしてほしい（CorridorGenerator / RoomGenerator は既にそうなっている）。
+- **層の注意（型変更は不要）**: `Box.kind` に `'glowOnly'`（または `glow:` 接頭）を付けた発光箔は器具に数えない。装飾の発光体（扉灯・LED 列・サイン列）を大量に置くときはこれを付けること。
+- **P2 への要望は無し**: クロスフェードは three 標準の `lightMapIntensity` uniform + 頂点属性の減衰で実装したので、`cloneWithLightMap` / シェーダ注入の変更は不要。
+  将来フェード中の属性再アップロード（0.5 s、見えている外殻メッシュのみ）を無くしたければ、uniform `lightmapBlend` で `vBakedLight * (1 − blend)` にする案がある（任意）。
+
+## 統合担当の処理記録（第8回・2026-09-21: 光と材質の仕上げ）
+
+反映済み:
+- **P1**: テンプレート別の色温度（`presets.ts` の `KELVIN_RANGE` / `applyLightKelvin`。`generateLayout` 先頭で専用 fork）、扉の光漏れ（`src/render/DoorLeak.ts`。レア度別の色と動き、Seam は開閉ともに特殊。PointLight は増やさない）。
+- **P2**: 部屋別 envMap（パレット色の箱部屋を PMREM、LRU 8）、艶床の clearcoat、`render.floorWetness`（E01 / E07 / E09）、水面の透過・フレネル・水深減衰、夜景の部屋別位相、器具面の emissive を lightColor に追従。
+- **P3**: ライトマップ到着の 0.5 s クロスフェード、InstancedMesh / glTF の足元照度、`kind: 'glowOnly'` の発光箔（M11 の扉灯 139 枚を器具に数えない）、小発光体の 1 点サンプル、焼き込みの器具色 × lightColor。
+- **統合**: ParkingGenerator / VerticalGenerator の固定 0xdfe8ff を `palette.lightColor` に。
+
+未対応（次回へ）:
+- 開いた Seam 扉の演出は Modifier が open にした扉にしか出ない（本編では閉じた Seam の漏れのみ）。
+- 区画ごとの器具色差し替え（EraPreset / ZoneThemeShuffle）は palette 1 色。
+- glTF（adoptExternal）と水面（variant 経由）は共有 envMap のまま。prefetchAhead で roomEnvironment を先に焼く余地。
+- E06 / E08 / E11 / E19 の `wetness` を床だけにするかは判断待ち。clearcoat / 透過の Tier 切り替え。
+- フェード中 0.5 s の属性再アップロードを uniform 化する案。
+- **統合の調整**: 部屋別 envMap の LRU を 8 → 24 枚、キーの高さを 1 m 刻みに（8 枚では seed 7 の 13 部屋踏破で 104 枚の焼き直し ≈ 390 ms が入室フレームに乗った。24 枚で 3 seed × 12 部屋の焼き直し 50 枚、命中 607）。
+- **統合後の計測**（3 seed × 12 部屋、Tier high）: ERROR 0 / コンソールエラー 0、100 ms 超フレーム 11 / 75（第7回 8、第6回 3）、入室中央値 30 ms、開扉中央値 4 ms、最大 298 ms（U04 開扉の後回し構築）、GPU 中央値 11.9 ms（第6回 9.4。clearcoat・透過・漏れ光の分）。
+
+## F2（カメラ挙動: 手持ち感 / 視線の遅れ / 撮像 pass への入力）→ 統合（2026-09-22）
+
+編集: `src/player/PlayerController.ts`（`CAMERA_FEEL` / `CAMERA_PRESETS`、`feel` / `cameraFeelSuppressed` / `setStillness` / `teleportSerial`、`syncCamera` の合成）、
+`src/game/Game.ts`（`applyCameraSettings` / `updateStillness` / `updateCameraMotion` / `updateRecOverlay`、`enterRoom` の `notifyRoomEnter`）、
+`src/core/Settings.ts`（`postfx: FilmPreset`、`handheld` / `cameraLag` / `recOverlay` / `frameHold`）、`src/ui/SettingsPanel.ts`、`src/audio/AudioEngine.ts`（`ambientLevel`）。記録は `docs/film-camera.md`。
+
+1. **`Game.applyPostFxConfig` の暫定 `'archival' → 'homeVideo'` は外した**（Settings の sanitize に移し、Game は `film = d.postfx`、low Tier の clean は off）。
+2. **`videoPass.params.frameHold` の上書き**は `PostFX.configure`（`applyPreset` が値を写す）の直後に `Game.applyCameraSettings` で書き戻している。
+   PostFX が他のタイミングで `applyPreset` を呼ぶようになったら `applyCameraSettings()` を呼ぶか、`PostFX` に `frameHoldOverride: number | null` を持たせてほしい。
+3. **`RecOverlay` の親は `document.body`**（`Game.recOverlay = new RecOverlay(document.body)`）。表示は設定 `recOverlay` かつ playing / riding / transition のときだけ
+   `setVisible(true)`（メニュー・開始画面では false）。F1b が別の親（`#hud` など）や「メニュー中も表示」を想定しているなら Game の `updateRecOverlay` を直す。
+4. `postfx.setCameraMotion` には表示カメラ（遅れ・ふらつき込み）の rad/s を渡している。テレポート・入室のフレームは 0。LensPass 側で「入室直後のフォーカスの迷い」と
+   回転ブラーが重なる瞬間の見え方は F1a と一緒に確認したい。
+5. `AudioEngine.ambientLevel` は推定値（レイヤー gain の合成 → `1 - exp(-bus/1.4)` × 音量）で、非表示タブでは 0。VideoPass の暗部ノイズの係数はこの範囲
+   （無音 0.02 / 1 本 0.41 / 3 本 0.57）で合わせてほしい（F1b）。
+
+## F1a（撮像 pass: `src/render/LensPass.ts` / `src/render/shaders/LensShader.ts`）→ 統合（2026-09-22）
+
+実装の記録は `docs/film-lens.md`。公開 API（`params` / `applyPreset` / `setDepthTexture` / `setCameraMotion` / `notifyRoomEnter` / `update` / `exposureGain` / `luminance`）は変えていない。
+`LensParams.glow` の意味だけ「ぼかした明部の超過分に掛ける倍率（0〜0.6）」に変えた（目安 0〜0.08 では見えなかった。プリセットは 0.35 / 0.45）。
+
+1. **GTAO 停止時の深度**: `PostFX.setAoSuppressed(true)`（untextured の部屋）で GTAOPass が enabled = false になると `GTAOPass.depthTexture` は更新されず、LensPass のかすみ / DoF が
+   前の部屋の深度を見続ける。`setAoSuppressed` の中（か `render` の先頭）で `this.lensPass?.setDepthTexture(this.gtaoPass?.enabled ? this.gtaoPass.depthTexture : null)` を
+   呼んでほしい。null を渡せば LensPass が自前の半解像度深度パスに切り替わる（C02 で +0.5〜0.6 ms、+18 calls）。
+2. **デバッグ HUD**: `lensPass.exposureGain` / `luminance`（幾何平均、線形）に加えて `whiteBalance`（Vector3）/ `centerDistance`（m）/ `statReads` / `statErrors` を公開した。
+   1 行足すなら `lens gain 1.23 L 0.043 wb 0.95/1.01/1.09 d 8.3m`。
+3. **固定コストの情報**: composer の RT が MSAA（samples 2）なので、フルスクリーン pass 1 枚ごとに resolve blit が入り、効果を全部切っても LensPass は min 0.82 ms（1080p）。
+   効果ぶんの増分は min +0.15 / p25 +0.3〜0.6 ms。VideoPass も同じ固定コストを払うはずなので、RenderPass だけ MSAA の RT に描いて以後は非 MSAA でピンポンする構成
+   （EffectComposer を使わず自前で回す）にすれば pass あたり 0.5 ms 前後浮く見込み。優先度は低い。
+4. **mid Tier**: GTAO が無いので LensPass が自前深度パスを毎フレーム描く（haze / dof > 0 のとき）。重ければ mid の `LENS_PRESETS` 側で haze / dof を 0 にするか、
+   `LENS_TUNING.DEPTH_SCALE` を 0.35 に。恒久策は composer の RT に DepthTexture を付けて RenderPass の深度を GTAO / Lens で共有すること（PostFX 側の変更）。
+5. **F2 へ**: `setCameraMotion` は表示カメラの rad/s のままで良い（1/60 s × 焦点距離 px に換算、上限 24 px @1080p、τ 0.06 s で平滑）。入室フレームが 0 なら迷い（0.3 s）と
+   回転ブラーが重なるのは入室後に振り向いたときだけで、同じディスク核に足すだけなので破綻しない。DoF は回転 0.5 rad/s 以上で止めている。
+6. **露出の基準**: `LENS_TUNING.EXPOSURE_KEY = 0.045`（seed 7 の 9 部屋の幾何平均輝度 0.02〜0.11 の中央）。ライトマップの再調整で部屋の平均が変わったら測り直す
+   （`game.postfx.lensPass.luminance` を各部屋で読むだけ）。補正の強さは `EXPOSURE_ADAPT = 0.45`（R06 のような明るい部屋で 0.67 まで下がる。強ければ 0.3 へ）。
+
+## F1b（映像記録系 VideoPass / RecOverlay）→ 統合・F2（2026-09-22）
+
+実装したもの（所有: `src/render/VideoPass.ts`、`src/render/shaders/VideoShader.ts`、`src/ui/RecOverlay.ts`。記録 `docs/film-video.md`、画像 `docs/film-video/`）: 公開 API は不変。`VideoParams.frameBlend`（間引き時の残像 0〜0.5）と確認用 `forceJitter(frames)` / `forceHeadSwitch(frames)`、`RecOverlay.date`（既定 '2003.07.14'、'auto' で今日）/ `elapsed` を追加。
+
+依頼（所有外）:
+
+- **PostFX（統合）: composer の RT が 2× MSAA の HalfFloat で、後段の全 pass（GTAO / Bloom / Lens / Output）がそこへ書く。** VideoPass を置くと OutputPass が画面ではなく MSAA RT へ描き、解決（resolve）+ 16 MB の書き読みで whole-frame が 2.5〜4 ms 増える（LensPass 追加でも ≈1 ms。VideoPass 自体は 1080p で 0.2〜1.0 ms。`docs/film-video.md` §3）。
+  案: (a) RenderPass だけ MSAA の専用 RT に描いて非 MSAA の composer RT へ 1 回コピー（CopyShader 0.2 ms）、(b) `EffectComposer` に渡す rt を非 MSAA にして RenderPass 側で MSAA → resolve、(c) OutputPass 以降は UnsignedByte で足りるので、VideoPass の入力だけ別の 8 bit RT にする。(a) か (b) が効く。
+- **Game（F2）: 設定 `frameHold` で homeVideo / clean に間引きを強制するとき `frameBlend` も入れてほしい**（`video.params.frameBlend = 0.3` 程度。プリセット値 0 のままだと残像の無い純粋なコマ落ちになる）。tape は既に 0.3。
+- **Game / スクリーンショット系（統合）**: `postfx.frozenSeed` に数値を入れると VideoPass はノイズの種を固定し、揺れ・ヘッド切替の新規イベントも起こさない（`force*` は数える）。比較画像を撮る経路があれば設定を。
+- **RecOverlay の配置（F2）**: タイムコード（左下）はスマホの左スティック領域と視覚的に重なる（pointer-events は無効なので操作は妨げない）。スマホでは非表示にするか、位置を変えるなら `RecOverlay` 側で対応するので指示をほしい。
+- **観察（統合）**: ホットリロード直後に 1 回だけ部屋が真っ暗（器具面が消え、ライトマップ無し）になり `GL_INVALID_OPERATION: Mismatch between texture format and sampler type` が 256 件出た。`film: 'off'` でも暗いままで再読み込みで解消（再現せず）。VideoPass 無しで起きるので別要因（depth / shadow / 整数テクスチャのサンプラ不一致）。
+
+## 統合担当の処理記録（第9回・2026-09-22: 撮像効果）
+
+反映済み:
+- **土台（統合）**: `src/render/FilmPreset.ts`（off / clean / homeVideo / tape）、`LensPass`（OutputPass の前・線形 HDR）と `VideoPass`（OutputPass の後・表示域）を composer に配線、PostFX に `setCameraMotion` / `setAudioNoise` / `setStillness` / `notifyRoomEnter` を追加。旧 `AnalogCameraShader`（archival）は VideoPass に置き換え（設定 'archival' は homeVideo に読み替え）。
+- **MSAA の限定（F1a / F1b の依頼）**: `MsaaRenderPass` でシーン描画だけを MSAA RT に描き 1 回 resolve、composer の ping-pong は非マルチサンプル・深度なし（後段 pass ごとの resolve 2.5〜4 ms を削減）。
+- **F1a**（`LensPass.ts` / `shaders/LensShader.ts`、`docs/film-lens.md`）: 歪み・色収差・減光・軟焦点・開口部のにじみとハレーション・フレア・接写 DoF・フォーカスの迷い・かすみ・フリッカー・回転ブラー・露出 / WB の追従（2×1 Float RT の非同期読み戻し）。
+- **F1b**（`VideoPass.ts` / `shaders/VideoShader.ts` / `ui/RecOverlay.ts`、`docs/film-video.md`）: 色調整・色差の横ぼかし・音量連動の暗部ノイズ・黒の浮き・ニー・走査線とコーミング・水平同期ずれ・ヘッド切替・間引きと残像・DCT・REC / タイムコード。
+- **F2**（`Game.ts` / `PlayerController.ts` / `Settings.ts` / `SettingsPanel.ts` / `AudioEngine.ts`、`docs/film-camera.md`）: 設定 5 項目（プリセット既定 homeVideo・手持ち感・視線の遅れ・表示 fps・REC 表示）、歩行と呼吸の手持ち揺れ、視線の遅れ 50 ms、FOV ゆらぎ、回転速度と環境音の供給、静止 3 s の時間停止感、入室通知。
+- **統合の追加**: GTAO 停止中（M13）は LensPass に深度 null を渡して自前深度へ、設定で間引きを強制したときは残像 0.3 を入れる。
+
+未対応（次回へ）:
+- 色収差は差分加算の近似（強い DoF / ブラー時に R/B の縁が硬い）。DoF の歩行中無効は深度の急変と回転で判定（並進速度の API 無し）。
+- iOS Safari の非同期読み戻し未確認（失敗 3 回で追従停止・ゲイン 1）。mid Tier は自前深度パスが毎フレーム走る（+0.5 ms）。
+- 手持ち感の横揺れ、ゲームパッドのドリフトで静止に入らない可能性、メニューの縦の長さ。DCT は粒子に埋もれてほぼ見えない。ヘッド切替を常時薄く出すかは演出判断待ち。

@@ -27,7 +27,7 @@ import type { Box, DynamicSpec, InstanceSpec, LabelSpec, MatId, ParticleSpec, Ro
 import { MaterialLibrary, SURFACES, wetnessOverrides, L2_FLAGS, type ExternalOverrides, type MaterialOverrides, type UploadHandle } from './MaterialLibrary';
 import { appearanceSeed, attachSurfaceAppearance, corridorWearRegion, corridorDustRegion, wetWallBoxes, doorSurfaceId } from './SurfaceAppearance';
 import { surfaceBox, applyMetricUV, isBevelMat, SurfaceLighting } from './SurfaceGeometry';
-import { allocateLightmapAtlas, createLightmapTexture, isLightmapTarget, LightmapBaker, lightmapsSupported, writeConstantUV1, writeLightmapUV, type LightmapJobHandle } from './Lightmap';
+import { allocateLightmapAtlas, createLightmapTexture, InstanceLighting, isLightmapTarget, LIGHTMAP_FADE_MS, LightmapBaker, LightmapSampler, lightmapsSupported, startLightmapCrossfade, writeConstantUV1, writeLightmapUV, type LightmapJobHandle } from './Lightmap';
 import { vehicleSurfaces, foliageGeometry, grassGeometry } from './ObjectGeometry';
 import { detailedBoxes } from './ArchitecturalDetails';
 import { PropCatalog, PROP_TRIANGLE_BUDGET, TILED_KINDS, type CatalogEntry, type LoadedProp } from './PropCatalog';
@@ -38,6 +38,7 @@ import { ROOM_BY_ID } from '../data';
 import { buildDecalLayer } from './DecalLayer';
 import { applyWearEffects } from './wearEffects';
 import { applyBuildModifiers } from '../modifiers';
+import { particleList } from '../generators/particles';
 import type { RuntimeContext } from '../modifiers/types';
 
 export interface DoorObject {
@@ -120,6 +121,11 @@ export interface RoomLightmap {
   texelMean?: number;
   /** Worker が飛ばしたレイの本数（到着後） */
   rays?: number;
+  /** クロスフェードの長さ（ms。到着後。頂点焼き込み → テクセル、インスタンスの定数値 → 床の値）と開始時刻（performance.now()） */
+  fadeMs?: number;
+  appliedAt?: number;
+  /** InstancedMesh / glTF プロップの照明（到着後）: 旧値 / 新値の平均輝度比と、床から値を拾えたインスタンス数 */
+  instances?: { ratio: number; sampled: number; total: number };
   /** 検証用: 対象の箱と 6 面の矩形（px, py, pw, ph）、黒テクセルの uv */
   debug?: { targets: Box[]; rects: ({ px: number; py: number; pw: number; ph: number } | null)[][]; blackU: number; blackV: number };
   job: LightmapJobHandle | null;
@@ -389,6 +395,8 @@ export class RoomBuilder {
     const officeLighting = definition?.baseTemplate === 'CorridorOffice';
     // 焼き込みの遮蔽体には置換した箱も含める（プロップが占める体積の近似）
     const bake = new SurfaceLighting({ ...work, boxes: replaced.size ? displayBoxes.concat([...replaced]) : displayBoxes }, officeLighting, { ...(layout.lighting ?? {}), roll: !!roll });
+    // InstancedMesh / glTF プロップの照明（担当 P3）: 到着前は bake.sample の定数値、ライトマップ到着で足元の床の値へフェード
+    const shading = new InstanceLighting();
     for (const original of workBoxes) if (original.solid) colliders.push(aabbToWorld(original, p));
 
     // チャンク格子
@@ -494,7 +502,8 @@ export class RoomBuilder {
       ? allocateLightmapAtlas(lmTargets, { texel: lmCfg.texel, maxSize: lmCfg.maxSize, footprint: layout.footprint, bounds: layout.bounds, shell: shellBoxes })
       : null;
     const lmTex = atlas ? createLightmapTexture(atlas.width, atlas.height) : null;
-    const lmMaterialFor = (mat: MatId): THREE.MeshStandardMaterial => this.materials.forRoom(untextured ? 'untextured' : mat, { roomId: node.roomId, seed: node.seed, overrides, lightMap: lmTex, lightMapIntensity: 1 });
+    // palette / height: 部屋別 envMap（P2。MaterialLibrary.roomEnvironment。low Tier / legacy / untextured では共有のまま）
+    const lmMaterialFor = (mat: MatId): THREE.MeshStandardMaterial => this.materials.forRoom(untextured ? 'untextured' : mat, { roomId: node.roomId, seed: node.seed, overrides, lightMap: lmTex, lightMapIntensity: 1, palette: layout.palette, height: layout.height });
     mark('lightmapPlan');
     yield; // 中断点: 準備が終わった
 
@@ -605,7 +614,8 @@ export class RoomBuilder {
     if (atlas && lmTex && lmCfg && lmMeshes.length) {
       const info: RoomLightmap = { texture: lmTex, width: atlas.width, height: atlas.height, texel: atlas.texel, texels: atlas.texelCount, faces: atlas.faceCount, ready: false, job: null, upload: null,
         debug: { targets: lmTargets, rects: atlas.rects, blackU: atlas.blackU, blackV: atlas.blackV } };
-      const req = { ...bake.payload(), width: atlas.width, height: atlas.height, faces: atlas.faces, aoRays: lmCfg.aoRays };
+      // faces は Worker へ転送（transfer）されて元の配列が空になるので、到着後の CPU サンプル（LightmapSampler）用にコピーを渡す
+      const req = { ...bake.payload(), width: atlas.width, height: atlas.height, faces: atlas.faces.slice(), aoRays: lmCfg.aoRays };
       const started = performance.now();
       this.materials.track(lmTex);
       info.job = LightmapBaker.shared.enqueue(req, () => group.visible, (res) => {
@@ -624,10 +634,17 @@ export class RoomBuilder {
             for (let i = 0; i < ranges.length; i += 2) {
               const s = ranges[i] * 3, e = (ranges[i] + ranges[i + 1]) * 3;
               for (let k = s; k < e; k += 3) { vSum += 0.2126 * arr[k] + 0.7152 * arr[k + 1] + 0.0722 * arr[k + 2]; vN++; }
-              arr.fill(0, s, e);
             }
-            attr.needsUpdate = true;
           }
+          // クロスフェード（担当 P3）: 頂点焼き込みを 1 − t で減衰、lightMapIntensity を t で立ち上げる（LIGHTMAP_FADE_MS）。
+          // 完了時に対象頂点の bakedLight は 0 になる（二重加算を避ける。従来はここで即 0 埋めしていた）
+          const now = performance.now();
+          startLightmapCrossfade(lmMeshes, now);
+          // InstancedMesh / glTF プロップ: 足元の床のライトマップ値へ同じ時間でフェード
+          shading.apply(new LightmapSampler(atlas, res.data), now);
+          info.fadeMs = LIGHTMAP_FADE_MS;
+          info.appliedAt = now;
+          info.instances = { ratio: shading.ratio, sampled: shading.stats.sampled, total: shading.stats.total };
           info.vertexMean = vN ? vSum / vN : 0;
           info.texelMean = res.stats.mean;
           info.rays = res.stats.rays;
@@ -781,7 +798,7 @@ export class RoomBuilder {
     yield; // 中断点: デカールまで
     // InstancedMesh（反復配置）。チャンクごとに 1 InstancedMesh、Tier の instanceScale で間引く
     for (const spec of layout.instances ?? []) {
-      triangles += this.buildInstances(spec, chunks, chunkGroups, chunkIndexOf, materialFor, bake, tier, colliders, p, legacy);
+      triangles += this.buildInstances(spec, chunks, chunkGroups, chunkIndexOf, materialFor, bake, shading, tier, colliders, p, legacy);
     }
 
     mark('instances');
@@ -790,17 +807,25 @@ export class RoomBuilder {
     const propState: PropState = { disposed: false, built: null };
     group.userData.propState = propState;
     cleanup.push(() => { propState.disposed = true; });
-    if (propPlan.length) triangles += installProps(propPlan, catalog, chunks, chunkGroups, chunkIndexOf, bake, materialFor, propOverrides, propState, legacy);
+    if (propPlan.length) triangles += installProps(propPlan, catalog, chunks, chunkGroups, chunkIndexOf, bake, shading, materialFor, propOverrides, propState, legacy);
 
     mark('props');
     yield; // 中断点: プロップまで（残りはパーティクル・可動要素・Modifier の build フック）
-    // パーティクル（Points + 頂点シェーダ）
-    if (layout.particles && tier.particleCap > 0) {
-      const built = buildParticles(layout.particles, layout.bounds, tier.particleCap, new Rng(node.seed).fork('particles'));
-      if (built) {
-        group.add(built.points);
-        effects.push(built.effect);
-      }
+    // パーティクル（スロットごとに 1 Points + 頂点シェーダ）。粒数は部屋合計で Tier の particleCap に収める（超えるときは比例で削る）
+    const particleSlots = particleList(layout);
+    if (particleSlots.length && tier.particleCap > 0) {
+      const wanted = particleSlots.map((spec) => particleCount(spec, layout.bounds));
+      const sum = wanted.reduce((a, b) => a + b, 0);
+      const k = sum > tier.particleCap ? tier.particleCap / sum : 1;
+      particleSlots.forEach((spec, i) => {
+        const count = Math.floor(wanted[i] * k);
+        // 先頭スロットの rng は従来（単一スロット）と同じ fork 名にして既存部屋の粒配置を変えない
+        const built = buildParticles(spec, layout.bounds, count, new Rng(node.seed).fork(i === 0 ? 'particles' : `particles:${i}`));
+        if (built) {
+          group.add(built.points);
+          effects.push(built.effect);
+        }
+      });
     }
 
     // 可動要素（個別 Mesh + 動くコライダ）
@@ -851,7 +876,7 @@ export class RoomBuilder {
 
   private buildInstances(
     spec: InstanceSpec, chunks: RoomChunk[], chunkGroups: THREE.Group[], chunkIndexOf: (x: number, z: number) => number,
-    materialFor: (m: MatId) => THREE.MeshStandardMaterial, bake: SurfaceLighting, tier: QualityTier, colliders: AABB[],
+    materialFor: (m: MatId) => THREE.MeshStandardMaterial, bake: SurfaceLighting, shading: InstanceLighting, tier: QualityTier, colliders: AABB[],
     placement: NonNullable<RoomInstance['placement']>, legacy: boolean,
   ): number {
     const [sx, sy, sz] = spec.size;
@@ -878,6 +903,8 @@ export class RoomBuilder {
     for (const [ci, list] of perChunk) {
       const geo = base.clone();
       const baked = new Float32Array(list.length * 3);
+      // ライトマップ到着後の足元サンプル用: [x, 底面 y, z, 半幅 x, 半幅 z]（yaw を含む AABB の半幅）
+      const probes = new Float32Array(list.length * 5);
       const mesh = new THREE.InstancedMesh(geo, materialFor(botanical?'plantLeaf':spec.mat), list.length);
       list.forEach((t, i) => {
         const s = t.scale ?? 1;
@@ -888,14 +915,17 @@ export class RoomBuilder {
         mesh.setMatrixAt(i, m);
         const l = bake.sample([t.pos[0], t.pos[1] + sy * s / 2, t.pos[2]]);
         baked[i * 3] = l[0]; baked[i * 3 + 1] = l[1]; baked[i * 3 + 2] = l[2];
+        const c = Math.abs(Math.cos(t.yaw)), sn = Math.abs(Math.sin(t.yaw));
+        const hx = (c * sx + sn * sz) / 2 * s, hz = (sn * sx + c * sz) / 2 * s;
+        probes[i * 5] = t.pos[0]; probes[i * 5 + 1] = t.pos[1]; probes[i * 5 + 2] = t.pos[2]; probes[i * 5 + 3] = hx; probes[i * 5 + 4] = hz;
         if (spec.solid) {
-          const c = Math.abs(Math.cos(t.yaw)), sn = Math.abs(Math.sin(t.yaw));
-          const hx = (c * sx + sn * sz) / 2 * s, hz = (sn * sx + c * sz) / 2 * s;
           colliders.push(aabbToWorld({ min: [t.pos[0] - hx, t.pos[1], t.pos[2] - hz], max: [t.pos[0] + hx, t.pos[1] + sy * s, t.pos[2] + hz] }, placement));
         }
       });
-      // 焼き込みはインスタンスごとの一定値（InstancedBufferAttribute として同じ attribute 名で渡す）
+      // 焼き込みはインスタンスごとの一定値（InstancedBufferAttribute として同じ attribute 名で渡す）。
+      // ライトマップが届いたら InstanceLighting が足元の床の値へ差し替える（到着済みなら register が即書く）
       geo.setAttribute('bakedLight', new THREE.InstancedBufferAttribute(baked, 3));
+      shading.register(mesh, probes);
       mesh.instanceMatrix.needsUpdate = true;
       mesh.frustumCulled = true;
       mesh.computeBoundingSphere();
@@ -1071,6 +1101,9 @@ function overridesFor(layout: RoomLayout): MaterialOverrides {
   const render = layout.render;
   const overrides: MaterialOverrides = {};
   if (render?.wetness) Object.assign(overrides, wetnessOverrides(render.wetness));
+  if (render?.floorWetness) overrides.floorWetness = render.floorWetness; // 床材だけ（MaterialLibrary.resolveOverrides が畳む）
+  // 器具の発光面を palette.lightColor（P1 の色温度）に追従させる（器具材質だけ。MaterialLibrary.resolveOverrides が他の材質から落とす）
+  if (layout.palette?.lightColor !== undefined) overrides.lightTint = layout.palette.lightColor;
   if (render?.colorMask) overrides.colorMask = render.colorMask;
   if (render?.style === 'legacy') overrides.style = 'legacy';
   if (render?.gradient) overrides.gradient = { ...render.gradient, range: projectRange(layout.bounds, render.gradient.axis) };
@@ -1113,11 +1146,16 @@ const PARTICLE_DEFAULTS: Record<ParticleSpec['type'], { vel: Vec3; sway: number;
   dust: { vel: [0, -.05, 0], sway: .15, size: .03, color: 0xf0e8d8, alpha: .35 },
 };
 
-function buildParticles(spec: ParticleSpec, roomBounds: AABB, cap: number, rng: Rng): { points: THREE.Points; effect: RoomEffect } | null {
+/** スロットが求める粒数（density × 発生領域の体積。Tier の上限は呼び出し側が部屋合計で掛ける） */
+function particleCount(spec: ParticleSpec, roomBounds: AABB): number {
+  const bb = spec.aabb ?? roomBounds;
+  const volume = Math.max(0, (bb.max[0] - bb.min[0]) * (bb.max[1] - bb.min[1]) * (bb.max[2] - bb.min[2]));
+  return Math.max(0, Math.round(spec.density * volume));
+}
+
+function buildParticles(spec: ParticleSpec, roomBounds: AABB, count: number, rng: Rng): { points: THREE.Points; effect: RoomEffect } | null {
   const bb = spec.aabb ?? roomBounds;
   const size: Vec3 = [bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]];
-  const volume = Math.max(0, size[0] * size[1] * size[2]);
-  const count = Math.min(cap, Math.max(0, Math.round(spec.density * volume)));
   if (count <= 0) return null;
   const d = PARTICLE_DEFAULTS[spec.type];
   const positions = new Float32Array(count * 3);
@@ -1501,7 +1539,7 @@ function planProps(work: RoomLayout, rng: Rng, catalog: PropCatalog): PropPlacem
 /** モデルごとに InstancedMesh（チャンク別）を作る。未読込のモデルは箱の仮表示を出し、到着後に差し替える。戻り値は今すぐ足した三角形数 */
 function installProps(
   plan: PropPlacement[], catalog: PropCatalog, chunks: RoomChunk[], chunkGroups: THREE.Group[], chunkIndexOf: (x: number, z: number) => number,
-  bake: SurfaceLighting, materialFor: (m: MatId) => THREE.MeshStandardMaterial, propOverrides: ExternalOverrides, state: PropState, legacy: boolean,
+  bake: SurfaceLighting, shading: InstanceLighting, materialFor: (m: MatId) => THREE.MeshStandardMaterial, propOverrides: ExternalOverrides, state: PropState, legacy: boolean,
 ): number {
   const byModel = new Map<string, PropPlacement[]>();
   for (const pp of plan) {
@@ -1522,14 +1560,20 @@ function installProps(
       let tris = 0;
       for (const [ci, items] of perChunk) {
         const baked = new Float32Array(items.length * 3);
+        // ライトマップ到着後の足元サンプル用: [x, 底面 y, z, 半幅 x, 半幅 z]（置き換えた箱の足跡）
+        const probes = new Float32Array(items.length * 5);
         items.forEach((it, i) => {
           const l = bake.sample([it.t.pos[0], (it.box.min[1] + it.box.max[1]) / 2, it.t.pos[2]]);
           baked[i * 3] = l[0]; baked[i * 3 + 1] = l[1]; baked[i * 3 + 2] = l[2];
+          probes[i * 5] = it.t.pos[0]; probes[i * 5 + 1] = it.box.min[1]; probes[i * 5 + 2] = it.t.pos[2];
+          probes[i * 5 + 3] = (it.box.max[0] - it.box.min[0]) / 2; probes[i * 5 + 4] = (it.box.max[2] - it.box.min[2]) / 2;
         });
         for (const part of model.parts) {
           const geo = part.geometry.clone();
           geo.setAttribute('bakedLight', new THREE.InstancedBufferAttribute(baked.slice(), 3));
           const mesh = new THREE.InstancedMesh(geo, catalog.materialFor(part, propOverrides), items.length);
+          // glTF プロップも InstancedMesh と同じ経路（インスタンスごとの一様値）でライトマップの足元の値を受ける
+          shading.register(mesh, probes);
           items.forEach((it, i) => {
             pos.set(it.t.pos[0], it.t.pos[1], it.t.pos[2]);
             q.setFromAxisAngle(up, it.t.yaw);

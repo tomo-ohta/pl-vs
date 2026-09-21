@@ -189,6 +189,21 @@ function furnish(c: FurnishCtx, tid: string, area: number, w: number, d: number,
           B.push(box([sx0, rise, z], [sx1, rise + 0.3, z + 0.5], 'furnitureDark'));
           B.push(box([sx0, rise + 0.3, z + 0.3], [sx1, rise + 0.9, z + 0.5], 'furnitureDark'));
         }
+        // 側通路の階段: 段床の高さが変わる列で、側通路（両側 1.5 m）に 0.15 m × 2 段の踏み段を置く（段床の 0.3 m を歩いて登れる）。
+        // 段床と同じ高さの踏み面が通路側へ続くので、通路は段床に合わせて階段状になる
+        const prevRise = Math.floor((((ir.z1 - (z + 1.1)) / (ir.z1 - ir.z0)) * 1.0) / 0.3) * 0.3;
+        if (rise > 0.01) {
+          for (const [ax0, ax1] of [[r.x0 + WALL_T, ir.x0], [ir.x1, r.x1 - WALL_T]] as [number, number][]) {
+            const zEnd = Math.min(z + 1.1, ir.z1);
+            // 列の奥（スクリーン側）0.35 m は 1 段低い踏み段、残りは段床と同じ高さ
+            if (rise - prevRise > 0.01) {
+              B.push(box([ax0, 0, zEnd - 0.35], [ax1, rise - 0.15, zEnd], c.L.palette.floor));
+              B.push(box([ax0, 0, z], [ax1, rise, zEnd - 0.35], c.L.palette.floor));
+            } else {
+              B.push(box([ax0, 0, z], [ax1, rise, zEnd], c.L.palette.floor));
+            }
+          }
+        }
       }
       // スクリーンは 16:9（PastWindow の 256×144 RT と同じ比率。全幅だと映像が横に伸びる）。幅は室内幅 − 2 と 16 m の小さい方、高さは天井 − 1.5 m まで。
       // 周りは暗幕（furnitureDark の箔）で全幅を覆う

@@ -5,14 +5,15 @@
  *   RenderPass（scene → HalfFloat RT、MSAA samples = Tier.postfx.msaa）
  *   → GTAOPass（画面空間の遮蔽。Tier.postfx.gtaoScale の解像度で計算し、乗算合成）
  *   → UnrealBloomPass（閾値高め・弱い強度。発光箔だけが滲む）
- *   → ShaderPass(AnalogCameraShader)（設定 postfx = 'archival' のときだけ。線形 HDR のまま粒子・彩度・減光・色ずれ）
+ *   → LensPass（撮像プリセット off 以外。線形 HDR: レンズ歪み・色収差・軟焦点・かすみ・露出 / WB 追従など。src/render/LensPass.ts）
  *   → OutputPass（renderer.toneMapping + sRGB 変換を **ここで 1 回だけ**）
+ *   → VideoPass（撮像プリセット off 以外。表示域: 色調整・色のにじみ・暗部ノイズ・走査線など。画面へ描く。src/render/VideoPass.ts）
  *
  * トーンマップの二重適用について: three.js は RenderTarget へ描く材質のトーンマップと出力色空間変換を自動で無効化する
  * （WebGLRenderer.getProgram の toneMapping / outputColorSpace は画面描画時だけ有効）。renderer.toneMapping は
  * 直接描画（composer 無し）では材質側で、composer 使用時は OutputPass だけで働く。
  *
- * gtao / bloom / analog が全て false で msaa = 0 なら composer を作らず renderer.render で直接描画する（low Tier、設定 'off'）。
+ * gtao / bloom が false・msaa = 0・撮像プリセット 'off' なら composer を作らず renderer.render で直接描画する（設定 'off'、low Tier の 'clean'）。
  * resize / DPR / Tier 変更は setSize / configure で RenderTarget を作り直す。dispose で全て解放。
  *
  * 既知の制約: composer 使用時は toneMapped = false の材質（SignAtlas の板サインなど）も OutputPass でトーンマップされる。
@@ -22,9 +23,12 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { AnalogCameraShader, ANALOG_PRESETS, type AnalogParams } from './shaders/AnalogCameraShader';
+import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { CopyShader } from 'three/addons/shaders/CopyShader.js';
+import { LensPass } from './LensPass';
+import { VideoPass } from './VideoPass';
+import type { FilmPreset } from './FilmPreset';
 
 export type ToneMappingId = 'aces' | 'agx';
 export const TONE_MAPPINGS: Record<ToneMappingId, THREE.ToneMapping> = {
@@ -41,8 +45,8 @@ export interface PostFXConfig {
   msaa: number;
   /** GTAO の解像度倍率（0.5 = 半解像度） */
   gtaoScale: number;
-  /** 撮像 pass（archival） */
-  analog: boolean;
+  /** 撮像プリセット（LensPass / VideoPass。'off' で両 pass を置かない） */
+  film: FilmPreset;
 }
 
 /** GTAO の調整値（屋内 2.4〜3 m の天井、机・椅子の接地の陰） */
@@ -174,18 +178,50 @@ class RoomGTAOPass extends GTAOPass {
   }
 }
 
+/**
+ * MSAA をシーン描画だけに限定する RenderPass。composer の ping-pong バッファは非マルチサンプル（HalfFloat・深度なし）にし、
+ * シーンは自前の MSAA RenderTarget に描いてから readBuffer へ 1 回だけコピー（= resolve）する。
+ * 従来は composer の両バッファが MSAA だったため、後段の全 pass（GTAO 合成・bloom 合成・Lens・Output・Video）が
+ * 描くたびに resolve が走り、1080p で 2.5〜4 ms を無駄にしていた（担当 F1b の計測）
+ */
+class MsaaRenderPass extends RenderPass {
+  private readonly target: THREE.WebGLRenderTarget;
+  private readonly copy: FullScreenQuad;
+  private readonly copyMat: THREE.ShaderMaterial;
+  constructor(scene: THREE.Scene, camera: THREE.Camera, samples: number) {
+    super(scene, camera);
+    this.target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: Math.max(1, samples | 0), depthBuffer: true, stencilBuffer: false });
+    this.target.texture.name = 'PostFX.msaa';
+    this.copyMat = new THREE.ShaderMaterial({ uniforms: THREE.UniformsUtils.clone(CopyShader.uniforms), vertexShader: CopyShader.vertexShader, fragmentShader: CopyShader.fragmentShader, depthTest: false, depthWrite: false });
+    this.copy = new FullScreenQuad(this.copyMat);
+  }
+  override setSize(width: number, height: number): void { this.target.setSize(width, height); }
+  override render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget, deltaTime: number, maskActive: boolean): void {
+    if (this.renderToScreen) { super.render(renderer, writeBuffer, readBuffer, deltaTime, maskActive); return; }
+    super.render(renderer, writeBuffer, this.target, deltaTime, maskActive);
+    // MSAA → 単一サンプルへ（テクスチャとして読む時点で three が blit で resolve する）
+    this.copyMat.uniforms.tDiffuse.value = this.target.texture;
+    renderer.setRenderTarget(readBuffer);
+    this.copy.render(renderer);
+  }
+  override dispose(): void { super.dispose(); this.target.dispose(); this.copyMat.dispose(); this.copy.dispose(); }
+}
+
 export class PostFX {
   composer: EffectComposer | null = null;
   gtaoPass: GTAOPass | null = null;
   bloomPass: UnrealBloomPass | null = null;
-  analogPass: ShaderPass | null = null;
+  lensPass: LensPass | null = null;
+  videoPass: VideoPass | null = null;
   outputPass: OutputPass | null = null;
   private renderPass: RenderPass | null = null;
-  config: PostFXConfig = { gtao: false, bloom: false, msaa: 0, gtaoScale: 0.5, analog: false };
-  /** archival の調整値（ゲーム中に変更可） */
-  readonly analog: AnalogParams = { ...ANALOG_PRESETS.archival };
+  config: PostFXConfig = { gtao: false, bloom: false, msaa: 0, gtaoScale: 0.5, film: 'off' };
   /** スクリーンショット用: 数値を入れるとノイズの種を固定する。null なら毎フレーム更新 */
   frozenSeed: number | null = null;
+  private lastRenderAt = 0;
+  private cameraMotion: [number, number] = [0, 0];
+  private audioNoise = 0;
+  private stillness = 0;
   readonly timer: FrameTimer;
   private width = 1;
   private height = 1;
@@ -203,10 +239,15 @@ export class PostFX {
   configure(cfg: PostFXConfig): void {
     const c = this.config;
     const same = this.composer !== null || !needsComposer(cfg)
-      ? c.gtao === cfg.gtao && c.bloom === cfg.bloom && c.msaa === cfg.msaa && c.gtaoScale === cfg.gtaoScale && c.analog === cfg.analog
+      ? c.gtao === cfg.gtao && c.bloom === cfg.bloom && c.msaa === cfg.msaa && c.gtaoScale === cfg.gtaoScale && (c.film === 'off') === (cfg.film === 'off')
       : false;
     this.config = { ...cfg };
-    if (same) return;
+    if (same) {
+      // pass 構成が同じでプリセットだけ変わった: 数値を写すだけ
+      this.lensPass?.applyPreset(cfg.film);
+      this.videoPass?.applyPreset(cfg.film);
+      return;
+    }
     this.disposeComposer();
     if (!needsComposer(cfg)) return;
     this.build();
@@ -214,10 +255,12 @@ export class PostFX {
 
   private build(): void {
     const cfg = this.config;
-    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: Math.max(0, cfg.msaa | 0), depthBuffer: true, stencilBuffer: false });
+    // MSAA はシーン描画だけ（MsaaRenderPass）。composer の ping-pong は非マルチサンプル・深度なし
+    const msaa = Math.max(0, cfg.msaa | 0);
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 0, depthBuffer: msaa === 0, stencilBuffer: false });
     rt.texture.name = 'PostFX.rt1';
     const composer = new EffectComposer(this.renderer, rt);
-    this.renderPass = new RenderPass(this.scene, this.camera);
+    this.renderPass = msaa > 0 ? new MsaaRenderPass(this.scene, this.camera, msaa) : new RenderPass(this.scene, this.camera);
     composer.addPass(this.renderPass);
     if (cfg.gtao) {
       const g = new RoomGTAOPass(this.scene, this.camera, 1, 1);
@@ -242,13 +285,21 @@ export class PostFX {
       composer.addPass(b);
       this.bloomPass = b;
     }
-    if (cfg.analog) {
-      const a = new ShaderPass(AnalogCameraShader);
-      composer.addPass(a);
-      this.analogPass = a;
+    if (cfg.film !== 'off') {
+      const lens = new LensPass(this.scene, this.camera);
+      lens.applyPreset(cfg.film);
+      lens.setDepthTexture(this.gtaoPass && !this.aoSuppressed ? this.gtaoPass.depthTexture : null);
+      composer.addPass(lens);
+      this.lensPass = lens;
     }
     this.outputPass = new OutputPass();
     composer.addPass(this.outputPass);
+    if (cfg.film !== 'off') {
+      const video = new VideoPass();
+      video.applyPreset(cfg.film);
+      composer.addPass(video);
+      this.videoPass = video;
+    }
     this.composer = composer;
     this.applySize();
   }
@@ -268,7 +319,6 @@ export class PostFX {
     const ph = Math.max(1, Math.floor(this.height * this.pixelRatio));
     this.composer.setPixelRatio(1);
     this.composer.setSize(pw, ph);
-    if (this.analogPass) (this.analogPass.uniforms.resolution.value as THREE.Vector2).set(pw, ph);
   }
 
   /** 1 フレーム描画（composer か直接描画）。renderer.info は 1 フレーム分（影・G バッファ・全 pass）を合算する */
@@ -276,13 +326,18 @@ export class PostFX {
     this.frame++;
     this.renderer.info.autoReset = false;
     this.renderer.info.reset();
-    if (this.analogPass) {
-      const u = this.analogPass.uniforms;
-      u.seed.value = this.frozenSeed ?? (this.frame % 4096);
-      u.grain.value = this.analog.grain;
-      u.desaturate.value = this.analog.desaturate;
-      u.vignette.value = this.analog.vignette;
-      u.chroma.value = this.analog.chromaPx;
+    const now = performance.now();
+    const dt = this.lastRenderAt ? Math.min(0.1, (now - this.lastRenderAt) / 1000) : 1 / 60;
+    this.lastRenderAt = now;
+    if (this.lensPass) {
+      this.lensPass.setCameraMotion(this.cameraMotion[0], this.cameraMotion[1]);
+      this.lensPass.update(dt, this.frame);
+    }
+    if (this.videoPass) {
+      this.videoPass.frozenSeed = this.frozenSeed;
+      this.videoPass.setAudioNoise(this.audioNoise);
+      this.videoPass.setStillness(this.stillness);
+      this.videoPass.update(dt, this.frame);
     }
     if (this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
@@ -295,26 +350,40 @@ export class PostFX {
   setAoSuppressed(on: boolean): void {
     this.aoSuppressed = on;
     if (this.gtaoPass) this.gtaoPass.enabled = !on;
+    // GTAO が止まると深度も更新されないので、LensPass には null を渡して自前の深度パスへ切り替えさせる（担当 F1a の依頼）
+    this.lensPass?.setDepthTexture(!on && this.gtaoPass ? this.gtaoPass.depthTexture : null);
   }
   private aoSuppressed = false;
+
+  // ------------------------------------------------------------ 撮像 pass への入力（Game が毎フレーム / イベントで渡す）
+  /** カメラの回転速度（rad/s。回転だけのモーションブラー） */
+  setCameraMotion(yawRate: number, pitchRate: number): void { this.cameraMotion[0] = yawRate; this.cameraMotion[1] = pitchRate; }
+  /** 環境音の大きさ（0〜1。暗部ノイズと連動） */
+  setAudioNoise(x: number): void { this.audioNoise = Math.max(0, Math.min(1, x)); }
+  /** プレイヤーが静止している秒数（時間停止感） */
+  setStillness(sec: number): void { this.stillness = Math.max(0, sec); }
+  /** 入室直後: オートフォーカスの迷い */
+  notifyRoomEnter(): void { this.lensPass?.notifyRoomEnter(); }
 
   /** デバッグ HUD 用の 1 行 */
   describe(): string {
     if (!this.composer) return 'direct';
     const c = this.config;
-    return [c.gtao ? `gtao×${c.gtaoScale}` : null, c.bloom ? 'bloom' : null, c.msaa ? `msaa${c.msaa}` : null, c.analog ? 'archival' : null].filter(Boolean).join('+') || 'composer';
+    return [c.gtao ? `gtao×${c.gtaoScale}` : null, c.bloom ? 'bloom' : null, c.msaa ? `msaa${c.msaa}` : null, c.film !== 'off' ? `film:${c.film}` : null].filter(Boolean).join('+') || 'composer';
   }
 
   private disposeComposer(): void {
     this.gtaoPass?.dispose();
     this.bloomPass?.dispose();
-    this.analogPass?.dispose();
+    this.lensPass?.dispose();
+    this.videoPass?.dispose();
     this.outputPass?.dispose();
     this.renderPass?.dispose();
     this.composer?.dispose();
     this.gtaoPass = null;
     this.bloomPass = null;
-    this.analogPass = null;
+    this.lensPass = null;
+    this.videoPass = null;
     this.outputPass = null;
     this.renderPass = null;
     this.composer = null;
@@ -327,5 +396,5 @@ export class PostFX {
 }
 
 function needsComposer(cfg: PostFXConfig): boolean {
-  return cfg.gtao || cfg.bloom || cfg.analog || cfg.msaa > 0;
+  return cfg.gtao || cfg.bloom || cfg.film !== 'off' || cfg.msaa > 0;
 }

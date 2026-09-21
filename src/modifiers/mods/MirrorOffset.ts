@@ -285,12 +285,21 @@ const MirrorOffset: ModifierImpl = {
     const frame = (a0: number, a1: number, y0: number, y1: number) => (pl!.axis === 'z'
       ? box([a0, y0, frameN0], [a1, y1, frameN1], 'stainless', false)
       : box([frameN0, y0, a0], [frameN1, y1, a1], 'stainless', false));
+    // 鏡像側の面にも同じ枡（鏡の中に枡が映っているように見える。offset ぶんずらすと枡だけが二重に見えるのでずらさない）
+    const faceM = pl.realSign < 0 ? pl.m + SLAB_HALF : pl.m - SLAB_HALF;
+    const mN0 = pl.realSign < 0 ? faceM : faceM - 0.02;
+    const mN1 = pl.realSign < 0 ? faceM + 0.02 : faceM;
+    const frameM = (a0: number, a1: number, y0: number, y1: number) => (pl!.axis === 'z'
+      ? box([a0, y0, mN0], [a1, y1, mN1], 'stainless', false)
+      : box([mN0, y0, a0], [mN1, y1, a1], 'stainless', false));
     for (const [p0, p1] of panels) {
       slabs.push(slabA(p0, p1, y0m, y1m, 'glass'));
-      slabs.push(frame(p0 - 0.03, p1 + 0.03, y0m - 0.03, y0m));
-      slabs.push(frame(p0 - 0.03, p1 + 0.03, y1m, y1m + 0.03));
-      slabs.push(frame(p0 - 0.03, p0, y0m, y1m));
-      slabs.push(frame(p1, p1 + 0.03, y0m, y1m));
+      for (const fr of [frame, frameM]) {
+        slabs.push(fr(p0 - 0.03, p1 + 0.03, y0m - 0.03, y0m));
+        slabs.push(fr(p0 - 0.03, p1 + 0.03, y1m, y1m + 0.03));
+        slabs.push(fr(p0 - 0.03, p0, y0m, y1m));
+        slabs.push(fr(p1, p1 + 0.03, y0m, y1m));
+      }
     }
 
     L.boxes = [...shell, ...kept, ...slabs, ...mirrored];

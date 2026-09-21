@@ -1,5 +1,6 @@
 /** 建築用途別の素材・照明パレット。共通PBR素材で全生成器をカバーする。 */
 import type { RoomDefinition, TemplateDef } from '../core/types';
+import type { Rng } from '../core/rng';
 import type { Palette } from './layout';
 
 const BASE: Record<string, Partial<Palette>> = {
@@ -95,3 +96,124 @@ export function paletteFor(def: RoomDefinition, template: TemplateDef, fallback:
   }
   return base;
 }
+
+// ---------------------------------------------------------------- 色温度（V04 手順 9。担当 P1）
+/**
+ * テンプレート別の色温度範囲 [Kmin, Kmax]（ケルビン）。同じテンプレートでも部屋ごとに 1 値を選び、同じ白が全室に並ばないようにする。
+ * 範囲は狭く（2,700〜5,000 K の中で 300〜700 K 幅）: オフィス 4,000〜4,600 / 学校 3,800〜4,400 / 病院 4,300〜5,000 / ホテル 2,700〜3,100 /
+ * 住居 2,800〜3,200 / 地下・設備 3,400〜4,000 / 店舗 3,600〜4,200 / 駐車場 3,900〜4,500。キーは template.id（無ければ baseTemplate）
+ */
+export const KELVIN_RANGE: Record<string, [number, number]> = {
+  // 廊下系
+  CorridorOffice: [4000, 4600],
+  CorridorSchool: [3800, 4400],
+  CorridorHospital: [4300, 5000],
+  CorridorHotel: [2700, 3100],
+  CorridorEntertainment: [2700, 3000],
+  CorridorService: [3400, 4000],
+  ApartmentCorridor: [2800, 3200],
+  TransitCorridor: [3900, 4500],
+  GenericCorridor: [3700, 4300],
+  Bridge: [3400, 4000],
+  PoolCorridor: [4000, 4600],
+  // 部屋系
+  LargeRoom: [3900, 4500],
+  SmallRoom: [3700, 4300],
+  GenericRoom: [3800, 4400],
+  Classroom: [3800, 4400],
+  Restroom: [4000, 4600],
+  LockerRoom: [3800, 4400],
+  RetailRoom: [3600, 4200],
+  Theater: [2700, 3100],
+  Gallery: [3200, 3800],
+  OfficeGrid: [4000, 4600],
+  PlayArea: [3000, 3600],
+  OrganicZone: [3600, 4200],
+  ParkingGrid: [3900, 4500],
+  WarehouseGrid: [3600, 4200],
+  ShelfGrid: [3300, 3900],
+  RetailGrid: [3600, 4200],
+  StorageGrid: [3400, 4000],
+  MazeGrid: [3600, 4200],
+  ServerGrid: [4200, 4800],
+  ServiceMaze: [3400, 4000],
+  AtriumLobby: [3400, 4000],
+  Terminal: [3900, 4500],
+  VerticalCore: [3400, 4000],
+  DynamicGrid: [3800, 4400],
+  StreetGrid: [3400, 4000],
+  RoadGraph: [3400, 4000],
+};
+/** lightingPreset の語で決まる範囲（テンプレートより優先。暖色系の語は器具が lightWarm になるので必ず電球色の帯に入れる） */
+const KELVIN_BY_PRESET: [RegExp, [number, number]][] = [
+  [/暖色|電球|橙|夕|琥珀/, [2700, 3100]],
+  [/冷白|均一/, [4200, 4800]],
+  [/蛍光|白色/, [3900, 4500]],
+];
+const KELVIN_DEFAULT: [number, number] = [3800, 4400];
+/** ホワイトバランス。この色温度が無彩色の白になる（4,600 K: 既存パレットの「病院 0xf3f6ff がわずかに青、ホテル 0xffc98a が電球色」に一致） */
+const KELVIN_WHITE_BALANCE = 4600;
+
+/** 黒体近似（Tanner Helland の式）。ケルビン → 0..1 の RGB（白バランス無し。6,600 K 付近が白） */
+export function blackbodyRgb(kelvin: number): [number, number, number] {
+  const t = Math.min(400, Math.max(10, kelvin / 100));
+  let r: number, g: number, b: number;
+  if (t <= 66) {
+    r = 255;
+    g = 99.4708025861 * Math.log(t) - 161.1195681661;
+    b = t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307;
+  } else {
+    r = 329.698727446 * Math.pow(t - 60, -0.1332047592);
+    g = 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+    b = 255;
+  }
+  const c = (v: number) => Math.min(255, Math.max(0, v)) / 255;
+  return [c(r), c(g), c(b)];
+}
+
+/** ケルビン → 器具色（0xRRGGBB）。白バランス KELVIN_WHITE_BALANCE で割り、最大チャンネルを 1 に正規化する（明るさは色温度で変えない） */
+export function kelvinToLightColor(kelvin: number, whiteBalance = KELVIN_WHITE_BALANCE): number {
+  const c = blackbodyRgb(kelvin);
+  const w = blackbodyRgb(whiteBalance);
+  const rgb = [c[0] / Math.max(1e-3, w[0]), c[1] / Math.max(1e-3, w[1]), c[2] / Math.max(1e-3, w[2])];
+  const m = Math.max(rgb[0], rgb[1], rgb[2], 1e-3);
+  const q = (v: number) => Math.round(Math.min(1, Math.max(0, v / m)) * 255);
+  return (q(rgb[0]) << 16) | (q(rgb[1]) << 8) | q(rgb[2]);
+}
+
+/** この定義・テンプレートに使う色温度範囲。青系の演出（水族館・水中）や器具が lightPanel / lightWarm 以外の部屋は null（色温度化しない） */
+export function kelvinRangeFor(def: RoomDefinition, template: TemplateDef, palette: Palette): [number, number] | null {
+  if (palette.light !== 'lightPanel' && palette.light !== 'lightWarm') return null;
+  const l = def.lightingPreset;
+  if (/青|水族|水中/.test(l)) return null;
+  for (const [re, range] of KELVIN_BY_PRESET) if (re.test(l)) return range;
+  return KELVIN_RANGE[template.id] ?? KELVIN_RANGE[template.baseTemplate ?? ''] ?? KELVIN_DEFAULT;
+}
+
+/**
+ * 部屋ごとの色温度を選んで palette.lightColor（と ambient の色味）を決める。generateLayout が Generator の前に呼ぶ
+ * （生成 → dressing → Modifier の順なので、Mythic / Legendary のドレッシングや FakeSky / LightingPhase / EraPreset の上書きはそのまま残る）。
+ * rng は専用 fork（p.rng.fork('kelvin')）を渡す: 既存の乱数列を消費せず、他の生成結果は変わらない。
+ * ambient は既存の色（テンプレートの雰囲気）を保ちつつ 45% だけ器具色へ寄せる（焼き込みの環境光と半球光が器具色に追従する）。
+ * 戻り値は選んだケルビン（対象外なら null）
+ */
+export function applyLightKelvin(palette: Palette, def: RoomDefinition, template: TemplateDef, rng: Rng): number | null {
+  const range = kelvinRangeFor(def, template, palette);
+  if (!range) return null;
+  const kelvin = Math.round(rng.float(range[0], range[1]) / 10) * 10;
+  palette.lightColor = kelvinToLightColor(kelvin);
+  palette.ambient = tintTowards(palette.ambient, palette.lightColor, 0.45);
+  return kelvin;
+}
+
+/** base の輝度を保ちつつ色味を tint へ k だけ寄せる */
+function tintTowards(base: number, tint: number, k: number): number {
+  const br = (base >> 16) & 255, bg = (base >> 8) & 255, bb = base & 255;
+  const tr = (tint >> 16) & 255, tg = (tint >> 8) & 255, tb = tint & 255;
+  const lum = 0.299 * br + 0.587 * bg + 0.114 * bb;
+  const tl = Math.max(1, 0.299 * tr + 0.587 * tg + 0.114 * tb);
+  const s = lum / tl;
+  const mix = (b: number, t: number) => Math.round(Math.min(255, Math.max(0, b * (1 - k) + t * s * k)));
+  return (mix(br, tr) << 16) | (mix(bg, tg) << 8) | mix(bb, tb);
+}
+

@@ -1,6 +1,8 @@
 /**
  * PropRepetition — 同一プロップの大量反復（U11 luggage 0.8 / U15 sameProduct 1.0 / R03 banquetTable 1.0 /
  * R20 storageDoor 1.0 / L13 serverRack 1.0 / L17 apartmentBlock 1.0）。params: propId, density（基準間隔の逆数）, scale（既定 1.0）。
+ * propId 別の追加 params: sameProduct は mat（商品の MatId。省略時は seed で 6 種から 1 つ）と size（[w, h, d] m。細い w < 0.12 は円柱近似）、
+ * storageDoor は doorMat（扉板の見た目の MatId。省略時 doorMetal）。
  *
  * layout フックの決定論 post-pass。propId ごとの戦略:
  *  - grid（banquetTable / apartmentBlock / 既定 crates）: シェル以降の家具（FURNITURE_MATS）を捨て、格子（基準間隔 × scale / density）に再配置。
@@ -8,6 +10,8 @@
  *  - shelfFill（sameProduct / serverRack / storageDoor）: GridGenerator の棚ブロック（shelfMetal / furnitureDark / metal の高い solid 箱）を検出し、
  *    その中身（非 solid の詰め物）を捨てて、同一ユニットを面に並べる。棚が無ければ自前で棚列を作る（fallback 部屋）。
  *    storageDoor の扉板は非 solid の 'doorMetal' 箱として L.boxes に出す（DuplicateNumber が「doorMetal の非 solid 箱 = 扉」として番号を貼れるように）。
+ *    doorMat が doorMetal 以外のときは、その doorMetal 箱を裏板にして手前に doorMat の薄い化粧板を重ねる（番号板は化粧板の 6 mm 手前に出る）。
+ *  - ドレッシングの箱（kind が 'dress:' で始まる。generators/dressing）は removeFills / removeInterior で捨てない（PropRepetition.shared.isDress）。
  *  - ring（luggage）: 矩形リングのコンベア（solid 'metal' + 'rubber' ベルト面）を作り、その上に同一スーツケースを instances で並べる。
  * 通路: ソケット前 ±1.6 m と入口→各出口の直線帯 1.2 m は solid を置かない（PropRepetition.shared の Clearance）。
  * Tier: instances は RoomBuilder が instanceScale で間引く。solid 箱の数・位置は Tier に依らない。
@@ -18,9 +22,9 @@ import type { Rng } from '../../core/rng';
 import type { Rect } from '../../generators/footprint';
 import { box, type Box, type InstanceSpec, type MatId, type RoomLayout } from '../../generators/layout';
 import type { ModifierImpl } from '../types';
-import { num, str } from '../util';
+import { num, str, vec3 } from '../util';
 import {
-  boxBlocked, clamp, clearanceOf, innerRect, interiorBoxesOf, isFurniture, overlapsSolid, pushInstances, removeInterior, type Clearance,
+  boxBlocked, clamp, clearanceOf, innerRect, interiorBoxesOf, isDress, isFurniture, overlapsSolid, pushInstances, removeInterior, type Clearance,
 } from './PropRepetition.shared';
 
 const MAX_PER_SPEC = 12000;
@@ -36,8 +40,8 @@ const PropRepetition: ModifierImpl = {
     switch (propId) {
       case 'luggage': return luggage(L, c, rng, density, scale);
       case 'banquetTable': return banquetTable(L, c, rng, density, scale);
-      case 'sameProduct': return sameProduct(L, c, rng, density, scale);
-      case 'storageDoor': return storageDoor(L, c, rng, density, scale);
+      case 'sameProduct': return sameProduct(L, c, rng, density, scale, params);
+      case 'storageDoor': return storageDoor(L, c, rng, density, scale, params);
       case 'serverRack': return serverRack(L, c, rng, density, scale);
       case 'apartmentBlock': return apartmentBlock(L, c, rng, density, scale);
       default: return crates(L, c, rng, density, scale);
@@ -90,9 +94,9 @@ function findBlocks(L: RoomLayout, mats: MatId[], minH: number, minThick: number
   return interiorBoxesOf(L).filter((b) => b.solid && mats.includes(b.mat) && b.max[1] - b.min[1] >= minH && Math.min(b.max[0] - b.min[0], b.max[2] - b.min[2]) >= minThick && Math.max(b.max[0] - b.min[0], b.max[2] - b.min[2]) >= 1.2);
 }
 
-/** ブロックに掛かる非 solid の詰め物を捨てる（照明パネルは天井付近なので掛からない） */
+/** ブロックに掛かる非 solid の詰め物を捨てる（照明パネルは天井付近なので掛からない。ドレッシングの箔 `dress:*` は removeInterior が残す） */
 function removeFills(L: RoomLayout, blocks: Box[]): void {
-  removeInterior(L, (b) => !b.solid && !/^light|^ceiling/.test(b.mat) && blocks.some((k) => b.min[0] < k.max[0] + 0.15 && b.max[0] > k.min[0] - 0.15 && b.min[2] < k.max[2] + 0.15 && b.max[2] > k.min[2] - 0.15 && b.min[1] < k.max[1] + 0.1 && b.max[1] > k.min[1] - 0.1));
+  removeInterior(L, (b) => !b.solid && !isDress(b) && !/^light|^ceiling/.test(b.mat) && blocks.some((k) => b.min[0] < k.max[0] + 0.15 && b.max[0] > k.min[0] - 0.15 && b.min[2] < k.max[2] + 0.15 && b.max[2] > k.min[2] - 0.15 && b.min[1] < k.max[1] + 0.1 && b.max[1] > k.min[1] - 0.1));
 }
 
 /** 棚が無い部屋（fallback）に自前の棚列を作る。axis 'x' の列を z 間隔で */
@@ -327,22 +331,30 @@ function luggage(L: RoomLayout, c: Clearance, rng: Rng, density: number, scale: 
 
 // ---------------------------------------------------------------- sameProduct（U15）
 
-function sameProduct(L: RoomLayout, c: Clearance, rng: Rng, density: number, scale: number): void {
+/** 細い商品（w < 0.12 m）は箔 2 枚を 45° ずらして重ね、8 角柱（ボトル）に近似する。InstanceSpec は箱しか描けない（RoomBuilder.buildInstances） */
+const THIN_PRODUCT_W = 0.12;
+
+function sameProduct(L: RoomLayout, c: Clearance, rng: Rng, density: number, scale: number, params: Record<string, unknown>): void {
   let blocks = findBlocks(L, ['shelfMetal', 'furnitureLight', 'furnitureDark'], 1.3, 0.5);
   if (blocks.length === 0) blocks = makeRows(L, c, rng, { aisle: 2.2, depth: 0.9, height: 1.7, mat: 'shelfMetal', segment: 6 });
   removeFills(L, blocks);
-  // 商品は seed で 1 種（全て同じ）
-  const mat = rng.pick<MatId>(['boxCardboard', 'carPaint', 'wallGreen', 'yellowLine', 'upholstery', 'lightGreen']);
-  const pw = 0.28 * scale, ph = 0.36 * scale, pd = 0.24 * scale;
-  let pitch = Math.max(pw + 0.02, (0.32 * scale) / density);
-  // 上限を超えそうなら間隔を広げる（Tier 間引きは RoomBuilder 側）
+  // 商品は 1 種（全て同じ）。params.mat があればそれ、無ければ seed で 6 種から（rng の消費は mat 指定時のみ省く = 同じ params なら同じ結果）
+  const mat: MatId = typeof params.mat === 'string' && params.mat ? (params.mat as MatId) : rng.pick<MatId>(['boxCardboard', 'carPaint', 'wallGreen', 'yellowLine', 'upholstery', 'lightGreen']);
+  // 寸法: params.size（[w, h, d] m。scale を掛ける）か既定の箱 0.28 × 0.36 × 0.24
+  const sized = Array.isArray(params.size);
+  const [pw, ph, pd] = sized ? (vec3(params.size, [0.28, 0.36, 0.24]).map((v) => Math.max(0.02, v) * scale) as Vec3) : [0.28 * scale, 0.36 * scale, 0.24 * scale];
+  const thin = pw < THIN_PRODUCT_W;
+  // 間隔: 既定は従来の 0.32 / density。size 指定時は幅 + 4 cm を基準にする（細いボトルほど密に並ぶ）
+  let pitch = sized ? Math.max(pw + 0.02, (pw + 0.04) / density) : Math.max(pw + 0.02, (0.32 * scale) / density);
+  // 上限を超えそうなら間隔を広げる（Tier 間引きは RoomBuilder 側）。円柱近似は箔 2 枚なので上限を半分に
+  const cap = thin ? MAX_PER_SPEC / 2 : MAX_PER_SPEC;
   const estimate = () => blocks.reduce((n, b) => {
     const len = Math.max(b.max[0] - b.min[0], b.max[2] - b.min[2]);
     const h = b.max[1] - b.min[1];
     const levels = Math.max(1, Math.floor((h - 0.3) / Math.max(0.9, h / 3)));
     return n + (len / pitch) * 2 * levels;
   }, 0);
-  while (estimate() > MAX_PER_SPEC) pitch *= 1.25;
+  while (estimate() > cap) pitch *= 1.25;
   const spec: InstanceSpec = { mat, size: [pw, ph, pd], transforms: [], solid: false };
   for (const b of blocks) {
     const h = b.max[1] - b.min[1];
@@ -356,20 +368,30 @@ function sameProduct(L: RoomLayout, c: Clearance, rng: Rng, density: number, sca
         const n = Math.floor((f.a1 - f.a0 - 0.2) / pitch);
         const start = f.a0 + ((f.a1 - f.a0) - n * pitch) / 2 + pitch / 2;
         for (let k = 0; k < n; k++) {
+          if (thin && spec.transforms.length >= cap) break;
           spec.transforms.push({ pos: onFace(f, start + k * pitch, off, y), yaw: f.alongX ? 0 : Math.PI / 2 });
         }
       }
     }
   }
   pushInstances(L, rng, spec);
+  if (thin && spec.transforms.length) {
+    // 45° 回した同じ箔を同じ順序で重ねる（pushInstances のシャッフル後の配列を写すので、Tier の等間隔間引きで 2 枚が同じ個体に残る）
+    const twin: InstanceSpec = { mat, size: [pw, ph, pd], transforms: spec.transforms.map((t) => ({ ...t, yaw: t.yaw + Math.PI / 4 })), solid: false };
+    L.instances!.push(twin);
+  }
 }
 
 // ---------------------------------------------------------------- storageDoor（R20）
 
-function storageDoor(L: RoomLayout, c: Clearance, rng: Rng, density: number, scale: number): void {
+function storageDoor(L: RoomLayout, c: Clearance, rng: Rng, density: number, scale: number, params: Record<string, unknown>): void {
   let blocks = findBlocks(L, ['metal', 'shelfMetal', 'wallConcrete'], 2.0, 1.4);
   if (blocks.length === 0) blocks = makeRows(L, c, rng, { aisle: 2.2, depth: 2.4, height: Math.max(2.6, L.height - 0.4), mat: 'metal', segment: 12 });
   removeFills(L, blocks);
+  // 扉板の見た目。doorMetal 以外なら doorMetal の裏板（DuplicateNumber の扉検出 = doorMetal の非 solid 箱、番号板は裏板の面 + 0.012）の手前に
+  // doorMat の薄い化粧板（0.069〜0.074）を重ねる。番号板（0.080）は化粧板の 6 mm 手前。横筋は化粧板の材質（redShutter の格子など）に任せて省く
+  const doorMat = str(params.doorMat, 'doorMetal') as MatId;
+  const skinned = doorMat !== 'doorMetal';
   const pitch = Math.max(1.2, (2.4 * scale) / density);
   const doorW = Math.min(pitch - 0.2, 2.3 * scale);
   const handles: InstanceSpec = { mat: 'metal', size: [0.05, 0.35, 0.06], transforms: [], solid: false };
@@ -383,18 +405,25 @@ function storageDoor(L: RoomLayout, c: Clearance, rng: Rng, density: number, sca
       const start = f.a0 + ((f.a1 - f.a0) - n * pitch) / 2 + pitch / 2;
       for (let k = 0; k < n; k++) {
         const a = start + k * pitch;
-        // 扉板（非 solid の doorMetal 箱。DuplicateNumber が扉として番号を貼る）
+        // 扉板（非 solid の doorMetal 箱。DuplicateNumber が扉として番号を貼る）。化粧板があるときは裏板（0.02〜0.068）
         const lo = onFace(f, a - doorW / 2, 0.02, b.min[1] + 0.02);
-        const hi = onFace(f, a + doorW / 2, 0.07, b.min[1] + 0.02 + doorH);
+        const hi = onFace(f, a + doorW / 2, skinned ? 0.068 : 0.07, b.min[1] + 0.02 + doorH);
         L.boxes.push(box(lo, hi, 'doorMetal', false));
+        if (skinned) {
+          const slo = onFace(f, a - doorW / 2 - 0.02, 0.069, b.min[1] + 0.015);
+          const shi = onFace(f, a + doorW / 2 + 0.02, 0.074, b.min[1] + 0.02 + doorH + 0.01);
+          L.boxes.push(box(slo, shi, doorMat, false));
+        }
         // 枠（wallDark の薄い帯）
         const flo = onFace(f, a - doorW / 2 - 0.06, 0.0, b.min[1] + doorH + 0.02);
         const fhi = onFace(f, a + doorW / 2 + 0.06, 0.08, b.min[1] + doorH + 0.14);
         L.boxes.push(box(flo, fhi, 'wallDark', false));
-        // 取手とシャッターの横筋
+        // 取手とシャッターの横筋（横筋は既定の doorMetal のときだけ）
         handles.transforms.push({ pos: onFace(f, a + doorW / 2 - 0.3, 0.1, b.min[1] + 0.95), yaw: f.alongX ? 0 : Math.PI / 2 });
-        for (let y = b.min[1] + 0.5; y < b.min[1] + doorH - 0.2; y += 0.5) {
-          ribs.transforms.push({ pos: onFace(f, a, 0.085, y), yaw: f.alongX ? 0 : Math.PI / 2 });
+        if (!skinned) {
+          for (let y = b.min[1] + 0.5; y < b.min[1] + doorH - 0.2; y += 0.5) {
+            ribs.transforms.push({ pos: onFace(f, a, 0.085, y), yaw: f.alongX ? 0 : Math.PI / 2 });
+          }
         }
       }
     }

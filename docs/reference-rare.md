@@ -29,7 +29,7 @@
 | R17 | 0 | +0.5k | 0 | 14 | 56 | ベンチを外してベッドを置く |
 | R18 | +9 | +2.0k | 0 | 1 | 45 | |
 | R19 | +57 | +2.9k | +2 | 2 | 142 | |
-| R20 | +62 | +5.1k | 0 | 48（上限。Modifier の分は隠れる） | 480 | |
+| R20 | −20〜−41（器具を外す） | +0.4〜1.0k | 0 | 0（番号板は DuplicateNumber の 48） | 0 | A1 整理後（2026-09-21） |
 
 ライト Δ の ±1 は `wear.ts` の lightOff（器具が変わると当たり方が変わる）による差で、ドレッシングが足すのは R01 / R05 / R08 / R19 の 2 灯まで。
 
@@ -148,9 +148,9 @@
 - 参考との差: 机は最大 12 卓なので大きな部屋では中央に寄る。カップの湯気は Modifier の位置依存。
 
 ### R20 巨大トランクルーム（GridGenerator StorageGrid + PropRepetition storageDoor + DuplicateNumber）
-- 実装: PropRepetition が後で置く doorMetal の扉板（面から 0.02〜0.07）・枡・横筋・DuplicateNumber の番号（≈0.082）の手前 0.10〜0.116 に redShutter のソリッド箔（同じ規則で位置を再計算。ソリッドなのは Modifier の removeFills がブロック 0.15 m 以内の非ソリッド箔を捨てるため）、番号「A-1xx」を 0.13 に自前で（DuplicateNumber の duplicateRate で重複）。通路の中心線に蛍光灯のライン（長い lightPanel）。灰の床はそのまま。
-- 見えたもの（`R20-s7-entry` / `-diag`）: 両側に赤いシャッターの列と番号板、取手、頭上の蛍光灯ライン。
-- 参考との差: Modifier の灰色の扉板・枡・横筋（最大 250 箱 + instances）が裏に残る（隠れているだけ）。規則を二重に持つ（依頼済み）。
+- 実装（2026-09-21 A1 で整理）: 赤いシャッターは PropRepetition storageDoor の params `doorMat: 'redShutter'`（rooms.json）で Modifier 側が出す（doorMetal の裏板 0.02〜0.068 = DuplicateNumber の扉検出用 + redShutter の化粧板 0.069〜0.074、番号板は 0.080、横筋は省く。取手・枡はそのまま）。ドレッシングは通路の中心線の蛍光灯ライン（長い lightPanel）と灰の ambient だけ。以前の redShutter のソリッド箔（最大 260）と自前の番号板（規則の二重実装）は外した。
+- 見えたもの（`R20-s7-entry` / `-diag` → A1 後 `R20-s7-after.jpg`）: 両側に赤いシャッターの列と DuplicateNumber の番号板、取手、頭上の蛍光灯ライン。見た目は整理前と同じ。
+- 構築時間 seed 7: 125 → 95 ms（横筋 800 instances とソリッド箔 200 が無くなった分）。箔 673 → 673（裏板 + 化粧板 = 以前のソリッド箔と同数）。
 
 ## 保留（まとめ）
 - R04: 格子天井 + 蛍光灯は FakeSky(dusk) と矛盾 → 生垣のみ。判断待ち。

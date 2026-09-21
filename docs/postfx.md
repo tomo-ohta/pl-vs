@@ -168,3 +168,9 @@ renderer.render 相当（毎フレーム Game.renderFrame → PostFX.render）
 | AgX vs ACES、直接描画（C06） | `C06-clean-agx.jpg` / `C06-clean-aces.jpg` / `C06-off.jpg` |
 | GTAO あり / なし（C11） | `C11-clean.jpg` / `C11-nogtao.jpg` |
 | 部屋別 fog の shim（R06、composer / 直接描画） | `R06-clean.jpg` / `R06-off.jpg` |
+
+## 12. 水面の透過パスと霧の順序（P2、2026-09-21）
+
+- `water` / `waterShallow` / `waterWall` が `MeshPhysicalMaterial`（transmission）になった（`docs/material-variation.md` 11.4）。three は透過物が見えるフレームで不透明物を transmission RT にもう 1 回描く（`renderer.transmissionResolutionScale` は既定 1.0。ガラスが見える部屋では従来から発生）。GPU が厳しければ `transmissionResolutionScale = 0.5` を Game 側で設定できる（水面のぼかしが粗くなるだけ）。
+- RenderPass の RT へ描くときも透過パスはカメラごとの RT に描かれ、GTAO の法線パス（overrideMaterial）では省かれる。
+- 霧の順序: 夜景（`windowNight` の emissive）と水面はどちらも `fog_fragment`（scene.fog）→ roomFog（`linearToOutputTexel` 後の mix）の順で霧に沈む。雨の Points は材質側で霧を受けないので、遠い雨は霧に沈まない（M18 では窓まで 3.5 m なので目立たない）。
