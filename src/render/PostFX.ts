@@ -36,7 +36,8 @@ export const TONE_MAPPINGS: Record<ToneMappingId, THREE.ToneMapping> = {
   agx: THREE.AgXToneMapping,
 };
 /** 露出（旧 1.25。焼き込み側で「器具直下 : 器具の間 : 突き当たり ≈ 1 : 0.45 : 0.15」に調整する前提で下げる） */
-export const DEFAULT_EXPOSURE = 1.0;
+// ~0.86 EV below the previous baseline; bright rooms retain their designed lights.
+export const DEFAULT_EXPOSURE = 0.55;
 
 export interface PostFXConfig {
   gtao: boolean;
@@ -62,7 +63,8 @@ export const GTAO_PARAMS = {
 };
 
 /** ブルーム（閾値は線形 HDR の輝度。発光箔 emission 2.3〜2.8 だけが超え、壁面 < 1 は滲まない。scale: 明部抽出〜ミップの基準解像度 = 実解像度 × scale / 2） */
-export const BLOOM_PARAMS = { strength: 0.12, radius: 0.3, threshold: 1.5, scale: 0.5 }; // 閾値を上げて黒い穴・消灯した器具・窓の夜景が灰色に浮かないようにする
+// 2026-09-23: 夜景の窓・街灯・サインなど光る場所すべてに掛かるよう閾値 1.5 → 1.0（壁の照り返しは線形 1.0 未満）。強度・半径は少し上げる
+export const BLOOM_PARAMS = { strength: 0.16, radius: 0.4, threshold: 1.0, scale: 0.5 }; // 閾値を上げて黒い穴・消灯した器具・窓の夜景が灰色に浮かないようにする
 
 interface Stats { median: number; p95: number; max: number; n: number }
 

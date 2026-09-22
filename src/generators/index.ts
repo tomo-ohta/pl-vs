@@ -22,6 +22,7 @@ import { generateDynamicGrid, variants as dynamicGridVariants } from './DynamicG
 import { applyLayoutModifiers } from '../modifiers';
 import { applyWearLayout } from './wear';
 import { applyDressing } from './dressing';
+import { applyOddity } from './oddity';
 import { applyDecalRules } from './decals';
 import { applyLightKelvin } from './presets';
 
@@ -66,6 +67,7 @@ export function generateLayout(p: GenParams, fallback: boolean): RoomLayout {
   const L = generateRaw(p, fallback);
   // 部屋別ドレッシング（参考画像に合わせた大物・サイン・照明色。Modifier より前）
   applyDressing(L, p);
+  applyOddity(L, p); // 奇妙さ（間取り・配置・表面・光の仕掛け。Modifier の前）
   applyLayoutModifiers(L, p);
   // 全部屋共通の後処理（決定論。p.rng.fork で独立した乱数列）: 低確率の破れ（担当 W）→ デカール配置（担当 D）
   applyWearLayout(L, p);

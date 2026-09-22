@@ -122,7 +122,7 @@ export const SURFACES: Record<MatId, Surface> = {
   yellowLine: { texture: 'concrete', color: 0xd6b74d, meters: 1.5, roughness: .63, bump: .003 },
   // 窓の外（夜の遠景）: 生成テクスチャ 'night'（暗い青灰の空〜建物のシルエット・疎らな窓明かり・街灯の滲み。8 m × 4 m）を
   // 白い emissive で薄く光らせる。diffuse は暗く（室内光で白けない）。担当 W が窓の裏板に使う
-  windowNight: { detail: 'glass', texture: 'night', color: 0x0b0e14, meters: 4, roughness: 1, bump: 0, emission: .9, emissiveColor: 0xffffff },
+  windowNight: { detail: 'glass', texture: 'night', color: 0x0b0e14, meters: 4, roughness: 1, bump: 0, emission: 1.15, emissiveColor: 0xffffff },
   // 参考画像（COMMON 基礎ステージ）向けの差し色・部材
   seatBlue: { texture: 'carpet', color: 0x3b5578, meters: .45, roughness: .95, bump: .005 },
   lockerGreen: { texture: 'metal', color: 0x6f8a6a, meters: 1, roughness: .42, bump: .0008, metalness: .25 },
@@ -185,6 +185,8 @@ export const SURFACES: Record<MatId, Surface> = {
   skyDusk: { texture: 'sky', color: 0xd28a5a, meters: 40, roughness: 1, bump: 0, emission: 1.0, doubleSide: true },
   skyNoon: { texture: 'sky', color: 0x8fb8ea, meters: 40, roughness: 1, bump: 0, emission: 1.4, doubleSide: true },
   /** 浅水（ShallowWater）。床の上に貼る水面（透過。水深 = 部屋座標 y。岸際は透明） */
+  // 出所の無い水たまり（oddity）。透過（transmission）を使わない Standard: Common の部屋にも置くので、透過パスの毎フレームの追加描画を避ける
+  puddle: { texture: 'water', color: 0x7f9a98, meters: 2, roughness: .05, bump: .001, opacity: .55, flow: .8 },
   waterShallow: { texture: 'water', color: 0xdce9e6, meters: 2.5, roughness: .05, bump: .0015, flow: 1.4, water: { transmission: .88, ior: 1.33, attenuationColor: 0x5aa39a, attenuationDistance: 1.0, reflect: 1.8, thickness: 1, depthFromFloor: true, albedoMix: .65 } },
   /** 水の壁（WaterWall）。開口を塞ぐ縦の水面（両面。厚みは一定 0.3 m） */
   waterWall: { texture: 'water', color: 0xc4dcd8, meters: 2, roughness: .05, bump: .002, flow: 2.2, doubleSide: true, water: { transmission: .85, ior: 1.33, attenuationColor: 0x2f7a74, attenuationDistance: .6, reflect: 1.8, thickness: .3, albedoMix: .6 } },
@@ -932,6 +934,17 @@ export class MaterialLibrary {
     const parallaxScale = { value: parallaxHeight };
     // Generated irradiance supplements indirect diffuse, preserving direct PBR response.
     m.onBeforeCompile = (shader) => {
+      if (s.texture === 'water' && !flat && !legacy) {
+        // 水面: 手続きの小波（3 方向）+ 足音の波紋（共有 uniform）で法線を揺らす。水平な面だけ（幾何法線 y > 0.5）。
+        // 反射（envMap・器具の鏡面）と透過の屈折の両方が揺れるので「透明な板」に見えない
+        shader.uniforms.surfaceTime = this.clock;
+        shader.uniforms.waterRipples = this.waterRipples;
+        shader.uniforms.waterWaves = { value: s.opacity !== undefined ? 0.7 : 1.0 };
+        shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWaterWorld; varying vec3 vWaterGeoN;');
+        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvWaterWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWaterGeoN = normalize(mat3(modelMatrix) * objectNormal);');
+        shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${WATER_PARS_GLSL}`);
+        shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = liminalWaterNormal(normal);');
+      }
       if (s.flow && !flat) {
         shader.uniforms.surfaceTime = this.clock;
         shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float surfaceTime;');
@@ -1026,7 +1039,7 @@ vNightPhase = fract(sin(dot(nightCell, vec2(12.9898, 78.233))) * 43758.5453);`);
     const family = flat ? 'flat' : legacy ? 'legacy' : cc0 ? (cc0Albedo ? 'cc0' : 'cc0paint') : authored ? 'authored' : 'plain';
     // physical の種類（glass / water / gloss / carPaint）は three 側のキー（clearcoat / transmission の有無）で分かれるが、可読性のため明示する
     const phys = !physical ? '' : waterSpec ? (waterSpec.depthFromFloor ? '-water-depth' : '-water') : s.glass ? '-glass' : s.gloss ? '-gloss' : '-coat';
-    m.customProgramCacheKey = () => `liminal-pbr-v4-${varied || worn ? SURFACE_VARIATION_KEY : 'plain'}-${varied ? 'macro' : 'nomacro'}-${family}-${blendParams ? 'tile' : 'notile'}-${pom ? 'pom' : 'nopom'}-${s.flow && !flat ? 'flow' : 'static'}-${s.grid && !flat && !legacy && !cc0 ? s.grid.join(',') : 'nogrid'}-${gradient ? 'grad' : 'nograd'}-${fogSpec ? 'roomfog' : 'scenefog'}${night ? '-night' : ''}${phys}`;
+    m.customProgramCacheKey = () => `liminal-pbr-v4-${varied || worn ? SURFACE_VARIATION_KEY : 'plain'}-${varied ? 'macro' : 'nomacro'}-${family}-${blendParams ? 'tile' : 'notile'}-${pom ? 'pom' : 'nopom'}-${s.flow && !flat ? 'flow' : 'static'}-${s.grid && !flat && !legacy && !cc0 ? s.grid.join(',') : 'nogrid'}-${gradient ? 'grad' : 'nograd'}-${fogSpec ? 'roomfog' : 'scenefog'}${night ? '-night' : ''}${phys}${s.texture === 'water' && !flat && !legacy ? '-water' : ''}`;
     return m;
   }
 
@@ -1152,6 +1165,16 @@ vNightPhase = fract(sin(dot(nightCell, vec2(12.9898, 78.233))) * 43758.5453);`);
   setDiagnostic(mode: string): void { this.diagnostic.value = Math.max(0, ['beauty','albedo','roughness','normal','baked','direct','wear','environment'].indexOf(mode)); }
 
   update(dt: number): void { this.clock.value += dt; }
+
+  /** 水面の波紋（最大 8 個のリングバッファ。x, z, 発生時刻, 強さ）。水材質が共有する uniform */
+  readonly waterRipples = { value: Array.from({ length: WATER_RIPPLES }, () => new THREE.Vector4(0, 0, -100, 0)) };
+  private rippleHead = 0;
+  /** 足音などで波紋を起こす（ワールド座標）。強さ 1 = 通常の一歩 */
+  addRipple(x: number, z: number, strength = 1): void {
+    const v = this.waterRipples.value[this.rippleHead];
+    v.set(x, z, this.clock.value, strength);
+    this.rippleHead = (this.rippleHead + 1) % WATER_RIPPLES;
+  }
 
   /** 現在のバリアント数（デバッグ表示用） */
   get variantCount(): number { return this.variants.size; }
@@ -1799,6 +1822,49 @@ function createSkyTexture(): THREE.Texture {
  * 地平線はカメラの目の高さ（無限遠の地平線は常に目の高さ）。層は u 方向に周期、v はクランプ（上端 = 空、下端 = 地面の暗さ）。
  * 遠景: 45 m 奥・80 m × 40 m、近景: 12 m 奥・40 m × 40 m（アルファで遠景に重ねる）。sRGB → 線形は pow 2.2 の近似
  */
+/** 波紋の同時数 */
+export const WATER_RIPPLES = 8;
+
+/**
+ * 水面の法線の揺らぎ。手続きの小波 3 方向（波長 0.9 / 0.55 / 1.4 m、振幅 6 / 4 / 8 mm）と、足音の波紋（波長 0.25 m、速さ 1.2 m/s、
+ * 減衰 0.9 s、前線の外側は無し）から高さ勾配を解析的に求め、world の法線 (−dh/dx, 1, −dh/dz) を view 空間へ回して
+ * normal_fragment_maps の結果に足す。水平な面（幾何法線 y > 0.5）にだけ効く（E09 の縦の水壁は法線マップだけ）
+ */
+const WATER_PARS_GLSL = `
+varying vec3 vWaterWorld; varying vec3 vWaterGeoN;
+uniform float surfaceTime; uniform vec4 waterRipples[${WATER_RIPPLES}]; uniform float waterWaves;
+vec2 liminalWaveGrad(vec2 p, vec2 dir, float lambda, float amp, float omega, float t) {
+  float k = 6.2831853 / lambda;
+  float ph = dot(p, dir) * k + omega * t;
+  return dir * (amp * k * cos(ph));
+}
+vec3 liminalWaterNormal(vec3 n) {
+  vec3 gn = normalize(vWaterGeoN);
+  if (gn.y < 0.5 || waterWaves <= 0.0) return n;
+  vec2 p = vWaterWorld.xz;
+  float t = surfaceTime;
+  vec2 g = vec2(0.0);
+  g += liminalWaveGrad(p, normalize(vec2(1.0, 0.3)), 0.9, 0.006, 1.4, t);
+  g += liminalWaveGrad(p, normalize(vec2(-0.6, 1.0)), 0.55, 0.004, 2.2, t);
+  g += liminalWaveGrad(p, normalize(vec2(0.4, -0.8)), 1.4, 0.008, 0.9, t);
+  for (int i = 0; i < ${WATER_RIPPLES}; i++) {
+    vec4 rp = waterRipples[i];
+    float age = t - rp.z;
+    if (rp.w <= 0.0 || age < 0.0 || age > 2.6) continue;
+    vec2 d = p - rp.xy;
+    float r = max(length(d), 1e-3);
+    float front = 1.2 * age;
+    float env = 0.012 * rp.w * exp(-age * 1.1) * exp(-max(r - front, 0.0) * 6.0) * smoothstep(0.0, 0.12, r) / (1.0 + r * 1.5);
+    float ph = 6.2831853 * (r - front) / 0.25;
+    g += (d / r) * (env * 6.2831853 / 0.25 * cos(ph));
+  }
+  g *= waterWaves;
+  vec3 wn = normalize(vec3(-g.x, 1.0, -g.y));
+  vec3 vn = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
+  vec3 vgn = normalize((viewMatrix * vec4(gn, 0.0)).xyz);
+  return normalize(n + (vn - vgn));
+}`;
+
 const NIGHT_PARS_GLSL = `
 varying vec3 vNightWorld; varying vec3 vNightNormal; varying float vNightPhase;
 uniform sampler2D nightFar; uniform sampler2D nightNear;

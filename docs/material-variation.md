@@ -225,3 +225,9 @@ diffuseColor.rgb = max(0, liminalTone * diffuseColor.rgb)     （map_fragment �
 - `MaterialOverrides.lightTint`（sRGB hex）。RoomBuilder の `overridesFor` が `layout.palette.lightColor` を入れ、`resolveOverrides` が **器具材質（`isFixtureMat`: lightPanel / lightWarm / lightTube* / lightGreen / lightYellow で emission 付き）だけ**に残す（サイン・画面・空箔・ネオン・街灯・他の材質はキーから落ちて共有材質のまま）。
 - `createMaterial` で `emissive = 材質の発光色 × normalizedTint(lightColor)`（最大チャンネル 1 に正規化した線形色。明るさは変えない）。legacy は対象外。キーは `t` + 1/16 刻みの 3 桁 hex（白 'fff' は落とす）。
 - 確認: R01（lightColor 0xfff2e4）で `lightWarm|tfdc` emissive #ffc789（変更前 #ffd29a）。器具材質の variant が部屋の色温度ごとに 1 つ増える（LRU 256 の範囲）。
+
+
+## 12. 水面の揺らぎと波紋（2026-09-23）
+`texture: 'water'` の材質（water / waterShallow / puddle / waterWall）に `onBeforeCompile` で法線の揺らぎを注入（`WATER_PARS_GLSL`）。
+手続きの小波 3 方向（波長 0.9 / 0.55 / 1.4 m、振幅 6 / 4 / 8 mm、角速度 1.4 / 2.2 / 0.9）と、`materials.addRipple(x, z, strength)` で起こす波紋（最大 8、波長 0.25 m、速さ 1.2 m/s、減衰 0.9 s）の高さ勾配から world 法線を作り、view 空間へ回して `normal_fragment_maps` の結果に足す。水平な面（幾何法線 y > 0.5）だけ。
+Game は水ゾーン内の一歩ごと（`player.onStride`）に足元へ波紋を起こす（ダッシュは強さ 1.4）。反射（envMap・器具の鏡面）と透過の屈折の両方が揺れる。

@@ -20,6 +20,8 @@ export interface InputState {
   /** しゃがみ（PC: 押している間 / スマホ: トグル） */
   crouch: boolean;
   interact: boolean;
+  /** R キーの押下（そのフレームだけ true）。懐中電灯のオン / オフ */
+  flashlight: boolean;
   menu: boolean;
   /** タップによるインタラクト（画面座標 NDC）。無ければ null */
   tap: { x: number; y: number } | null;
@@ -44,6 +46,7 @@ export class InputController {
   private lookDY = 0;
   private jumpEdge = false;
   private interactEdge = false;
+  private flashlightEdge = false;
   private menuEdge = false;
   private tap: { x: number; y: number } | null = null;
   private stick = { active: false, id: -1, x: 0, y: 0, cx: 0, cy: 0 };
@@ -86,6 +89,7 @@ export class InputController {
       this.keys.add(e.code);
       if (e.code === 'Space') this.jumpEdge = true;
       if (e.code === 'KeyE') this.interactEdge = true;
+      if (e.code === 'KeyR' && !e.repeat) this.flashlightEdge = true;
       if (e.code === 'Escape') this.menuEdge = true;
       if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
       // しゃがみ中の Ctrl+移動キーがブラウザのショートカットになるのを可能な範囲で抑える（Ctrl+W 等は抑止不可）
@@ -279,6 +283,7 @@ export class InputController {
       dash: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchDash,
       crouch: this.crouchHeld,
       interact: this.interactEdge,
+      flashlight: this.flashlightEdge,
       menu: this.menuEdge,
       tap: this.tap,
     };
@@ -286,11 +291,12 @@ export class InputController {
     this.lookDY = 0;
     this.jumpEdge = false;
     this.interactEdge = false;
+    this.flashlightEdge = false;
     this.menuEdge = false;
     this.tap = null;
     void this.touchJump;
     if (!this.enabled) {
-      return { ...st, moveX: 0, moveY: 0, lookDX: 0, lookDY: 0, jump: false, dash: false, crouch: false, interact: false, tap: null };
+      return { ...st, moveX: 0, moveY: 0, lookDX: 0, lookDY: 0, jump: false, dash: false, crouch: false, interact: false, flashlight: false, tap: null };
     }
     return st;
   }

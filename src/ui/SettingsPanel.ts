@@ -12,7 +12,7 @@
  */
 import type { Settings, SettingsData } from '../core/Settings';
 
-type SliderKey = keyof Pick<SettingsData, 'masterVolume' | 'ambientVolume' | 'sfxVolume' | 'lookSensitivity' | 'handheld'>;
+type SliderKey = keyof Pick<SettingsData, 'masterVolume' | 'ambientVolume' | 'sfxVolume' | 'lookSensitivity' | 'handheld' | 'vhsStrength'>;
 type SelectKey = keyof Pick<SettingsData, 'postfx' | 'frameHold' | 'toneMapping' | 'cameraLag' | 'recOverlay'>;
 
 interface SliderDef {
@@ -56,6 +56,7 @@ const ROWS: RowDef[] = [
       { value: 'tape', label: 'テープ（走査線・揺れ）' },
     ],
   },
+  { kind: 'slider', key: 'vhsStrength', label: 'VHS 効果', min: 0, max: 2, step: 0.05, format: (v) => (v <= 0 ? 'オフ' : `${Math.round(v * 100)}%`) },
   { kind: 'slider', key: 'handheld', label: '手持ち感', min: 0, max: 1, step: 0.05, format: (v) => (v <= 0 ? 'オフ' : pct(v)) },
   { kind: 'select', key: 'cameraLag', label: '視線の遅れ', options: ON_OFF, bool: true, note: '50 ms' },
   {

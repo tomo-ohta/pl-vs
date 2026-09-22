@@ -302,7 +302,8 @@ export class RoomBuilder {
     const ids = new Set<MatId>();
     const shared = new Set<MatId>();
     const instanced = new Set<MatId>();
-    const boxes = legacy ? layout.boxes : detailedBoxes(layout, definition?.baseTemplate);
+    // kind 'emitOnly' は焼き込みの光源にだけ数え、描かない（光源の無い明るい一角。oddity）
+    const boxes = (legacy ? layout.boxes : detailedBoxes(layout, definition?.baseTemplate)).filter((b) => b.kind !== 'emitOnly');
     for (const original of boxes) {
       const themed = original.propGroup && original.kind === 'plant' ? { ...original, mat: 'paintWhite' as const } : original.mat === 'plant' && !legacy && Math.min(...original.max.map((v,k)=>v-original.min[k]))>.15 ? {...original,mat:'plantLeaf' as const} : definition?.baseTemplate === 'Theater' && original.mat === 'furnitureDark' ? { ...original, mat: 'upholstery' as const } : original;
       const s = SURFACES[themed.mat];
@@ -385,7 +386,7 @@ export class RoomBuilder {
     const replaced = new Set(propPlan.flatMap(pp => pp.box.propGroup ? propGroups.get(pp.box.propGroup)!.filter(b=>b.mat==='plant') : [pp.box]));
     if (vehicles.length) for (const b of work.boxes) if (b.vehicle) replaced.add(b);
     const visibleWork = replaced.size ? { ...work, boxes: work.boxes.filter((b) => !replaced.has(b)) } : work;
-    let displayBoxes = legacy ? work.boxes : detailedBoxes(visibleWork, definition?.baseTemplate);
+    let displayBoxes = (legacy ? work.boxes : detailedBoxes(visibleWork, definition?.baseTemplate)).filter((b) => b.kind !== 'emitOnly');
     if(!legacy) for(const b of visibleWork.boxes) if(b.propGroup && b.kind==='plant') {
       const r=Math.min(b.max[0]-b.min[0],b.max[2]-b.min[2])*.425, x=(b.min[0]+b.max[0])/2,z=(b.min[2]+b.max[2])/2,y=b.min[1]+(b.max[1]-b.min[1])*.84;
       displayBoxes.push({min:[x-r,y-.01,z-r],max:[x+r,y,z+r],mat:'plantSoil',solid:false});
@@ -485,7 +486,7 @@ export class RoomBuilder {
       const themed = original.propGroup && original.kind === 'plant' ? { ...original, mat: 'paintWhite' as const } : original.mat === 'plant' && !legacy && Math.min(...original.max.map((v,k)=>v-original.min[k]))>.15 ? {...original,mat:'plantLeaf' as const} : definition?.baseTemplate === 'Theater' && original.mat === 'furnitureDark' ? { ...original, mat: 'upholstery' as const } : original;
       const osx = themed.max[0] - themed.min[0];
       const osy = themed.max[1] - themed.min[1];
-      const special = !legacy && (!!themed.propGroup || (themed.mat === 'rubber' && osx < .3 && osy > .4) || (themed.mat === 'plantLeaf'));
+      const special = !legacy && (!!themed.propGroup || (themed.mat === 'rubber' && osx < .3 && osy > .4) || (themed.mat === 'plantLeaf') || themed.mat === 'puddle');
       const target = lmWanted && !special && isLightmapTarget(themed, !!SURFACES[themed.mat].emission, !!SURFACES[themed.mat].decal);
       for (const b of special ? [themed] : splitByChunk(themed)) {
         if (b.max[0] - b.min[0] <= 0.0001 || b.max[1] - b.min[1] <= 0.0001 || b.max[2] - b.min[2] <= 0.0001) continue;
@@ -521,6 +522,10 @@ export class RoomBuilder {
       let g: THREE.BufferGeometry;
       if (part.geometry) {
         g = part.geometry;
+        applyMetricUV(g, b.mat);
+      } else if (!legacy && b.mat === 'puddle') {
+        // 水たまり: 箱の足跡に収まる不定形の平面（角の無い輪郭。中心座標で決まる固定シード）
+        g = puddleGeometry(b);
         applyMetricUV(g, b.mat);
       } else if (!legacy && b.mat === 'plantSoil') {
         g=new THREE.CylinderGeometry(sx/2,sx/2,sy,32);g.translate((b.min[0]+b.max[0])/2,(b.min[1]+b.max[1])/2,(b.min[2]+b.max[2])/2);applyMetricUV(g,b.mat);
@@ -1632,4 +1637,30 @@ function installProps(
     });
   }
   return now;
+}
+
+/**
+ * 水たまりの不定形ジオメトリ（oddity の 'puddle'）。箱の足跡（楕円の半径 rx / rz）に収まる 28 頂点の輪郭を、
+ * 中心座標から決めた固定シードの 2〜5 次の正弦で揺らして作る。上向きの平面（法線 +Y）を箱の上面の高さに置く
+ */
+function puddleGeometry(b: Box): THREE.BufferGeometry {
+  const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2;
+  const rx = (b.max[0] - b.min[0]) / 2, rz = (b.max[2] - b.min[2]) / 2;
+  let seed = ((Math.round(cx * 100) * 73856093) ^ (Math.round(cz * 100) * 19349663)) >>> 0;
+  const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  const a1 = rnd() * Math.PI * 2, a2 = rnd() * Math.PI * 2, a3 = rnd() * Math.PI * 2;
+  const k1 = 0.14 + rnd() * 0.1, k2 = 0.07 + rnd() * 0.08;
+  const N = 28;
+  const shape = new THREE.Shape();
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * Math.PI * 2;
+    const rr = 0.78 + k1 * Math.sin(2 * t + a1) + k2 * Math.sin(3 * t + a2) + 0.05 * Math.sin(5 * t + a3);
+    const x = Math.cos(t) * rx * rr, y = Math.sin(t) * rz * rr;
+    if (i === 0) shape.moveTo(x, y); else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  const g = new THREE.ShapeGeometry(shape, 1);
+  g.rotateX(-Math.PI / 2);
+  g.translate(cx, b.max[1], cz);
+  return g;
 }

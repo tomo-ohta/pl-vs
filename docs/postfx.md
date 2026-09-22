@@ -174,3 +174,6 @@ renderer.render 相当（毎フレーム Game.renderFrame → PostFX.render）
 - `water` / `waterShallow` / `waterWall` が `MeshPhysicalMaterial`（transmission）になった（`docs/material-variation.md` 11.4）。three は透過物が見えるフレームで不透明物を transmission RT にもう 1 回描く（`renderer.transmissionResolutionScale` は既定 1.0。ガラスが見える部屋では従来から発生）。GPU が厳しければ `transmissionResolutionScale = 0.5` を Game 側で設定できる（水面のぼかしが粗くなるだけ）。
 - RenderPass の RT へ描くときも透過パスはカメラごとの RT に描かれ、GTAO の法線パス（overrideMaterial）では省かれる。
 - 霧の順序: 夜景（`windowNight` の emissive）と水面はどちらも `fog_fragment`（scene.fog）→ roomFog（`linearToOutputTexel` 後の mix）の順で霧に沈む。雨の Points は材質側で霧を受けないので、遠い雨は霧に沈まない（M18 では窓まで 3.5 m なので目立たない）。
+
+## 追記（2026-09-23）: ブルームの閾値
+UnrealBloom の閾値を 1.5 → 1.0、強度 0.16、半径 0.4。夜景の窓（emission 0.9 → 1.15）・街灯・サイン・器具など光る場所すべてに滲みが掛かる。壁の照り返しは線形 1.0 未満なので滲まない。
