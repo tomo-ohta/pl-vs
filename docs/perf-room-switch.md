@@ -18,7 +18,8 @@
   同期構築はここに乗る。
 - `game.toggleDoor(roomId, portalId)`: E / タップと同じ経路（施錠・Modifier の拒否・乗車・Seam・開閉）を外から呼べる（`interactRay` もこれを使う）。
 - `window.__buildProfile`（最新 200 件）に `steps` / `frames`（分割構築の中断回数・またいだフレーム数）を追加。
-- 前後比較のスイッチ: URL `?l2=off` で本作業の機能を全て無効（`?l2=bitmap,queue,prefetch,split,precompile` で個別に無効）。
+- 前後比較のスイッチ: URL `?l2=off` で本作業の機能を全て無効（`?l2=bitmap,queue,prefetch,split,precompile,throttle` で個別に無効）。
+- `throttle`（CC0 テクスチャ取得の並列数制限と再試行）と、起動時の一括先読みの廃止は `docs/texture-loading.md`。
   同じビルドで「修正前」相当の数値が取れる（`L2_FLAGS`、`window.__l2flags`）。
 
 ### 計測手順（自動）
