@@ -30,6 +30,7 @@ import { MaterialLibrary, L2_FLAGS } from '../render/MaterialLibrary';
 import { PostFX, TONE_MAPPINGS, DEFAULT_EXPOSURE, type PostFXConfig } from '../render/PostFX';
 import { VIDEO_PRESETS } from '../render/VideoPass';
 import type { FilmPreset } from '../render/FilmPreset';
+import { PlayerFlashlight } from '../render/PlayerFlashlight';
 import { RecOverlay } from '../ui/RecOverlay';
 import { RoomBuilder, type BuiltRoom } from '../render/RoomBuilder';
 import { DoorLeakSystem, SEAM_CLOSED_RANGE, CLOSED_RANGE, type DoorLeakEntry, type LeakStyle } from '../render/DoorLeak';
@@ -222,6 +223,9 @@ export class Game {
   readonly settingsPanel: SettingsPanel;
   /** ポスト処理（GTAO / bloom / 撮像 pass / OutputPass）と描画時間の計測。Tier と設定 postfx から applyPostFxConfig が組む */
   readonly postfx: PostFX;
+  readonly flashlight = new PlayerFlashlight(this.scene);
+  /** 懐中電灯のオン / オフ（R キー。既定オン） */
+  flashlightOn = true;
   /** REC・タイムコード表示（DOM。設定 recOverlay。playing / riding / transition の間だけ見せる） */
   readonly recOverlay = new RecOverlay(document.body);
   /** 地図の表示状態（MapRotation / MapErase が書く。参照は固定） */
@@ -328,12 +332,14 @@ export class Game {
       this.input.sensitivityScale = d.lookSensitivity;
       // postfx は composer を組み直す（末尾で applyCameraSettings も呼ぶ）。カメラ挙動だけの変更は pass を作り直さない
       if (changed.includes('postfx') || changed.includes('toneMapping')) this.applyPostFxConfig();
-      else if (changed.some((k) => k === 'handheld' || k === 'cameraLag' || k === 'recOverlay' || k === 'frameHold')) this.applyCameraSettings();
+      else if (changed.some((k) => k === 'handheld' || k === 'cameraLag' || k === 'recOverlay' || k === 'frameHold' || k === 'vhsStrength')) this.applyCameraSettings();
     });
     this.postfx = new PostFX(this.renderer, this.scene, this.camera);
     this.player.onStride = (rank) => {
       if (rank === 'still') return;
       this.audio.footstep(undefined, rank, this.player.crouching, this.player.inWaterZone || undefined);
+      // 水の中の一歩ごとに水面へ波紋（MaterialLibrary の水材質の共有 uniform）
+      if (this.player.inWaterZone) this.materials.addRipple(this.player.pos.x, this.player.pos.z, rank === 'dash' ? 1.4 : 1.0);
     };
     this.player.onLand = (speed) => this.audio.land(speed);
 
@@ -480,6 +486,7 @@ export class Game {
     }
     this.currentRoomId = roomId;
     const def = this.defOf(node);
+    if (prev !== roomId) this.flashlight.reset();
     // 訪問ログ（visitLog / prevRoomId）は markVisited が更新する
     this.world.graph.markVisited(roomId, node.definitionId, def?.rarity ?? null);
     // 見えている部屋（構築済み）と訪問済みの部屋は凍結し、新しい開口を追加しない。
@@ -1227,10 +1234,11 @@ export class Game {
     // 表示フレームレートの間引き: 'off' はプリセット値（configure / applyPreset が写した値）に戻す。'30' / '24' はプリセットに関係なく上書き
     const video = this.postfx.videoPass;
     if (video) {
+      video.strength = d.vhsStrength;
       const preset = VIDEO_PRESETS[this.postfx.config.film];
       video.params.frameHold = d.frameHold === 'off' ? preset.frameHold : Number(d.frameHold);
       // 設定で間引きを強制したときは残像のブレンドも入れる（プリセットが 0 のままだと保持フレームが硬く切り替わる。担当 F1b の依頼）
-      video.params.frameBlend = video.params.frameHold > 0 ? Math.max(preset.frameBlend, 0.3) : preset.frameBlend;
+      video.params.frameBlend = video.params.frameHold > 0 ? Math.max(preset.frameBlend, 0.06) : preset.frameBlend;
     }
     this.updateRecOverlay(0);
   }
@@ -1297,7 +1305,7 @@ export class Game {
    */
   perf(): ReturnType<PostFX['timer']['stats']> & { pipeline: string; shadows: number; roomSwitch: ReturnType<RoomSwitchProfiler['summary']>; uploadsPending: number } {
     this.postfx.timer.poll();
-    return { ...this.postfx.timer.stats(), pipeline: this.postfx.describe(), shadows: this.streaming?.shadowCount ?? 0, roomSwitch: this.switchProfiler.summary(), uploadsPending: this.materials.uploads.pending };
+    return { ...this.postfx.timer.stats(), pipeline: this.postfx.describe(), shadows: (this.streaming?.shadowCount ?? 0) + Number(this.flashlight.light.visible && this.flashlight.light.castShadow), roomSwitch: this.switchProfiler.summary(), uploadsPending: this.materials.uploads.pending };
   }
 
   private autoQuality(dt: number): void {
@@ -1350,6 +1358,8 @@ export class Game {
   private stepBody(dt: number, stepStart: number): void {
     const polled = this.input.poll();
     const input: InputState = this.devInput ? { ...polled, ...this.devInput } : polled;
+    // R で懐中電灯のオン / オフ（メニュー中は無視）
+    if (input.flashlight && this.state === 'playing') { this.flashlightOn = !this.flashlightOn; this.hud.setHint(this.flashlightOn ? '懐中電灯: オン' : '懐中電灯: オフ'); }
     if (input.menu) {
       if (this.state === 'playing') this.openMenu();
       else if (this.state === 'menu') this.closeMenu();
@@ -1414,6 +1424,7 @@ export class Game {
     this.audio.setListener([cam.x, cam.y, cam.z], this.player.yaw, this.player.pitch);
     this.audio.update(dt);
     // 撮像 pass への入力: 表示カメラの回転速度（回転ブラー）・環境音の大きさ（暗部ノイズ）。REC 表示の更新
+    this.flashlight.update(this.camera, this.state === 'menu' ? 0 : dt, this.flashlightOn && !!this.currentRoomId && this.state !== 'start', this.tier.id === 'low');
     this.updateCameraMotion(dt);
     this.postfx.setAudioNoise(this.audio.ambientLevel);
     this.updateRecOverlay(dt);

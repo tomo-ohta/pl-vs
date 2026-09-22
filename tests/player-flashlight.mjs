@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { PlayerFlashlight } from '../src/render/PlayerFlashlight.ts';
+
+const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+const torch = new PlayerFlashlight(scene);
+const direction = () => torch.light.target.position.clone().sub(torch.light.position).normalize();
+torch.update(camera, 1 / 60, true);
+camera.rotation.y = Math.PI / 2;
+torch.update(camera, 1 / 60, true);
+const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+const lag = direction().angleTo(forward);
+assert(lag > .01 && lag < .245, 'Turn inertia must remain within the visible forward cone');
+for (let i = 0; i < 60; i++) torch.update(camera, 1 / 60, true);
+assert(direction().angleTo(forward) < .004, 'Beam must settle on the viewing direction');
+const stationary = direction();
+let peakSway = 0;
+for (let i = 0; i < 60; i++) {
+  camera.position.z -= .05; torch.update(camera, 1 / 60, true);
+  peakSway = Math.max(peakSway, direction().angleTo(stationary));
+}
+assert(peakSway > .01, 'Walking must sway the beam');
+assert(torch.light.position.equals(camera.position), 'Light origin must not extend through a nearby wall');
+const paused = direction();
+torch.update(camera, 0, true);
+assert(direction().distanceTo(paused) < 1e-10, 'Menu pause must stop sway');
+camera.position.set(100, 2, 100); camera.rotation.y = Math.PI;
+torch.update(camera, 1 / 60, true, true);
+assert(direction().angleTo(new THREE.Vector3(0, 0, 1)) < .004, 'Teleport must clear stale aim');
+torch.update(camera, 1 / 60, false);
+assert(!torch.light.visible);
+torch.dispose();
+assert.equal(scene.children.length, 0, 'Disposal must release light and target');
+console.log('Flashlight: bounded lag, settling, walking sway, pause, teleport, disable and disposal passed');

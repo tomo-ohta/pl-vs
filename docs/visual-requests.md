@@ -392,3 +392,106 @@ P1 の変更: `src/generators/presets.ts`（`KELVIN_RANGE` / `applyLightKelvin`�
 - 色収差は差分加算の近似（強い DoF / ブラー時に R/B の縁が硬い）。DoF の歩行中無効は深度の急変と回転で判定（並進速度の API 無し）。
 - iOS Safari の非同期読み戻し未確認（失敗 3 回で追従停止・ゲイン 1）。mid Tier は自前深度パスが毎フレーム走る（+0.5 ms）。
 - 手持ち感の横揺れ、ゲームパッドのドリフトで静止に入らない可能性、メニューの縦の長さ。DCT は粒子に埋もれてほぼ見えない。ヘッド切替を常時薄く出すかは演出判断待ち。
+
+## 統合追加（2026-09-22: 暗さ・懐中電灯・VHS）
+
+全室の基準露出を 0.55 に変更し、暗さを戻し過ぎない自動露出へ調整。Game に歩行揺れ／追従遅れ／影付きの常時携行ライトを追加。homeVideo / tape の撮像効果を強化。上記第9回以前のパラメータ値は実装当時の記録。現在値・検証・残課題は `visual-improvement-spec.md` 冒頭の「暗い基準露出・携行ライト・VHS強化」を参照。
+
+## O3 → 統合（2026-09-22: 奇妙さ生成 surfaces.ts / traces.ts）
+
+実装したもの（`src/generators/oddity/surfaces.ts` = `SURFACE_ODDITIES`、`src/generators/oddity/traces.ts` = `TRACE_ODDITIES`）:
+- `surface.shallowPits`（theme / weight 4）/ `surface.ceilingGaps`（theme / weight 3）/ `surface.wallHoles`（weight 2）/ `surface.water`（weight 3）
+- `light.mismatch`（theme / weight 3）/ `light.timeMix`（weight 2）/ `trace.marks`（theme / weight 3）
+
+仕様からずらした点（要確認）:
+- **`trace.marks` の category は `'contents'`**。`OddCategory` に `'trace'` が無いため（`shared.ts` は編集禁止）。結果として O2 の contents 系と添え物の枠を取り合う。`'trace'` を足すなら `shared.ts` 側の追加が要る。
+- **天井の空隙に「裾」を 4 枚足した**。指示どおり穴の 0.35 m 上に `void` の板（各辺 +0.1 m）を置くだけだと、斜めから見たとき板の外側の明るい空が見えてしまう。天井スラブ上端（h+0.18）から板までを塞ぐ厚さ 0.02 の `void` を穴の周囲 4 辺に追加した（1 穴あたり +4 箱）。
+- **ダクトは天井スラブに埋まる**。0.25 m 角を空隙（h+0.2〜h+0.35）に収められないので、y を h+0.06〜h+0.31 にして穴から見える部分だけ露出させている。穴の外側はスラブの中（非ソリッド）。
+- **カートの箱は 9 個**。指示は「0.03 の枠 8 本 + ソリッドは外形の箱 1 つ」だが、外形の箱をソリッドかつ可視で置くと枠に見えないので、支柱 4 本をソリッド・上端の枠 4 本を非ソリッドにし、すり抜け防止に底の棚板 1 枚（ソリッド）を足した。`canPlace` は指示どおり外形の箱 1 つで確認している。
+- **`surface.water` の weak は 1〜2 個**（theme: false なので strong は来ない。1 個だけだと弱かった）。
+
+置けない / 出にくい条件:
+- `surface.shallowPits`: 主矩形の短辺が 2.0 m 未満の部屋は `applicable` で除外。穴は各辺から 0.5 m 以上内側 + 扉前ゾーン + 既存ソリッドを避けるので、家具の多い部屋では strong でも 1〜3 個しか置けないことがある（動線は塞いでよい設定）。
+- `surface.ceilingGaps`: 天井高 2.2 m 未満と天井シェルの無い部屋は除外。吊り下げ蛍光灯は器具箔の 0.5 m 下が 1.9 m 未満になる部屋では出ない（天井 2.5 m 級の部屋は空隙だけになる）。
+- `trace.marks` の「引かれた椅子」が非常に稀（seed 11 の 499 部屋で 5 室、seed 23 の 303 部屋で 2 室）。`kind: 'chair'` の propGroup と、高さ 0.68〜0.80 m のソリッド天板が 2.2 m 以内に同居する部屋がほとんど無いため。机の天板の判定を広げるか、`furniture.ts` 側で机にも `kind: 'desk'` の propGroup を付けてもらえると増やせる。
+- `light.timeMix` の窓差し替えは `windowNight` の箔が 2 枚以上ある部屋だけ（seed 23 で 2 室）。ほとんどは時計 3 個の側に落ちる。
+
+見た目が弱いもの（統合側で調整してもらえると良い点）:
+- **時計サイン（`kind: 'clock'`、width 0.45）の文字が小さく、2 m 先から時刻が読めない**。3 個並べても「小さい暗い板が 3 枚」に見える。clock の CanvasTexture の文字倍率を上げるか、width の下限を引き上げたい。
+- **吊り下がった蛍光灯が「段差のある 2 枚のパネル」に見える**（箔 2 枚で傾きを近似しているため）。箔を回転できる手段（`DecalSpec.yaw` 相当か、箱の yaw）があれば本物の傾きにしたい。鎖（0.02 m 角）も細くてほぼ見えない。
+- **壁の穴**は暗い部屋（C03 ビジネスホテル廊下など）では黒い `void` デカールが背景に溶けて判別できない。強い部屋（コインランドリー等）では良好。
+- 浅い穴の黒い正方形デカール（抜けたタイル）は `tier.decals = false` の Tier では全部消える。穴本体は箱なので残る。
+
+検証: `npx tsc --noEmit -p .` 0 エラー / `node tools/seam-stats.mjs --seeds 7,11,23 --rooms 40` で `deterministic=true` `overlap=0` / 実機 seed 7・11・23 で 7 種すべて出現、コンソールエラー 0。浅い穴は `devInput.moveY` で歩いて出入りできることを確認（y が −0.15 まで下がって戻る）。
+
+## O2 → 統合（内容物の配置と欠落 / `src/generators/oddity/contents.ts` = `CONTENT_ODDITIES`）
+
+実装したもの（7 種）:
+- `contents.oneDeviation`（theme / weight 4）/ `contents.clusterAndVoid`（theme / weight 3）/ `contents.stacking`（theme / weight 2）/
+  `contents.wallFurniture`（theme / weight 2）/ `contents.uniformFacing`（theme / weight 2）/ `contents.countAnomaly`（theme / weight 3）/ `contents.uselessFixtures`（theme 不可 / weight 3）
+
+仕様からずらした点（要確認）:
+- **`propGroup` の無い 1 箱家具もグループとして扱う**。`common.ts` の `furnishCafeteriaProps` は椅子・机を `kinded()` の 1 箱で置く（`propGroup` が無いので `propGroups()` に出ない）。`contents.ts` 内で `kind` が `chair` / `table` / `desk` / `bench` / `vending` / `cabinet` の単独箱を `solo#n` という擬似グループにして拾っている。`furniture.ts` 側でここにも `tagGroup` を付けてもらえれば擬似グループは不要になる。
+- **ロッカーの kind は `'lockers'`**（指示の `'lockerBank'` は実在しない）。両方を受けるようにしてある。
+- **集積（`clusterAndVoid`）の塊は最大 4.5 m 角に制限**。指示どおり全グループを格子に詰めると C09 の 238 脚が 17 × 22 の格子になって部屋をほぼ埋めたので、「一角」に収まるよう格子の辺を 4.5 m で打ち切り、入らない分は捨てている（例: C09 で 42/42、238 脚の部屋では 80 脚を残して 158 脚が消える = 空白になる）。
+- **複製した家具の薄板を 10 cm まで厚くしている**（`detached(..., plump)`）。指示どおり `propGroup` を外すと `FurnitureShapes` の描き替えが効かず、素の箱（座面 4 cm・背 5 cm の薄板 + 3 cm の脚）になって「板」に見えたため、金属以外の薄い箱だけ 10 cm に膨らませた。壁付きの複製は膨らんだ分が壁に埋まらないよう室内側へ押し戻している。
+- **`uniformFacing` のロッカーは 1 部屋 120 扉まで**（C11 は 480 扉あるため）。開いた中の暗い `void` 箔は先頭 60 扉だけ（箱予算 +150 を守るため）。
+- **`countAnomaly` の非常口サインは 8 枚で打ち切り**（`pushSign` 自体の上限は 44 だが指示どおり 8 に自制）。
+- **`uselessFixtures` の壁付け箔は `canPlace(..., { lanes: false })`**。非ソリッドなので動線帯は見ず、足跡・扉前ゾーン・既存ソリッドだけ見ている。
+
+置けない / 出にくい条件:
+- `contents.oneDeviation`: 椅子系グループ 6 つ以上、またはロッカーの扉 6 枚以上の部屋だけ。C09 / C10 / C11 / U06 / U13 に集中する。90°/180° 回転は連結椅子（2.0 m）では周囲に当たって落ちることが多く、その場合は「通路側へ 0.5〜0.7 m 出す」に落ちる。
+- `contents.clusterAndVoid`: 椅子系 8 グループ以上か、商品らしい小箱 12 個以上。商品側の判定は「非ソリッド・`boxCardboard`/`plastic*`/`signPlate`・XZ 1.0 m 未満・高さ 0.8 m 未満・y 0.15 以上」。売場（C12 / C13 / U17 / R12）でよく出る。
+- `contents.stacking`: ロッカーの横倒しは壁際 1.8 m の張り出しが `canPlace` を通らない部屋が多く、実際は「机の 2 段重ね」と「椅子 3〜5 脚の塔」がほとんど。机は `kind` が無い（`furniture.longTable` は `tagGroup` を呼ばない）ので高さ 0.68〜0.80 の天板で拾っている。
+- `contents.wallFurniture`: 天井版は h − 0.85 が家具に当たらない部屋のみ。壁版は壁の空き区間 0.8 m 以上かつ `1.2 ≤ baseY ≤ h − 0.4 − 椅子の奥行` が成り立つ部屋のみ（天井 2.2 m 級の廊下では出ない）。
+- `contents.uniformFacing`: 椅子は「向きが読める」グループ 6 つ以上（座 + 同じ材質の高い背が要る）。回転後に 70% 以上が成功しないと諦めて次の候補へ落ちる。
+- `contents.countAnomaly`: 消火器は空き区間 4.3 m 以上、時計は 4.4 m 以上の壁が要る。無ければ非常口サインに落ちる（ほぼ全部屋で成立するので発生回数が多い。seed 7 / 11 / 23 の 120 部屋踏破で 68〜128 件）。weight を下げたい場合は統合側で調整可。
+
+見た目が弱いもの（統合側 / 描画側に相談したい点）:
+- **壁・天井に付けた椅子が「板」に見える**。`propGroup` を外すと `FurnitureShapes.chairGroup` の描き替えが効かず、素の薄板になる。10 cm に膨らませて多少改善したが、正面から見ると棚板のよう。描画側に「任意の姿勢の椅子」を描く入口（例: `kind: 'dress:oddChair'` + 向きベクトル）があれば大きく良くなる。天井吊り（上下反転）は脚が見えるので比較的読める。
+- **押せない自販機ボタン（0.05 m 角 × 12）が小さく、明るい壁では飛ぶ**。指示どおり「機械本体は無い」ので後ろに板を置いていない。暗い裏板を 1 枚許してもらえれば読みやすくなる。
+- **ロッカーの扉板 instance は当たり判定を持たない**（`spec(..., solid: false)`）。50〜80° 開いた扉の中をすり抜けられる。`InstanceSpec.solid` を true にすると yaw 込みの AABB（0.38 × 0.02 の外接 = ほぼ 0.3 m 角）がコライダになり通路を塞ぐので、意図的に非ソリッドにしている。
+- **横倒しのロッカーは高さ 0.5 m のソリッド**で、`PLAYER.step`（0.35 m）を超えるため乗り越えられない。動線・扉前は `canPlace` で避けている。
+
+検証: `npx tsc --noEmit -p .` 0 エラー / `node tools/seam-stats.mjs --seeds 3 --rooms 40` と `--seeds 7,11,23 --rooms 40` で `deterministic=true` `overlap=0`（`deadEnd=5` は本仕掛けを外しても同じ = 既存）。実機 seed 7 / 11 / 23 で 7 種すべて出現、コンソールエラー 0。
+
+## O1 → 統合（間取りの不自然さ / `src/generators/oddity/layout.ts` = `LAYOUT_ODDITIES`）
+
+実装したもの（6 種）:
+- `layout.openingOffset`（theme / weight 3）: (a) 浮いた扉（幅 0.9 × 高 2.05、下端 0.4 m、枡 0〜0.05・扉板 0.05〜0.08・取っ手 metal）/ (b) 天井近くの小さな出口（0.6 角の `void` を壁面から 1 cm、周囲 4 本の `trim` 枡、上 0.12 m に幅 0.4 の緑 EXIT サイン。開口上端 = h − 0.3）/ (c) 突き当たりの横向き扉（`isCorridor` の短辺の壁に 2.05 × 0.9 を y 0.6〜1.5）。strong は (a) か (c) を正面 + 別の壁に (b)、weak はどれか 1 つ。
+- `layout.roomInRoom`（theme / weight 2）: 主矩形 ≥ 60 m² かつ短辺 ≥ 7 m。2.5〜4.0 m 角・壁厚 `WALL_T`・高さ h か h − 0.4（5 割）。壁 4 枚（ソリッド・部屋の壁材）+ 天井板（非ソリッド、h − 0.4 のときだけ top〜top+0.12）。5 割で外壁との隙間 0.7 m。入口側の面に飾り扉 1 つ。最大 20 回試行、strong は最初の 16 回だけ `c.focus` 内に限定。
+- `layout.steps`（theme / weight 3）: (a) 主矩形の長辺を半分に割り、ソケットの無い側に床材 0〜0.3 のソリッド + その中に完全に入る内装を `shifted(b, 0, 0.3, 0)` / (b) 廊下の 1.5 m 区間を `cutShell` で切って床上面 −0.15（厚 0.2）+ 切り口 2 辺に壁材の立ち上がり（非ソリッド）/ (c) 3 段上り（0.15 × 0.3 m）→ 1.2 m 踊り場（0.45）→ 2 段下り、計 2.7 m。strong は (c) → (a)、weak は (b) → (a)。
+- `layout.windowInward`（theme 不可 / weight 2）: 3 割で夜景箔を短くして残りを壁材で塞ぐ（壁材は窓の奥面から室内側 +0.24、ただし内面 +0.08 で頭打ち）/ 7 割で夜景 → `void` + 2 cm 手前に `glass` + 0.6 cm 手前に幅 60% × 高さ 0.06 の `lightWarm` 帯。
+- `layout.corridorTaper`（theme / weight 2）: `isCorridor` かつ内法幅 ≥ 2.2 m。長辺の両面に 1 m 刻みの壁（床〜天井・ソリッド）を足して最狭 1.3 m まで絞る。strong は入口側から奥へ線形に、weak は中央 ±2 m だけ最大厚。
+- `layout.pillars`（theme / weight 2）: strong は 4 割で (d) 天井から下がって下端 0.45 m の柱、外れたら (a)+(c) 天井 −0.35 の孤立柱。weak は 6.5 割で (b) 既存の `columnConcrete` 柱（4 本以上あるとき）を 0.6〜0.9 m ずらす、外れたら (c)。
+
+仕様からずらした点（要確認）:
+- **壁に密着する箱は `canPlace(..., { margin: WALL_T - 0.001 })`**。`canPlace` の既定 margin は `WALL_T + 0.02` なので、壁面に貼り付く `corridorTaper` の絞り壁は既定では必ず落ちる（最初の実装では 1 本も置けなかった）。
+- **`corridorTaper` の隣り合う 1 m の箱は `ignore` で自分同士を無視**。`canPlace` の `gap`（既定 0.05）は接している箱を重なりと見なすため、無視しないと 1 個おきにしか置けず櫛状になる。
+- **`steps` (a) の段差板は `canPlace(..., { lanes: false, ignore: () => true })`**（足跡と扉前ゾーンだけ見る）。上げる側の内装は一緒に 0.3 m 持ち上げるので既存ソリッドとの重なり判定は無意味。分割線を 0.15 m 超えてまたぐソリッド内装がある比率（0.5 → 0.45 → 0.55 → 0.42 → 0.58）は飛ばす。
+- **`steps` (a) は `instances` と `decals` を持ち上げていない**。`L.instances` のロッカー扉や床デカールが上がった半分にあると床に埋まる。統合側で「矩形内の instance を y+0.3」する共通ヘルパがあると正確になる。
+- **飾り扉の枡は `y0 − 0.065` が負にならないよう `Math.max(0, ...)`**。横向き扉（y0 = 0.6）や浮いた扉（y0 = 0.4）では素直に下へ 6.5 cm 伸ばしている。
+
+置けない / 出にくい条件:
+- `layout.roomInRoom`: 主矩形 ≥ 60 m² かつ短辺 ≥ 7 m の部屋だけ。C11 / C15 のような細長い大部屋では 20 回試して全滅し `roomInRoom: no space` のログが残る（主に既存家具と動線帯に当たる）。
+- `layout.corridorTaper`: 廊下（短辺 ≤ 3.2 m・長辺 ≥ 8 m）かつ内法幅 ≥ 2.2 m。実質 C01 / C04 / C05 / C17 級のみ。ソケットが多い廊下では `freeRuns(f, sockets, 0.8)` が細切れになり、weak（中央 4 m）で 1 箱しか置けないことがある（例: seed 7 の C17 で `4 m pinch to 1.3 m (1 boxes)`）。幅を絞る演出としては弱いので、1 箱しか置けないときは諦めて別の仕掛けに落とす方が良いかもしれない。
+- `layout.steps` (b)(c): 廊下かつ全ソケットから 2 m 以上離れた 1.5 m / 2.7 m の帯が要る。短い廊下（長辺 < 6 m / < 4.7 m）では出ない。
+- `layout.steps` (a): ソケットが分割線の両側にある部屋は不可（廊下の途中に扉がある部屋はほぼ全滅）。実際に出るのは端に扉が寄った大部屋（C09 / C14 / U02）。
+- `layout.windowInward`: `mat === 'windowNight'` の箔がある部屋だけ（C08 / C09 / R05 など）。踏破 505 部屋で 3〜4 件と少ない。
+- `layout.pillars` (b): 天井まで届く `columnConcrete` のソリッド柱が 4 本以上ある部屋だけ（駐車場・倉庫系）。
+
+見た目が弱いもの（統合側 / 描画側に相談したい点）:
+- **U09 の部屋では奇妙さの箱が全部消える**。seed 7 の r174 / r291 / r301 / r732 / r842 / r2994（すべて U09）は `notes` に仕掛けが載っているのに最終レイアウトの `kind` が全滅（`dress:odd` が 0 個、家具の `kind` も全部 undefined）。U09 に掛かる Modifier がレイアウトを作り直していると思われる。**これは layout 以外のカテゴリも同じはず**なので統合側で確認してほしい。
+- **`steps` (b) の 1 段下がり（0.15 m）は明るい廊下だと目立たない**。切り口の立ち上がりを壁材にしているが、床材と近い色だと段差に見えない。切り口だけ暗い材（`metalDark` など）にする案がある。
+- **`pillars` (b) 格子からずれた柱は、柱が 4 本（2 × 2）しかない部屋だと「格子」に見えず気づけない**。6 本以上を条件にした方が効くかもしれない。
+- **`openingOffset` (b) の EXIT サインは幅 0.4 m で文字が小さい**（`SignAtlas` は width × 1/4 の高さ）。開口が 0.6 m 角なので釣り合いは取れているが、遠目では緑の板に見える。
+- **飾り扉の材質は `L.palette.door` そのまま**なので、本物の扉と区別が付かない部屋がある（浮いた扉は下端 0.4 m で違和感が出るが、横向き扉は「横長のパネル」に見えることがある）。Modifier 側で「偽扉を数える」処理（DuplicateNumber 等）がこの扉も数えることになる点も確認してほしい。
+
+検証: `npx tsc --noEmit -p .` 0 エラー / `node tools/seam-stats.mjs --seeds 3 --rooms 40` と `--seeds 7,11,23 --rooms 40` で `deterministic=true` `overlap=0` `loadMismatch=0/0`（`deadEnd=5` は `LAYOUT_ODDITIES` を空にしても同じ = 既存）。実機 seed 7 で (a) 浮いた扉 = r125 C07 / (b) 天井近くの出口 = r1 C02 / (c) 横向き扉 = r1 C02 / 部屋の中の部屋 = r116 C16 / 階段 = r10 C08 / 1 段下がり = r46 C05 / 半分高い床 = r745 C09 / 内側を向く窓 = r70 C09 / 廊下の絞り = r49 C17 / 天井に届かない柱 = r97 C06 を目視確認、コンソールエラー 0。seed 7 / 11 / 23 で 6 種すべて出現。
+
+
+## 統合担当の処理記録（第10回・2026-09-22: 奇妙さ生成）
+
+- **土台**: `src/generators/oddity/`（index / shared + layout / contents / surfaces / traces）。予算表と主題の規則は `docs/oddity.md`。RoomBuilder に `kind: 'emitOnly'`（描かない光源）。
+- **O1 / O2 / O3** の 20 種を統合。`trace` カテゴリ追加、`countAnomaly` 重み 2、MirrorOffset の clipBox / reflectBox で kind を保持（U09 で箔が消える問題）。
+- 未対応: `steps`(a) の instances / decals の持ち上げ、任意姿勢の椅子の描画（壁・天井の椅子が板に見える）、`common.ts` の椰子・机への propGroup 付与、時計サインの可読性、吊り灯の傾き（箔の yaw）。

@@ -49,6 +49,19 @@ export interface VideoUniforms {
   jitterBand: THREE.IUniform<THREE.Vector4>;
   /** ヘッド切替: x = 帯の高さ（uv。画面下端から）、y = 横ずれ（1080p 基準 px）、z = 強さ（0 で無効）、w = 明滅の深さ */
   headBand: THREE.IUniform<THREE.Vector4>;
+  /** 以下 VHS の追加項目（VideoParams の同名フィールド） */
+  lumaBlur: THREE.IUniform<number>;
+  chromaShift: THREE.IUniform<number>;
+  smear: THREE.IUniform<number>;
+  ringing: THREE.IUniform<number>;
+  /** 四隅の減光（表示域。0〜0.4） */
+  vignette: THREE.IUniform<number>;
+  lineJitter: THREE.IUniform<number>;
+  snow: THREE.IUniform<number>;
+  tracking: THREE.IUniform<number>;
+  chromaNoise: THREE.IUniform<number>;
+  /** 経過秒（行揺れのゆっくりした波に使う） */
+  timeSec: THREE.IUniform<number>;
 }
 
 export function createVideoUniforms(): VideoUniforms {
@@ -71,11 +84,21 @@ export function createVideoUniforms(): VideoUniforms {
     blockSeed: { value: 0 },
     jitterBand: { value: new THREE.Vector4(0, 0, 0, 0) },
     headBand: { value: new THREE.Vector4(0, 0, 0, 0) },
+    lumaBlur: { value: 0 },
+    chromaShift: { value: 0 },
+    smear: { value: 0 },
+    ringing: { value: 0 },
+    vignette: { value: 0 },
+    lineJitter: { value: 0 },
+    snow: { value: 0 },
+    tracking: { value: 0 },
+    chromaNoise: { value: 0 },
+    timeSec: { value: 0 },
   };
 }
 
 /** 走査線の暗線の深さ（scanlines = 1 のとき奇数行を 12% 暗く。tape 0.35 → 4%。0.22 では白い器具面に縞が露骨だった） */
-export const SCANLINE_DEPTH = 0.12;
+export const SCANLINE_DEPTH = 0.15;
 /** 静止秒数がこれを超えたら揺れ（ジッタ・ヘッド切替）を止める（時間停止感: 粒子だけが動く） */
 export const STILLNESS_CALM_SEC = 3;
 
@@ -106,6 +129,16 @@ export const VideoShader = {
     uniform float blockSeed;
     uniform vec4 jitterBand;
     uniform vec4 headBand;
+    uniform float lumaBlur;
+    uniform float chromaShift;
+    uniform float smear;
+    uniform float ringing;
+    uniform float vignette;
+    uniform float lineJitter;
+    uniform float snow;
+    uniform float tracking;
+    uniform float chromaNoise;
+    uniform float timeSec;
     varying vec2 vUv;
 
     // BT.601（SD ビデオ）の輝度・色差
@@ -125,24 +158,63 @@ export const VideoShader = {
 
     #ifdef COLOR_STAGE
     vec3 colorStage(vec2 uv, vec2 px, uvec2 ip) {
+      float scale1080c = resolution.y / 1080.0;
       vec3 rgb = texture2D(tDiffuse, uv).rgb;
+      float y0 = dot(rgb, LUMA);
 
-      // 2. 色のにじみ（クロマサブサンプリング）: 輝度は中心 1 タップのまま、色差だけ横に 7 タップ（1 2 3 4 3 2 1 / 16）ぼかす。
-      //    テープの色差は輝度より遅れて出るので、わずかに右へずらして採る（半径の 35%）
+      // 2a. 輝度の横ぼかし（VHS の輝度帯域 ≈ 240 本）: 5 タップ（1 2 3 2 1 / 9）。輪郭が横方向にだけ甘くなる
+      float y = y0;
+      float yWide = y0;
+      if (lumaBlur > 0.0 || ringing > 0.0) {
+        float lr = max(lumaBlur, 1.2) * scale1080c * px.x;
+        float acc = 3.0 * y0;
+        float accW = 0.0;
+        for (int i = 1; i <= 2; i++) {
+          float a = dot(texture2D(tDiffuse, vec2(uv.x - float(i) * lr * 0.5, uv.y)).rgb, LUMA);
+          float b = dot(texture2D(tDiffuse, vec2(uv.x + float(i) * lr * 0.5, uv.y)).rgb, LUMA);
+          float w = 3.0 - float(i);
+          acc += w * (a + b);
+          accW += a + b;
+        }
+        float yb = acc / 9.0;
+        yWide = (accW + y0) / 5.0;
+        y = mix(y0, yb, min(lumaBlur, 1.0));
+      }
+
+      // 2b. 色のにじみ（クロマサブサンプリング）: 色差だけ横に 7 タップ（1 2 3 4 3 2 1 / 16）ぼかし、右へ chromaShift ぶん遅らせる。
+      //     行ごとの色相ずれ（chromaNoise）はテープの色同期の甘さ
+      vec2 cc = vec2(dot(rgb, CB), dot(rgb, CR));
       if (chromaBlur > 0.0) {
-        float r = chromaBlur * (resolution.y / 1080.0);
+        float r = chromaBlur * scale1080c;
         float stepX = r / 3.0 * px.x;
-        float delay = r * 0.35 * px.x;
-        vec2 cc = vec2(0.0);
+        float delay = (r * 0.35 + chromaShift * scale1080c) * px.x;
+        cc = vec2(0.0);
         for (int i = -3; i <= 3; i++) {
           vec3 sm = texture2D(tDiffuse, vec2(uv.x - delay + float(i) * stepX, uv.y)).rgb;
           float w = 4.0 - abs(float(i));
           cc += w * vec2(dot(sm, CB), dot(sm, CR));
         }
         cc *= 1.0 / 16.0;
-        float y = dot(rgb, LUMA);
-        rgb = vec3(y + 1.402 * cc.y, y - 0.344136 * cc.x - 0.714136 * cc.y, y + 1.772 * cc.x);
       }
+      if (chromaNoise > 0.0) {
+        float rowN = hashU(uvec2(ip.y / 2u, 3u), uint(seed) + 29u) - 0.5;
+        float rowM = hashU(uvec2(ip.y / 2u, 4u), uint(seed) + 31u) - 0.5;
+        cc += vec2(rowN, rowM) * chromaNoise * 0.05;
+      }
+      // 2c. 明部の右への滲み（テープの smear）: 左側 6 タップの明部（0.55 超）を減衰させて足す。暖色寄り
+      float sm = 0.0;
+      if (smear > 0.0) {
+        float sstep = 3.0 * scale1080c * px.x;
+        for (int i = 1; i <= 6; i++) {
+          float l = dot(texture2D(tDiffuse, vec2(uv.x - float(i) * sstep, uv.y)).rgb, LUMA);
+          sm += max(l - 0.55, 0.0) * (1.0 - float(i) / 7.0);
+        }
+        sm *= smear * 0.35;
+      }
+      // 2d. リンギング: 輝度と広いぼかしの差を足し戻して縁に明暗の線を出す（強調回路の出過ぎ）
+      if (ringing > 0.0) y += (y0 - yWide) * ringing * 1.4;
+      y += sm;
+      rgb = vec3(y + 1.402 * cc.y, y - 0.344136 * cc.x - 0.714136 * cc.y, y + 1.772 * cc.x) + sm * vec3(0.10, 0.03, -0.04);
 
       // 1. 色調整: 彩度低下と白点の偏り（RGB ゲイン）
       float luma = dot(rgb, LUMA);
@@ -187,6 +259,13 @@ export const VideoShader = {
 
       #ifdef FINAL_STAGE
       float scale1080 = resolution.y / 1080.0;
+      // 7a. 行ごとの横揺れ（トラッキングの甘さ）: 行のハッシュ + ゆっくり流れる波（2 行単位、下端ほど強い）
+      if (lineJitter > 0.0) {
+        float rowJ = hashU(uvec2(ip.y / 2u, 9u), s + 23u) - 0.5;
+        float wave = sin(vUv.y * 40.0 + timeSec * 1.7) * 0.35 + sin(vUv.y * 7.0 - timeSec * 0.6) * 0.25;
+        float bottom = 1.0 + 2.0 * smoothstep(0.35, 0.0, vUv.y);
+        uv.x += (rowJ * 0.6 + wave * 0.4) * lineJitter * bottom * scale1080 * px.x;
+      }
       // 7. テープの揺れ（水平同期ずれ）: 行帯の中だけ横にずらす。帯の上端で最大、下へ向かって同期が戻る（t^1.5）
       if (jitterBand.w > 0.0) {
         float t = (vUv.y - jitterBand.x) / max(jitterBand.y - jitterBand.x, 1e-4);
@@ -215,12 +294,36 @@ export const VideoShader = {
       #endif
 
       #ifdef FINAL_STAGE
-      // 8. ヘッド切替の帯: 行ごとの明滅 + 粗いノイズ、帯の上端に 1 px の裂け目
+      // 12. 常時のトラッキング帯: 画面下端 0〜3% がざらつき、行ごとに横ずれし、上端がちらつく
+      if (tracking > 0.0) {
+        float th = tracking * 0.03;
+        float inT = step(vUv.y, th);
+        if (inT > 0.0) {
+          float k = 1.0 - vUv.y / max(th, 1e-4);
+          float rowT = hashU(uvec2(ip.y, 5u), s + 37u) - 0.5;
+          vec3 shifted = texture2D(tDiffuse, vec2(uv.x + rowT * 14.0 * k * scale1080 * px.x, uv.y)).rgb;
+          float tn = hashU(ip, s + 41u);
+          rgb = mix(rgb, shifted * (0.6 + 0.8 * tn) + (tn - 0.5) * 0.5 * k, 0.85);
+        }
+      }
+      // 14. スノー: 暗部に散る白い点（画素の 0.15% × snow）
+      if (snow > 0.0) {
+        float l = dot(rgb, LUMA);
+        float dark = 1.0 - smoothstep(0.1, 0.5, l);
+        float sn = hashU(ip, s + 61u);
+        if (sn < 0.0015 * snow * (0.3 + 0.7 * dark)) rgb += vec3(0.35 + 0.45 * hashU(ip, s + 67u));
+      }
+      // 8. ヘッド切替の帯: 行ごとの明滅 + 粗いノイズ（白い線は出さない）
       if (inHead > 0.0) {
         float fl = 1.0 + (hashU(uvec2(ip.y, 1u), s + 13u) - 0.5) * 1.2 * headBand.w;
         vec3 noisy = rgb * fl + (hashU(ip, s + 17u) - 0.5) * 0.4;
         rgb = mix(rgb, noisy, inHead);
-        rgb += inHead * 0.12 * step(abs(vUv.y - headBand.x), px.y);
+      }
+      // 15. 四隅の減光: 楕円の外側だけ（辺の中央はほとんど変えない）
+      if (vignette > 0.0) {
+        vec2 q = (vUv - 0.5) * 2.0;
+        float rr = dot(q, q) * 0.5;
+        rgb *= 1.0 - vignette * smoothstep(0.32, 1.0, rr);
       }
       // 6. 走査線: 2 px 周期（出力ピクセル基準）の弱い暗線
       if (scanlines > 0.0) rgb *= 1.0 - scanlines * ${SCANLINE_DEPTH.toFixed(2)} * float(ip.y & 1u);

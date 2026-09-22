@@ -43,11 +43,17 @@ export interface SettingsData {
   recOverlay: boolean;
   /** 表示フレームレートの間引き */
   frameHold: FrameHoldId;
+  /** VHS 効果の強さ（0〜2。1 = プリセットの値そのまま。VideoPass の各効果に掛かる） */
+  vhsStrength: number;
   /** トーンマップ */
   toneMapping: ToneMappingId;
 }
 
-export const SETTINGS_KEY = 'liminal.settings.v1';
+export const SETTINGS_KEY = 'liminal.settings.v3';
+/** 旧キー（v2）。v3 が無ければここから移行する（vhsStrength は新しい既定 200% に置き換える） */
+export const SETTINGS_KEY_V2 = 'liminal.settings.v2';
+/** 旧キー（v1）。v2 が無ければここから移行する（postfx と recOverlay は新しい既定 tape / on に置き換える） */
+export const SETTINGS_KEY_V1 = 'liminal.settings.v1';
 
 export const DEFAULT_SETTINGS: Readonly<SettingsData> = {
   masterVolume: 0.8,
@@ -55,10 +61,11 @@ export const DEFAULT_SETTINGS: Readonly<SettingsData> = {
   sfxVolume: 1.0,
   lookSensitivity: 1.0,
   tier: 'auto',
-  postfx: 'homeVideo',
+  postfx: 'tape',
   handheld: 0.6,
   cameraLag: true,
-  recOverlay: false,
+  recOverlay: true,
+  vhsStrength: 2.0,
   frameHold: 'off',
   toneMapping: 'agx',
 };
@@ -81,6 +88,19 @@ export class Settings {
       if (raw) {
         const obj = JSON.parse(raw) as unknown;
         if (obj && typeof obj === 'object') parsed = obj as Partial<SettingsData>;
+      } else {
+        // 旧キーからの移行: v2 は vhsStrength だけ新しい既定（200%）に、v1 は描画効果と REC 表示も新しい既定（tape / on）にする
+        const v2 = storage?.getItem(SETTINGS_KEY_V2);
+        const v1 = v2 ? null : storage?.getItem(SETTINGS_KEY_V1);
+        const src = v2 ?? v1;
+        if (src) {
+          const obj = JSON.parse(src) as unknown;
+          if (obj && typeof obj === 'object') {
+            const { vhsStrength: _v, postfx: p1, recOverlay: r1, ...rest } = obj as Partial<SettingsData>;
+            void _v;
+            parsed = v2 ? { ...rest, postfx: p1, recOverlay: r1 } : rest;
+          }
+        }
       }
     } catch {
       parsed = {};
@@ -164,6 +184,7 @@ function sanitize(d: SettingsData): SettingsData {
     cameraLag: bool(d.cameraLag, DEFAULT_SETTINGS.cameraLag),
     recOverlay: bool(d.recOverlay, DEFAULT_SETTINGS.recOverlay),
     frameHold,
+    vhsStrength: typeof d.vhsStrength === 'number' && Number.isFinite(d.vhsStrength) ? Math.min(2, Math.max(0, d.vhsStrength)) : DEFAULT_SETTINGS.vhsStrength,
     toneMapping,
   };
 }

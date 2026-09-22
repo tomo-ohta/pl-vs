@@ -90,11 +90,12 @@ function clipBox(b: Box, r: Rect): Box | null {
   const z0 = Math.max(b.min[2], r.z0);
   const z1 = Math.min(b.max[2], r.z1);
   if (x1 - x0 < 0.01 || z1 - z0 < 0.01) return null;
-  return { min: [x0, b.min[1], z0], max: [x1, b.max[1], z1], mat: b.mat, solid: b.solid };
+  // kind / propGroup を保つ（奇妙さの箔 'dress:odd' や家具の kind が鏡の実側で消えないように）
+  return { ...b, min: [x0, b.min[1], z0], max: [x1, b.max[1], z1] };
 }
 
 function reflectBox(pl: Plane, b: Box, shift: number): Box {
-  return box(reflectPoint(pl, b.min, shift), reflectPoint(pl, b.max, shift), b.mat, false);
+  return { ...box(reflectPoint(pl, b.min, shift), reflectPoint(pl, b.max, shift), b.mat, false), kind: b.kind };
 }
 
 /** 候補の鏡面。鏡像側の壁にソケットが無く、全ソケットが実側に（余白付きで）収まる位置を探す。

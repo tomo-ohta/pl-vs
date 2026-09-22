@@ -60,31 +60,31 @@ export interface LensParams {
 /**
  * プリセット値の意図:
  *   - off: 全部 0（PostFX は film 'off' なら pass 自体を置かないので、実質デバッグ用）
- *   - clean: 撮像の癖は付けない。露出 / WB の追従と、遠方のごく弱いかすみ（3%）だけ
- *   - homeVideo: 保存状態の良い家庭用ビデオ。歪み 0.03（端の直線がわずかに曲がる）、色収差 0.5 px、減光 8%、軟焦点 0.5 px（3×3 テント）、
- *     にじみ 0.35 + 暖色 0.6（器具の周りがうっすら橙に、窓・出口の向こうが白く溶ける）、フレア 0.3（器具を斜めに見たときの横筋）、DoF 0.6（接写で背景 ≤ 1.8 px）、
- *     迷い 0.6（入室後 0.3 s、最大 1.5 px）、かすみ 6% @20 m、フリッカー 1%、回転ブラー 0.5（2 rad/s で約 12 px）
+ *   - clean: 撮像の癖は付けない。露出 / WB の追従と、遠方のごく弱いかすみ（1.5%）だけ
+ *   - homeVideo: 保存状態の良い家庭用ビデオ。歪み 0.03（端の直線がわずかに曲がる）、色収差 0.7 px、減光 12%、軟焦点 0.6 px（3×3 テント）、
+ *     にじみ 0.42 + 暖色 0.6（器具の周りがうっすら橙に、窓・出口の向こうが白く溶ける）、フレア 0.3（器具を斜めに見たときの横筋）、DoF 0.6（接写で背景 ≤ 1.8 px）、
+ *     迷い 0.6（入室後 0.3 s、最大 1.5 px）、かすみ 2.5% @20 m、フリッカー 1%、回転ブラー 0.5（2 rad/s で約 12 px）
  *   - tape: homeVideo より一段強く（歪み 0.04、色収差 0.7 px、減光 10%、軟焦点 0.7 px、にじみ 0.45、フリッカー 1.5%、ブラー 0.6）。走査線等は VideoPass 側
  */
 export const LENS_PRESETS: Record<FilmPreset, LensParams> = {
   off: { distortion: 0, chroma: 0, vignette: 0, softFocus: 0, glow: 0, halation: 0, flare: 0, dof: 0, focusHunt: 0, haze: 0, flicker: 0, motionBlur: 0, autoExposure: 0, autoWhiteBalance: 0 },
-  clean: { distortion: 0, chroma: 0, vignette: 0, softFocus: 0, glow: 0, halation: 0, flare: 0, dof: 0, focusHunt: 0, haze: 0.03, flicker: 0, motionBlur: 0, autoExposure: 1, autoWhiteBalance: 1 },
-  homeVideo: { distortion: 0.03, chroma: 0.5, vignette: 0.08, softFocus: 0.5, glow: 0.35, halation: 0.6, flare: 0.3, dof: 0.6, focusHunt: 0.6, haze: 0.06, flicker: 0.01, motionBlur: 0.5, autoExposure: 1, autoWhiteBalance: 1 },
-  tape: { distortion: 0.04, chroma: 0.7, vignette: 0.1, softFocus: 0.7, glow: 0.45, halation: 0.8, flare: 0.3, dof: 0.6, focusHunt: 0.8, haze: 0.06, flicker: 0.015, motionBlur: 0.6, autoExposure: 1, autoWhiteBalance: 1 },
+  clean: { distortion: 0, chroma: 0, vignette: 0, softFocus: 0, glow: 0, halation: 0, flare: 0, dof: 0, focusHunt: 0, haze: 0.015, flicker: 0, motionBlur: 0, autoExposure: 1, autoWhiteBalance: 1 },
+  homeVideo: { distortion: 0.03, chroma: 0.7, vignette: 0.12, softFocus: 0.6, glow: 0.42, halation: 0.6, flare: 0.3, dof: 0.6, focusHunt: 0.6, haze: 0.025, flicker: 0.01, motionBlur: 0.5, autoExposure: 1, autoWhiteBalance: 1 },
+  tape: { distortion: 0.04, chroma: 0.7, vignette: 0.1, softFocus: 0.7, glow: 0.45, halation: 0.8, flare: 0.3, dof: 0.6, focusHunt: 0.8, haze: 0.025, flicker: 0.015, motionBlur: 0.6, autoExposure: 1, autoWhiteBalance: 1 },
 };
 
 /** 調整値（docs/film-lens.md 2 章） */
 export const LENS_TUNING = {
   /**
-   * 露出: 目標の幾何平均輝度（線形、トーンマップ前）。seed 7 の Common 8 部屋の実測は 0.02〜0.075（中央 0.045。AgX + 露出 1.0 で設計された
-   * 部屋は log 平均がこの程度に落ちる）ので、典型的な部屋でゲイン ≈ 1 になるよう 0.045 に置く。追従は log 域で ADAPT の割合だけ
-   * （1 = 完全補正。0.45 で 2 倍暗い部屋が 1.37 倍、E06 のような暗室は上限へ）。ゲインは [GAIN_MIN, GAIN_MAX]、時定数 EXPOSURE_TAU s
+   * 暗い基準露出 .55 に合わせた目標の幾何平均輝度（線形、トーンマップ前）。
+   * log 域の補正を 30% に抑え、暗室を明るく戻すゲインは最大 1.2。
+   * 部屋ごとの明暗差を保ち、懐中電灯の照射部分だけが浮かぶようにする。
    */
-  EXPOSURE_KEY: 0.045,
-  EXPOSURE_ADAPT: 0.45,
+  EXPOSURE_KEY: 0.032,
+  EXPOSURE_ADAPT: 0.30,
   EXPOSURE_TAU: 1.7,
   GAIN_MIN: 0.6,
-  GAIN_MAX: 1.8,
+  GAIN_MAX: 1.2,
   /** WB: 灰色仮定の RGB ゲイン（log 域で WB_ADAPT の割合。暖色の部屋ばかりなので完全補正だと常に上限に張り付く）を ±WB_LIMIT に制限、時定数 WB_TAU s */
   WB_LIMIT: 0.08,
   WB_ADAPT: 0.6,

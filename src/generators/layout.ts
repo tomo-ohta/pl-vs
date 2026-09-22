@@ -18,7 +18,7 @@ export type MatId =
   | 'plantLeaf' | 'plantSoil' | 'shelfMetal' | 'boxCardboard' | 'plant' | 'water' | 'carPaint' | 'carGlass' | 'rubber' | 'upholstery'
   // Phase 2 Modifier / 未実装 Generator 向け（v1.3 追加）
   | 'lightGreen' | 'lightYellow' | 'screenGlow' | 'skyOvercast' | 'skyDusk' | 'skyNoon'
-  | 'waterShallow' | 'waterWall' | 'shadowDecal' | 'untextured'
+  | 'waterShallow' | 'waterWall' | 'puddle' | 'shadowDecal' | 'untextured'
   | 'floorAsphalt' | 'wallBrick' | 'windowLit' | 'windowDark' | 'sodiumLight' | 'signPlate' | 'signEmissive'
   | 'ice' | 'snow' | 'grass';
 

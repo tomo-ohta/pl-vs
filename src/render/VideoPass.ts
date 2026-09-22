@@ -53,13 +53,33 @@ export interface VideoParams {
   frameHold: number;
   /** フレーム間引きの切り替え時に前フレームを残す割合（残像。0〜0.5。frameHold = 0 なら無効） */
   frameBlend: number;
+  /** 輝度の横ぼかし半径（1080p 基準 px。VHS の輝度帯域 ≈ 240 本の甘さ。0〜3） */
+  lumaBlur: number;
+  /** 色差を右へずらす量（1080p 基準 px。色が輪郭より遅れる。0〜4） */
+  chromaShift: number;
+  /** 明部が右へ引きずる（テープの滲み。0〜1） */
+  smear: number;
+  /** 輪郭のリンギング（強調回路の出過ぎで縁に明暗の線。0〜1） */
+  ringing: number;
+  /** 四隅の減光（表示域。0〜0.4） */
+  vignette: number;
+  /** 行ごとの横揺れ（トラッキングの甘さ。1080p 基準 px。0〜2） */
+  lineJitter: number;
+  /** スノーノイズ（暗部に白い点。0〜1） */
+  snow: number;
+  /** 画面下端の常時トラッキング帯（高さの目安 0〜1 → 0〜3%） */
+  tracking: number;
+  /** 行ごとの色相ずれ（色差ノイズ。0〜1） */
+  chromaNoise: number;
 }
 
 export const VIDEO_PRESETS: Record<FilmPreset, VideoParams> = {
-  off: { desaturate: 0, tint: [1, 1, 1], chromaBlur: 0, noise: 0, colorNoise: 0, blackLift: 0, knee: 0, scanlines: 0, interlace: 0, jitter: 0, headSwitch: 0, dctBlocks: 0, frameHold: 0, frameBlend: 0 },
-  clean: { desaturate: 0.05, tint: [1, 1, 1], chromaBlur: 0, noise: 0, colorNoise: 0, blackLift: 0, knee: 0, scanlines: 0, interlace: 0, jitter: 0, headSwitch: 0, dctBlocks: 0, frameHold: 0, frameBlend: 0 },
-  homeVideo: { desaturate: 0.12, tint: [1.0, 1.0, 0.97], chromaBlur: 2.5, noise: 0.012, colorNoise: 0.3, blackLift: 0.025, knee: 0.4, scanlines: 0, interlace: 0, jitter: 0, headSwitch: 0, dctBlocks: 0, frameHold: 0, frameBlend: 0 },
-  tape: { desaturate: 0.15, tint: [1.0, 1.02, 0.96], chromaBlur: 3.5, noise: 0.018, colorNoise: 0.4, blackLift: 0.035, knee: 0.6, scanlines: 0.35, interlace: 0.4, jitter: 0.15, headSwitch: 0.2, dctBlocks: 0.3, frameHold: 30, frameBlend: 0.3 },
+  off: { desaturate: 0, tint: [1, 1, 1], chromaBlur: 0, noise: 0, colorNoise: 0, blackLift: 0, knee: 0, scanlines: 0, interlace: 0, jitter: 0, headSwitch: 0, dctBlocks: 0, frameHold: 0, frameBlend: 0, lumaBlur: 0, chromaShift: 0, smear: 0, ringing: 0, vignette: 0, lineJitter: 0, snow: 0, tracking: 0, chromaNoise: 0 },
+  clean: { desaturate: 0.05, tint: [1, 1, 1], chromaBlur: 0, noise: 0, colorNoise: 0, blackLift: 0, knee: 0, scanlines: 0, interlace: 0, jitter: 0, headSwitch: 0, dctBlocks: 0, frameHold: 0, frameBlend: 0, lumaBlur: 0, chromaShift: 0, smear: 0, ringing: 0, vignette: 0.12, lineJitter: 0, snow: 0, tracking: 0, chromaNoise: 0 },
+  homeVideo: { desaturate: 0.12, tint: [1.0, 1.0, 0.97], chromaBlur: 3.3, noise: 0.019, colorNoise: 0.4, blackLift: 0.012, knee: 0.45, scanlines: 0.2, interlace: 0.12, jitter: 0.025, headSwitch: 0.035, dctBlocks: 0, frameHold: 0, frameBlend: 0, lumaBlur: 0.8, chromaShift: 1.0, smear: 0.25, ringing: 0.2, vignette: 0.2, lineJitter: 0.3, snow: 0.05, tracking: 0, chromaNoise: 0.15 },
+  // tape = バックルームズ映像でよく見る VHS の質感。輝度の横方向の甘さ・色の遅れとにじみ・明部の右への滲み・縁のリンギング・
+  // 行ごとの横揺れ・ドロップアウトの白い筋・スノー・常時のトラッキング帯を重ね、コントラストは黒浮きとニーで寝かせる。残像（frameBlend）は控えめ
+  tape: { desaturate: 0.24, tint: [1.03, 1.0, 0.93], chromaBlur: 10, noise: 0.046, colorNoise: 0.6, blackLift: 0.045, knee: 0.85, scanlines: 0.7, interlace: 0.4, jitter: 0.45, headSwitch: 0.5, dctBlocks: 0.2, frameHold: 30, frameBlend: 0.06, lumaBlur: 3.2, chromaShift: 4.5, smear: 1.0, ringing: 0.8, vignette: 0.32, lineJitter: 2.0, snow: 0.15, tracking: 0.85, chromaNoise: 0.75 },
 };
 
 /**
@@ -79,6 +99,40 @@ export class VideoPass extends Pass {
   readonly params: VideoParams = { ...VIDEO_PRESETS.off, tint: [1, 1, 1] };
   /** 数値ならノイズの種を固定（スクリーンショット用）。null なら毎フレーム更新 */
   frozenSeed: number | null = null;
+  /** VHS 効果の強さ（設定スライダー。0〜2、1 = params そのまま）。frameHold 以外の全効果に掛かる（上限あり） */
+  strength = 1;
+  private readonly eff: VideoParams = { ...VIDEO_PRESETS.off, tint: [1, 1, 1] };
+
+  /** params × strength（各効果の上限でクランプ）。update / render はこちらを読む */
+  private effective(): VideoParams {
+    const p = this.params, k = this.strength, e = this.eff;
+    const c = (v: number, max: number) => Math.min(max, v * k);
+    e.desaturate = c(p.desaturate, 0.6);
+    e.tint = [1 + (p.tint[0] - 1) * k, 1 + (p.tint[1] - 1) * k, 1 + (p.tint[2] - 1) * k];
+    e.chromaBlur = c(p.chromaBlur, 24);
+    e.noise = c(p.noise, 0.12);
+    e.colorNoise = Math.min(1, p.colorNoise);
+    e.blackLift = c(p.blackLift, 0.12);
+    e.knee = c(p.knee, 1);
+    e.scanlines = c(p.scanlines, 1);
+    // コーミングは 1.0 にすると奇数行が前フレームのまま更新されず「焼き付き」になるので 0.8 が上限
+    e.interlace = c(p.interlace, 0.6);
+    e.jitter = c(p.jitter, 1);
+    e.headSwitch = c(p.headSwitch, 1);
+    e.dctBlocks = c(p.dctBlocks, 1);
+    e.frameHold = p.frameHold;
+    e.frameBlend = c(p.frameBlend, 0.2);
+    e.lumaBlur = c(p.lumaBlur, 8);
+    e.chromaShift = c(p.chromaShift, 12);
+    e.smear = c(p.smear, 2.5);
+    e.ringing = c(p.ringing, 2);
+    e.vignette = c(p.vignette, 0.55);
+    e.lineJitter = c(p.lineJitter, 5);
+    e.snow = c(p.snow, 0.5);
+    e.tracking = c(p.tracking, 1.2);
+    e.chromaNoise = c(p.chromaNoise, 2);
+    return e;
+  }
   private readonly uniforms: VideoUniforms;
   private readonly singleMaterial: THREE.ShaderMaterial;
   private readonly colorMaterial: THREE.ShaderMaterial;
@@ -152,7 +206,7 @@ export class VideoPass extends Pass {
 
   /** composer.render の直前に PostFX が呼ぶ。params → uniform、音量・静止の連動、確率イベント、フレーム間引きの判定 */
   update(dt: number, frame: number): void {
-    const p = this.params;
+    const p = this.effective();
     const u = this.uniforms;
     this.time += dt;
     const frozen = this.frozenSeed !== null;
@@ -211,6 +265,17 @@ export class VideoPass extends Pass {
     u.scanlines.value = p.scanlines;
     u.dctBlocks.value = p.dctBlocks;
     u.blockSeed.value = Math.floor(this.time * 2) % SEED_PERIOD;
+    // VHS の追加項目（静止中はドロップアウトと行揺れを止める。粒子とスノーは残す）
+    u.lumaBlur.value = p.lumaBlur;
+    u.chromaShift.value = p.chromaShift;
+    u.smear.value = p.smear;
+    u.ringing.value = p.ringing;
+    u.vignette.value = p.vignette;
+    u.lineJitter.value = calm && !this.forced ? p.lineJitter * 0.3 : p.lineJitter;
+    u.snow.value = p.snow;
+    u.tracking.value = p.tracking;
+    u.chromaNoise.value = p.chromaNoise;
+    u.timeSec.value = this.time;
   }
 
   override setSize(width: number, height: number): void {
@@ -224,7 +289,7 @@ export class VideoPass extends Pass {
   }
 
   override render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget): void {
-    const p = this.params;
+    const p = this.effective();
     const u = this.uniforms;
     const out = this.renderToScreen ? null : writeBuffer;
     const needsPrev = p.interlace > 0 || p.frameHold > 0;
