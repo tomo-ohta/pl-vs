@@ -28,6 +28,7 @@
 import * as THREE from 'three';
 import { addSurfaceAppearance, usesSurfaceVariation, usesSurfaceWear, SURFACE_VARIATION_KEY } from './SurfaceAppearance';
 import { createSurfaceMaps, hasAuthoredDetail, type DetailKind } from './SurfaceDetail';
+import { ImageRequestQueue } from './textureQueue';
 import { CC0_INDEX_URL, CC0_MATERIALS_URL, CC0_VARIANTS, DEFAULT_BLEND, TONE_TABLE, variantHash, type Cc0Index, type Cc0IndexEntry, type Cc0Variant } from './cc0Materials';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { MatId, Palette } from '../generators/layout';
@@ -348,10 +349,10 @@ const MAX_VARIANTS = 256;
 
 /**
  * 部屋切り替えの軽量化（担当 L2。docs/perf-room-switch.md）の各機能のスイッチ。計測の前後比較用に URL `?l2=off`（全部無効）または
- * `?l2=bitmap,queue,prefetch,split,precompile`（列挙したものを無効）で切れる。通常は全て有効
+ * `?l2=bitmap,queue,prefetch,split,precompile,throttle`（列挙したものを無効）で切れる。通常は全て有効
  */
 export const L2_FLAGS = {
-  /** CC0 セットを ImageBitmapLoader で読む（デコードを別スレッドへ） */
+  /** CC0 セットを fetch + createImageBitmap で読む（デコードを別スレッドへ）。false で TextureLoader */
   bitmap: true,
   /** 読込済みテクスチャ・ライトマップの先行アップロード待ち行列 */
   queue: true,
@@ -361,6 +362,8 @@ export const L2_FLAGS = {
   split: true,
   /** 2 hop 先の部屋の材質シェーダの事前コンパイル */
   precompile: true,
+  /** CC0 テクスチャ取得の並列数制限とリトライ（配信元のレート制限対策） */
+  throttle: true,
 };
 (() => {
   try {
@@ -370,6 +373,11 @@ export const L2_FLAGS = {
     for (const k of Object.keys(L2_FLAGS) as (keyof typeof L2_FLAGS)[]) if (v === 'off' || v.split(',').includes(k)) L2_FLAGS[k] = false;
   } catch { /* ignore */ }
 })();
+/** CC0 テクスチャの同時取得数。GitHub Pages は数十件の同時要求で 503 を返すことがある */
+const CC0_MAX_CONCURRENT = 6;
+/** 一時的な失敗（5xx / 429 / 通信断）を読み直す回数 */
+const CC0_MAX_RETRIES = 3;
+
 const q = (v: number, step: number) => Math.round(v / step) * step;
 /** 2 層混合のマスクの周期（m）。3〜6 m の間 */
 const TILE_NOISE_PERIOD = 4.5;
@@ -386,13 +394,20 @@ export class MaterialLibrary {
   private readonly manager = new THREE.LoadingManager();
   private readonly loader = new THREE.TextureLoader(this.manager);
   /**
-   * CC0 セット用（担当 L2）: JPEG のデコードを main thread から外す。createImageBitmap は別スレッドでデコードし、
-   * `imageOrientation: 'flipY'` で TextureLoader（flipY = true）と同じ向きの画像にする（three は ImageBitmap の flipY を無視する）。
-   * createImageBitmap の無い環境（Node / 古いブラウザ）では null → TextureLoader
+   * CC0 セットのテクスチャ取得（担当 L2 + 公開時の 503 対策）。
+   * - JPEG のデコードを main thread から外す（fetch + createImageBitmap は別スレッドでデコードする）
+   * - 同時に走らせるのは数件まで。起動時に 160 枚前後を一斉に投げると配信元（GitHub Pages など）が
+   *   レート制限して 503 を返すため、待ち行列で流量を絞り、5xx / 429 は指数バックオフで読み直す
+   * - createImageBitmap の無い環境（Node のテスト・古いブラウザ）では TextureLoader へ退避する
    */
-  private readonly bitmapLoader: THREE.ImageBitmapLoader | null = L2_FLAGS.bitmap && typeof createImageBitmap === 'function' && typeof fetch === 'function'
-    ? new THREE.ImageBitmapLoader(this.manager).setOptions({ imageOrientation: 'flipY', premultiplyAlpha: 'none' })
-    : null;
+  private readonly imageQueue = new ImageRequestQueue({
+    maxConcurrent: L2_FLAGS.throttle ? CC0_MAX_CONCURRENT : 64,
+    maxRetries: L2_FLAGS.throttle ? CC0_MAX_RETRIES : 0,
+    useBitmap: L2_FLAGS.bitmap,
+    fallbackLoad: (url) => new Promise<TexImageSource>((resolve, reject) => {
+      this.loader.load(url, (t) => resolve(t.image as TexImageSource), undefined, reject);
+    }),
+  });
   /**
    * 追跡テクスチャ（CC0 / ライトマップ / サイン・ラベルのアトラス）の GPU アップロード回数（texture.onUpdate）と、
    * ライトマップの反映回数。部屋切り替えの計測（Game.switchProfiler）が読む
@@ -423,7 +438,7 @@ export class MaterialLibrary {
 
   constructor() {
     this.manager.onError = (url) => this.errors.push(url);
-    // 1) 生成テクスチャ（従来）→ 2) index.json があれば CC0 の先頭候補を同じ LoadingManager で読む → 3) legacy の縮小を作って ready。
+    // 1) 生成テクスチャ（従来）→ 2) index.json があれば CC0 セットの器を作る（読込は初回使用時）→ 3) legacy の縮小を作って ready。
     // index が無い / fetch 失敗 / Node 環境では 2) を飛ばし、従来どおりの材質になる（ビルド前でも動く）。
     const generated = new Promise<void>((resolve) => { this.manager.onLoad = () => resolve(); });
     const index = loadCc0Index();
@@ -431,7 +446,7 @@ export class MaterialLibrary {
       await generated;
       const idx = await index;
       this.cc0Status.index = idx ? 'loaded' : 'missing';
-      if (idx) await this.startCc0(idx);
+      if (idx) this.startCc0(idx);
       this.refreshLegacyTextures();
     })();
     for (const id of new Set(Object.values(SURFACES).map((s) => s.texture))) {
@@ -628,7 +643,7 @@ export class MaterialLibrary {
       const pick = this.pick(id, seed);
       if (pick.variant < 0) continue;
       const set = this.cc0Sets.get(CC0_VARIANTS[id]![pick.variant].set);
-      if (!set || set.failed || set.eager) continue;
+      if (!set || set.failed) continue;
       if (!sets.has(set)) {
         sets.add(set);
         let rooms = this.setPrefetchers.get(set);
@@ -636,6 +651,7 @@ export class MaterialLibrary {
         rooms.add(roomId);
       }
       if (!set.resident) started++;
+      if (!set.resident) set.loadPriority = 1; // まだ読み始めていなければ先読み扱い
       set.ensureLoaded();
     }
     this.refreshCc0Status();
@@ -662,7 +678,6 @@ export class MaterialLibrary {
 
   /** 構築済みの部屋からも先読みからも参照されない遅延セットを GPU から解放する */
   private maybeEvict(set: Cc0Set): void {
-    if (set.eager) return;
     if (this.setRooms.get(set)?.size) return;
     if (this.setPrefetchers.get(set)?.size) return;
     set.evict();
@@ -793,39 +808,72 @@ export class MaterialLibrary {
     this.refreshCc0Status();
   }
 
+  /**
+   * 今の画面に要る CC0 テクスチャ（優先度 0）が全て届くまで待つ。2 hop 先の先読みは待たない。
+   * 最初の部屋を組んだ直後に呼び、揃ってからタイトル画面の開始を押せるようにする（平均色のままの面を見せない）。
+   * timeoutMs を過ぎたら諦めて進む（配信元が不調でもタイトル画面が固まらないように）
+   */
+  imagesReady(timeoutMs = 15000): Promise<void> {
+    const idle = this.imageQueue.idle(0);
+    if (timeoutMs <= 0) return idle;
+    return Promise.race([idle, new Promise<void>((resolve) => { setTimeout(resolve, timeoutMs); })]);
+  }
+
+  /** 画像取得の待ち行列の状態（デバッグ・計測用） */
+  get imageQueueStatus(): { waiting: number; running: number; retries: number; failures: number; loaded: number } {
+    return { ...this.imageQueue.status, ...this.imageQueue.stats };
+  }
+
   /** 構築済みの部屋が参照するセットか（先読みだけなら false。アップロードの優先度に使う） */
   private isRetained(set: Cc0Set): boolean { return !!this.setRooms.get(set)?.size; }
 
-  /** index.json の内容から CC0 セットを作り、先頭候補（get / variant が使う）だけ同じ LoadingManager で読む（onLoad が再度発火するのを待つ） */
-  private startCc0(index: Cc0Index): Promise<void> {
+  /**
+   * CC0 テクスチャ 1 枚を待ち行列経由で読む。
+   * LoadingManager には「予約した時点」で itemStart を通し、完了（成功・恒久的失敗のどちらでも）で itemEnd を返す。
+   * こうしないと、待ち行列で後回しにした分が始まる前に itemsLoaded === itemsTotal となり、onLoad（= ready）が早く解決してしまう。
+   */
+  private loadCc0Image(set: Cc0Set, url: string, onLoad: (image: TexImageSource) => void, onError: () => void): void {
+    // 今すぐ要るもの（構築済みの部屋が参照するセット・初回使用）を先に流し、2 hop 先の先読みは後ろに回す
+    const priority = this.isRetained(set) ? 0 : set.loadPriority;
+    this.manager.itemStart(url);
+    this.imageQueue.load(url, priority, (image) => {
+      this.manager.itemEnd(url);
+      onLoad(image);
+    }, (err) => {
+      console.warn('[cc0] texture load failed', url, err);
+      this.manager.itemError(url);
+      this.manager.itemEnd(url);
+      onError();
+    });
+  }
+
+  /**
+   * index.json の内容から CC0 セットの器を作る（読込はしない）。
+   * 以前は材質 ID ごとの先頭候補 46 セット（テクスチャ約 140 枚・75 MB）を起動時に読み、その完了までタイトル画面を
+   * 操作できないようにしていた。実際に要るのは最初の部屋が使う数セットだけなので、読込は初回使用（derive）と
+   * 2 hop 先の先読み（prefetchRoom）に任せ、起動時の一括取得はやめた。読込前は index.json の平均色の 1 px が出る
+   */
+  private startCc0(index: Cc0Index): void {
     const base = baseUrl() + CC0_MATERIALS_URL;
     // Displacement（視差）を読むセット
     const wantHeight = new Set<string>();
     for (const list of Object.values(CC0_VARIANTS)) for (const v of list!) if ((v.parallax ?? 0) > 0) wantHeight.add(v.set);
-    const eager = new Set<Cc0Set>();
     const onFail = (_failed: Cc0Set) => this.refreshCc0Status(); // 失敗したセットは availableVariants から外れる（材質は代替の単色のまま）
     const host: Cc0Host = {
-      loader: this.loader, bitmapLoader: this.bitmapLoader,
+      loadImage: (set, url, onLoad, onError) => this.loadCc0Image(set, url, onLoad, onError),
       track: (t) => this.track(t),
-      enqueueUpload: (set, t, big) => { if (L2_FLAGS.queue) this.uploads.enqueue(t, { big, priority: set.eager || this.isRetained(set) ? 1 : 2 }); },
+      enqueueUpload: (set, t, big) => { if (L2_FLAGS.queue) this.uploads.enqueue(t, { big, priority: this.isRetained(set) ? 1 : 2 }); },
       cancelUpload: (t) => this.uploads.cancel(t),
     };
     for (const list of Object.values(CC0_VARIANTS) as Cc0Variant[][]) {
-      let first = true;
       for (const v of list) {
         const entry = index[v.set];
         if (!entry) continue;
         let set = this.cc0Sets.get(v.set);
         if (!set) { set = new Cc0Set(v.set, entry, base, host, this.anisotropy, wantHeight.has(v.set), onFail); this.cc0Sets.set(v.set, set); }
-        if (first) { set.eager = true; eager.add(set); first = false; }
       }
     }
     this.refreshCc0Status();
-    if (!eager.size) return Promise.resolve();
-    // onLoad は itemStart より先に差し替える（読込は非同期なので同期的に発火することはないが、順序を明示する）
-    const done = new Promise<void>((resolve) => { this.manager.onLoad = () => resolve(); });
-    for (const set of eager) set.ensureLoaded();
-    return done;
   }
 
   private refreshCc0Status(): void {
@@ -1397,9 +1445,8 @@ function hueMatrix(hueDeg: number, light: number): THREE.Matrix3 {
  */
 /** Cc0Set が MaterialLibrary から借りるもの（読込器・アップロード追跡・先行アップロードの待ち行列） */
 interface Cc0Host {
-  loader: THREE.TextureLoader;
-  /** createImageBitmap が使えるときだけ（デコードを main thread から外す） */
-  bitmapLoader: THREE.ImageBitmapLoader | null;
+  /** 1 枚読む。並列数制限とリトライは MaterialLibrary 側の待ち行列が持つ */
+  loadImage(set: Cc0Set, url: string, onLoad: (image: TexImageSource) => void, onError: () => void): void;
   track(t: THREE.Texture): void;
   /** 読込完了したテクスチャを先行アップロードの待ち行列へ（big: 1024² 級） */
   enqueueUpload(set: Cc0Set, t: THREE.Texture, big: boolean): void;
@@ -1420,8 +1467,11 @@ function cloneWithLightMap(base: THREE.MeshStandardMaterial, lightMap: THREE.Tex
 class Cc0Set {
   color: THREE.Texture | null = null; normal: THREE.Texture | null = null; roughness: THREE.Texture | null = null; ao: THREE.Texture | null = null; height: THREE.Texture | null = null;
   failed = false;
-  /** 起動時に読む先頭候補（evict しない） */
-  eager = false;
+  /**
+   * この時点で読むときの優先度（0: 今の画面に要る / 1: 2 hop 先の先読み）。
+   * 待ち行列はこれを見て順番を決める。prefetchRoom だけが 1 を入れる
+   */
+  loadPriority = 0;
   /** GPU に載っている（読込中含む） */
   resident = false;
   readonly id: string;
@@ -1484,9 +1534,7 @@ class Cc0Set {
         if (this.resident) this.host.enqueueUpload(this, t, isBigImage(image));
       };
       const onError = () => { if (!this.failed) { this.failed = true; this.onFail(this); } };
-      const url = this.base + file;
-      if (this.host.bitmapLoader) this.host.bitmapLoader.load(url, onLoad, undefined, onError);
-      else this.host.loader.load(url, (loaded) => onLoad(loaded.image as TexImageSource), undefined, onError);
+      this.host.loadImage(this, this.base + file, onLoad, onError);
       return t;
     };
     this.color = make(this.entry.color, 'color', true, avg);
@@ -1516,6 +1564,7 @@ class Cc0Set {
 
   /** SURFACES.meters / 実寸 の repeat と 90° 回転を持つ派生テクスチャ。読込を始めていなければ始める */
   derive(repeat: number, rotate: boolean, albedo = true): Cc0Maps {
+    this.loadPriority = 0; // 実際に使われた（= 今の画面に要る）
     this.ensureLoaded();
     const key = `${repeat.toFixed(4)}|${rotate ? 1 : 0}|${albedo ? 'c' : 'p'}`;
     let d = this.derived.get(key);
