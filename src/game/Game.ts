@@ -19,7 +19,7 @@
  */
 import * as THREE from 'three';
 import { aabbContains } from '../core/aabb';
-import { QUALITY_TIERS, dirVec, toWorld, type QualityTier, type QualityTierId, type Rarity, type RoomDefinition, type RoomInstance, type Portal, type Vec3 } from '../core/types';
+import { QUALITY_TIERS, dirVec, mobileTier, toWorld, type QualityTier, type QualityTierId, type Rarity, type RoomDefinition, type RoomInstance, type Portal, type Vec3 } from '../core/types';
 import { randomWorldSeed } from '../core/rng';
 import { ROOM_BY_ID } from '../data';
 import { InputController, type InputState } from '../input/InputController';
@@ -48,6 +48,7 @@ import { Settings } from '../core/Settings';
 import { checkCanOpen, hasModifier, modParams, runEnter, runExit, runUpdate, DEFAULT_LOCKED_HINT } from '../modifiers';
 import { installWorldHooks } from '../modifiers/hooks';
 import type { GameServices, MapViewState, RuntimeContext } from '../modifiers/types';
+import { IS_MOBILE } from '../core/device';
 import type { RoomLayout } from '../generators/layout';
 
 type State = 'start' | 'playing' | 'menu' | 'transition' | 'riding';
@@ -206,6 +207,11 @@ export class RoomSwitchProfiler {
   }
 }
 
+/** スマホの描画の上限（Hz）。撮像プリセット tape / homeVideo は表示を 24〜30 fps に間引くので、それ以上描いても見えない */
+const MOBILE_RENDER_HZ = 30;
+/** スマホの部屋の分割構築に 1 フレームで使う時間（ms。PC は RoomStreamingManager.BUILD_BUDGET_MS = 24） */
+const MOBILE_BUILD_BUDGET_MS = 8;
+
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -266,6 +272,8 @@ export class Game {
   private readonly menuEl = document.getElementById('menu')!;
   private readonly startEl = document.getElementById('start')!;
   private debugOn = false;
+  /** スマホの描画間引き（stepBody）: 前回描画からの経過秒 */
+  private renderAcc = 0;
   // 半球光は一様な照度で焼き込みの明暗（器具の間・突き当たりの沈み）を埋めるので弱く（0.32 → 0.06）
   private hemi = new THREE.HemisphereLight(0xe5e4d5, 0x6c665a, 0.1);
   private env: { from: EnvTarget; to: EnvTarget; t: number } | null = null;
@@ -287,7 +295,13 @@ export class Game {
   readonly switchProfiler: RoomSwitchProfiler;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // スマホは既定フレームバッファの MSAA を持たない（撮像 pass の軟焦点で縁は目立たず、全画面の多重サンプル分の GPU メモリを節約）
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !IS_MOBILE, powerPreference: 'high-performance' });
+    // GPU メモリ不足などで WebGL が失われると最後のフレームで止まり、操作が効かないように見える。案内を出す（復帰は再読み込み）
+    canvas.addEventListener('webglcontextlost', () => {
+      console.error('WebGL context lost');
+      this.hud.setHint('描画が中断されました。ページを再読み込みしてください');
+    });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     // トーンマップは設定（既定 AgX。applyPostFxConfig が反映）。直接描画では材質側、EffectComposer 使用時は OutputPass だけが
     // 適用する（RenderTarget 描画中は three.js が材質側のトーンマップと出力変換を無効化するので二重にならない。src/render/PostFX.ts）
@@ -1174,7 +1188,7 @@ export class Game {
   // ------------------------------------------------------------ quality
   setTier(id: QualityTierId): void {
     this.tierId = id;
-    this.tier = QUALITY_TIERS[id];
+    this.tier = IS_MOBILE ? mobileTier(QUALITY_TIERS[id]) : QUALITY_TIERS[id];
     // applyPostFxConfig が composer を組み直してから resize（DPR 上限は composer の有無で変わる）
     this.applyPostFxConfig();
     (this.scene.fog as THREE.Fog).far = Math.min(this.envNow.designFar, this.tier.fogFar);
@@ -1189,7 +1203,7 @@ export class Game {
 
   private resize(): void {
     // composer 使用時は Tier の maxPixelRatio で DPR を抑える（HiDPI での GTAO / bloom / MSAA の負荷。直接描画は従来の上限 2）
-    const cap = this.postfx.active ? this.tier.maxPixelRatio : 2;
+    const cap = this.postfx.active || IS_MOBILE ? this.tier.maxPixelRatio : 2;
     const dpr = Math.min(window.devicePixelRatio || 1, cap) * this.tier.renderScale;
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -1381,6 +1395,10 @@ export class Game {
   }
 
   private stepBody(dt: number, stepStart: number): void {
+    // スマホは描画（シーン・撮像 pass・ミニマップ）を MOBILE_RENDER_HZ までに間引く。入力・移動・扉・音は毎フレーム
+    this.renderAcc += dt;
+    const renderNow = !IS_MOBILE || this.renderAcc >= (1 / MOBILE_RENDER_HZ) * 0.9;
+    if (renderNow) this.renderAcc = 0;
     const polled = this.input.poll();
     const input: InputState = this.devInput ? { ...polled, ...this.devInput } : polled;
     // R で懐中電灯のオン / オフ（メニュー中は無視）
@@ -1424,7 +1442,8 @@ export class Game {
       }
       // 後回しにした隣接部屋をフレーム予算の範囲で構築し（大きな部屋は複数フレームに分割）、新しい材質のシェーダは
       // 実描画と同じ条件（composer の RenderTarget）で非同期にコンパイルしておく
-      if (this.streaming.pendingCount > 0 && this.streaming.buildPending(L2_FLAGS.split ? RoomStreamingManager.BUILD_BUDGET_MS : 4) > 0) this.updateVisibility();
+      const buildBudget = L2_FLAGS.split ? (IS_MOBILE ? MOBILE_BUILD_BUDGET_MS : RoomStreamingManager.BUILD_BUDGET_MS) : 4;
+      if (this.streaming.pendingCount > 0 && this.streaming.buildPending(buildBudget) > 0) this.updateVisibility();
       this.streaming.precompile(this.renderer, this.camera, this.compileRenderTarget(), this.tier);
       this.streaming.updateChunks(this.camera.position, this.tier.fogFar);
       this.streaming.updateLights(this.camera.position, this.tier, dt);
@@ -1434,7 +1453,7 @@ export class Game {
       this.doorLeaks.update(dt, now);
       this.hud.setCount(this.world.graph.visitedCount);
       // ミニマップは現在いるフロアだけ（左上にフロア名）
-      drawMap(this.minimap, this.world, this.currentRoomId, { x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw }, {
+      if (renderNow) drawMap(this.minimap, this.world, this.currentRoomId, { x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw }, {
         center: [this.player.pos.x, this.player.pos.z], pxPerCell: 7, level: levelOf(this.world, this.currentRoomId), label: true,
         rotation: this.mapView.rotation || undefined, hiddenRoomIds: this.mapView.hiddenRoomIds,
       });
@@ -1449,13 +1468,15 @@ export class Game {
     this.audio.setListener([cam.x, cam.y, cam.z], this.player.yaw, this.player.pitch);
     this.audio.update(dt);
     // 撮像 pass への入力: 表示カメラの回転速度（回転ブラー）・環境音の大きさ（暗部ノイズ）。REC 表示の更新
+    // 懐中電灯の影（SpotLight の影マップ = シーンの追加描画 1 回）は Tier の影と揃える（スマホは mobileTier で 0）
+    this.flashlight.light.castShadow = this.tier.shadowLights > 0;
     this.flashlight.update(this.camera, this.state === 'menu' ? 0 : dt, this.flashlightOn && !!this.currentRoomId && this.state !== 'start', this.tier.id === 'low', this.flashlightHitDistance());
     this.updateCameraMotion(dt);
     this.postfx.setAudioNoise(this.audio.ambientLevel);
     this.updateRecOverlay(dt);
     // 読込済みテクスチャの先行アップロード（1 フレームに数枚。更新に余裕があるフレームだけ。docs/perf-room-switch.md）
     this.materials.uploads.flush(this.renderer, performance.now() - stepStart);
-    this.renderFrame();
+    if (renderNow) this.renderFrame();
   }
 
   private runModifierUpdates(dt: number, now: number): void {

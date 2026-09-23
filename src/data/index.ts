@@ -57,13 +57,13 @@ export function isImplemented(def: RoomDefinition): boolean {
   return IMPLEMENTED_GENERATORS.has(def.generator);
 }
 
-/** 基礎重み（07 シート） */
+/** 基礎重み（07 シートの 55 / 25 / 12 / 5 / 2.5 / 0.5 から、Rare 以上を増やした値。xlsx 未反映） */
 export const RARITY_WEIGHT: Record<Rarity, number> = {
-  Common: 55, Uncommon: 25, Rare: 12, Epic: 5, Legendary: 2.5, Mythic: 0.5,
+  Common: 33, Uncommon: 24, Rare: 19, Epic: 18, Legendary: 4, Mythic: 6.5,
 };
-/** 最低深度（07 シート） */
+/** 最低深度（07 シートの 4 / 10 / 20 / 35 から前倒し。xlsx 未反映） */
 export const RARITY_MIN_DEPTH: Record<Rarity, number> = {
-  Common: 0, Uncommon: 0, Rare: 4, Epic: 10, Legendary: 20, Mythic: 35,
+  Common: 0, Uncommon: 0, Rare: 2, Epic: 5, Legendary: 10, Mythic: 18,
 };
 export const RARITY_COLOR: Record<Rarity, string> = {
   Common: '#9aa3b2', Uncommon: '#6fcf97', Rare: '#5aa9ff', Epic: '#b57bff', Legendary: '#f2c14e', Mythic: '#ff6b81',

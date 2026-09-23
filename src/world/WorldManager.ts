@@ -209,7 +209,7 @@ export class WorldManager {
           exits: node.exitCount,
           variant: node.variant,
           palette,
-          label: { text: def.name, sub: node.fallback ? `TODO ${def.generator} / ${def.baseTemplate}` : `${def.id} ${def.rarity}` },
+          // 入口の案内板（部屋名・ID・レア度）は廃止。GenParams.label を渡さなければ labelAtEntry は何も置かない
           allowHole: node.depth >= 1 && node.entryReq?.type !== 'hole',
           extraSockets: node.extraSockets,
           removedSockets: node.removedSockets,

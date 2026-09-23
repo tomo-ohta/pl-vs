@@ -5,9 +5,15 @@ export class Hud {
   private readonly count = document.getElementById('hud-count')!;
   private readonly hint = document.getElementById('hud-hint')!;
   private readonly debug = document.getElementById('debug')!;
+  /** 左上の部屋名・レア度・発見数はデバッグ HUD がオンのときだけ出す（操作案内 hud-hint は常に出す） */
+  private readonly info = [this.room, this.count];
   private lastRoom = '';
   private lastCount = -1;
   private lastHint = '';
+
+  constructor() {
+    this.syncInfo();
+  }
 
   setRoom(def: RoomDefinition | null, adapter: boolean, fallback: boolean): void {
     const key = def ? def.id + (fallback ? '!' : '') : adapter ? 'adapter' : '';
@@ -39,7 +45,12 @@ export class Hud {
 
   toggleDebug(): boolean {
     this.debug.hidden = !this.debug.hidden;
+    this.syncInfo();
     return !this.debug.hidden;
+  }
+
+  private syncInfo(): void {
+    for (const el of this.info) el.hidden = this.debug.hidden;
   }
 }
 

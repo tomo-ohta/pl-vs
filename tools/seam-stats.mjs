@@ -39,6 +39,9 @@ const KEEP = opt('keep', false) !== false;
 // Phase 2: Modifier（layout / onNodeCreated / onConnect）を含めて計測する（既定）。--no-mods で Modifier 無しの世界と比較できる。
 // rolldown は import.meta.glob を展開しないので、src/modifiers/mods/*.ts を列挙して registerModifier で手動登録する
 const WITH_MODS = opt('no-mods', false) === false;
+// --take-seams: 意図的 Seam 扉（Legendary 遠方配置・エレベーター以外の hook）も通常の扉と同じく未踏破なら進む（プレイヤーに近い踏破）。
+// 既定（無し）は従来どおり行き止まりで戻る先も無いときだけ通る（dead-end 計測の基準を変えないため）
+const TAKE_SEAMS = opt('take-seams', false) !== false;
 
 // ------------------------------------------------------------ 束ね（rolldown）
 const tmp = mkdtempSync(join(tmpdir(), 'seamstats-'));
@@ -115,6 +118,17 @@ function walk(M, seed, n) {
     const node = world.graph.get(cur);
     const opts = node.portals.filter((p) => p.targetRoomId && !p.locked && !p.seam && !p.oneWay && world.graph.has(p.targetRoomId) && !world.graph.get(p.targetRoomId).visited && world.graph.get(p.targetRoomId).placement);
     let next = opts[0]?.targetRoomId;
+    if (TAKE_SEAMS) {
+      const sp = node.portals.find((p) => p.seam && p.type === 'door' && !p.isReturn && !p.locked && !(p.targetRoomId && world.graph.has(p.targetRoomId) && world.graph.get(p.targetRoomId).visited));
+      // 未踏破の扉が k 本あれば Seam 扉は 1/(k+1) で選ぶ（決定論: 踏破数で回す）
+      if (sp && world.graph.visitedCount % (opts.length + 1) === 0) {
+        const r = world.resolveSeamTarget(node, sp);
+        if (!r.target.visited) {
+          seamCross++;
+          next = r.target.roomId;
+        }
+      }
+    }
     if (!next && stack.length === 0) {
       // 行き止まりで戻る先も無いときだけ、意図的 Seam 扉（Legendary 前室 / hook）を通る
       const sp = node.portals.find((p) => p.seam && p.type === 'door' && !p.isReturn && !p.locked);
@@ -209,7 +223,16 @@ function measure(M, seed, n) {
       if (!p.isReturn && p.locked && !p.targetRoomId && !p.seam && p.type !== 'door' && p.type !== 'hole' && !nd.removedSockets.includes(p.socketId)) r.voidOpenings++;
     }
   }
-  void ROOM_BY_ID;
+  // 踏破した部屋のレア度内訳（Adapter を除く）
+  // 配置された部屋（未踏破を含む）のレア度内訳。Legendary の遠方配置は Seam 扉の先なので、徒歩 DFS の踏破数には出にくい
+  r.rarity = {};
+  r.rarityPlaced = {};
+  for (const nd of nodes) {
+    if (nd.isAdapter) continue;
+    const k = ROOM_BY_ID.get(nd.definitionId)?.rarity ?? '?';
+    if (nd.placement) r.rarityPlaced[k] = (r.rarityPlaced[k] ?? 0) + 1;
+    if (nd.visited) r.rarity[k] = (r.rarity[k] ?? 0) + 1;
+  }
   return r;
 }
 
@@ -246,6 +269,12 @@ function summarize(rows) {
     avgArea: Math.round(rows.reduce((a, r) => a + r.avgArea, 0) / rows.length),
     ms: sum('ms'),
   };
+  s.rarity = {};
+  s.rarityPlaced = {};
+  for (const r of rows) {
+    for (const [k, v] of Object.entries(r.rarity)) s.rarity[k] = (s.rarity[k] ?? 0) + v;
+    for (const [k, v] of Object.entries(r.rarityPlaced)) s.rarityPlaced[k] = (s.rarityPlaced[k] ?? 0) + v;
+  }
   s.badTotal = s.seamLog + s.deadEnd;
   s.badPer100Nodes = per100(s.badTotal, s.nodes);
   s.badPer100Visited = per100(s.badTotal, s.visited);
@@ -275,6 +304,12 @@ function markdown(s, rows) {
   lines.push(`| toJSON→fromJSON 整合（ソケット不一致ノード / 箱・照明不一致ノード） | ${s.loadMismatch} / ${s.loadLayoutMismatch} |`);
   lines.push(`| 施錠され行き先の無い非扉開口（stairs / ramp / street / gate） | ${s.voidOpenings} |`);
   lines.push(`| 平均床面積（m²） | ${s.avgArea} |`);
+  const rarLine = (m) => {
+    const tot = Object.values(m).reduce((a, v) => a + v, 0);
+    return ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'].map((k) => `${k} ${m[k] ?? 0}（${f(per100(m[k] ?? 0, tot))}%）`).join(' / ');
+  };
+  lines.push(`| 踏破した部屋のレア度（件・%） | ${rarLine(s.rarity)} |`);
+  lines.push(`| 配置された部屋のレア度（件・%） | ${rarLine(s.rarityPlaced)} |`);
   lines.push(`| 所要時間（ms、決定論の 2 回目を除く） | ${s.ms} |`);
   lines.push('');
   lines.push(`| seed | 踏破 | ノード | 部屋 | 前室 | seam | dead-end | 施錠/扉 | 重なり | 決定論 | load不一致 |`);

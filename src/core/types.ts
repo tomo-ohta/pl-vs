@@ -257,6 +257,24 @@ export const QUALITY_TIERS: Record<QualityTierId, QualityTier> = {
   },
 };
 
+/**
+ * スマホ（pointer: coarse）で使う Tier の上書き。PC より小さい GPU で同じ部屋を描くための差分だけを持つ。
+ * - 画素密度は CSS ピクセル 1:1 まで（HiDPI の 2〜3 倍は撮像効果の軟焦点・走査線で見分けられない）
+ * - 影（PointLight のキューブ影 = シーンを 6 回追加描画）・MSAA・GTAO は切る。ブルームは mid 以上だけ残す
+ * - 監視映像・スナップショットの RenderTarget 更新は 10 Hz まで
+ */
+export function mobileTier(t: QualityTier): QualityTier {
+  return {
+    ...t,
+    renderScale: t.id === 'low' ? 0.75 : 1.0,
+    maxPixelRatio: 1,
+    shadowLights: 0,
+    shadowMapSize: 0,
+    rtUpdateHz: Math.min(t.rtUpdateHz, 10),
+    postfx: { ...t.postfx, gtao: false, msaa: 0 },
+  };
+}
+
 export function dirVec(d: Dir): Vec3 {
   switch (d) {
     case 0: return [0, 0, 1];

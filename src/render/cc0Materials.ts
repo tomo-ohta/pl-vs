@@ -67,6 +67,9 @@ export type Cc0Index = Record<string, Cc0IndexEntry>;
 /** BASE_URL からの相対 */
 export const CC0_INDEX_URL = 'cc0/materials/index.json';
 export const CC0_MATERIALS_URL = 'cc0/materials/';
+/** スマホ向けの縮小版（tools/build-mobile-textures.mjs。Color / NormalGL 512 px・補助 256 px。パスは materials/ と同じ） */
+export const CC0_SMALL_MATERIALS_URL = 'cc0/materials-sm/';
+export const CC0_INDEX_FILE = 'index.json';
 
 /** 無地素材の既定の 2 層混合（2 層目は 1/0.61 ≈ 1.6 倍の大きさ、位相ずらし） */
 export const DEFAULT_BLEND: [number, number, number] = [0.61, 0.31, 0.77];

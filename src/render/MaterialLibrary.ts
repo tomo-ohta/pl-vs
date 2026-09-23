@@ -29,10 +29,11 @@ import * as THREE from 'three';
 import { addSurfaceAppearance, usesSurfaceVariation, usesSurfaceWear, SURFACE_VARIATION_KEY } from './SurfaceAppearance';
 import { createSurfaceMaps, hasAuthoredDetail, type DetailKind } from './SurfaceDetail';
 import { ImageRequestQueue } from './textureQueue';
-import { CC0_INDEX_URL, CC0_MATERIALS_URL, CC0_VARIANTS, DEFAULT_BLEND, TONE_TABLE, variantHash, type Cc0Index, type Cc0IndexEntry, type Cc0Variant } from './cc0Materials';
+import { CC0_INDEX_FILE, CC0_MATERIALS_URL, CC0_SMALL_MATERIALS_URL, CC0_VARIANTS, DEFAULT_BLEND, TONE_TABLE, variantHash, type Cc0Index, type Cc0IndexEntry, type Cc0Variant } from './cc0Materials';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { MatId, Palette } from '../generators/layout';
 import type { QualityTier, QualityTierId, Vec3 } from '../core/types';
+import { SMALL_TEXTURES } from '../core/device';
 
 export type TextureId = 'wallpaper' | 'carpet' | 'concrete' | 'wood' | 'ceiling' | 'tile' | 'metal' | 'linoleum' | 'cardboard' | 'foliage' | 'diffuser' | 'water' | 'sky' | 'night';
 /** ガラスの定義（V06 手順 1: 通常ガラス / 車窓 / 暗い窓を別定義にし、金属度で反射を足す代用をやめる） */
@@ -451,7 +452,7 @@ export class MaterialLibrary {
     })();
     for (const id of new Set(Object.values(SURFACES).map((s) => s.texture))) {
       // 'sky'（雲の濃淡）と 'night'（夜景）は画像ではなく生成。他は textures/liminal/<id>.jpg
-      const t = id === 'sky' ? createSkyTexture() : id === 'night' ? createNightTexture() : this.loader.load(`${import.meta.env.BASE_URL}textures/liminal/${id}.jpg`);
+      const t = id === 'sky' ? createSkyTexture() : id === 'night' ? createNightTexture() : this.loader.load(`${import.meta.env.BASE_URL}textures/${SMALL_TEXTURES ? 'liminal-sm' : 'liminal'}/${id}.jpg`);
       t.colorSpace = THREE.SRGBColorSpace;
       t.wrapS = t.wrapT = id === 'tile' ? THREE.RepeatWrapping : THREE.MirroredRepeatWrapping;
       // 夜景は u 方向に周期（8 m）、v は上下に伸ばさない（空の上端・地面の下端で止める）
@@ -854,7 +855,7 @@ export class MaterialLibrary {
    * 2 hop 先の先読み（prefetchRoom）に任せ、起動時の一括取得はやめた。読込前は index.json の平均色の 1 px が出る
    */
   private startCc0(index: Cc0Index): void {
-    const base = baseUrl() + CC0_MATERIALS_URL;
+    const base = baseUrl() + cc0MaterialsDir;
     // Displacement（視差）を読むセット
     const wantHeight = new Set<string>();
     for (const list of Object.values(CC0_VARIANTS)) for (const v of list!) if ((v.parallax ?? 0) > 0) wantHeight.add(v.set);
@@ -1805,11 +1806,23 @@ function baseUrl(): string {
   }
 }
 
-/** public/cc0/materials/index.json を読む。無い / 失敗 / fetch が無い環境では null（従来の生成テクスチャに戻る） */
+/** CC0 セットのファイルを読むディレクトリ（loadCc0Index が決める。スマホは縮小版 materials-sm/ があればそちら） */
+let cc0MaterialsDir = CC0_MATERIALS_URL;
+
+/** public/cc0/materials/index.json を読む（SMALL_TEXTURES なら先に materials-sm/index.json）。無い / 失敗 / fetch が無い環境では null（従来の生成テクスチャに戻る） */
 async function loadCc0Index(): Promise<Cc0Index | null> {
+  if (SMALL_TEXTURES) {
+    const small = await loadCc0IndexFrom(CC0_SMALL_MATERIALS_URL);
+    if (small) { cc0MaterialsDir = CC0_SMALL_MATERIALS_URL; return small; }
+  }
+  cc0MaterialsDir = CC0_MATERIALS_URL;
+  return loadCc0IndexFrom(CC0_MATERIALS_URL);
+}
+
+async function loadCc0IndexFrom(dir: string): Promise<Cc0Index | null> {
   if (typeof fetch !== 'function' || typeof document === 'undefined') return null;
   try {
-    const res = await fetch(baseUrl() + CC0_INDEX_URL, { cache: 'no-cache' });
+    const res = await fetch(baseUrl() + dir + CC0_INDEX_FILE, { cache: 'no-cache' });
     if (!res.ok) return null;
     // Vite の dev server は無いパスに index.html を返すことがあるので JSON として解釈できるものだけ受け付ける
     const type = res.headers.get('content-type') ?? '';
