@@ -495,3 +495,119 @@ P1 の変更: `src/generators/presets.ts`（`KELVIN_RANGE` / `applyLightKelvin`�
 - **土台**: `src/generators/oddity/`（index / shared + layout / contents / surfaces / traces）。予算表と主題の規則は `docs/oddity.md`。RoomBuilder に `kind: 'emitOnly'`（描かない光源）。
 - **O1 / O2 / O3** の 20 種を統合。`trace` カテゴリ追加、`countAnomaly` 重み 2、MirrorOffset の clipBox / reflectBox で kind を保持（U09 で箔が消える問題）。
 - 未対応: `steps`(a) の instances / decals の持ち上げ、任意姿勢の椅子の描画（壁・天井の椅子が板に見える）、`common.ts` の椰子・机への propGroup 付与、時計サインの可読性、吊り灯の傾き（箔の yaw）。
+
+
+## M1 → 統合（モニュメント: officeTotem / steel）
+
+実装したのは `src/generators/monument/officeTotem.ts` と `src/generators/monument/steel.ts` の 2 ファイルだけ。相談したい点:
+
+- **`index.ts` の `partBounds` は傾いた部品を「最大辺の立方体」に膨らませる**（`if (p.rot && …) { const m = Math.max(hx, hy, hz); hx = hz = m; hy = m; }`）。傾いた柱（高さ 3 m・傾き 2°）や斜めの脚（長さ 10 m）では外接箱が ±1.5 m / ±5 m になり、`colliders` を返さない文法では足跡が radius を大きく超えて `canPlace` がほぼ全部落ちる。**2 種とも `colliders` を自前で（回転後の頂点 / 棒の端点から）計算して返している**ので実害は無いが、`partBounds` を「回転を実際に掛けた外接箱」にしておくと、他の文法でも既定の当たり判定が使えるようになる。
+- **当たり判定の箱の数**: `placeMonument` は `budgetOk(colliders.length + 2)` を通るので、部品ごとに箱を返すと予算を食う。2 種とも union コストの小さい対から潰して **最大 8 箱**に減らし、さらに **床〜2.4 m に切り詰めて**（頭上は通れるように）返している。文法側の共通ヘルパとして `index.ts` に置いてもらえると各担当が重複して書かずに済む。
+- **展示光（`emitOnly` の `lightWarm`、`top = min(c.h - 0.05, o.height + 0.3)` に 1.2 m 角）が近距離で白飛びする**。屋内 h ≈ 3 m だと物体の 0.3 m 上に 1.2 m 角の発光面が来るため、3 m 以内から見上げるとモニュメントがほぼ潰れる（R18 の暗い廊下で顕著）。発光面をもう少し小さく（0.7 m 角程度）するか、`o.height + 0.5` まで上げると形が読める。
+- **屋内の `radius`（= `height * 0.38`、最小 0.9 m）が steel には狭い**。指定どおりの寸法（脚の直径 0.35〜0.6 m・板の直径 0.8〜1.6 m・切れた管 1.5〜4 m）を素直に置くと足跡を超えるので、`reach = radius * 0.92` を基準に脚の半径を `reach * 0.20`、管を `reach * 0.16`、横材を `reach * 0.22` で頭打ちにして「隙間のある鉄骨」に見えるよう調整した。屋内でも `radius` を `height * 0.45` 程度まで許せると、鋼構造らしい抜けが出る。
+- **`signs` の `width`** は officeTotem が `0.4 × max(1, S)`（S = 全体倍率、最大 1.1 m）、steel が `max(0.28, 0.3 × S)`。屋外 15 m の塔に幅 0.4 m の刻印は読めないので倍率を掛けている。`pushSign` 側の最小可読幅の目安があれば合わせる。
+- **風のある部屋（R18「密閉風洞廊下」）では `zoneForce` でプレイヤーが流されるので、デバッグ用のテレポート確認が難しい**。`game.player.pos` を毎フレーム固定して撮った。確認用に「その場に固定」のデバッグフラグがあると助かる。
+
+
+
+## M3 → 統合（謎の物体: `ribbon` / `colorStack`）
+
+実装したもの（担当ファイル 2 つのみ。`types.ts` / `index.ts` / 描画側は触っていない）:
+
+- **`src/generators/monument/ribbon.ts`**（部品 16〜24・三角形 7,700〜7,900）
+  基壇 = `marbleFloor` の低い板 + 一段広い沓ずり（2 個）／屋外はさらに `glass` 0.02 厚の水盤 1 枚。
+  帯 = `ribbon` 2〜3 本（幅 = `height × 0.12〜0.2`、ただし足跡の都合で `radius × 0.45` で頭打ち。厚み = 幅 × 0.25〜0.4）。
+  path は 5〜8 点で、基壇から立ち上がり → 途中 1〜2 回旋回方向を反転（S 字 / 閉じない輪）→ 頂点（= `height − 幅/2`）の手前が `n−2` 番目、末端は頂点の 55〜82% の高さで空中終わり。2 本目以降は 55% の確率で 1 本目の曲線上（u = 0.2〜0.55）から分岐、外れると基壇の脇から平行に立ち上がる。幅は 1 本目の 55〜90%（`distort` 比例）。
+  穴の縁 = `ring` 4〜8 個、球 = `sphere` 3〜5 個（最後の 1 個は帯から離れて浮く）、根元の小片 = `box` 4〜7 個。
+  刻印 = 基壇正面に 1 枚（`A SOFTER GEOMETRY` ほか 5 種から）。
+
+- **`src/generators/monument/colorStack.ts`**（部品 17〜26・三角形 2,100〜2,600）
+  基壇 = `floorTile` の円柱（半径 = `radius × 0.7〜0.9`）+ 側面 4 面に `plate` 0.3 角の `signPlate`。
+  積層 = 5〜9 段（屋外 +2）。各段は `cylinder`（3 割で先細り）/ `box` / 水平円盤 / 立てた円盤（pitch 90°）/ `sphere` から選び、円盤と球は連続しない。色は `plasticRed` / `plasticYellow` / `plasticBlue` / `lockerGreen` / `floorTile` / `signPlate` から隣接が同色にならないよう選び、円盤は 22% で `glass`。
+  ジグザグ = `plasticRed` の `box`（0.25 × 0.6 × 0.25 × 屋外倍率）5〜8 個を 45° ずつ振りながら塔の側面に。螺旋の帯 = `ribbon` 1 本（8〜12 点で 1〜1.5 周）。頂部 = `sphere`（65% `plasticRed` / 35% `neonRed`）。
+
+寸法の作り方（`height ±15%` と足跡を必ず満たすため）:
+- **colorStack の段の高さは「仕様の範囲で重みを引く → 合計が `height − 基壇 − 頂部球の直径` になるよう一律に配分」**。段数も `stackH / (0.95 × 屋外倍率)` から決めるので配分係数はほぼ 1 になり、比率だけが乱数で変わる。球・立てた円盤は高さ = 直径なので半径も一緒に縮み、上限で削れたぶんは高さの自由な段（円柱・箱・水平円盤）へ配り直す。
+- **半径は必ず `o.radius` 基準で頭打ち**（本体 0.62 / 円盤 0.95 / 箱 1.1 / 球 0.6 倍）。段のずらし（0〜0.5 m × `distort`）も `|中心| + 半幅 ≤ radius × 1.05` に丸める。
+- 両方とも最後に `fitFootprint(parts, radius × 1.18)` で、はみ出した部品を中心側へ寄せる（`partBounds` と同じ近似を自前に持っている）。
+- ribbon の当たり判定は制御点まわりの 0.4〜0.8 m 角を作った後、`mergeBoxes` で近いものを束ねて 8 個以下に減らしている（束ねないと天井の低い部屋で 14 個出て `budgetOk` と `canPlace` が苦しい）。
+
+**要望 1（重要・描画側のバグ）: `MonumentGeometry.monumentSurfaces` が ExtrudeGeometry を混ぜた材質グループを丸ごと落とす。**
+`ribbon` は `ExtrudeGeometry` = 非インデックスで、他のプリミティブ（box / sphere / torus / cylinder / tube）はインデックス付き。
+`mergeGeometries(geos, false)` は両者が混ざると `null` を返し、`if (!merged) continue;` でその材質の部品が **1 個も描かれない**（コンソールに
+`THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 2 ...` が出る）。
+最初の実装では帯と根元の小片を同じ `marbleWhite` にしていたため、帯が丸ごと消えていた。
+暫定対応として **帯の材質は帯だけで使う**ようにしてある:
+- ribbon: 帯 = `marbleWhite`（屋外 5 割で `stainless`）、穴の縁・球 = `stainless`（帯が `stainless` のときは `metal`）、小片 = `marbleFloor`。
+- colorStack: 螺旋の帯だけ `marbleFloor` / `goldTrim`。**本来は仕様どおり `floorTile` / `signPlate` にしたいが、基壇と刻印板が同じ材質を使うため回避している。**
+
+直し方は `monumentSurfaces` で `g.toNonIndexed()` を掛けてから結合する（または `mergeGeometries` が null のとき材質グループを個別ジオメトリとして出す）のが簡単だと思う。直ったら両ファイルの材質を仕様どおりに戻す。**他の担当の文法（steel / cubeCluster など）が `ribbon` / `tube` を使う場合も同じ罠にかかる**ので、描画側で直すのが望ましい。
+
+**要望 2: `partBounds` の `cylinder` は `size[2]`（radiusTop）を `Math.max(a, c ?? 0)` で見るが、描画側は `c ?? a` を使う。**
+`size` が `Vec3` で 3 要素必須なので「radiusTop 省略」を表現できず、`[r, h, 0]` と書くと描画側が **円錐** になる（当たり判定は正しい円柱）。colorStack では常に `size[2] = 半径` を明示しているが、`0` を「省略」と読む文法が出ると食い違う。`types.ts` のコメントに「radiusTop を省略したいときは radius と同じ値を入れる」と書き足してほしい。
+
+**要望 3: 屋内の低い部屋（`height 2.3〜2.6` / `radius 0.9`）では帯が窮屈**。
+`radius = height × 0.38` だと足跡が 0.9 m しかなく、幅 0.3〜0.45 m の帯を通す余地が実質 0.5 m 半径しか残らないので、S 字が「折り畳まれた塊」に見える。
+屋内の `radius` を `height × 0.45` 程度まで広げるか、`ribbon` を選ぶ部屋の条件を「短辺 8 m 以上」にできると、参考画像の伸びやかさに近づく。屋外（`R04` 屋内住宅街・高さ 9 m）では狙いどおりに見えている。
+
+**要望 4: モニュメントの「展示光源」が帯に効いていない。**
+`placeMonument` が真上（`o.height + 0.3`、天井 −0.05 で頭打ち）に 1.2 m 角の `lightWarm` を置いているが、帯の上端がその光源とほぼ同じ高さなので、帯の側面は暗いまま。`marbleWhite` の帯が部屋の壁（`wallCream`）と同じ明度に沈むので、光源をもう 0.3 m 下げるか、足元にも弱い箔を 1 枚足したい。
+
+確認:
+- `npx tsc --noEmit -p .` 0 エラー。
+- `npx tsx scratch/m3.mts`（屋内 2.3 / 3.2 / 5 m・屋外 6 / 10 / 15 m × `distort` 0.1 / 0.5 / 0.8 × 8 seed = 144 通り）で、
+  高さ = `o.height` ぴったり（`partBounds` 基準、箱の傾き近似で最大 +5%）、足跡 ≤ `o.radius × 1.2`、部品数 16〜26、三角形 ≤ 7,908（ribbon）/ ≤ 2,600（colorStack）。NG 0 / 144。
+- 実機 seed 7: ribbon = r28（U04 無名自販機室・天井 2.6 m）と r8884（R04 屋内住宅街・9 m）、colorStack = r1847（R12 日用品博物館）/ r5462（R14 浸水学校・4.45 m）/ r1747（C09 社員食堂・5 m）を目視。要望 1 の修正後はコンソールエラー 0（`console.error` を捕まえて 0 件、全材質グループが描画されていることも確認）。
+
+
+## M2 → 統合（謎の物体: `stoneFrame` / `cubeCluster`）
+
+実装したもの（担当ファイル 2 つのみ。`types.ts` / `index.ts` / 描画側・配置側は触っていない）:
+
+- **`src/generators/monument/stoneFrame.ts`**（石の枢組み。部品 24〜25・三角形 1,400〜3,800）
+  基壇 = `marbleFloor` の板（幅 = `2 × radius × 0.5〜0.9`、高さ = `min(max(H × 0.07, 0.25), 0.5)`）+ 一回り小さい沓ずり（`marbleWhite` / `columnConcrete`）。屋外は手前（−Z）に `stairs`（幅 = 基壇 × 0.6、奥行き 1.2〜2 m を足跡で頭打ち）。
+  柱 = 2〜4 本の `box`（角 = `0.5〜0.9 × 屋外倍率`、高さ = `(H − 基壇) × 0.40〜0.55`）+ 各柱の柱頭 0.09 m。1 本だけ roll `3〜8°`（`distort` 比例）。
+  梁 = 柱の上に 1 本（片側だけ 0.1〜0.5 m 持ち出す）+ その上に直交する細い桁 1 本（何も支えていない）。
+  枢 = `frame` 1〜3 枚（yaw 0 / 90° / 30° を符号ランダム）。**必ず 1 枚は基壇の足跡の外へ出して浮かせる**（`outsideSpot()` が ±Z / ±X の空きを探し、7 割で下向きの細い吊り棒 `cylinder` 0.02〜0.04 を 1 本足す。余地が無い低天井では梁の上に隙間を空けて浮かせる）。
+  円環 = `ring` 1〜2 個。1 個目は柱の真上（柱が輪を貫く）、5 割で中心に鏡面球 `sphere`（`stainless`、半径 = 円環の 0.35〜0.5）。2 個目は足跡の外で完全に浮く。
+  階段 = `stairs` 1〜2 本。1 本目は梁の上から立ち上がって上端の先が空、2 本目は 3 割で roll π の逆さ吊り（空中で終わる）。
+  浮く立方体 = `box` 1〜3 個（`columnConcrete` / `stainless`）。**1 個目の上端が全体の最高点**（`H × 0.965〜1.0`）になるように置き、`metalDark` の細い `cylinder` 1 本で上か下の部品につなぐ。
+  刻印 = 柱の正面に 1 枚（屋外は +X 面にもう 1 枚）。`A HIGHER CIRCLE` / `STILL WE RISE` / `FOR A BRIGHTER` / `NOTHING BEYOND` ほか 6 種、幅 `min(0.5, 柱 × 0.95)`、地 `0xdedad2` / 文字 `0x3a3630`。
+  当たり判定 = 基壇（沓ずり込み）/ 屋外階段 / 柱 / 下端が 2.2 m 未満の階段。3〜7 箱。
+
+- **`src/generators/monument/cubeCluster.ts`**（立方体の群。部品 22〜29・三角形 760〜1,250）
+  寸法の基準 `unit = clamp(H × 0.20, 0.45, min(2.2 × 屋外倍率, radius × 0.82))` を先に決め、基壇・支点・立方体をすべてこれに比例させる。
+  基壇 = `marbleFloor`（幅 = `unit × 1.8〜2.6`、高さ 0.3〜0.5）。支点 = `cylinder [unit×0.32, unit×0.45, 0.02]` に `rot pitch π` を掛けた逆円錐（下が点、`metal`）。
+  幹 = 支点の上から 3〜6 段。段数は `残り高さ / (unit × 0.95)`、各段の比は `1 → ×0.74〜0.97`（下限 0.5）で、**比と隙間の合計が `H × 0.94〜1.0` ちょうどになるよう一律配分**するので高さが必ず合う。5 割で `yaw 10〜35°`（`distort` 比例で pitch も）。隙間は 5 割で 0（接触）、残りが `0.1〜0.4 m` 浮き。
+  枝 = 幹の側面に接する / 浮く立方体を合計 6〜14 個になるまで（親の 0.45〜0.85 倍、足跡と床からの高さで棄却）。
+  枢 = `frame` 2〜4 枚を立方体の間に刺す（貫通可。`columnConcrete` / `wallWhite` / 鏡面）。
+  細い棒 = `cylinder`（半径 0.015〜0.03、`metalDark`）4〜8 本を**親子の立方体の間だけ**に張る（遠い対を結ぶと長くなりすぎるため）。
+  鏡面 = 幹の 1 個目と 18% の枝が `stainless`（屋内は `metal`）。
+  刻印は無し。基壇正面に `plate`（0.4 × 0.15、`signPlate`）と `signs` の 4 桁の年号（1958〜1979）。
+  当たり判定 = 基壇 + 床から 2.2 m 以下に掛かる立方体の外接箱（大きい順に 6 個まで）。2〜7 箱。
+
+歪み（`o.distort`）の入れ方: 柱の傾き角・柱と立方体のずらし量・梁の持ち出し・浮きの隙間・枢と円環の傾き・回転角のばらつきに線形で掛けている（`distort = 0` でもわずかに崩れるが、`1` で 2〜3 倍）。
+
+相談したい点:
+
+- **要望 1（`types.ts` のコメント）: `ring` は無回転で「立って」いる。** `THREE.TorusGeometry` は XY 平面に乗るので、無回転のトーラスは正面（−Z）を向いて立つ輪になる。仕様書の「`rot` pitch 90° で立てる」を素直に入れると逆に**寝て**しまう（`partBounds` も `hx = hy = a + b` / `hz = b` で無回転を「立っている」前提にしている）。ここでは**無回転 + yaw と微小な roll**で扱った。`types.ts` の `ring` の行を「無回転で XY 平面に立つ。寝かせるときは pitch 90°」に直してほしい。
+- **要望 2（`partBounds` の回転近似。M1 の指摘と同じ根）: 傾けた `cylinder` が `len/2` の立方体になる。** 細い棒（半径 0.02・長さ 3 m）を斜めに 1 本張るだけで外接箱が ±1.5 m に膨らむ。`colliders` を返しているので当たり判定に実害は無いが、**「足跡 ≤ radius × 1.2」の検算がこの近似で行われる**ため、実形状では収まっているのに落ちる。2 ファイルとも `partBounds` と同じ近似の `halfXZ()` を自前に持ち、最後に `fitFootprint(parts, radius × 1.1)` ではみ出した部品を内側へ寄せている（M3 と同じ対処）。`index.ts` に「回転を実際に掛けた外接箱」版を置いてもらえると各担当の重複が消える。
+- **要望 3（要確認・座標のずれ）: `oddity/monument.ts` の `toRoom` の回転向きが `core/types.ts` の `rotQ`・描画側の `makeRotationY` と逆。**
+  `toRoom` は `nx = -z, nz = x`、`rotQ`（= `RoomBuilder` が部屋ごとに掛ける `group.rotation.y`）と `MonumentGeometry` の `makeRotationY(m.yaw)` は `nx = z, nz = -x`。
+  `q = 0 / 2` では一致するが、**`q = 1 / 3` のとき `colliders` と `signs` だけが描画と 90°×2 ずれる**（左右が入れ替わる）はず。ブラウザで見た限り `q = 0` の部屋しか当たらなかったので未確認。`toRoom` を `rotQ` に置き換えるのが安全だと思う。
+- **要望 4（寸法の読み替え）: 屋内の低い部屋では仕様書の絶対値が入らない。** 枢 h 2〜4 m / 階段 1.5〜3 m / 立方体 0.6〜2.2 m は屋外（H 6〜15 m）の値としてそのまま使い、**屋内（H 2.3〜5 m）は H 比に読み替えて縮めた**（枢 h = 梁上の残り × 0.7〜1.0、階段 = H × 0.22〜0.34、立方体 = H × 0.20 前後）。そうしないと天井を抜ける。
+- **要望 5（仕様からずらした点）: `cubeCluster` の基壇を「幅 2〜3.2 m」ではなく `unit × 1.8〜2.6` にした。** H 2.3 m の部屋では立方体が 0.45〜0.5 m 角になるので、基壇だけ 3 m あると「大きな机の上の小さな模型」に見えた（最初の実装のスクショで確認）。屋外では `3.2 × 屋外倍率` で頭打ちなので仕様の範囲に収まる。
+- **要望 6（見た目）: 懐中電灯を 3 m 以内で当てると `marbleWhite` / `marbleFloor` が完全に白飛びする。** 展示光は M1 の指摘で 0.44 m 角に縮まったが、近距離の懐中電灯側はまだ飽和する（U11 手荷物受取所で 3.2 m から正面を撮ると輪と柱の陰影が全部飛んだ）。4〜6 m 離れると狙いどおりに見えるので、懐中電灯の近距離減衰か白系材の roughness を見てほしい。
+- **参考（配置の偏り）: seed 7 では最初の 150 部屋で `cubeCluster` が 1 件も出なかった。** `kindFor` のプールで `stoneFrame` が「コンクリート」と「大理石・白・タイル」の両方に入っているため相対的に多い（同じ 150 部屋で `stoneFrame` 12 件）。seed 11 では `cubeCluster` が 6 件出るので偏りの範囲だが、`stoneFrame` をどちらか一方のプールに絞ると散らばりが良くなるかもしれない。
+
+確認:
+- `npx tsc --noEmit -p .` 0 エラー。
+- `npx tsx scratch/m2.mts`（屋内 2.3〜5 m / 屋外 6〜15 m × `distort` 0 / 0.33 / 0.67 / 1 × 12 seed = 48 通り。`radius` は `oddity/monument.ts` の新しい式に合わせた）で
+  高さ = `o.height` の −6%〜+9%（`partBounds` 基準）、足跡 ≤ `o.radius × 1.2`、部品数 22〜29、三角形 ≤ 3,784（stoneFrame）/ ≤ 1,248（cubeCluster）、床下へ出る部品 0、同じ seed で同じ出力。NG 0 / 48。
+- 実機 seed 7: `stoneFrame` = r8（U12 営業時間外フードコート・天井 5 m）。seed 11: `stoneFrame` = r2920（U11 手荷物受取所・5 m）、`cubeCluster` = r2574（C10 市役所待合室・4.45 m）/ r698 相当の低天井（R19 無人喫茶店・2.6 m）。浮いた枢の下に何も無いこと・輪が柱を貫いていること・逆円錐 1 点で立方体の山が載っていることを目視。コンソールエラー 0（`THREE.WebGLShadowMap: PCFSoftShadowMap has been removed` の警告のみ = 既存）。
+
+## 統合担当の処理記録（第11回・2026-09-23: 謎の物体）
+
+- 土台: `src/generators/monument/`（types / index + 6 文法）、`src/render/MonumentGeometry.ts`、RoomBuilder の special 部品経路、`kind: 'colliderOnly'`（描かない当たり判定）、`src/generators/oddity/monument.ts`（space.monument、重み 4、屋外は 1〜3 基）。
+- M1 / M2 / M3 の要望のうち反映: partBounds の回転、mergeGeometries の非インデックス化、toRoom の回転向き、ring のコメント、展示光の縮小、屋内 radius 0.45。
+- 未対応: 懐中電灯 3 m 以内で白系材が白飛び（懐中電灯の強度か材質側の上限）、kindFor で stoneFrame が 2 プールに入り cubeCluster が出にくい（重み調整は様子見）、M3 の螺旋帯の材質を仕様（floorTile / signPlate）へ戻す。

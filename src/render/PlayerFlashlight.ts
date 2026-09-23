@@ -62,7 +62,13 @@ export class PlayerFlashlight {
     return tex;
   }
 
-  update(camera: THREE.Camera, dt: number, enabled: boolean, low = false): void {
+  /** 正面の面までの距離に応じた減光の現在値（1 = 遠い、0.12 = 密着） */
+  private nearScale = 1;
+  /**
+   * @param hitDistance 視線方向の最寄りの面までの距離（m。無ければ Infinity）。近い壁・扉に光が集中して白飛びしないよう、
+   *   3 m 以内で強度を距離の 1.8 乗で落とす（0.5 m で 7%、1 m で 14%、2 m で 48%）。変化は 0.12 s で追従
+   */
+  update(camera: THREE.Camera, dt: number, enabled: boolean, low = false, hitDistance = Infinity): void {
     this.light.visible = enabled;
     if (!enabled) { this.reset(); return; }
     const step = Math.min(Math.max(dt, 0), .05);
@@ -89,8 +95,10 @@ export class PlayerFlashlight {
     this.forward.set(0, 0, -1).applyQuaternion(this.aim);
     this.light.target.position.copy(this.light.position).addScaledVector(this.forward, 12);
     // MaterialLibrary applies diffuse scale .8 on low versus .4 on other tiers.
-    // マップで中心が 0.7 に落ちるぶん 1.4 倍（芯の明るさは従来どおり）
-    this.light.intensity = (low ? 47.5 : 95) * 1.4;
+    // 近接減光: 正面の面が 3 m より近いほど弱く。マップで中心が 0.7 に落ちるぶんは 1.2 倍（従来より少し暗く、白飛びしにくい）
+    const target = Number.isFinite(hitDistance) ? Math.max(0.07, Math.min(1, Math.pow(hitDistance / 3, 1.8))) : 1;
+    this.nearScale += (target - this.nearScale) * Math.min(1, step / 0.12);
+    this.light.intensity = (low ? 47.5 : 95) * 1.2 * this.nearScale;
   }
 
   dispose(): void { this.light.removeFromParent(); this.light.target.removeFromParent(); this.light.map?.dispose(); this.light.dispose(); }

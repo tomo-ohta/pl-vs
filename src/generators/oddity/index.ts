@@ -16,13 +16,14 @@ import { CONTENT_ODDITIES } from './contents';
 import { SURFACE_ODDITIES } from './surfaces';
 import { TRACE_ODDITIES } from './traces';
 import { SPACE_ODDITIES, isLargeEmpty } from './space';
+import { monument } from './monument';
 
 export interface OddRecord { theme: string | null; accents: string[]; notes: string[] }
 export type OddLayout = RoomLayout & { oddity?: OddRecord };
 
 const DISABLED = typeof window !== 'undefined' && typeof window.location !== 'undefined' && new URLSearchParams(window.location.search).has('noodd');
 
-export const ALL_ODDITIES: Oddity[] = [...LAYOUT_ODDITIES, ...CONTENT_ODDITIES, ...SURFACE_ODDITIES, ...TRACE_ODDITIES, ...SPACE_ODDITIES];
+export const ALL_ODDITIES: Oddity[] = [...LAYOUT_ODDITIES, ...CONTENT_ODDITIES, ...SURFACE_ODDITIES, ...TRACE_ODDITIES, ...SPACE_ODDITIES, monument];
 
 /** 希少度ごとの予算 */
 const BUDGET: Record<string, { normal: number; theme: number; accents: [number, number] }> = {
@@ -49,7 +50,7 @@ export function applyOddity(L: RoomLayout, p: GenParams): void {
   const used = new Set<OddCategory>();
   // 主題
   if (largeEmpty) {
-    rec.theme = tryApply(c, SPACE_ODDITIES, 'strong', used) ?? tryApply(c, ALL_ODDITIES.filter((o) => o.theme), 'strong', used);
+    rec.theme = tryApply(c, [...SPACE_ODDITIES, monument], 'strong', used) ?? tryApply(c, ALL_ODDITIES.filter((o) => o.theme), 'strong', used);
     rec.notes.push('large empty room');
   } else if (rng.chance(budget.theme)) {
     const themeId = tryApply(c, ALL_ODDITIES.filter((o) => o.theme), 'strong', used);

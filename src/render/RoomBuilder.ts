@@ -29,6 +29,7 @@ import { appearanceSeed, attachSurfaceAppearance, corridorWearRegion, corridorDu
 import { surfaceBox, applyMetricUV, isBevelMat, SurfaceLighting } from './SurfaceGeometry';
 import { allocateLightmapAtlas, createLightmapTexture, InstanceLighting, isLightmapTarget, LIGHTMAP_FADE_MS, LightmapBaker, LightmapSampler, lightmapsSupported, startLightmapCrossfade, writeConstantUV1, writeLightmapUV, type LightmapJobHandle } from './Lightmap';
 import { vehicleSurfaces, foliageGeometry, grassGeometry } from './ObjectGeometry';
+import { monumentSurfaces } from './MonumentGeometry';
 import { detailedBoxes } from './ArchitecturalDetails';
 import { PropCatalog, PROP_TRIANGLE_BUDGET, TILED_KINDS, type CatalogEntry, type LoadedProp } from './PropCatalog';
 import { wallSpans } from '../generators/footprint';
@@ -303,7 +304,7 @@ export class RoomBuilder {
     const shared = new Set<MatId>();
     const instanced = new Set<MatId>();
     // kind 'emitOnly' は焼き込みの光源にだけ数え、描かない（光源の無い明るい一角。oddity）
-    const boxes = (legacy ? layout.boxes : detailedBoxes(layout, definition?.baseTemplate)).filter((b) => b.kind !== 'emitOnly');
+    const boxes = (legacy ? layout.boxes : detailedBoxes(layout, definition?.baseTemplate)).filter((b) => b.kind !== 'emitOnly' && b.kind !== 'colliderOnly');
     for (const original of boxes) {
       const themed = original.propGroup && original.kind === 'plant' ? { ...original, mat: 'paintWhite' as const } : original.mat === 'plant' && !legacy && Math.min(...original.max.map((v,k)=>v-original.min[k]))>.15 ? {...original,mat:'plantLeaf' as const} : definition?.baseTemplate === 'Theater' && original.mat === 'furnitureDark' ? { ...original, mat: 'upholstery' as const } : original;
       const s = SURFACES[themed.mat];
@@ -383,10 +384,13 @@ export class RoomBuilder {
     const propPlan = !legacy && !untextured && !roll && catalog.ready ? planProps(propWork, new Rng(node.seed).fork('props'), catalog) : [];
     const vehicles = !legacy && !roll ? vehicleSurfaces(work.boxes) : [];
     cleanup.push(()=>vehicles.forEach(v=>v.geometry.dispose()));
+    // モニュメント（謎の物体）: 部品列をプリミティブで組み立て、vehicles と同じ special 部品として結合する
+    const monuments = !legacy && !roll ? monumentSurfaces(work) : [];
+    cleanup.push(() => monuments.forEach((v) => v.geometry.dispose()));
     const replaced = new Set(propPlan.flatMap(pp => pp.box.propGroup ? propGroups.get(pp.box.propGroup)!.filter(b=>b.mat==='plant') : [pp.box]));
     if (vehicles.length) for (const b of work.boxes) if (b.vehicle) replaced.add(b);
     const visibleWork = replaced.size ? { ...work, boxes: work.boxes.filter((b) => !replaced.has(b)) } : work;
-    let displayBoxes = (legacy ? work.boxes : detailedBoxes(visibleWork, definition?.baseTemplate)).filter((b) => b.kind !== 'emitOnly');
+    let displayBoxes = (legacy ? work.boxes : detailedBoxes(visibleWork, definition?.baseTemplate)).filter((b) => b.kind !== 'emitOnly' && b.kind !== 'colliderOnly');
     if(!legacy) for(const b of visibleWork.boxes) if(b.propGroup && b.kind==='plant') {
       const r=Math.min(b.max[0]-b.min[0],b.max[2]-b.min[2])*.425, x=(b.min[0]+b.max[0])/2,z=(b.min[2]+b.max[2])/2,y=b.min[1]+(b.max[1]-b.min[1])*.84;
       displayBoxes.push({min:[x-r,y-.01,z-r],max:[x+r,y,z+r],mat:'plantSoil',solid:false});
@@ -496,6 +500,7 @@ export class RoomBuilder {
       }
     }
     for (const v of vehicles) parts.push({ b: v.box, special: true, target: -1, geometry: v.geometry });
+    for (const v of monuments) parts.push({ b: v.box, special: true, target: -1, geometry: v.geometry });
     // 隠れた面（スラブの外側・家具の底）の判定に使う外殻の箱
     const shellCount = layout.shellCount ?? 0;
     const shellBoxes = (shellCount > 0 ? work.boxes.slice(0, shellCount) : work.boxes).filter((b) => b.solid && /^(floor|ceiling|wall)/.test(b.mat));

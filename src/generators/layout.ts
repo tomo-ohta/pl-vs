@@ -1,5 +1,6 @@
 /** Generator の出力 = RoomLayout（純データ）。RoomBuilder が Three.js に変換する。 */
 import type { Dir, PortalType, RoomDefinition, RoomInstance, Socket, TemplateDef, Vec3 } from '../core/types';
+import type { MonumentSpec } from './monument/types';
 import type { Rng } from '../core/rng';
 import type { AABB } from '../core/aabb';
 import type { Rect } from './footprint';
@@ -236,6 +237,8 @@ export interface RoomLayout {
   particles?: ParticleSpec | ParticleSpec[];
   signs?: SignSpec[];
   decals?: DecalSpec[];
+  /** 謎の物体（モニュメント）。描画は src/render/MonumentGeometry.ts、当たり判定は kind 'colliderOnly' の箱で別に持つ */
+  monuments?: MonumentSpec[];
   dynamics?: DynamicSpec[];
   render?: RenderOverrides;
   lighting?: LightingOverrides;

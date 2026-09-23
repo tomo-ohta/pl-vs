@@ -1226,6 +1226,31 @@ export class Game {
    * 設定（手持ち感 / 視線の遅れ / REC 表示 / 表示 fps）をカメラ挙動・撮像 pass に写す（担当 F2。docs/film-camera.md）。
    * composer は作り直さない。REC 表示の実際の表示切替は state を見て stepBody（updateRecOverlay）が行う
    */
+  /** 視線方向の最寄りのソリッド（現在の部屋 + 隣接の当たり判定）までの距離。懐中電灯の近接減光に使う（近いほど弱く） */
+  private flashlightHitDistance(): number {
+    if (!this.currentRoomId || !this.flashlightOn) return Infinity;
+    const ids = [this.currentRoomId, ...this.world.graph.placedNeighbors(this.currentRoomId)];
+    const o = this.camera.position;
+    const d = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    let best = 6;
+    for (const b of this.streaming.colliders(ids)) {
+      // スラブ法（軸ごとの入退場 t の交差）
+      let t0 = 0, t1 = best;
+      let ok = true;
+      for (let k = 0; k < 3 && ok; k++) {
+        const oc = k === 0 ? o.x : k === 1 ? o.y : o.z;
+        const dc = k === 0 ? d.x : k === 1 ? d.y : d.z;
+        if (Math.abs(dc) < 1e-6) { if (oc < b.min[k] || oc > b.max[k]) ok = false; continue; }
+        let ta = (b.min[k] - oc) / dc, tb = (b.max[k] - oc) / dc;
+        if (ta > tb) { const tmp = ta; ta = tb; tb = tmp; }
+        t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+        if (t0 > t1) ok = false;
+      }
+      if (ok && t0 < best) best = t0;
+    }
+    return best >= 6 ? Infinity : best;
+  }
+
   private applyCameraSettings(): void {
     const d = this.settings.data;
     this.player.feel.handheld = d.handheld;
@@ -1424,7 +1449,7 @@ export class Game {
     this.audio.setListener([cam.x, cam.y, cam.z], this.player.yaw, this.player.pitch);
     this.audio.update(dt);
     // 撮像 pass への入力: 表示カメラの回転速度（回転ブラー）・環境音の大きさ（暗部ノイズ）。REC 表示の更新
-    this.flashlight.update(this.camera, this.state === 'menu' ? 0 : dt, this.flashlightOn && !!this.currentRoomId && this.state !== 'start', this.tier.id === 'low');
+    this.flashlight.update(this.camera, this.state === 'menu' ? 0 : dt, this.flashlightOn && !!this.currentRoomId && this.state !== 'start', this.tier.id === 'low', this.flashlightHitDistance());
     this.updateCameraMotion(dt);
     this.postfx.setAudioNoise(this.audio.ambientLevel);
     this.updateRecOverlay(dt);
