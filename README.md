@@ -10,7 +10,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # dist/ に本番ビルド
 npm run typecheck  # tsc --noEmit
-npm run seamstats  # tools/seam-stats.mjs: headless で 10 seed × 100 部屋を踏破し Seam / 施錠行き止まりを計測（docs/seam-stats.md）
+npm run seamstats  # tools/seam-stats.mjs: headless で 10 seed × 100 部屋を踏破し Seam / 施錠行き止まりを計測（docs/seam-stats.md）。`--take-seams` で意図的 Seam 扉も通常の扉と同じ確率で通る（プレイヤーに近い踏破。レア度の実測に使う）
 ```
 
 URL パラメータ: `?seed=42` で worldSeed を固定、`?new=1` でセーブを無視して新規開始、`?nolock=1` で Pointer Lock を使わない（自動テスト・埋め込みブラウザ向け）、`?force=<ROOM_ID>`（開発用）で次の部屋抽選をその定義に固定（配置に成功した時点で解除。`node.forcedDefinitionId` に残るのでセーブ・再生成でも同じ定義になる）。
@@ -92,6 +92,7 @@ glTF プロップ置換は既定オフ（小物はノイズになるため。`?p
 
 ### その他
 - **品質 Tier**: low / mid / high（内部解像度 0.65 / 0.8 / 1.0、ライト上限、フォグ距離、rtUpdateHz、flicker、decals、instanceScale、particleCap、convolver）。自動モードはフレーム時間で昇降。設定で固定可。
+- **スマホ（`src/core/device.ts` の IS_MOBILE = pointer: coarse）**: Tier は `mobileTier()` で上書き（DPR 1.0 まで・影 / 懐中電灯の影 / MSAA / GTAO なし・RT 更新 10 Hz）、既定フレームバッファの antialias なし、描画（シーン・撮像 pass・ミニマップ）は 30 Hz まで（入力・移動は毎フレーム）、部屋の分割構築は 8 ms / フレーム。テクスチャは縮小版（`npm run build:mobile` → `public/cc0/materials-sm/`（512 / 256 px）・`public/textures/liminal-sm/`（512 px）。無ければ通常版。`?tex=sm` / `?tex=full` で上書き）。ミニマップは左上 120 px。WebGL が失われたら再読み込みを案内する。
 - **セーブ**: localStorage に RoomGraph（ノード・配置・Portal・追加ソケット・visitLog・modifierState）+ プレイヤー位置。レイアウトは seed から再生成する。乗車中はセーブしない。
 
 ## Phase 2（Modifier 43 種 + Generator 4 種）

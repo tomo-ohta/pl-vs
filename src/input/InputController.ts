@@ -50,7 +50,7 @@ export class InputController {
   private menuEdge = false;
   private tap: { x: number; y: number } | null = null;
   private stick = { active: false, id: -1, x: 0, y: 0, cx: 0, cy: 0 };
-  private lookPointer = { id: -1, x: 0, y: 0, moved: 0, t: 0 };
+  private lookPointer = { id: -1, x: 0, y: 0, moved: 0, t: 0, last: 0 };
   private touchDash = false;
   private touchJump = false;
   /** スマホのしゃがみトグル状態 */
@@ -215,33 +215,53 @@ export class InputController {
       });
     }
 
-    // 画面スワイプで視点。短いタップはインタラクト
+    // 画面スワイプで視点。短いタップはインタラクト。
+    // 視点の指は 1 本だけ追う。その指の終了（pointerup / pointercancel / lostpointercapture）を取りこぼすと lookPointer.id が
+    // 残って以後のスワイプを全て無視してしまうので、canvas で pointer capture を取り、終了は window（capture 段）でも拾う。
+    // さらに新しい指が来たとき、追っている指がもう画面に無ければ（activeTouches に無い）新しい指へ乗り換える
+    const activeTouches = new Set<number>();
+    window.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') activeTouches.add(e.pointerId); }, { capture: true });
     this.canvas.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse') return;
       this.setMode('mobile');
-      if (this.lookPointer.id !== -1) return;
-      this.lookPointer = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, t: performance.now() };
+      // 追っている指が 2 秒以上何も送ってこなければ、終了の通知ごと失われたとみなして乗り換える
+      const now = performance.now();
+      const tracking = this.lookPointer.id !== -1 && activeTouches.has(this.lookPointer.id) && now - this.lookPointer.last < 2000;
+      if (tracking && this.lookPointer.id !== e.pointerId) return;
+      this.lookPointer = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, t: now, last: now };
+      try { this.canvas.setPointerCapture(e.pointerId); } catch { /* 既に離れた指 */ }
+      e.preventDefault();
     });
     this.canvas.addEventListener('pointermove', (e) => {
       if (e.pointerId !== this.lookPointer.id) return;
+      // 高頻度の入力は getCoalescedEvents に分かれているが、差分は最後の座標との差で足りる
       const dx = e.clientX - this.lookPointer.x;
       const dy = e.clientY - this.lookPointer.y;
       this.lookPointer.x = e.clientX;
       this.lookPointer.y = e.clientY;
       this.lookPointer.moved += Math.abs(dx) + Math.abs(dy);
+      this.lookPointer.last = performance.now();
       this.lookDX += dx * this.mobileSensitivity * this.sensitivityScale;
       this.lookDY += dy * this.mobileSensitivity * this.sensitivityScale;
     });
     const endLook = (e: PointerEvent) => {
       if (e.pointerId !== this.lookPointer.id) return;
       const dt = performance.now() - this.lookPointer.t;
-      if (this.lookPointer.moved < 12 && dt < 350) {
+      if (e.type === 'pointerup' && this.lookPointer.moved < 12 && dt < 350) {
         this.tap = { x: (e.clientX / window.innerWidth) * 2 - 1, y: -(e.clientY / window.innerHeight) * 2 + 1 };
       }
       this.lookPointer.id = -1;
     };
-    this.canvas.addEventListener('pointerup', endLook);
-    this.canvas.addEventListener('pointercancel', endLook);
+    const endTouch = (e: PointerEvent) => {
+      activeTouches.delete(e.pointerId);
+      endLook(e);
+    };
+    this.canvas.addEventListener('lostpointercapture', endLook);
+    window.addEventListener('pointerup', endTouch, { capture: true });
+    window.addEventListener('pointercancel', endTouch, { capture: true });
+    // iOS Safari は touch-action: none でも、canvas 以外から始まったピンチ / ダブルタップで拡大することがあるので止める
+    this.canvas.addEventListener('touchstart', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
   }
 
   /** スマホのしゃがみトグルを解除する（乗車開始・リスポーン時など） */

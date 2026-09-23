@@ -14,8 +14,8 @@ export function rollRarity(rng: Rng, ctx: GeneratorContext): Rarity {
   const candidates = RARITIES.filter((r) => ctx.depth >= RARITY_MIN_DEPTH[r]);
   return rng.weighted(candidates, (r) => {
     let w = RARITY_WEIGHT[r];
-    if (hasHighRecent && (r === 'Epic' || r === 'Legendary' || r === 'Mythic')) w *= 0.25;
-    if (r === 'Rare' && ctx.roomsSinceRare >= 15) w *= 1 + 0.25 * (ctx.roomsSinceRare - 14);
+    if (hasHighRecent && (r === 'Epic' || r === 'Legendary' || r === 'Mythic')) w *= 0.5;
+    if (r === 'Rare' && ctx.roomsSinceRare >= 6) w *= 1 + 0.25 * (ctx.roomsSinceRare - 5);
     return w;
   });
 }

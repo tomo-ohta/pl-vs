@@ -23,6 +23,11 @@ html, body {
 #hud-hint:empty { display: none; }
 
 #minimap { position: fixed; right: 12px; bottom: 12px; width: 180px; height: 180px; background: rgba(10,12,18,0.6); border-radius: 8px; pointer-events: none; }
+/* スマホ: 右下は JUMP / DASH / CROUCH が占めるので、ミニマップは左上に小さく置く（左上の部屋名はデバッグ HUD のときだけ） */
+@media (pointer: coarse) {
+  #minimap { right: auto; bottom: auto; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); width: 120px; height: 120px; }
+  #hud { top: 140px; }
+}
 #reticle { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,0.75); pointer-events: none; }
 #debug { position: fixed; right: 12px; top: 12px; font: 11px/1.4 ui-monospace, Menlo, monospace; color: #cfd6e4; background: var(--ui-bg); padding: 6px 8px; border-radius: 6px; white-space: pre; pointer-events: none; }
 #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.25s linear; }
