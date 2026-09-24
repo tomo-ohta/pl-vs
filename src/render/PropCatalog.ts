@@ -71,10 +71,18 @@ export const PROP_KINDS: Record<string, string[]> = {
   ladder: ['ladder_sectioned_01', 'wooden_ladder'],
   lightFixture: ['mounted_fluorescent_lights', 'caged_hanging_light'],
   payphone: ['korean_public_payphone_01'],
+  /** 駐車中の車（RoomBuilder が vehicle.id ごとに車体・窓・タイヤの箱をまとめた枠を作る。カバーを掛けた車で置き換える） */
+  car: ['covered_car'],
   /** 対応モデル無し（箔のまま） */
   lockers: [],
   vending: [],
 };
+
+/**
+ * 実際に置き換える kind（小物はノイズになるので大きな家具だけ。第15回で車 car・ブラウン管 tv を追加）。
+ * 他の kind は PROP_KINDS に候補があっても箔のまま
+ */
+const REPLACED_KINDS = new Set(['chair', 'desk', 'table', 'cabinet', 'shelf', 'sofa', 'plant', 'car', 'tv']);
 
 /** 長辺方向に複数体を並べる kind（机の列・棚・ソファ）。他は 1 箱 1 体 */
 export const TILED_KINDS = new Set(['desk', 'table', 'shelf', 'cabinet', 'sofa', 'lockers']);
@@ -93,8 +101,12 @@ const MOUNT: Record<string, PropMount> = {
 /** 壊れた書き出し（steel_frame_shelves_01 は 11 × 21 m）などカタログから外す id */
 const EXCLUDE = new Set(['steel_frame_shelves_01']);
 
-/** 1 部屋あたりのプロップ三角形予算。超える候補は選ばない（軽い候補が無ければ箔のまま） */
+/** 1 部屋あたりのプロップ三角形予算（high の値。Tier 別は propTriangleBudget）。超える候補は選ばない（軽い候補が無ければ箔のまま） */
 export const PROP_TRIANGLE_BUDGET = 750_000;
+/** Tier 別の予算（mid = スマホの既定。社員食堂の椅子 200 脚 × 3,356 三角形 = 67 万は high だけ全数が通る） */
+export function propTriangleBudget(tier: 'low' | 'mid' | 'high'): number {
+  return tier === 'high' ? PROP_TRIANGLE_BUDGET : tier === 'mid' ? 220_000 : 90_000;
+}
 /** 1 モデルの三角形上限（potted_plant_01 = 176k などは LOD / decimate 待ちで外す） */
 export const PROP_MODEL_TRIANGLE_MAX = 90_000;
 /** 上書き付き（fog / colorMask）プロップ材質の LRU 上限 */
@@ -121,6 +133,7 @@ export class PropCatalog {
   private readonly variants = new Map<string, THREE.Material>();
   readonly errors: string[] = [];
   private readonly baseUrl: string;
+  private ktx2Set = false;
 
   constructor(baseUrl = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/') {
     this.baseUrl = baseUrl;
@@ -161,7 +174,7 @@ export class PropCatalog {
 
   /** kind の候補（index 未着なら空） */
   candidates(kind: string): CatalogEntry[] {
-    if (!this.index || !new Set(['chair', 'desk', 'table', 'cabinet', 'shelf', 'sofa', 'plant']).has(kind)) return [];
+    if (!this.index || !REPLACED_KINDS.has(kind)) return [];
     const ids = PROP_KINDS[kind] ?? [];
     const out: CatalogEntry[] = [];
     for (const id of ids) { const e = this.index.get(id); if (e) out.push(e); }
@@ -180,6 +193,9 @@ export class PropCatalog {
     const entry = this.index?.get(id);
     if (!entry) return Promise.resolve(null);
     p = new Promise<LoadedProp | null>((resolve) => {
+      // glTF のテクスチャは KTX2（KHR_texture_basisu。tools/build-cc0-models.mjs）。ローダーが無ければ JPEG の source を読む
+      const ktx2 = this.library?.ktx2Loader;
+      if (ktx2 && !this.ktx2Set) { this.loader.setKTX2Loader(ktx2); this.ktx2Set = true; }
       this.loader.load(
         `${this.baseUrl}cc0/${entry.gltf}`,
         (gltf) => {

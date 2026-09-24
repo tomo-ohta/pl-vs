@@ -391,11 +391,14 @@ export function urinalRow(B: Box[], f: Face, a0: number, n: number): void {
 export function washer(B: Box[], f: Face, at: number, stacked = false): void {
   const d0 = 0.03, d1 = 0.63;
   const unit = (y: number, dryer: boolean) => {
+    const from = B.length;
     B.push(alongFace(f, at, 0.6, d0, d1, y, y + 0.85, 'shelfMetal', true));
     B.push(alongFace(f, at + 0.12, 0.36, d1, d1 + 0.012, y + 0.2, y + 0.56, 'metalDark', false));
     // 丸窓は暗い艶ガラス（carGlass）。透過ガラス（glass）は transmission の再描画パスを増やすので使わない
     B.push(alongFace(f, at + 0.15, 0.3, d1, d1 + 0.02, y + 0.23, y + 0.53, 'carGlass', false));
     B.push(alongFace(f, at + 0.05, 0.5, d1, d1 + 0.01, y + (dryer ? 0.06 : 0.7), y + (dryer ? 0.16 : 0.8), 'metalDark', false));
+    // 表示用タグ（描画側 ApplianceFromBoxes が 1 台ずつコード生成の洗濯機 / 乾燥機に置き換える）
+    tagGroup(B, from, gid(dryer ? 'dryer' : 'washer', f.dir, at, f.face, y), dryer ? 'dryer' : 'washer');
   };
   unit(0, false);
   if (stacked) unit(0.85, true);

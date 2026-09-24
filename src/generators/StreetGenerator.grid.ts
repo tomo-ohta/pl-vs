@@ -109,14 +109,14 @@ function themeOf(kind: Kind, def: RoomDefinition): Theme {
   const lamp = /青/.test(l) ? blue : /蛍光|白色/.test(l) ? white : sodium;
   const base: Theme = {
     h: 9, wall: 'wallConcrete', ceiling: 'ceilingDark', ...lamp, lampH: 5.0, ambient: 0x3a3c44, fog: 0x0b0d14, litChance: 0.45,
-    buildingMats: ['wallBrick', 'wallConcrete', 'wallBeige', 'wallCream'], claddingMats: ['wallBrick', 'wallConcrete', 'wallBeige', 'wallDark'],
+    buildingMats: ['wallBrick', 'wallConcrete', 'wallBeige', 'wallCream', 'sidingWood'], claddingMats: ['wallBrick', 'wallConcrete', 'wallBeige', 'wallDark', 'sidingMetal'],
     bHeight: [5, 8], ceilingPanels: /蛍光/.test(l), shopSigns: ['24H', 'CAFE', '薬', 'HOTEL', 'P', 'OPEN', '本', 'BAR', 'ランドリー', 'CLINIC'],
   };
   switch (kind) {
     case 'city':
       return { ...base, h: 12, lampH: 6.0, ambient: 0x2c3048, fog: 0x2b2f4a, litChance: 0.35, bHeight: [7, 11], buildingMats: ['wallConcrete', 'wallDark', 'wallBrick', 'wallWhite'], claddingMats: ['wallConcrete', 'wallDark', 'wallBrick', 'wallWhite'], shopSigns: ['HOTEL', 'BANK', '24H', 'NEON', 'CINEMA', 'EXIT', 'BAR', 'DINER', 'OFFICE', '空室'] };
     case 'suburb':
-      return { ...base, h: 9, litChance: 0.7, bHeight: [3.6, 6.2], buildingMats: ['wallCream', 'wallBeige', 'wallWhite', 'wallBrick'], claddingMats: ['wallCream', 'wallBeige', 'wallWhite'], shopSigns: ['FOR SALE', 'No.7', 'No.12', '郵便', 'PARK'] };
+      return { ...base, h: 9, litChance: 0.7, bHeight: [3.6, 6.2], buildingMats: ['wallCream', 'sidingWood', 'wallBeige', 'sidingWood', 'wallWhite', 'wallBrick'], claddingMats: ['wallCream', 'sidingWood', 'wallBeige', 'sidingMetal', 'wallWhite'], shopSigns: ['FOR SALE', 'No.7', 'No.12', '郵便', 'PARK'] };
     case 'danchi':
       return { ...base, h: 12, lampMat: 'lightWarm', lampColor: 0xffd9a0, lampIntensity: 1.0, lampH: 4.5, ambient: 0x34363c, litChance: 0.4, bHeight: [11, 11], buildingMats: ['wallConcrete'], claddingMats: ['wallConcrete', 'wallBeige'], shopSigns: ['A-1', 'B-2', 'C-3', '集会所', '管理'] };
     case 'expo':

@@ -19,6 +19,7 @@
 import type { Rng } from '../../core/rng';
 import { addDir, type Dir, type Socket, type Vec3 } from '../../core/types';
 import type { AABB } from '../../core/aabb';
+import { trainSpecFor } from '../../render/TrainGeometry';
 import { along, across, inner, wallSpans, type Rect, type WallSpan } from '../footprint';
 import { alongFace, chair, doorZones, freeRuns, hitsZone, innerFaces, insideRects, lineFace, longTable, signAt, signOnWall, type Face } from '../furniture';
 import { box, DOOR_W, kinded, WALL_T, type Box, type GenParams, type InstanceSpec, type LightSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
@@ -929,6 +930,21 @@ function dressE11(ctx: Ctx): void {
   boxes.push(alongFace(f, head + Math.min(0, hs * 0.015), 0.015, v0 + 0.5, v0 + 2.1, 1.5, 2.3, 'screenDark', false));
   boxes.push(alongFace(f, tail + Math.min(0, ts * 0.03), 0.03, v0 + 0.45, v0 + 0.65, 1.0, 1.12, 'neonRed', false));
   boxes.push(alongFace(f, tail + Math.min(0, ts * 0.03), 0.03, v0 + 1.95, v0 + 2.15, 1.0, 1.12, 'neonRed', false));
+  // 電車の見た目（src/render/TrainGeometry.ts）: 車体の箱に向き（ホーム側・先頭）を付け、車体まわりの装飾箔（屋根・窓・扉・前照灯・尾灯・連結部）は
+  // kind 'train.part'（RoomBuilder は描かない。焼き込みの光源・遮蔽としては残る = 点灯した窓の暖色がホームに落ちる）
+  {
+    const longAxis = f.horizontal ? 0 : 2, shortAxis = f.horizontal ? 2 : 0;
+    const mid = (b: Box, k: number) => (b.min[k] + b.max[k]) / 2;
+    const bodies = boxes.filter((b) => b.mat === 'paintWhite' && b.solid);
+    const lit = boxes.find((b) => b.mat === 'windowLit');
+    bodies.forEach((b, c) => {
+      const platform = (lit && mid(lit, shortAxis) > mid(b, shortAxis) ? 1 : -1) as 1 | -1;
+      const isHead = headAtStart ? c === 0 : c === bodies.length - 1;
+      const headRoomSign = (!isHead ? 0 : headAtStart ? -1 : 1) as 1 | -1 | 0;
+      b.train = trainSpecFor(longAxis === 0, platform, headRoomSign);
+    });
+    for (const b of boxes.slice(1)) if (!b.train) b.kind = 'train.part';
+  }
   // ホーム端の白線と黄色の点字帯（コンコース側）
   boxes.push(alongFace(f, at - 1.0, len + 2.0, pv + 0.06, pv + 0.14, 0.0, 0.006, 'signPlate', false));
   boxes.push(alongFace(f, at - 1.0, len + 2.0, pv + 0.5, pv + 0.8, 0.0, 0.007, 'yellowLine', false));

@@ -1,0 +1,63 @@
+{
+ "window-rooms": {
+  "cols": 4,
+  "rows": 3,
+  "count": 12,
+  "files": [
+   "01-tatami-warm-open.png",
+   "02-tatami-tv-lace.png",
+   "03-tatami-fluorescent-open.png",
+   "04-bedroom-warm-lace.png",
+   "05-bedroom-desk-open.png",
+   "06-bedroom-tv-blinds.png",
+   "07-office-fluorescent-blinds.png",
+   "08-office-desk-open.png",
+   "09-office-warm-open.png",
+   "10-kitchen-warm-lace.png",
+   "11-kitchen-fluorescent-open.png",
+   "12-kitchen-desk-blinds.png"
+  ],
+  "source": "assets/generated/2. 窓の奥の部屋（夜に外から窓越しに見える室内）",
+  "license": "user-provided (AI generated; see generation.json)"
+ },
+ "screens-arcade": {
+  "cols": 4,
+  "rows": 2,
+  "count": 8,
+  "files": [
+   "arcade-01-space-shooter.png",
+   "arcade-02-palm-racing.png",
+   "arcade-03-falling-blocks.png",
+   "arcade-04-silhouette-fighter.png",
+   "arcade-05-abstract-maze.png",
+   "arcade-06-undersea.png",
+   "arcade-07-orbital-pinball.png",
+   "arcade-08-crystal-platformer.png"
+  ],
+  "source": "assets/generated/3. 画面の絵（ゲーム画面とパソコンの画面）",
+  "license": "user-provided (AI generated; see generation.json)"
+ },
+ "screens-pc": {
+  "cols": 2,
+  "rows": 2,
+  "count": 4,
+  "files": [
+   "computer-01-green-terminal.png",
+   "computer-02-blue-spreadsheet.png",
+   "computer-03-grey-desktop.png",
+   "computer-04-no-signal.png"
+  ],
+  "source": "assets/generated/3. 画面の絵（ゲーム画面とパソコンの画面）",
+  "license": "user-provided (AI generated; see generation.json)"
+ },
+ "cans": {
+  "cols": 8,
+  "rows": 4,
+  "count": 32,
+  "files": [
+   "fictional-cans-8x4.png"
+  ],
+  "source": "assets/generated/4. 自販機の商品パネル（架空ブランドの缶）",
+  "license": "user-provided (AI generated; see generation.json)"
+ }
+}

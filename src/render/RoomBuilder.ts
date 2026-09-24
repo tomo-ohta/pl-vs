@@ -26,12 +26,16 @@ import { addDir, QUALITY_TIERS, rotQ, toWorld, type Dir, type Portal, type Quali
 import type { Box, DynamicSpec, InstanceSpec, LabelSpec, MatId, ParticleSpec, RoomLayout, SignSpec, ZoneKind } from '../generators/layout';
 import { MaterialLibrary, SURFACES, wetnessOverrides, L2_FLAGS, type ExternalOverrides, type MaterialOverrides, type UploadHandle } from './MaterialLibrary';
 import { appearanceSeed, attachSurfaceAppearance, corridorWearRegion, corridorDustRegion, wetWallBoxes, doorSurfaceId } from './SurfaceAppearance';
-import { surfaceBox, applyMetricUV, isBevelMat, SurfaceLighting } from './SurfaceGeometry';
+import { surfaceBox, applyMetricUV, isBevelMat, setBevelQuality, SurfaceLighting } from './SurfaceGeometry';
+import { attachWindowRoom, WINDOW_ROOM_MATS } from './WindowRoom';
+import { trainSurfaces } from './TrainGeometry';
+import { applianceMats, buildAppliance } from './props/ApplianceGeometry';
+import { appliancesFromBoxes } from './props/ApplianceFromBoxes';
 import { allocateLightmapAtlas, createLightmapTexture, InstanceLighting, isLightmapTarget, LIGHTMAP_FADE_MS, LightmapBaker, LightmapSampler, lightmapsSupported, startLightmapCrossfade, writeConstantUV1, writeLightmapUV, type LightmapJobHandle } from './Lightmap';
 import { vehicleSurfaces, foliageGeometry, grassGeometry } from './ObjectGeometry';
 import { monumentSurfaces } from './MonumentGeometry';
 import { detailedBoxes } from './ArchitecturalDetails';
-import { PropCatalog, PROP_TRIANGLE_BUDGET, TILED_KINDS, type CatalogEntry, type LoadedProp } from './PropCatalog';
+import { PropCatalog, propTriangleBudget, TILED_KINDS, type CatalogEntry, type LoadedProp } from './PropCatalog';
 import { wallSpans } from '../generators/footprint';
 import { WALL_T } from '../generators/layout';
 import { SignAtlas, MAX_ATLASES_PER_ROOM } from './SignAtlas';
@@ -141,10 +145,17 @@ interface BuildClock {
   prof: Record<string, number>;
   steps: number;
   frames: number;
+  /** 1 回の中断点間（gen.next 1 回）の最長 ms と、その区間が終わった直前の段階名（フリーズ調査用） */
+  maxStepMs: number;
+  maxStepAt: string;
+  /** 直前に mark した段階名 */
+  last: string;
 }
 
 /** 分割構築の 1 部屋あたりの結合ループの単位（この箱数ごとに中断できる） */
 const BUILD_PARTS_PER_STEP = 24;
+/** 結合ループは箱の数に加えて経過時間でも中断する（大きな箱の焼き込みが続くと 24 個で 100 ms を超えるため） */
+const BUILD_SLICE_MS = 6;
 
 /**
  * 分割構築のハンドル（担当 L2）。RoomBuilder.beginBuild が返す。`step(deadline)` を呼ぶたびに構築を進め、deadline（performance.now 基準）
@@ -175,7 +186,10 @@ export class RoomBuildJob {
     this.clock.t = performance.now();
     this.clock.frames++;
     for (;;) {
+      const s0 = performance.now();
       const r = this.gen.next();
+      const d = performance.now() - s0;
+      if (d > this.clock.maxStepMs) { this.clock.maxStepMs = d; this.clock.maxStepAt = this.clock.last; }
       this.clock.steps++;
       if (r.done) { this.result = r.value; this.finished = true; return true; }
       if (performance.now() >= deadline) return false;
@@ -261,7 +275,7 @@ export class RoomBuilder {
     void PropCatalog.shared.preload();
   }
 
-  setTier(tier: QualityTier): void { this.tier = tier; }
+  setTier(tier: QualityTier): void { this.tier = tier; setBevelQuality(tier.id); }
 
   /** 距離でチャンクの表示を切り替える簡易版（RoomStreamingManager から毎フレーム呼べる）。1 チャンクの部屋は何もしない */
   static updateChunkVisibility(built: BuiltRoom, cameraPos: THREE.Vector3, farDistance: number): void {
@@ -284,7 +298,7 @@ export class RoomBuilder {
    * 中断点を持つジョブを返す。RoomStreamingManager.buildPending が後回しの部屋をフレーム予算の範囲で進める
    */
   beginBuild(node: RoomInstance, layout: RoomLayout): RoomBuildJob {
-    const clock: BuildClock = { t: performance.now(), prof: {}, steps: 0, frames: 0 };
+    const clock: BuildClock = { t: performance.now(), prof: {}, steps: 0, frames: 0, maxStepMs: 0, maxStepAt: '', last: 'start' };
     const cleanup: (() => void)[] = [];
     return new RoomBuildJob(node.roomId, this.buildSteps(node, layout, clock, cleanup), clock, cleanup);
   }
@@ -317,9 +331,18 @@ export class RoomBuilder {
     shared.add(layout.palette.door);
     shared.add('doorMetal');
     shared.add(untextured ? 'untextured' : 'trim');
-    for (const d of layout.decals ?? []) if (tier.decals && SURFACES[d.mat]) shared.add(untextured ? 'untextured' : d.mat);
+    for (const d of layout.decals ?? []) if (tier.decals && SURFACES[decalMat(d)]) shared.add(untextured ? 'untextured' : decalMat(d));
     for (const d of layout.dynamics ?? []) if (SURFACES[d.box.mat]) shared.add(untextured ? 'untextured' : d.box.mat);
-    for (const i of layout.instances ?? []) if (SURFACES[i.mat]) instanced.add(untextured ? 'untextured' : i.mat);
+    for (const i of layout.instances ?? []) {
+      if (i.shape && !untextured) for (const m of applianceMats(i.shape, { body: i.mat, accent: i.accent, screen: i.screen })) instanced.add(m);
+      else if (SURFACES[i.mat]) instanced.add(untextured ? 'untextured' : i.mat);
+    }
+    // 箱のグループから置き換える家電（ApplianceFromBoxes）の材質も事前コンパイルの対象に
+    if (!untextured) {
+      const kinds = new Set(layout.boxes.map((b) => b.kind).filter((k) => k === 'vending' || k === 'washer' || k === 'dryer'));
+      for (const k of kinds) for (const m of applianceMats(k as 'vending' | 'washer' | 'dryer', { body: 'plasticRed', screen: 0 })) instanced.add(m);
+      if (kinds.has('vending')) for (const m of ['plasticBlue', 'paintWhite', 'metalDark'] as MatId[]) instanced.add(m);
+    }
     for (const id of ids) shared.delete(id);
     return { ids: [...ids], shared: [...shared], instanced: [...instanced], overrides, lit };
   }
@@ -328,7 +351,7 @@ export class RoomBuilder {
     // 段階別の計時（フリーズ調査用。window.__buildProfile に最新 200 件）。分割構築では step の再開時に clock.t が進むので、
     // フレーム間の待ち時間は段階に数えない
     const prof = clock.prof;
-    const mark = (k: string) => { const now = performance.now(); prof[k] = (prof[k] ?? 0) + (now - clock.t); clock.t = now; };
+    const mark = (k: string) => { const now = performance.now(); prof[k] = (prof[k] ?? 0) + (now - clock.t); clock.t = now; clock.last = k; };
     const p = node.placement!;
     const tier = this.tier;
     const group = new THREE.Group();
@@ -380,15 +403,29 @@ export class RoomBuilder {
     const propGroups = new Map<string, Box[]>();
     for (const b of work.boxes) if (b.propGroup) { const list=propGroups.get(b.propGroup)??[];list.push(b);propGroups.set(b.propGroup,list); }
     const groupedBoxes: Box[] = [...propGroups].map(([id,bs])=>({ ...bs[0], propGroup:id, kind:bs.find(b=>b.kind)?.kind, min:[0,1,2].map(k=>k===1 && bs.some(b=>b.kind==='plant') ? Math.max(...bs.filter(b=>b.kind==='plant').map(b=>b.min[1]+(b.max[1]-b.min[1])*.84)) : Math.min(...bs.map(b=>b.min[k]))) as Vec3, max:[0,1,2].map(k=>Math.max(...bs.map(b=>b.max[k]))) as Vec3 }));
-    const propWork = { ...work, boxes:work.boxes.filter(b=>!b.propGroup).concat(groupedBoxes) };
-    const propPlan = !legacy && !untextured && !roll && catalog.ready ? planProps(propWork, new Rng(node.seed).fork('props'), catalog) : [];
-    const vehicles = !legacy && !roll ? vehicleSurfaces(work.boxes) : [];
+    // 駐車中の車（vehicle.id が parking: / street:）は車体・窓・タイヤの箱を 1 台分の枠にまとめ、kind 'car'（カバーを掛けた車）の候補にする。
+    // 乗車演出（VehicleRide）の乗り物は対象外
+    const parkedCars = new Map<string, Box[]>();
+    for (const b of work.boxes) if (b.vehicle && /^(parking|street):/.test(b.vehicle.id)) { const list = parkedCars.get(b.vehicle.id) ?? []; list.push(b); parkedCars.set(b.vehicle.id, list); }
+    const carBoxes: Box[] = [...parkedCars].map(([id, bs]) => ({ min: [0, 1, 2].map((k) => Math.min(...bs.map((b) => b.min[k]))) as Vec3, max: [0, 1, 2].map((k) => Math.max(...bs.map((b) => b.max[k]))) as Vec3, mat: bs[0].mat, solid: false, kind: 'car', vehicle: { id, body: false } }));
+    const propWork = { ...work, boxes:work.boxes.filter(b=>!b.propGroup).concat(groupedBoxes, carBoxes) };
+    const propPlan = !legacy && !untextured && !roll && catalog.ready ? planProps(propWork, new Rng(node.seed).fork('props'), catalog, propTriangleBudget(tier.id)) : [];
+    const coveredCars = new Set(propPlan.filter((pp) => pp.box.kind === 'car' && pp.box.vehicle).map((pp) => pp.box.vehicle!.id));
+    const vehicles = !legacy && !roll ? vehicleSurfaces(coveredCars.size ? work.boxes.filter((b) => !(b.vehicle && coveredCars.has(b.vehicle.id))) : work.boxes) : [];
     cleanup.push(()=>vehicles.forEach(v=>v.geometry.dispose()));
+    // 電車（Box.train の車体 → 断面の押し出し + 扉・窓・帯・屋根・床下）。車体と kind 'train.part' の装飾箔は描かない
+    const trains = !legacy && !roll ? trainSurfaces(work.boxes) : [];
+    cleanup.push(() => trains.forEach((v) => v.geometry.dispose()));
     // モニュメント（謎の物体）: 部品列をプリミティブで組み立て、vehicles と同じ special 部品として結合する
     const monuments = !legacy && !roll ? monumentSurfaces(work) : [];
     cleanup.push(() => monuments.forEach((v) => v.geometry.dispose()));
-    const replaced = new Set(propPlan.flatMap(pp => pp.box.propGroup ? propGroups.get(pp.box.propGroup)!.filter(b=>b.mat==='plant') : [pp.box]));
-    if (vehicles.length) for (const b of work.boxes) if (b.vehicle) replaced.add(b);
+    // 置き換えた箱は描かない。鉢植え（propGroup + plant）は葉の箱だけ（鉢と土は残す）、他の propGroup（椅子の座面・背・脚など）は全部
+    const replaced = new Set(propPlan.flatMap(pp => pp.box.propGroup ? propGroups.get(pp.box.propGroup)!.filter(b => pp.box.kind !== 'plant' || b.mat==='plant') : [pp.box]));
+    if (vehicles.length || coveredCars.size) for (const b of work.boxes) if (b.vehicle && (vehicles.length || coveredCars.has(b.vehicle.id))) replaced.add(b);
+    if (trains.length) for (const b of work.boxes) if (b.train || b.kind === 'train.part') replaced.add(b);
+    // 家電（自販機・洗濯機・乾燥機の箱のグループ）→ コード生成の家電のインスタンス（ApplianceFromBoxes）。元の箱は描かない
+    const appliances = !legacy && !untextured && !roll ? appliancesFromBoxes(work.boxes.filter((b) => !replaced.has(b)), [(work.bounds.min[0] + work.bounds.max[0]) / 2, (work.bounds.min[2] + work.bounds.max[2]) / 2]) : null;
+    if (appliances) for (const b of appliances.replaced) replaced.add(b);
     const visibleWork = replaced.size ? { ...work, boxes: work.boxes.filter((b) => !replaced.has(b)) } : work;
     let displayBoxes = (legacy ? work.boxes : detailedBoxes(visibleWork, definition?.baseTemplate)).filter((b) => b.kind !== 'emitOnly' && b.kind !== 'colliderOnly');
     if(!legacy) for(const b of visibleWork.boxes) if(b.propGroup && b.kind==='plant') {
@@ -501,6 +538,7 @@ export class RoomBuilder {
     }
     for (const v of vehicles) parts.push({ b: v.box, special: true, target: -1, geometry: v.geometry });
     for (const v of monuments) parts.push({ b: v.box, special: true, target: -1, geometry: v.geometry });
+    for (const v of trains) parts.push({ b: v.box, special: true, target: -1, geometry: v.geometry });
     // 隠れた面（スラブの外側・家具の底）の判定に使う外殻の箱
     const shellCount = layout.shellCount ?? 0;
     const shellBoxes = (shellCount > 0 ? work.boxes.slice(0, shellCount) : work.boxes).filter((b) => b.solid && /^(floor|ceiling|wall)/.test(b.mat));
@@ -516,8 +554,12 @@ export class RoomBuilder {
     const byChunk: Map<MatId, THREE.BufferGeometry[]>[] = chunks.map(() => new Map());
     /** 材質ごとの結合メッシュの中で、ライトマップ対象の頂点範囲（[start, count] の列）と現在の頂点オフセット */
     const lmByChunk: Map<MatId, { ranges: number[]; offset: number }>[] = chunks.map(() => new Map());
+    let sliceStart = performance.now();
     for (let pi = 0; pi < parts.length; pi++) {
-      if (pi > 0 && pi % BUILD_PARTS_PER_STEP === 0) yield; // 中断点: 箱 BUILD_PARTS_PER_STEP 個ごと
+      if (pi > 0 && (pi % BUILD_PARTS_PER_STEP === 0 || performance.now() - sliceStart > BUILD_SLICE_MS)) { // 中断点: 箱 BUILD_PARTS_PER_STEP 個ごと・BUILD_SLICE_MS ごと
+        yield;
+        sliceStart = performance.now();
+      }
       const part = parts[pi];
       const b = part.b;
       const source = b;
@@ -549,6 +591,8 @@ export class RoomBuilder {
         g = foliageGeometry(b, tier.id === 'low' ? .45 : 1);
         applyMetricUV(g, b.mat);
       } else g = surfaceBox(b, { legacy });
+      // 窓の奥の部屋（WindowRoom）: 窓の箱の中心と半分の寸法。同じ材質で結合する全ジオメトリに要るので、分割片（part.geometry）にも元の箱で付ける
+      if (!legacy && WINDOW_ROOM_MATS.has(b.mat)) attachWindowRoom(g, part.b.min, part.b.max);
       mark('geo');
       // uv1（ライトマップ）。結合する全ジオメトリが同じ属性集合を持つ必要があるので、対象外の箱にも黒テクセルの uv1 を付ける
       let lmRanges: [number, number][] | null = null;
@@ -807,7 +851,7 @@ export class RoomBuilder {
     mark('decals');
     yield; // 中断点: デカールまで
     // InstancedMesh（反復配置）。チャンクごとに 1 InstancedMesh、Tier の instanceScale で間引く
-    for (const spec of layout.instances ?? []) {
+    for (const spec of [...(layout.instances ?? []), ...(appliances?.specs ?? [])]) {
       triangles += this.buildInstances(spec, chunks, chunkGroups, chunkIndexOf, materialFor, bake, shading, tier, colliders, p, legacy);
     }
 
@@ -878,7 +922,7 @@ export class RoomBuilder {
     mark('modifiers');
     if (typeof window !== 'undefined') {
       const g = window as unknown as { __buildProfile?: unknown[] };
-      (g.__buildProfile ??= []).push({ room: node.roomId, def: node.definitionId, boxes: layout.boxes.length, total: Object.values(prof).reduce((a, b) => a + b, 0), steps: clock.steps, frames: clock.frames, ...prof });
+      (g.__buildProfile ??= []).push({ room: node.roomId, def: node.definitionId, boxes: layout.boxes.length, total: Object.values(prof).reduce((a, b) => a + b, 0), steps: clock.steps, frames: clock.frames, maxStepMs: clock.maxStepMs, maxStepAt: clock.maxStepAt, ...prof });
       if (g.__buildProfile.length > 200) g.__buildProfile.shift();
     }
     return built;
@@ -892,7 +936,8 @@ export class RoomBuilder {
     const [sx, sy, sz] = spec.size;
     if (sx <= 0 || sy <= 0 || sz <= 0 || spec.transforms.length === 0) return 0;
     // Tier で間引き（決定論: 等間隔に採用）
-    const scale = Math.max(0, Math.min(1, tier.instanceScale));
+    // 家電（shape）は間引かない（当たり判定の箱は残るので、間引くと機械だけが消えて歯抜けになる）
+    const scale = spec.shape ? 1 : Math.max(0, Math.min(1, tier.instanceScale));
     const picked = spec.transforms.filter((_, i) => Math.floor(i * scale) !== Math.floor((i - 1) * scale) || i === 0);
     if (!picked.length) return 0;
     const perChunk = new Map<number, InstanceSpec['transforms']>();
@@ -903,19 +948,22 @@ export class RoomBuilder {
     }
     const botanical = !legacy && (spec.mat === 'plant' || spec.mat === 'grass');
     const baseBox: Box={ min: [-sx / 2, 0, -sz / 2], max: [sx / 2, sy, sz / 2], mat: spec.mat, solid: false };
-    const base = botanical && spec.mat === 'grass' ? grassGeometry(baseBox,tier.id==='low'?.5:1) : botanical ? foliageGeometry(baseBox, tier.id === 'low' ? .3 : .65, Math.max(12,Math.floor(150000/(picked.length*12)))) : surfaceBox(baseBox, { legacy });
-    const triPer = base.getAttribute('position').count / 3;
+    // 形: 家電のコード生成（shape。材質ごとに複数の InstancedMesh）/ 植栽 / 箱
+    const bases: { geo: THREE.BufferGeometry; mat: MatId }[] = spec.shape && !legacy
+      ? [...buildAppliance(spec.shape, spec.size, { body: spec.mat, accent: spec.accent, screen: spec.screen })].map(([mat, geo]) => ({ geo, mat }))
+      : [{ geo: botanical && spec.mat === 'grass' ? grassGeometry(baseBox,tier.id==='low'?.5:1) : botanical ? foliageGeometry(baseBox, tier.id === 'low' ? .3 : .65, Math.max(12,Math.floor(150000/(picked.length*12)))) : surfaceBox(baseBox, { legacy }), mat: botanical ? 'plantLeaf' : spec.mat }];
     let total = 0;
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const pos = new THREE.Vector3();
     const scl = new THREE.Vector3();
-    for (const [ci, list] of perChunk) {
-      const geo = base.clone();
+    for (const [ci, list] of perChunk) for (const [bi, base] of bases.entries()) {
+      const triPer = base.geo.getAttribute('position').count / 3;
+      const geo = base.geo.clone();
       const baked = new Float32Array(list.length * 3);
       // ライトマップ到着後の足元サンプル用: [x, 底面 y, z, 半幅 x, 半幅 z]（yaw を含む AABB の半幅）
       const probes = new Float32Array(list.length * 5);
-      const mesh = new THREE.InstancedMesh(geo, materialFor(botanical?'plantLeaf':spec.mat), list.length);
+      const mesh = new THREE.InstancedMesh(geo, materialFor(base.mat), list.length);
       list.forEach((t, i) => {
         const s = t.scale ?? 1;
         pos.set(t.pos[0], t.pos[1], t.pos[2]);
@@ -928,7 +976,7 @@ export class RoomBuilder {
         const c = Math.abs(Math.cos(t.yaw)), sn = Math.abs(Math.sin(t.yaw));
         const hx = (c * sx + sn * sz) / 2 * s, hz = (sn * sx + c * sz) / 2 * s;
         probes[i * 5] = t.pos[0]; probes[i * 5 + 1] = t.pos[1]; probes[i * 5 + 2] = t.pos[2]; probes[i * 5 + 3] = hx; probes[i * 5 + 4] = hz;
-        if (spec.solid) {
+        if (spec.solid && bi === 0) {
           colliders.push(aabbToWorld({ min: [t.pos[0] - hx, t.pos[1], t.pos[2] - hz], max: [t.pos[0] + hx, t.pos[1] + sy * s, t.pos[2] + hz] }, placement));
         }
       });
@@ -944,7 +992,7 @@ export class RoomBuilder {
       chunks[ci].triangles += triPer * list.length;
       total += triPer * list.length;
     }
-    base.dispose();
+    for (const b of bases) b.geo.dispose();
     return total;
   }
 
@@ -1133,6 +1181,15 @@ function projectRange(bounds: AABB, axis: Vec3): [number, number] {
   return [lo, hi];
 }
 
+/**
+ * デカールの描画材質。床の水たまり（'water' + normal 'y'。Wetness / 雨の部屋のドレッシング）は 'puddle' にして、
+ * 不定形の輪郭（puddleGeometry）で描く。軸に沿った箱のままだと、回転（yaw）が外接矩形になり、重なった長方形が
+ * マス目状（ボクセル状）に見える
+ */
+function decalMat(d: NonNullable<RoomLayout['decals']>[number]): MatId {
+  return d.mat === 'water' && d.normal === 'y' ? 'puddle' : d.mat;
+}
+
 function decalBox(d: NonNullable<RoomLayout['decals']>[number]): Box {
   const t = .004;
   const [w, dd] = d.size;
@@ -1140,6 +1197,8 @@ function decalBox(d: NonNullable<RoomLayout['decals']>[number]): Box {
   const c = Math.abs(Math.cos(yaw)), s = Math.abs(Math.sin(yaw));
   if (d.normal === 'y') {
     const hx = (c * w + s * dd) / 2, hz = (s * w + c * dd) / 2;
+    // 水たまりは外接矩形ではなく元の寸法の楕円に収める（回転は輪郭の揺らぎに紛れる）
+    if (decalMat(d) === 'puddle') return { min: [d.pos[0] - w / 2, d.pos[1], d.pos[2] - dd / 2], max: [d.pos[0] + w / 2, d.pos[1] + t, d.pos[2] + dd / 2], mat: 'puddle', solid: false };
     return { min: [d.pos[0] - hx, d.pos[1], d.pos[2] - hz], max: [d.pos[0] + hx, d.pos[1] + t, d.pos[2] + hz], mat: d.mat, solid: false };
   }
   if (d.normal === 'x') return { min: [d.pos[0], d.pos[1] - dd / 2, d.pos[2] - w / 2], max: [d.pos[0] + t, d.pos[1] + dd / 2, d.pos[2] + w / 2], mat: d.mat, solid: false };
@@ -1335,6 +1394,9 @@ interface PropPlacement { box: Box; entry: CatalogEntry; transforms: PropTransfo
 interface PropState { disposed: boolean; built: BuiltRoom | null }
 
 const PROP_SCALE_MIN = 0.75;
+/** 高さで縮尺を決める kind と、そのときの床面のはみ出し許容（倍） */
+const HEIGHT_FIT_KINDS = new Set(['chair', 'car', 'tv']);
+const HEIGHT_FIT_OVERHANG = 1.4;
 const PROP_SCALE_MAX = 1.25;
 /** 列（TILED_KINDS）だけは断面が箱より小さいモデルも許す上限（1.25 にクランプして並べる。カウンター 0.9 m に 0.55 m の引出しなど） */
 const PROP_TILED_SCALE_RAW_MAX = 1.6;
@@ -1399,6 +1461,13 @@ function fitProp(b: Box, kind: string, e: CatalogEntry, prefer: number[], wallSi
         scale = Math.min(PROP_SCALE_MAX, s2);
         count = 1;
       }
+    } else if (HEIGHT_FIT_KINDS.has(kind)) {
+      // 椅子・車・テレビ: 生成器の箱は実物より床面が小さい（椅子 0.45 m 四方 / 実物 0.55〜0.68 m）ので、高さで縮尺を決め、
+      // 床面は箱の HEIGHT_FIT_OVERHANG 倍まではみ出してよい（見た目だけ。当たり判定は箱のまま）
+      const raw = bh / mh;
+      if (raw < PROP_SCALE_MIN || raw > PROP_SCALE_MAX) continue;
+      if (rw * raw > bw * HEIGHT_FIT_OVERHANG || rd * raw > bd * HEIGHT_FIT_OVERHANG) continue;
+      scale = raw;
     } else {
       // 一様スケールが 0.75〜1.25 に入る候補だけ（小さすぎるモデルを拡大して置かない）
       const raw = Math.min(bw / rw, bd / rd, bh / mh);
@@ -1416,7 +1485,10 @@ function fitProp(b: Box, kind: string, e: CatalogEntry, prefer: number[], wallSi
  * 1) 箱ごとに収まる候補を求める。2) 同じ kind が多い部屋（> 12 箱）は軽い候補に絞り、部屋ごとに 1 モデルへ統一する。
  * 3) 合計が三角形予算を超えるときは、使用量の多い kind から順に「最軽量へ切替 → 1 つおきに間引き」で収める。
  */
-function planProps(work: RoomLayout, rng: Rng, catalog: PropCatalog): PropPlacement[] {
+/** 影を落とすプロップの最大寸法の下限（m） */
+const PROP_SHADOW_MIN_SIZE = 1.2;
+
+function planProps(work: RoomLayout, rng: Rng, catalog: PropCatalog, budget: number): PropPlacement[] {
   const spans = wallSpans(work.footprint);
   const bounds = work.bounds;
   const center: [number, number] = [(bounds.min[0] + bounds.max[0]) / 2, (bounds.min[2] + bounds.max[2]) / 2];
@@ -1478,7 +1550,7 @@ function planProps(work: RoomLayout, rng: Rng, catalog: PropCatalog): PropPlacem
   // 三角形予算
   const cost = (sl: Slot): number => (sl.pick ? sl.pick.e.triangles * sl.pick.f.count : 0);
   const total = (): number => slots.reduce((a, sl) => a + cost(sl), 0);
-  for (let guard = 0; total() > PROP_TRIANGLE_BUDGET && guard < 64; guard++) {
+  for (let guard = 0; total() > budget && guard < 64; guard++) {
     // まず「最軽量の候補へ切替」で最も節約できる kind を切り替える（全 kind が最軽量になるまで）。それでも超えるなら使用量最大の kind を 1 つおきに間引く
     const savings = new Map<string, number>();
     for (const sl of slots) {
@@ -1595,7 +1667,9 @@ function installProps(
           mesh.frustumCulled = true;
           mesh.computeBoundingSphere();
           mesh.receiveShadow = true;
-          mesh.castShadow = true;
+          // 影を落とすのは大きな物（車・ソファなど最大寸法 1.2 m 以上）だけ。並べる椅子まで落とすと、影を落とす点光源が
+          // キューブの 6 面ぶん描き直すので三角形の増加が 6 倍効く
+          mesh.castShadow = Math.max(...model.size) * (items[0]?.t.scale ?? 1) >= PROP_SHADOW_MIN_SIZE;
           mesh.name = `prop/${id}`;
           mesh.userData.prop = id;
           mesh.matrixAutoUpdate = false;

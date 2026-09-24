@@ -10,3 +10,6 @@ export const IS_MOBILE = hasWindow && window.matchMedia('(pointer: coarse)').mat
 
 const texParam = hasWindow ? new URLSearchParams(window.location.search).get('tex') : null;
 export const SMALL_TEXTURES = texParam === 'sm' ? true : texParam === 'full' ? false : IS_MOBILE;
+
+/** CC0 素材を KTX2（index.json の ktx2）で読む。`?ktx=off` で JPEG に戻す（比較・不具合時の退避） */
+export const KTX2_TEXTURES = !(hasWindow && new URLSearchParams(window.location.search).get('ktx') === 'off');

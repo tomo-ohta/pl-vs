@@ -18,7 +18,7 @@ import { dirVec, type Dir, type Socket } from '../../core/types';
 import type { Rng } from '../../core/rng';
 import { across, along, inner, rect, rectArea, wallSpans, type Rect } from '../footprint';
 import { alongFace, doorZones, freeRuns, hitsZone, insideRects, signAt, tubePair, type Face } from '../furniture';
-import { box, kinded, WALL_T, type Box, type GenParams, type InstanceSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
+import { box, kinded, splitScreens, WALL_T, type Box, type GenParams, type InstanceSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
 
 /** テスト用スイッチ: false にすると何もしない（Node ハーネスの before / after 比較。ブラウザでは開発用 `?nodress=1` で無効化 = 構築時間の基準） */
 export const DRESS_UNCOMMON = { enabled: !(typeof location !== 'undefined' && /[?&]nodress=1/.test(location.search)) };
@@ -1247,9 +1247,8 @@ function u13(c: Ctx): void {
 function u14(c: Ctx): void {
   const { L, rng } = c;
   const desks = L.boxes.slice(c.start).filter((b) => b.solid && b.kind === 'desk' && b.max[1] - b.min[1] > 0.6 && b.max[1] - b.min[1] < 0.9);
-  const body: InstanceSpec = { mat: 'signPlate', size: [0.4, 0.34, 0.38], transforms: [] };
-  const screen: InstanceSpec = { mat: 'screenDark', size: [0.34, 0.26, 0.02], transforms: [] };
-  const kb: InstanceSpec = { mat: 'furnitureDark', size: [0.42, 0.025, 0.15], transforms: [] };
+  // CRT モニター + キーボード + マウスは 1 台分をコード生成の家電（shape 'crtPc'。正面 = 局所 +z = 座る側）で描く
+  const pc: InstanceSpec = { mat: 'signPlate', size: [0.42, 0.36, 0.4], transforms: [], shape: 'crtPc', accent: 'screenDark' };
   const phone: InstanceSpec = { mat: 'metalDark', size: [0.2, 0.05, 0.22], transforms: [] };
   const handset: InstanceSpec = { mat: 'metalDark', size: [0.05, 0.21, 0.06], transforms: [] };
   let stations = 0;
@@ -1269,9 +1268,9 @@ function u14(c: Ctx): void {
         const mx = alongX ? a : cc + off;
         const mz = alongX ? cc + off : a;
         const yaw = alongX ? 0 : Math.PI / 2;
-        body.transforms.push({ pos: [mx, top, mz], yaw });
-        screen.transforms.push({ pos: [alongX ? mx : mx + side * 0.2, top + 0.05, alongX ? mz + side * 0.2 : mz], yaw });
-        kb.transforms.push({ pos: [alongX ? mx : mx + side * 0.44, top, alongX ? mz + side * 0.44 : mz], yaw });
+        // 座る側（キーボードの側）= side の向き。alongX なら ±z、そうでなければ ±x
+        const facing = alongX ? (side > 0 ? 0 : Math.PI) : side * Math.PI / 2;
+        pc.transforms.push({ pos: [mx, top, mz], yaw: facing });
         if ((k + (side > 0 ? 0 : 1)) % 2 === 0) {
           const px = alongX ? a + 0.5 : cc + off + side * 0.1;
           const pz = alongX ? cc + off + side * 0.1 : a + 0.5;
@@ -1282,7 +1281,9 @@ function u14(c: Ctx): void {
       }
     }
   }
-  for (const s of [body, screen, kb, phone, handset]) pushInstances(L, rng, s);
+  for (const s of [pc, phone, handset]) pushInstances(L, rng, s);
+  // 画面はパソコンの絵 4 種（screen 0..3）と電源の切れた画面に分ける。台ごとの選択は位置のハッシュ（乱数列は従来どおり 1 回の shuffle）
+  splitScreens(L, pc, [0, 1, 2, 3, -1]);
   // 本棚（空き壁に 2〜3 台）と観葉植物（隅）
   let shelves = 0;
   for (const f of [...c.faces].sort((a, b) => (b.a1 - b.a0) - (a.a1 - a.a0))) {

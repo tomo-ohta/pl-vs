@@ -1,0 +1,47 @@
+{
+  "tool": "built-in image_gen",
+  "requestedSize": [
+    2048,
+    2048
+  ],
+  "actualSize": [
+    1254,
+    1254
+  ],
+  "requestedCoverageMeters": [
+    2,
+    2
+  ],
+  "notes": [
+    "生成サービスは2048指定に対して1254角で出力。2048要件未達。",
+    "シームレス指定で生成したが厳密な境界連続性・455mm寸法は未保証。",
+    "等間隔455mmの段割りは2000mm周期と割り切れないため、厳密な上下反復には実寸周期の調整が必要。"
+  ],
+  "assets": [
+    {
+      "name": "light-grey-stone",
+      "prompt": "Use case: photorealistic-natural. Asset type: game material albedo texture. Generate ONE individual square image, exactly 2048 x 2048 pixels, not a collage. Seamless tileable texture, orthographic front view of a Japanese residential exterior wall, fiber-cement ceramic siding panels with a light grey stone-textured pattern, panels 455 mm tall with thin horizontal joints and occasional vertical caulked seams, the texture covers a 2 m x 2 m area, flat even diffuse lighting, no shadows, no highlights, no perspective, no vignette, subtle weathering: faint rain streaks below joints where present, light dust, very slight color variation between panels where present, realistic photographic material scan, albedo map. Opposing edges must wrap continuously in both axes, with consistent color and pattern phase; no visible tile boundary. Physical material joints are allowed, image borders are not. Avoid: windows, doors, plants, people, text, logos, perspective, strong shadows, sun highlights, visible tiling seams, border, frame, watermark, 3D render look, cartoon. Requested material is light-grey-stone; preserve the 2 meter real-world scale and high-frequency realistic surface detail.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-3b085bae-a535-47e1-95ac-2c7f960ccbb4.png"
+    },
+    {
+      "name": "beige-brick-tile",
+      "prompt": "Use case: photorealistic-natural. Asset type: game material albedo texture. Generate ONE individual square image, exactly 2048 x 2048 pixels, not a collage. Seamless tileable texture, orthographic front view of a Japanese residential exterior wall, fiber-cement ceramic siding panels with a beige brick-tile pattern, panels 455 mm tall with thin horizontal joints and occasional vertical caulked seams, the texture covers a 2 m x 2 m area, flat even diffuse lighting, no shadows, no highlights, no perspective, no vignette, subtle weathering: faint rain streaks below joints where present, light dust, very slight color variation between panels where present, realistic photographic material scan, albedo map. Opposing edges must wrap continuously in both axes, with consistent color and pattern phase; no visible tile boundary. Physical material joints are allowed, image borders are not. Avoid: windows, doors, plants, people, text, logos, perspective, strong shadows, sun highlights, visible tiling seams, border, frame, watermark, 3D render look, cartoon. Requested material is beige-brick-tile; preserve the 2 meter real-world scale and high-frequency realistic surface detail.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-f607d0f7-429c-4a17-b8b2-4b844ce7ba84.png"
+    },
+    {
+      "name": "white-wood-grain",
+      "prompt": "Use case: photorealistic-natural. Asset type: game material albedo texture. Generate ONE individual square image, exactly 2048 x 2048 pixels, not a collage. Seamless tileable texture, orthographic front view of a Japanese residential exterior wall, fiber-cement ceramic siding panels with a white wood-grain lap board pattern, panels 455 mm tall with thin horizontal joints and occasional vertical caulked seams, the texture covers a 2 m x 2 m area, flat even diffuse lighting, no shadows, no highlights, no perspective, no vignette, subtle weathering: faint rain streaks below joints where present, light dust, very slight color variation between panels where present, realistic photographic material scan, albedo map. Opposing edges must wrap continuously in both axes, with consistent color and pattern phase; no visible tile boundary. Physical material joints are allowed, image borders are not. Avoid: windows, doors, plants, people, text, logos, perspective, strong shadows, sun highlights, visible tiling seams, border, frame, watermark, 3D render look, cartoon. Requested material is white-wood-grain; preserve the 2 meter real-world scale and high-frequency realistic surface detail.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-2509b93a-e710-4fca-b94f-e43a5e4321fe.png"
+    },
+    {
+      "name": "dark-brown-ribbed",
+      "prompt": "Use case: photorealistic-natural. Asset type: game material albedo texture. Generate ONE individual square image, exactly 2048 x 2048 pixels, not a collage. Seamless tileable texture, orthographic front view of a Japanese residential exterior wall, fiber-cement ceramic siding panels with a dark brown vertical ribbed pattern, panels 455 mm tall with thin horizontal joints and occasional vertical caulked seams, the texture covers a 2 m x 2 m area, flat even diffuse lighting, no shadows, no highlights, no perspective, no vignette, subtle weathering: faint rain streaks below joints where present, light dust, very slight color variation between panels where present, realistic photographic material scan, albedo map. Opposing edges must wrap continuously in both axes, with consistent color and pattern phase; no visible tile boundary. Physical material joints are allowed, image borders are not. Avoid: windows, doors, plants, people, text, logos, perspective, strong shadows, sun highlights, visible tiling seams, border, frame, watermark, 3D render look, cartoon. Requested material is dark-brown-ribbed; preserve the 2 meter real-world scale and high-frequency realistic surface detail.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-3e7e4aa3-9284-4b57-9d63-c9e541f8b63b.png"
+    },
+    {
+      "name": "off-white-fukitsuke",
+      "prompt": "Use case: photorealistic-natural. Generate exactly ONE 2048x2048 square game ALBEDO texture of off-white Japanese fukitsuke sprayed mortar plaster exterior wall. This is a single continuous unbroken mortar surface, NOT siding, NOT panels. Absolutely NO horizontal or vertical lines, NO joints, NO grooves, NO panel boundaries, NO masonry, NO seams. Entire frame covers 2m x 2m of fine stippled sprayed mortar plaster, uniform subtle random mineral granules, faint dust and subtle natural color variation. Orthographic straight-on photographic material scan, perfectly flat even diffuse illumination, no shading gradient, no baked shadows or highlights, no vignette. Seamless tileable in both axes, matching opposite edges. No windows, doors, plants, people, text, logos, perspective, shadows, sun highlights, border, frame, watermark, CGI look or cartoon. Fine real-world grain scale, professional PBR base color. Output 2048 x 2048 pixels.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-3246dbd2-1e06-4a19-89d0-2a5866ae0f38.png"
+    }
+  ]
+}

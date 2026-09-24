@@ -336,17 +336,14 @@ function dressR02(c: Ctx): void {
   if (slabs.length === 0) return;
   const overlapsSlab = (b: Box) => slabs.some((s) => b.min[0] < s.max[0] + 0.1 && b.max[0] > s.min[0] - 0.1 && b.min[2] < s.max[2] + 0.1 && b.max[2] > s.min[2] - 0.1);
   removeInterior(L, (b) => slabs.includes(b) || (!b.solid && b.mat === 'furnitureLight' && b.min[1] > 0.1 && overlapsSlab(b)));
-  const body = spec('screenDark', [0.72, 1.8, 0.7], true);
-  const deck = spec('rubber', [0.62, 0.05, 0.26]);
-  const screens: Record<string, InstanceSpec> = {
-    screenGlow: spec('screenGlow', [0.5, 0.42, 0.02]),
-    neonRed: spec('neonRed', [0.5, 0.42, 0.02]),
-    neonBlue: spec('neonBlue', [0.5, 0.42, 0.02]),
-  };
-  const marquee: Record<string, InstanceSpec> = {
-    screenGlow: spec('screenGlow', [0.6, 0.2, 0.02]),
-    neonRed: spec('neonRed', [0.6, 0.2, 0.02]),
-    neonBlue: spec('neonBlue', [0.6, 0.2, 0.02]),
+  // 筐体 1 台（本体・傾いた画面・看板・操作盤・コイン扉）はコード生成の家電（shape 'arcade'。正面 = 局所 +z）。画面と看板の色（accent）ごとに 1 つ
+  // 画面はゲーム画面の絵 8 種（screen 0..7。台ごとの選択は位置のハッシュ）、看板の色は絵ごとに固定（spec を 8 つに抑える）
+  const marquee: MatId[] = ['screenGlow', 'neonRed', 'neonBlue'];
+  const cabinets: InstanceSpec[] = Array.from({ length: 8 }, (_, n) => ({ ...spec('screenDark', [0.72, 1.8, 0.7], true), shape: 'arcade', accent: marquee[n % 3], screen: n }));
+  const cabinetAt = (p: Vec3) => {
+    let h = (Math.round(p[0] * 100) * 73856093) ^ (Math.round(p[2] * 100) * 19349663);
+    h = Math.imul(h ^ (h >>> 13), 0x5bd1e995);
+    return cabinets[Math.floor((((h ^ (h >>> 15)) >>> 0) / 4294967296) * cabinets.length)];
   };
   const mats = ['screenGlow', 'neonRed', 'neonBlue', 'neonBlue', 'screenGlow'];
   let count = 0;
@@ -358,7 +355,6 @@ function dressR02(c: Ctx): void {
     const cc = alongX ? (s.min[2] + s.max[2]) / 2 : (s.min[0] + s.max[0]) / 2;
     const bays = Math.max(1, Math.floor((a1 - a0) / 0.78));
     const bay = (a1 - a0) / bays;
-    const yaw = alongX ? 0 : Math.PI / 2;
     for (let k = 0; k < bays; k++) {
       const a = a0 + bay * (k + 0.5);
       for (const side of [-1, 1] as const) {
@@ -367,17 +363,16 @@ function dressR02(c: Ctx): void {
         const pos = (across: number, y: number): Vec3 => (alongX ? [a, y, across] : [across, y, a]);
         const fp: Box = alongX ? box([a - 0.36, 0, bc - 0.35], [a + 0.36, 1.8, bc + 0.35], 'screenDark') : box([bc - 0.35, 0, a - 0.36], [bc + 0.35, 1.8, a + 0.36], 'screenDark');
         if (hitsZone(c.zones, fp)) continue;
-        put(body, pos(bc, 0), yaw);
-        const front = cc + side * 0.72;
         const m = rng.pick(mats);
-        put(screens[m], pos(front, 1.0), yaw);
-        put(marquee[rng.chance(0.7) ? m : rng.pick(mats)], pos(front, 1.5), yaw);
-        put(deck, pos(cc + side * 0.83, 0.9), yaw);
+        void (rng.chance(0.7) ? m : rng.pick(mats)); // 旧: 画面・看板の色の抽選（乱数列を以前と揃えるため引くだけ。色は画面の絵で決まる）
+        // 正面 = 通路側（side の向き）。alongX なら ±z、そうでなければ ±x
+        const facing = alongX ? (side > 0 ? 0 : Math.PI) : side * Math.PI / 2;
+        put(cabinetAt(pos(bc, 0)), pos(bc, 0), facing);
         count++;
       }
     }
   }
-  commit(L, body, deck, ...Object.values(screens), ...Object.values(marquee));
+  commit(L, ...cabinets);
   L.render = { ...(L.render ?? {}), wetness: Math.max(L.render?.wetness ?? 0, 0.3) };
   signOnWall(L, innerFaces(c.rects), c.sockets, 'GAME CENTER', { y: Math.min(c.h - 0.5, 2.4), width: 2.0, prefer: [0, 1, 3], kind: 'emissive', color: 0xff5a68, background: 0x140a12 });
 }

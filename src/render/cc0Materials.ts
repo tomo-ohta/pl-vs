@@ -61,6 +61,8 @@ export interface Cc0IndexEntry {
   kind?: 'ambientcg' | 'polyhaven';
   source?: string;
   license?: string;
+  /** KTX2（Basis ETC1S）版のパス（tools/build-ktx2.mjs。color / normal / roughness が揃ったセットだけ）。無ければ JPEG を読む */
+  ktx2?: { color: string; normal: string; roughness: string; ao?: string; displacement?: string };
 }
 export type Cc0Index = Record<string, Cc0IndexEntry>;
 
@@ -168,6 +170,18 @@ export const CC0_VARIANTS: Partial<Record<MatId, Cc0Variant[]>> = {
     { set: 'Plaster007', meters: 2, tint: [.22, .18, .22] },
     { set: 'PaintedPlaster010', meters: 2, tint: [.48, .47, .7], note: '錆色の塗装漆喰を暗く' },
     { set: 'Concrete046', meters: 2, tint: [.18, .15, .2], note: 'コンクリートを暗く' },
+  ],
+  // 住宅の外壁: 提供素材（AI 生成。assets/generated/1.、tools/build-user-materials.mjs）の日本の窯業系サイディング・タイル・吹付け。1 枚 = 2 m 四方
+  sidingWood: [
+    { set: 'JP_SidingWoodWhite', meters: 2, tint: [1, 1, 1], note: '木目調サイディング（白）' },
+    { set: 'JP_SidingStoneGrey', meters: 2, tint: [1, 1, 1], note: '石目調サイディング（明るい灰）' },
+    { set: 'JP_TileBrickBeige', meters: 2, tint: [1, 1, 1], note: 'タイル調サイディング（ベージュ）' },
+    { set: 'JP_Fukitsuke', meters: 2, tint: [1, 1, 1], note: 'モルタル吹付け（白）' },
+    { set: 'WoodSiding013', meters: 2, tint: [1.5, 1.48, 1.42], note: '木の板張り（灰褐色。CC0）' },
+  ],
+  sidingMetal: [
+    { set: 'JP_SidingRibbedBrown', meters: 2, tint: [1, 1, 1], note: '縦リブのサイディング（焦げ茶）' },
+    { set: 'CorrugatedSteel005', meters: 1.5, tint: [1, 1, 1], note: 'トタンの波板（CC0）' },
   ],
   wallBrick: [{ set: 'Bricks101', meters: 1, tint: [.93, .87, .93], blend: BRICK, parallax: .01, note: '煉瓦 約 4 個 × 12 段 ≈ 1 m' }],
   columnConcrete: [

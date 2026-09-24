@@ -69,8 +69,11 @@ export class PlayerFlashlight {
    *   3 m 以内で強度を距離の 1.8 乗で落とす（0.5 m で 7%、1 m で 14%、2 m で 48%）。変化は 0.12 s で追従
    */
   update(camera: THREE.Camera, dt: number, enabled: boolean, low = false, hitDistance = Infinity): void {
-    this.light.visible = enabled;
-    if (!enabled) { this.reset(); return; }
+    // 消灯は強度 0 と影マップの更新停止で表す（visible = false にすると numSpotLights / 影の本数が変わり、見えている全材質の
+    // シェーダが作り直される。R キーの切り替えやタイトル画面からの開始で 100 ms 級の停止になっていた）
+    this.light.visible = true;
+    this.light.shadow.autoUpdate = enabled;
+    if (!enabled) { this.light.intensity = 0; this.reset(); return; }
     const step = Math.min(Math.max(dt, 0), .05);
     const distance = this.previous.distanceTo(camera.position);
     if (!this.initialized || distance > 3) {

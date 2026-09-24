@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { bevelRadius, chamferBoxGeometry } from './ChamferBox';
 import type { Box, LightingOverrides, MatId, RoomLayout } from '../generators/layout';
 import { inFootprint } from '../generators/footprint';
 import { SURFACES } from './MaterialLibrary';
@@ -12,16 +13,16 @@ import {
 
 /** Original collision boxes are untouched. Only the render mesh receives bevels.
  *  opts.legacy: 面取り・テッセレーション無し（RenderStyle legacy） */
-/** 面取り（RoundedBox）にする材質か。RoomBuilder はこの材質の箱をチャンク格子で分割しない（継ぎ目に角が出るため） */
-export function isBevelMat(mat: string): boolean {
-  return /^(door|furniture|shelf|boxCardboard|metal|column|carPaint|carGlass)/.test(mat);
-}
+export { isBevelMat, setBevelQuality, bevelRadius, type BevelQuality } from './ChamferBox';
 
 export function surfaceBox(b: Box, opts?: { legacy?: boolean }): THREE.BufferGeometry {
   const size = b.max.map((v, i) => v - b.min[i]);
-  const bevel = !opts?.legacy && isBevelMat(b.mat) && Math.min(...size) > .08;
-  const g = bevel
-    ? new RoundedBoxGeometry(size[0], size[1], size[2], 1, Math.min(b.mat === 'carPaint' || b.mat === 'carGlass' ? .13 : .018, Math.min(...size) * .2))
+  const r = opts?.legacy ? 0 : bevelRadius(b.mat, size);
+  const g = r > 0
+    ? b.mat === 'carPaint' || b.mat === 'carGlass'
+      // 車体は大きな丸みを分割無しの RoundedBox のまま（carGlass は下で台形に絞る）
+      ? new RoundedBoxGeometry(size[0], size[1], size[2], 1, r)
+      : chamferBoxGeometry(size[0], size[1], size[2], r)
     : opts?.legacy
       ? new THREE.BoxGeometry(size[0], size[1], size[2])
       : new THREE.BoxGeometry(size[0], size[1], size[2], Math.max(1, Math.min(40, Math.ceil(size[0] / 1.25))), Math.max(1, Math.min(40, Math.ceil(size[1] / 1.25))), Math.max(1, Math.min(40, Math.ceil(size[2] / 1.25))));

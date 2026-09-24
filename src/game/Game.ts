@@ -209,6 +209,10 @@ export class RoomSwitchProfiler {
 
 /** スマホの描画の上限（Hz）。撮像プリセット tape / homeVideo は表示を 24〜30 fps に間引くので、それ以上描いても見えない */
 const MOBILE_RENDER_HZ = 30;
+/** 開扉を待っている間の分割構築の予算（ms / フレーム） */
+const DOOR_WAIT_BUILD_BUDGET_MS = 40;
+/** 開扉を待つ上限（ms）。これを過ぎたら同期構築して開ける */
+const DOOR_WAIT_MAX_MS = 1500;
 /** スマホの部屋の分割構築に 1 フレームで使う時間（ms。PC は RoomStreamingManager.BUILD_BUDGET_MS = 24） */
 const MOBILE_BUILD_BUDGET_MS = 8;
 
@@ -272,6 +276,12 @@ export class Game {
   private readonly menuEl = document.getElementById('menu')!;
   private readonly startEl = document.getElementById('start')!;
   private debugOn = false;
+  /** 入室後に接続先を確定する隣接部屋（stepPrepareQueue が 1 フレーム 1 部屋） */
+  private prepareQueue: string[] = [];
+  /** 見えるようになった / 開ける扉の向こうの未構築の部屋: 接続先を確定してから構築の先頭へ（prepareQueue より先に処理） */
+  private connectQueue: string[] = [];
+  /** 構築待ちで開扉を保留している扉（toggleDoor → updateDoorWait）。1 つだけ */
+  private doorWait: { roomId: string; portalId: string; portal: Portal; target: string; since: number } | null = null;
   /** スマホの描画間引き（stepBody）: 前回描画からの経過秒 */
   private renderAcc = 0;
   // 半球光は一様な照度で焼き込みの明暗（器具の間・突き当たりの沈み）を埋めるので弱く（0.32 → 0.06）
@@ -396,6 +406,7 @@ export class Game {
     this.world = new WorldManager(new RoomGraph(seed));
     this.registerWorldHooks();
     this.streaming = new RoomStreamingManager(this.scene, this.builder, this.world);
+    this.prepareQueue = []; this.connectQueue = []; this.doorWait = null;
     const start = this.world.createStartRoom();
     // 入口ソケットの 1.5m 内側から開始（外接矩形の中心は折れ廊下では部屋の外になり得る）
     const sp = this.world.spawnPointOf(start);
@@ -411,6 +422,7 @@ export class Game {
     this.world = new WorldManager(RoomGraph.fromJSON(d.graph));
     this.registerWorldHooks();
     this.streaming = new RoomStreamingManager(this.scene, this.builder, this.world);
+    this.prepareQueue = []; this.connectQueue = []; this.doorWait = null;
     this.player.teleport(d.player.pos, d.player.yaw);
     this.player.pitch = d.player.pitch;
     this.currentRoomId = null;
@@ -506,9 +518,12 @@ export class Game {
     // 見えている部屋（構築済み）と訪問済みの部屋は凍結し、新しい開口を追加しない。
     // 構築待ち（後回し・分割構築の途中）の部屋も含める: 従来は入室までに 1 部屋 / フレームで構築が終わっていたので凍結されていた。
     // 分割構築で構築が入室に間に合わなくても世界の生成結果（tryNewExit の対象）が変わらないようにする
-    this.world.frozen = new Set<string>([roomId, ...this.streaming.built.keys(), ...this.streaming.pendingIds, ...[...this.world.graph.nodes.values()].filter((n) => n.visited).map((n) => n.roomId)]);
-    // 入室時: 現在の部屋と隣接部屋の接続先を確定（2 hop 先まで配置）
-    this.world.prepareRoom(roomId);
+    this.world.frozen = this.frozenSet(roomId);
+    // 入室時: 現在の部屋の接続先を確定（1 hop を配置）。隣接部屋の接続先（2 hop 先の配置 = WorldManager.prepareRoom の後半）は
+    // 入室の瞬間には要らない（使うのは隣の部屋の扉を開けるとき）ので、stepPrepareQueue が次のフレームから 1 部屋ずつ行う
+    // （入室時の 50〜130 ms の停止対策。順序と凍結の基準は prepareRoom と同じ）
+    this.world.ensureNeighbors(roomId);
+    this.prepareQueue = this.world.graph.placedNeighbors(roomId);
     // 通過した扉に時刻を記録（自動閉扉）
     if (prev) {
       const now = performance.now() / 1000;
@@ -592,10 +607,13 @@ export class Game {
     }
     // いま見える部屋（現在 + 開いた扉・ガラス・通路の先）だけ同期的に構築し、閉じた扉の先は次のフレーム以降に 1 部屋ずつ構築する
     // （入室時のフリーズを分散。扉を開けた瞬間は ensurePrepared が同期構築する）
-    const visibleNow = new Set<string>([this.currentRoomId, ...this.seeThroughReach()]);
+    // 同期で構築するのは今いる部屋だけ。開いた扉・通路の先に見える部屋は後回し構築の先頭に（見えている部屋は通常すでに構築済み）
+    const visibleNow = new Set<string>(this.seeThroughReach());
     this.streaming.dropPending(keep);
+    this.streaming.ensure(this.currentRoomId);
     for (const id of keep) {
-      if (visibleNow.has(id)) this.streaming.ensure(id);
+      if (id === this.currentRoomId) continue;
+      if (visibleNow.has(id)) this.streaming.prioritize(id);
       else this.streaming.enqueue(id);
     }
     this.streaming.disposeExcept(keep);
@@ -734,12 +752,14 @@ export class Game {
     const visible = new Set<string>([this.currentRoomId]);
     for (const id of this.seeThroughReach()) {
       visible.add(id);
-      // 見えるはずの部屋が未構築なら（扉を開けた直後など）接続を確定してから構築する
-      if (!this.streaming.built.has(id)) this.ensurePrepared(id);
+      // 見えるはずの部屋が未構築なら接続を確定し、後回し構築の先頭へ（同期構築しない。構築が済むと表示される）。
+      // 扉を開けた直後の向こうの部屋は toggleDoor が構築を待ってから開けるので、ここに来るのは 2 部屋以上先の部屋
+      if (!this.streaming.built.has(id)) this.prepareDeferred(id);
     }
     for (const [id, b] of this.streaming.built) {
       const wasVisible = b.group.visible;
-      b.group.visible = visible.has(id);
+      // 見えるようになった部屋は、シェーダの非同期コンパイルが済んでから出す（今いる部屋・既に見えていた部屋は待たない）
+      b.group.visible = visible.has(id) && (wasVisible || id === this.currentRoomId || this.streaming.isCompiled(id));
       // 見えるようになった部屋のライトマップ反映を先に（待ち行列の優先度 0）
       if (b.group.visible && !wasVisible && b.lightmap?.upload) this.materials.uploads.promote(b.lightmap.texture, 0);
       // 扉は所有部屋が非表示でも、反対側の部屋が見えていれば描く（裏から見て真っ暗にならない）
@@ -867,6 +887,59 @@ export class Game {
    * 扉パネルへの操作（E / タップ）。施錠・Modifier の拒否・乗車・Seam 遷移・通常の開閉を扱う。
    * 開発用スクリプトからも呼べる（interactRay と同じ経路。開扉の停止時間は switchProfiler に 'door' として残る）
    */
+  /** 新しい開口を追加しない部屋: 現在 + 構築済み + 構築待ち + 訪問済み（enterRoom と stepPrepareQueue で共通） */
+  private frozenSet(roomId: string): Set<string> {
+    return new Set<string>([roomId, ...this.streaming.built.keys(), ...this.streaming.pendingIds, ...[...this.world.graph.nodes.values()].filter((n) => n.visited).map((n) => n.roomId)]);
+  }
+
+  /** enterRoom が後回しにした隣接部屋の接続先の確定を 1 部屋だけ進める。全部済んだら 2 hop 先の先読みをやり直す */
+  private stepPrepareQueue(): number {
+    const t0 = performance.now();
+    const urgent = this.connectQueue.shift();
+    const id = urgent ?? this.prepareQueue.shift();
+    if (!id || !this.currentRoomId) return 0;
+    if (!this.world.graph.has(id)) return performance.now() - t0;
+    this.world.frozen = this.frozenSet(this.currentRoomId);
+    if (urgent) {
+      // ensurePrepared の前半と同じ（未構築なら接続先を確定し、開口が変わった部屋を作り直す）→ 構築の先頭へ
+      this.prepareConnections(id);
+      this.streaming.prioritize(id);
+      return performance.now() - t0;
+    }
+    this.world.ensureNeighbors(id);
+    // 開口が変わるのは凍結外（未構築）の部屋だけなので、作り直しは起きない想定。念のため refreshStreaming と同じ後始末をする
+    for (const d of [...this.world.dirty]) {
+      if (d === this.currentRoomId) continue;
+      const b = this.streaming.built.get(d);
+      if (b && b.group.visible) this.streaming.rebuild(d);
+      else this.streaming.evict(d);
+      this.world.dirty.delete(d);
+    }
+    if (!this.prepareQueue.length) {
+      this.updateVisibility();
+      this.prefetchAhead();
+    }
+    return performance.now() - t0;
+  }
+
+  /** 保留中の開扉: 向こうの部屋の構築が済んだら開ける。DOOR_WAIT_MAX_MS を過ぎたら同期で構築して開ける（保険） */
+  private updateDoorWait(): void {
+    const w = this.doorWait;
+    if (!w) return;
+    if (!this.world.graph.has(w.target) || w.portal.open) { this.doorWait = null; return; }
+    // 構築に加えてシェーダの非同期コンパイルも待つ（開けた直後の初回描画で同期コンパイルの停止が出ないように）
+    const ready = this.streaming.isCompiled(w.target);
+    if (!ready && performance.now() - w.since < DOOR_WAIT_MAX_MS) {
+      // 接続先の確定待ちの間は構築に回さない（確定後に stepPrepareQueue が先頭へ入れる）
+      if (!this.connectQueue.includes(w.target)) this.streaming.prioritize(w.target);
+      return;
+    }
+    this.connectQueue = this.connectQueue.filter((id) => id !== w.target);
+    this.doorWait = null;
+    if (!this.streaming.built.has(w.target)) this.ensurePrepared(w.target);
+    this.toggleDoor(w.roomId, w.portalId);
+  }
+
   toggleDoor(roomId: string, portalId: string): void {
     const portal = this.ownerPortal(roomId, portalId);
     const owner = this.ownerRoom(roomId, portalId);
@@ -899,6 +972,17 @@ export class Game {
       });
       return;
     }
+    // 開ける扉の向こうが未構築なら、構築を後回し構築の先頭に回し、構築が済んでから開ける（stepBody の updateDoorWait）。
+    // 同期構築（部屋により 40〜300 ms）の停止を、取っ手を回す程度の間（通常 0.1〜0.4 s）に置き換える
+    // 待つのはプレイヤーから見た向こう側（戻り側の扉を開けたときは所有側の部屋）
+    const farSide = owner.roomId === roomId ? portal.targetRoomId : owner.roomId;
+    if (!portal.open && farSide && this.world.graph.has(farSide) && !this.streaming.isCompiled(farSide) && L2_FLAGS.split) {
+      if (this.doorWait?.portal === portal) return; // 連打
+      this.prepareDeferred(farSide, true);
+      this.doorWait = { roomId, portalId, portal, target: farSide, since: performance.now() };
+      return;
+    }
+    this.doorWait = null;
     portal.open = !portal.open;
     if (!portal.open) portal.passedAt = undefined;
     this.audio.door(portal.open ? 'open' : 'close', doorMat, door?.center);
@@ -926,6 +1010,25 @@ export class Game {
    * 生の layout で構築すると後で prune / 床穴撤去 → rebuild が起きて目の前で部屋が変わる。先に接続先を確定してから構築する
    */
   private ensurePrepared(roomId: string): void {
+    this.prepareConnections(roomId);
+    this.streaming.ensure(roomId);
+  }
+
+  /**
+   * ensurePrepared の前半（接続先の確定と、それで開口が変わった部屋の作り直し / 破棄）だけを行い、構築は後回し構築の先頭に回す。
+   * 見えるようになった部屋・扉の向こうの部屋を同期構築せずに済ませる（扉を開けた瞬間の 100〜300 ms の停止対策）。
+   * 構築が済むと stepBody が updateVisibility を呼び、その時点で表示される
+   */
+  private prepareDeferred(roomId: string, first = false): void {
+    if (this.streaming.isBuiltOrQueued(roomId)) { this.streaming.prioritize(roomId); return; }
+    // 接続先の確定（1 部屋 20〜80 ms）もその場ではせず、stepPrepareQueue の先頭へ。確定したら構築の先頭に回す
+    const i = this.connectQueue.indexOf(roomId);
+    if (i >= 0 && !first) return;
+    if (i >= 0) this.connectQueue.splice(i, 1);
+    if (first) this.connectQueue.unshift(roomId); else this.connectQueue.push(roomId);
+  }
+
+  private prepareConnections(roomId: string): void {
     if (!this.streaming.built.has(roomId)) {
       this.world.ensureNeighbors(roomId);
       for (const id of [...this.world.dirty]) {
@@ -937,7 +1040,6 @@ export class Game {
         this.world.dirty.delete(id);
       }
     }
-    this.streaming.ensure(roomId);
   }
 
   /** 生の（戻り側を所有側に解決する前の）Portal が施錠されているか */
@@ -1344,7 +1446,7 @@ export class Game {
    */
   perf(): ReturnType<PostFX['timer']['stats']> & { pipeline: string; shadows: number; roomSwitch: ReturnType<RoomSwitchProfiler['summary']>; uploadsPending: number } {
     this.postfx.timer.poll();
-    return { ...this.postfx.timer.stats(), pipeline: this.postfx.describe(), shadows: (this.streaming?.shadowCount ?? 0) + Number(this.flashlight.light.visible && this.flashlight.light.castShadow), roomSwitch: this.switchProfiler.summary(), uploadsPending: this.materials.uploads.pending };
+    return { ...this.postfx.timer.stats(), pipeline: this.postfx.describe(), shadows: (this.streaming?.shadowCount ?? 0) + Number(this.flashlight.light.intensity > 0 && this.flashlight.light.castShadow), roomSwitch: this.switchProfiler.summary(), uploadsPending: this.materials.uploads.pending };
   }
 
   private autoQuality(dt: number): void {
@@ -1442,8 +1544,16 @@ export class Game {
       }
       // 後回しにした隣接部屋をフレーム予算の範囲で構築し（大きな部屋は複数フレームに分割）、新しい材質のシェーダは
       // 実描画と同じ条件（composer の RenderTarget）で非同期にコンパイルしておく
-      const buildBudget = L2_FLAGS.split ? (IS_MOBILE ? MOBILE_BUILD_BUDGET_MS : RoomStreamingManager.BUILD_BUDGET_MS) : 4;
-      if (this.streaming.pendingCount > 0 && this.streaming.buildPending(buildBudget) > 0) this.updateVisibility();
+      // 接続先の確定（後回し分）を先に 1 部屋。使った時間は分割構築の予算から引く（同じフレームに重ねない）
+      const prepMs = this.state === 'playing' ? this.stepPrepareQueue() : 0;
+      // 開扉を待っている間は予算を増やして早く終える（それでも 1 フレームの上限は保つ）
+      const urgent = !!this.doorWait;
+      const buildBudget = L2_FLAGS.split
+        ? (IS_MOBILE ? (urgent ? MOBILE_BUILD_BUDGET_MS * 2 : MOBILE_BUILD_BUDGET_MS) : (urgent ? DOOR_WAIT_BUILD_BUDGET_MS : RoomStreamingManager.BUILD_BUDGET_MS))
+        : 4;
+      if (this.streaming.pendingCount > 0 && this.streaming.buildPending(Math.max(4, buildBudget - prepMs)) > 0) this.updateVisibility();
+      this.updateDoorWait();
+      if (this.streaming.consumeCompiled()) this.updateVisibility();
       this.streaming.precompile(this.renderer, this.camera, this.compileRenderTarget(), this.tier);
       this.streaming.updateChunks(this.camera.position, this.tier.fogFar);
       this.streaming.updateLights(this.camera.position, this.tier, dt);

@@ -21,7 +21,11 @@ export type MatId =
   | 'lightGreen' | 'lightYellow' | 'screenGlow' | 'skyOvercast' | 'skyDusk' | 'skyNoon'
   | 'waterShallow' | 'waterWall' | 'puddle' | 'shadowDecal' | 'untextured'
   | 'floorAsphalt' | 'wallBrick' | 'windowLit' | 'windowDark' | 'sodiumLight' | 'signPlate' | 'signEmissive'
-  | 'ice' | 'snow' | 'grass';
+  | 'ice' | 'snow' | 'grass'
+  // 住宅街の外壁（第15回。提供素材の日本の外壁 + ambientCG）。屋内の壁と材質を分ける
+  | 'sidingWood' | 'sidingMetal'
+  // 提供素材の段積み画像（public/textures/generated）: ゲーム筐体の画面・机上 CRT の画面・自販機の缶（第16回）
+  | 'screenArcade' | 'screenPc' | 'canLabel';
 
 export interface Box {
   min: Vec3;
@@ -41,6 +45,8 @@ export interface Box {
   vehicle?: { id: string; body: boolean };
   /** 複数箱から成る鉢植えの表示用グループ。 */
   propGroup?: string;
+  /** 電車の車体（見た目専用。RoomBuilder が src/render/TrainGeometry.ts で 1 両を組む。局所系の向きは trainSpecFor で作る） */
+  train?: { alongX: boolean; platform: 1 | -1; head: 1 | -1 | 0 };
 }
 
 export interface LightSpec {
@@ -91,6 +97,14 @@ export interface InstanceSpec {
   transforms: { pos: Vec3; yaw: number; scale?: number }[];
   /** true なら各インスタンスの AABB をコライダにする */
   solid?: boolean;
+  /**
+   * 箱の代わりにコード生成の家電を描く（src/render/props/ApplianceGeometry.ts。正面 = 局所 +z、原点 = 底面の中心、size = [幅, 高さ, 奥行き]）。
+   * mat は本体の材質、accent は発光部（画面・看板・商品窓の奥）
+   */
+  shape?: 'vending' | 'washer' | 'dryer' | 'crtPc' | 'arcade';
+  accent?: MatId;
+  /** 画面の絵の番号（arcade = ゲーム画面 0..7、crtPc = パソコン画面 0..3、vending = 缶の並びの組 0..3）。無ければ従来の無地の発光 */
+  screen?: number;
 }
 
 export type ParticleType = 'steam' | 'mist' | 'rain' | 'snow' | 'dust';
@@ -448,4 +462,21 @@ export function floorWithHoles(out: Box[], x0: number, z0: number, x1: number, z
 
 export function ceiling(out: Box[], x0: number, z0: number, x1: number, z1: number, h: number, mat: MatId, thickness = 0.2): void {
   out.push(box([x0, h, z0], [x1, h + thickness, z1], mat));
+}
+
+/**
+ * L.instances に入った spec を、画面の絵の番号ごとの spec に分ける（家電は材質ごとの InstancedMesh なので、絵ごとにジオメトリの UV が違う）。
+ * 番号 −1 は絵なし（従来の accent のまま）。台ごとの選択は位置のハッシュ（乱数列を使わない）
+ */
+export function splitScreens(L: RoomLayout, spec: InstanceSpec, screens: readonly number[]): void {
+  const list = L.instances ?? [];
+  const at = list.indexOf(spec);
+  if (at < 0) return;
+  const parts = screens.map((n) => ({ ...spec, transforms: [] as InstanceSpec['transforms'], ...(n >= 0 ? { screen: n } : {}) }));
+  for (const t of spec.transforms) {
+    let h = (Math.round(t.pos[0] * 100) * 73856093) ^ (Math.round(t.pos[2] * 100) * 19349663);
+    h = Math.imul(h ^ (h >>> 13), 0x5bd1e995);
+    parts[Math.floor((((h ^ (h >>> 15)) >>> 0) / 4294967296) * parts.length)].transforms.push(t);
+  }
+  list.splice(at, 1, ...parts.filter((p) => p.transforms.length));
 }

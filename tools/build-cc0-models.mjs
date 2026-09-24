@@ -7,9 +7,13 @@
  *   size / triangles は glTF の accessor min/max とノード変換から計算した実寸（part 指定があればそのノードだけ）。
  *   PropCatalog はこの値でモデル選択（スケール判定・三角形予算）を glTF 読込前に済ませる。
  *
+ * テクスチャは KTX2（ETC1S + mipmap、上下反転なし = glTF の規約）も書き出し、glTF の textures に KHR_texture_basisu を足す
+ * （元の JPEG は source に残す = KTX2 を読めないローダーは JPEG を使う。extensionsRequired には入れない）。`--no-ktx2` で従来どおり。
+ *
  * 使い方: node tools/build-cc0-models.mjs   （package.json: npm run build:cc0:models）
  */
 import fs from 'node:fs';
+import { cleanupTmp, encodeFile } from './ktx2-lib.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,6 +22,7 @@ const srcRoot = path.join(root, 'assets', 'cc0');
 const outRoot = path.join(root, 'public', 'cc0', 'models');
 const manifestPath = path.join(srcRoot, 'manifest.json');
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+const WITH_KTX2 = !process.argv.includes('--no-ktx2');
 
 /** 複数体がまとまったモデルから 1 体だけ使う（ノード名の正規表現。PropCatalog も同じ式でフィルタする） */
 const PARTS = {
@@ -54,8 +59,7 @@ for (const id of ids) {
   const dstDir = path.join(outRoot, id);
   fs.mkdirSync(path.join(dstDir, 'textures'), { recursive: true });
   const gltf = JSON.parse(fs.readFileSync(gltfSrc, 'utf8'));
-  // glTF 本体
-  copy(gltfSrc, path.join(dstDir, path.basename(gltfSrc)));
+  // glTF 本体は画像の後で（KTX2 の参照を足して）書く
   // バッファ
   for (const b of gltf.buffers ?? []) {
     if (!b.uri || b.uri.startsWith('data:')) continue;
@@ -69,6 +73,8 @@ for (const id of ids) {
     if (!cand) { console.warn(`  ${id}: image missing ${im.uri}`); continue; }
     copy(cand, path.join(dstDir, im.uri));
   }
+  if (WITH_KTX2) await addKtx2(gltf, dstDir);
+  fs.writeFileSync(path.join(dstDir, path.basename(gltfSrc)), JSON.stringify(gltf));
   const part = PARTS[id];
   const stats = measure(gltf, part ? new RegExp(part) : null);
   index[id] = {
@@ -82,7 +88,43 @@ for (const id of ids) {
   };
 }
 fs.writeFileSync(path.join(outRoot, 'index.json'), JSON.stringify(index, null, 1));
+cleanupTmp();
 console.log(`wrote ${Object.keys(index).length} models (${copied} files, ${(bytes / 1e6).toFixed(1)} MB) → ${path.relative(root, outRoot)}/index.json`);
+
+/**
+ * 各テクスチャの画像を KTX2 にして images に足し、textures[i].extensions.KHR_texture_basisu.source で参照する。
+ * 用途は Poly Haven の命名（_diff_ = 色 / _nor_gl_ = 法線 / それ以外 = 線形の補助）と、材質の参照先（baseColor / normal）で決める
+ */
+async function addKtx2(gltf, dstDir) {
+  const images = gltf.images ?? [];
+  const kindOf = new Map();
+  for (const m of gltf.materials ?? []) {
+    const pbr = m.pbrMetallicRoughness ?? {};
+    if (pbr.baseColorTexture) kindOf.set(pbr.baseColorTexture.index, 'color');
+    if (m.emissiveTexture) kindOf.set(m.emissiveTexture.index, 'color');
+    if (m.normalTexture) kindOf.set(m.normalTexture.index, 'normal');
+  }
+  const made = new Map();
+  (gltf.textures ?? []).forEach((t, ti) => {
+    if (t.source === undefined || t.extensions?.KHR_texture_basisu) return;
+    const im = images[t.source];
+    if (!im?.uri || im.uri.startsWith('data:')) return;
+    const kind = kindOf.get(ti) ?? (/_diff_|_col_|basecolor/i.test(im.uri) ? 'color' : /_nor/i.test(im.uri) ? 'normal' : 'aux');
+    made.set(ti, { uri: im.uri, kind });
+  });
+  for (const [ti, { uri, kind }] of made) {
+    const src = path.join(dstDir, uri);
+    const outUri = uri.replace(/\.[a-z0-9]+$/i, '.ktx2');
+    const dst = path.join(dstDir, outUri);
+    if (!fs.existsSync(dst) || fs.statSync(dst).mtimeMs < fs.statSync(src).mtimeMs) fs.writeFileSync(dst, await encodeFile(src, kind, { yFlip: false }));
+    bytes += fs.statSync(dst).size;
+    let idx = images.findIndex((x) => x.uri === outUri);
+    if (idx < 0) { images.push({ uri: outUri, mimeType: 'image/ktx2' }); idx = images.length - 1; }
+    gltf.textures[ti].extensions = { ...(gltf.textures[ti].extensions ?? {}), KHR_texture_basisu: { source: idx } };
+  }
+  gltf.images = images;
+  if (made.size) gltf.extensionsUsed = [...new Set([...(gltf.extensionsUsed ?? []), 'KHR_texture_basisu'])];
+}
 
 function copy(src, dst) {
   const s = fs.statSync(src);

@@ -28,7 +28,7 @@ camera.position.set(100, 2, 100); camera.rotation.y = Math.PI;
 torch.update(camera, 1 / 60, true, true);
 assert(direction().angleTo(new THREE.Vector3(0, 0, 1)) < .004, 'Teleport must clear stale aim');
 torch.update(camera, 1 / 60, false);
-assert(!torch.light.visible);
+assert(torch.light.visible && torch.light.intensity === 0 && !torch.light.shadow.autoUpdate, 'Disabled torch stays in the light count (no program rebuild) but emits nothing');
 torch.dispose();
 assert.equal(scene.children.length, 0, 'Disposal must release light and target');
 console.log('Flashlight: bounded lag, settling, walking sway, pause, teleport, disable and disposal passed');
