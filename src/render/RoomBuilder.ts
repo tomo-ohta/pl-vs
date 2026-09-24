@@ -30,6 +30,8 @@ import { surfaceBox, applyMetricUV, isBevelMat, setBevelQuality, SurfaceLighting
 import { attachWindowRoom, WINDOW_ROOM_MATS } from './WindowRoom';
 import { trainSurfaces } from './TrainGeometry';
 import { applianceMats, buildAppliance } from './props/ApplianceGeometry';
+import { wheatClumpGeometry } from './Wheat';
+import { excludeFromOverridePasses } from './OverridePassExclusion';
 import { appliancesFromBoxes } from './props/ApplianceFromBoxes';
 import { allocateLightmapAtlas, createLightmapTexture, InstanceLighting, isLightmapTarget, LIGHTMAP_FADE_MS, LightmapBaker, LightmapSampler, lightmapsSupported, startLightmapCrossfade, writeConstantUV1, writeLightmapUV, type LightmapJobHandle } from './Lightmap';
 import { vehicleSurfaces, foliageGeometry, grassGeometry } from './ObjectGeometry';
@@ -334,7 +336,7 @@ export class RoomBuilder {
     for (const d of layout.decals ?? []) if (tier.decals && SURFACES[decalMat(d)]) shared.add(untextured ? 'untextured' : decalMat(d));
     for (const d of layout.dynamics ?? []) if (SURFACES[d.box.mat]) shared.add(untextured ? 'untextured' : d.box.mat);
     for (const i of layout.instances ?? []) {
-      if (i.shape && !untextured) for (const m of applianceMats(i.shape, { body: i.mat, accent: i.accent, screen: i.screen })) instanced.add(m);
+      if (i.shape && !untextured) for (const m of applianceMats(i.shape, { body: i.mat, accent: i.accent, screen: i.screen, variant: i.variant })) instanced.add(m);
       else if (SURFACES[i.mat]) instanced.add(untextured ? 'untextured' : i.mat);
     }
     // 箱のグループから置き換える家電（ApplianceFromBoxes）の材質も事前コンパイルの対象に
@@ -950,8 +952,10 @@ export class RoomBuilder {
     const baseBox: Box={ min: [-sx / 2, 0, -sz / 2], max: [sx / 2, sy, sz / 2], mat: spec.mat, solid: false };
     // 形: 家電のコード生成（shape。材質ごとに複数の InstancedMesh）/ 植栽 / 箱
     const bases: { geo: THREE.BufferGeometry; mat: MatId }[] = spec.shape && !legacy
-      ? [...buildAppliance(spec.shape, spec.size, { body: spec.mat, accent: spec.accent, screen: spec.screen })].map(([mat, geo]) => ({ geo, mat }))
-      : [{ geo: botanical && spec.mat === 'grass' ? grassGeometry(baseBox,tier.id==='low'?.5:1) : botanical ? foliageGeometry(baseBox, tier.id === 'low' ? .3 : .65, Math.max(12,Math.floor(150000/(picked.length*12)))) : surfaceBox(baseBox, { legacy }), mat: botanical ? 'plantLeaf' : spec.mat }];
+      ? [...buildAppliance(spec.shape, spec.size, { body: spec.mat, accent: spec.accent, screen: spec.screen, variant: spec.variant })].map(([mat, geo]) => ({ geo, mat }))
+      : spec.mat === 'wheat' && !legacy
+        ? [{ geo: wheatClumpGeometry(), mat: 'wheat' }]
+        : [{ geo: botanical && spec.mat === 'grass' ? grassGeometry(baseBox,tier.id==='low'?.5:1) : botanical ? foliageGeometry(baseBox, tier.id === 'low' ? .3 : .65, Math.max(12,Math.floor(150000/(picked.length*12)))) : surfaceBox(baseBox, { legacy }), mat: botanical ? 'plantLeaf' : spec.mat }];
     let total = 0;
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -964,6 +968,7 @@ export class RoomBuilder {
       // ライトマップ到着後の足元サンプル用: [x, 底面 y, z, 半幅 x, 半幅 z]（yaw を含む AABB の半幅）
       const probes = new Float32Array(list.length * 5);
       const mesh = new THREE.InstancedMesh(geo, materialFor(base.mat), list.length);
+      if (base.mat === 'wheat' && !legacy) excludeFromOverridePasses(mesh); // 切り抜きの板は AO / 深度の補助パスに写さない
       list.forEach((t, i) => {
         const s = t.scale ?? 1;
         pos.set(t.pos[0], t.pos[1], t.pos[2]);

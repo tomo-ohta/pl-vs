@@ -16,6 +16,7 @@ import { box, WALL_T, type Box, type GenParams, type InstanceSpec, type MatId, t
 import { inner, type Rect } from '../footprint';
 import { alongFace, doorZones, freeRuns, hitsZone, innerFaces, insideRects, signAt, signOnWall, type Face } from '../furniture';
 import { boxesOverlap, wallBands } from '../common';
+import { EXHIBIT_CAPTIONS, EXHIBIT_KINDS, EXHIBIT_SIZE, type ExhibitKind } from '../exhibits';
 
 /** 1 InstanceSpec あたりの上限（暴走防止。Tier 間引きは RoomBuilder 側） */
 const MAX_INST = 3000;
@@ -905,7 +906,12 @@ function dressR11(c: Ctx): void {
 }
 
 // ---------------------------------------------------------------- R12 日用品博物館（RoomGenerator Gallery）
-/** 壁を暗く、島の台と壁沿いの台にガラスケース（中は日用品: ケトル・椅子・電話・バケツ）、真上に小さなスポット、壁の英文 */
+/**
+ * 壁を暗く、島の台と壁沿いの台にガラスケース。中の日用品はコード生成の展示品（InstanceSpec.shape 'exhibit'、variant = 品目。
+ * src/render/props/MuseumObjects.ts: ケトル・黒電話・トランジスタラジオ・バケツ・樹脂の椅子・扇風機・炊飯器・アイロン・卓上ライト・
+ * 目覚まし時計・魔法瓶）。品目は部屋ごとに並べ替えた順に割り当て（同じ物が続かない）、ケースに入らない物（椅子）は次の品目へ。
+ * 展示品は正面を通路（島は部屋の中心、壁沿いは室内）へ向け、フェルトの敷板の上に置く。真上に小さなスポット、壁沿いは英文の説明
+ */
 function dressR12(c: Ctx): void {
   const { L, h, rng } = c;
   recolorShell(L, { wall: 'wallDark' });
@@ -915,40 +921,52 @@ function dressR12(c: Ctx): void {
   }
   recolorPanels(L, 'lightOff', false);
   for (const l of L.lights) { l.intensity *= 0.45; l.color = 0xffe0b0; }
-  const objects = ['kettle', 'chair', 'phone', 'bucket', 'kettle', 'radio'];
-  const captions: Record<string, string> = { kettle: 'KETTLE, c. 1998', chair: 'CHAIR, MOULDED PLASTIC', phone: 'TELEPHONE, ROTARY', bucket: 'BUCKET, 10 L', radio: 'RADIO, TRANSISTOR' };
-  let spots = 0;
-  const exhibit = (cx: number, cz: number, top: number, kind: string) => {
-    const B = L.boxes;
-    switch (kind) {
-      case 'kettle':
-        B.push(box([cx - 0.13, top, cz - 0.13], [cx + 0.13, top + 0.22, cz + 0.13], 'stainless', false));
-        B.push(box([cx + 0.12, top + 0.1, cz - 0.03], [cx + 0.24, top + 0.2, cz + 0.03], 'stainless', false));
-        B.push(box([cx - 0.03, top + 0.22, cz - 0.03], [cx + 0.03, top + 0.27, cz + 0.03], 'metalDark', false));
-        break;
-      case 'chair':
-        B.push(box([cx - 0.19, top + 0.36, cz - 0.19], [cx + 0.19, top + 0.4, cz + 0.19], 'plasticYellow', false));
-        B.push(box([cx - 0.19, top + 0.4, cz - 0.19], [cx + 0.19, top + 0.78, cz - 0.15], 'plasticYellow', false));
-        B.push(box([cx - 0.03, top, cz - 0.03], [cx + 0.03, top + 0.36, cz + 0.03], 'metalDark', false));
-        break;
-      case 'phone':
-        B.push(box([cx - 0.12, top, cz - 0.1], [cx + 0.12, top + 0.1, cz + 0.1], 'plasticRed', false));
-        B.push(box([cx - 0.13, top + 0.1, cz - 0.03], [cx + 0.13, top + 0.15, cz + 0.03], 'plasticRed', false));
-        break;
-      case 'bucket':
-        B.push(box([cx - 0.15, top, cz - 0.15], [cx + 0.15, top + 0.32, cz + 0.15], 'plasticBlue', false));
-        break;
-      default:
-        B.push(box([cx - 0.16, top, cz - 0.07], [cx + 0.16, top + 0.2, cz + 0.07], 'furnitureDark', false));
-        B.push(box([cx - 0.14, top + 0.06, cz + 0.07], [cx + 0.02, top + 0.16, cz + 0.076], 'metal', false));
-        break;
+  const order = rng.shuffle([...EXHIBIT_KINDS]);
+  const specs = new Map<ExhibitKind, InstanceSpec>();
+  let next = 0;
+  /** ケースの内寸（幅 × 奥行き × 高さ）に入る品目を順番に選ぶ */
+  const pick = (w: number, d: number, hh: number): ExhibitKind | null => {
+    for (let k = 0; k < order.length; k++) {
+      const kind = order[(next + k) % order.length];
+      const [sx, sy, sz] = EXHIBIT_SIZE[kind];
+      const fits = Math.max(sx, sz) <= Math.min(w, d) - 0.04 || (sx <= w - 0.04 && sz <= d - 0.04);
+      if (fits && sy <= hh - 0.05) { next = (next + k + 1) % order.length; return kind; }
     }
+    return null;
+  };
+  let spots = 0;
+  /**
+   * 展示: フェルトの敷板 → 小さな物は白い台座で持ち上げる（品目の上端がケースの床 + riseTo 前後になる高さ。ケースの天井から 0.15 m は空ける）→
+   * 品目、手前に説明札（小さな板を斜めに立てた代わりの薄箱）
+   */
+  const exhibit = (cx: number, cz: number, top: number, kind: ExhibitKind, yaw: number, w: number, d: number, caseH: number, riseTo: number) => {
+    L.boxes.push(box([cx - w / 2 + 0.02, top, cz - d / 2 + 0.02], [cx + w / 2 - 0.02, top + 0.012, cz + d / 2 - 0.02], 'whiteFabric', false));
+    const [sx, sy, sz] = EXHIBIT_SIZE[kind];
+    const riser = Math.max(0, Math.min(riseTo - sy, caseH - 0.15 - sy));
+    let y = top + 0.012;
+    // 正面方向（yaw の +z）と横方向
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    if (riser > 0.05) {
+      const hx = Math.min(w / 2 - 0.08, Math.max(sx, sz) / 2 + 0.05), hz = Math.min(d / 2 - 0.08, Math.max(sx, sz) / 2 + 0.05);
+      L.boxes.push(box([cx - hx, y, cz - hz], [cx + hx, y + riser, cz + hz], 'paintWhite', false));
+      y += riser;
+    }
+    // 説明札: 台座（無ければ品目）の手前、敷板の上
+    const reach = Math.max(sx, sz) / 2 + 0.1;
+    const px = cx + fx * Math.min(reach, (Math.abs(fx) > 0.5 ? w : d) / 2 - 0.06), pz = cz + fz * Math.min(reach, (Math.abs(fx) > 0.5 ? w : d) / 2 - 0.06);
+    const pw = Math.abs(fx) > 0.5 ? [0.035, 0.07] : [0.07, 0.035];
+    L.boxes.push(box([px - pw[0], top + 0.012, pz - pw[1]], [px + pw[0], top + 0.03, pz + pw[1]], 'signPlate', false));
+    let sp = specs.get(kind);
+    if (!sp) { sp = { mat: 'furnitureDark', size: EXHIBIT_SIZE[kind], transforms: [], shape: 'exhibit', variant: kind }; specs.set(kind, sp); }
+    sp.transforms.push({ pos: [cx, y, cz], yaw });
     if (spots < 24) {
       // スポット（下向きの小さな面光源。0.14 角では焼き込みがほぼ見えなかったので 0.3 角）
       L.boxes.push(box([cx - 0.15, h - 0.06, cz - 0.15], [cx + 0.15, h - 0.02, cz + 0.15], 'lightWarm', false));
       spots++;
     }
   };
+  const r0 = c.rects[0];
+  const mid: [number, number] = r0 ? [(r0.x0 + r0.x1) / 2, (r0.z0 + r0.z1) / 2] : [0, 0];
   // 島（patternIslands の furnitureLight）→ 暗い台 + ガラスケース
   let islands = 0;
   for (let i = c.start; i < L.boxes.length && islands < 14; i++) {
@@ -961,8 +979,13 @@ function dressR12(c: Ctx): void {
     const hw = Math.min(0.45, (b.max[0] - b.min[0]) / 2 - 0.1);
     const hd = Math.min(0.45, (b.max[2] - b.min[2]) / 2 - 0.1);
     if (hw < 0.2 || hd < 0.2) continue;
+    const kind = pick(hw * 2, hd * 2, 0.9);
+    if (!kind) continue;
     L.boxes.push(box([cx - hw, top, cz - hd], [cx + hw, top + 0.9, cz + hd], 'glass', false));
-    exhibit(cx, cz, top, rng.pick(objects));
+    // 正面は部屋の中心へ（軸に揃えた 4 方向）
+    const dx = mid[0] - cx, dz = mid[1] - cz;
+    const yaw = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? Math.PI / 2 : -Math.PI / 2) : (dz > 0 ? 0 : Math.PI);
+    exhibit(cx, cz, top, kind, yaw, hw * 2, hd * 2, 0.9, Math.max(0.3, 1.25 - top));
     islands++;
   }
   // 壁沿いの台（4 m ごと）+ 説明文
@@ -972,16 +995,20 @@ function dressR12(c: Ctx): void {
       for (let t = a0 + 1.5; t < a1 - 1.5 && wallCases < 8; t += 4.0) {
         const plinth = alongFace(f, t - 0.5, 1.0, 0.05, 0.65, 0, 0.9, 'furnitureDark', true);
         if (!canPlace(c, plinth, { lanes: false, gap: 0.3 })) continue;
+        const kind = pick(0.84, 0.44, 0.85);
+        if (!kind) continue;
         L.boxes.push(plinth);
         L.boxes.push(alongFace(f, t - 0.42, 0.84, 0.13, 0.57, 0.9, 1.75, 'glass', false));
-        const kind = rng.pick(objects);
         const center = onFace(f, t, 0.35, 0.9);
-        exhibit(center[0], center[2], 0.9, kind);
-        signAt(L, f, t, 1.98, 0.7, captions[kind] ?? kind, { color: 0xe8e4d8, background: 0x1c1c22 });
+        const yaw = f.horizontal ? (f.inward > 0 ? 0 : Math.PI) : f.inward * Math.PI / 2;
+        // 壁沿いは幅 0.84 × 奥行き 0.44（面の向きで x / z が入れ替わる）
+        exhibit(center[0], center[2], 0.9, kind, yaw, f.horizontal ? 0.84 : 0.44, f.horizontal ? 0.44 : 0.84, 0.85, 0.45);
+        signAt(L, f, t, 1.98, 0.7, EXHIBIT_CAPTIONS[kind], { color: 0xe8e4d8, background: 0x1c1c22 });
         wallCases++;
       }
     }
   }
+  commit(L, ...specs.values());
   signOnWall(L, innerFaces(c.rects), c.sockets, 'THE MUSEUM OF ORDINARY THINGS', { y: Math.min(h - 0.5, 2.3), width: 2.8, prefer: [0, 1, 3], color: 0xe8e4d8, background: 0x1c1c22, sub: '日用品博物館' });
   L.palette.light = 'lightOff';
   L.palette.ambient = 0x35343a;

@@ -82,7 +82,8 @@ function blankProductLabels(L: RoomLayout, rng: Rng): void {
   if (machines.length === 0) {
     // 自販機が無い（代替部屋など）: 空き壁に 2 台
     for (const slot of blankWallSlots(L, { width: 1.0, height: 1.9, y: 0.95, clearance: 0.5, depth: 1.0, spacing: 1.6 }).slice(0, 2)) {
-      const body = innerBand(slot.pos, slot.dir, -0.45, 0.45, 0, 1.9, 0, 0.9, 'furnitureDark', true);
+      // kind 'vending' を付ける（描画側 ApplianceFromBoxes が自販機の形に置き換える。無いと暗い箱 + 発光箔のまま描かれていた）
+      const body: Box = { ...innerBand(slot.pos, slot.dir, -0.45, 0.45, 0, 1.9, 0, 0.9, 'furnitureDark', true), kind: 'vending' };
       if (!canPlaceSolid(L, body)) continue;
       const face = opposite(slot.dir);
       L.boxes.push(body);

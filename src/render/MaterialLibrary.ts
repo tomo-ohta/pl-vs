@@ -29,6 +29,7 @@ import * as THREE from 'three';
 import { addSurfaceAppearance, usesSurfaceVariation, usesSurfaceWear, SURFACE_VARIATION_KEY } from './SurfaceAppearance';
 import { addSurfaceGrime, grimeClass } from './SurfaceGrime';
 import { addWindowRoom, WINDOW_ROOM_MATS, type WindowRoomPhoto } from './WindowRoom';
+import { createWheatTexture, WHEAT_WIND_GLSL } from './Wheat';
 import { createSurfaceMaps, hasAuthoredDetail, type DetailKind } from './SurfaceDetail';
 import { ImageRequestQueue } from './textureQueue';
 import { CC0_INDEX_FILE, CC0_MATERIALS_URL, CC0_SMALL_MATERIALS_URL, CC0_VARIANTS, DEFAULT_BLEND, TONE_TABLE, variantHash, type Cc0Index, type Cc0IndexEntry, type Cc0Variant } from './cc0Materials';
@@ -94,6 +95,8 @@ interface Surface {
   water?: WaterSpec;
   /** 提供素材の段積み画像（public/textures/generated/<atlas>）を map（と発光）に使う。UV はジオメトリが段のマスを指す（繰り返さない） */
   atlas?: GeneratedAtlas;
+  /** 切り抜きの板（alphaTest + alphaToCoverage、両面、風の揺れ）。絵は手続きで描く（'wheat' = src/render/Wheat.ts） */
+  cutout?: 'wheat';
 }
 /** tools/build-generated-textures.mjs が作る段積み画像 */
 type GeneratedAtlas = 'screens-arcade' | 'screens-pc' | 'cans';
@@ -118,8 +121,9 @@ export const SURFACES: Record<MatId, Surface> = {
   doorWood: { texture: 'wood', color: 0xb09576, meters: 1.1, roughness: .43, bump: .0008 },
   doorMetal: { detail: 'paint', albedo: false, texture: 'metal', color: 0xaab5ae, meters: 1, roughness: .46, bump: .001, metalness: 0 },
   trim: { texture: 'wood', color: 0x776653, meters: 1.1, roughness: .43, bump: .002 },
-  // 通常の窓・扉ガラス: 透過 + 弱い反射、金属度 0（拡散板 lightPanel 系とは別定義。texture は albedo:false なので使わない）
-  glass: { detail: 'glass', albedo: false, texture: 'diffuser', color: 0xdce8e4, meters: .35, roughness: .06, bump: .0002, metalness: 0, opacity: .2, glass: { transmission: .9, ior: 1.5, thickness: .01, reflect: 1.6 } },
+  // 通常の窓・扉ガラス: 透過 + 弱い反射、金属度 0（拡散板 lightPanel 系とは別定義。texture は albedo:false なので使わない）。
+  // 反射 1.6 では天井の器具の映り込みが HDR 0.8（露出後ほぼ白）になり、夜景の窓の上半分が白く飛んでいた（C09）ので 0.6
+  glass: { detail: 'glass', albedo: false, texture: 'diffuser', color: 0xdce8e4, meters: .35, roughness: .06, bump: .0002, metalness: 0, opacity: .2, glass: { transmission: .9, ior: 1.5, thickness: .01, reflect: .6 } },
   lightPanel: { texture: 'diffuser', color: 0xedf0d9, meters: .24, roughness: .45, bump: .001, emission: 2.5 },
   lightWarm: { texture: 'diffuser', color: 0xffd29a, meters: .24, roughness: .45, bump: .001, emission: 2.3 },
   lightOff: { texture: 'diffuser', color: 0x979c8f, meters: .24, roughness: .6, bump: .001 },
@@ -193,6 +197,9 @@ export const SURFACES: Record<MatId, Surface> = {
   screenPc: { texture: 'diffuser', color: 0x2a2a2a, emissiveColor: 0xffffff, meters: 1, roughness: .18, bump: 0, emission: 1.0, atlas: 'screens-pc' },
   // 自販機の缶のラベル（奥の発光パネルに照らされる分を弱い発光で足す）
   canLabel: { texture: 'diffuser', color: 0xffffff, emissiveColor: 0xffffff, meters: 1, roughness: .3, bump: 0, metalness: .25, emission: .35, atlas: 'cans' },
+  // 麦の株（L03）: 板の絵は茎・葉・穂・芒（Wheat.ts）。弱い自己発光（絵 × 0.14）で高い天井灯だけの暗い倉庫でも金色が沈まない。
+  // legacy / untextured は従来どおり color の箱
+  wheat: { texture: 'foliage', color: 0xd4b060, emissiveColor: 0xffffff, meters: 1, roughness: .85, bump: 0, emission: .14, doubleSide: true, cutout: 'wheat' },
   /** 偽の空（FakeSky）。天井箔として貼る。両面・大きなパターン */
   // 空箔（FakeSky）: 'diffuser' は拡散板の格子が空に見えないため、生成した低周波ノイズ 'sky'（雲の濃淡）を 40 m で貼る（FakeSky が offset を流す）
   skyOvercast: { texture: 'sky', color: 0xb9c0c8, meters: 40, roughness: 1, bump: 0, emission: 1.1, doubleSide: true },
@@ -215,7 +222,7 @@ export const SURFACES: Record<MatId, Surface> = {
   sidingMetal: { texture: 'metal', color: 0xa9aca9, meters: 1.5, roughness: .55, bump: .01, metalness: .25 },
   windowLit: { texture: 'diffuser', color: 0xffd9a0, meters: .6, roughness: .3, bump: .0005, emission: 1.8 },
   // 外から見た消灯した窓: 暗い室内（透過は僅か）+ 反射が主
-  windowDark: { detail: 'glass', albedo: false, texture: 'metal', color: 0x1a2024, meters: 1, roughness: .08, bump: .0001, metalness: 0, glass: { transmission: .2, ior: 1.5, thickness: .02, reflect: 2.2 } },
+  windowDark: { detail: 'glass', albedo: false, texture: 'metal', color: 0x1a2024, meters: 1, roughness: .08, bump: .0001, metalness: 0, glass: { transmission: .2, ior: 1.5, thickness: .02, reflect: 1.2 } },
   /** ナトリウム灯（街灯）。橙色の発光 */
   sodiumLight: { texture: 'diffuser', color: 0xffa040, meters: .24, roughness: .4, bump: .001, emission: 2.8 },
   signPlate: { texture: 'linoleum', color: 0xf0f0e8, meters: .5, roughness: .5, bump: .001 },
@@ -951,7 +958,8 @@ export class MaterialLibrary {
     // 夜景（windowNight）: 1 枚貼りではなく、面の奥に置いた層（遠景 45 m / 近景 12 m）を視線で視差サンプルして発光にする（legacy / untextured は従来の 1 枚貼り）
     const night = s.texture === 'night' && !flat && !legacy;
     const atlas = s.atlas && !flat && !legacy ? this.generatedAtlas(s.atlas) : null;
-    const map = night ? null : atlas ? atlas : cc0 ? (cc0Albedo ? cc0.color : null) : flat || s.albedo===false ? null : legacy ? this.legacyTexture(s.texture) : this.textures.get(s.texture);
+    const cutout = s.cutout && !flat && !legacy ? this.cutoutTexture(s.cutout) : null;
+    const map = night ? null : cutout ? cutout : atlas ? atlas : cc0 ? (cc0Albedo ? cc0.color : null) : flat || s.albedo===false ? null : legacy ? this.legacyTexture(s.texture) : this.textures.get(s.texture);
     const detail = flat || legacy || cc0 ? undefined : this.dataTextures.get(s.detail??s.texture);
     // CC0 の Roughness はそのまま roughnessMap に（係数 1 × 部屋別の倍率）。生成側は従来の s.roughness × 倍率
     const roughness = Math.max(.04, Math.min(1, (cc0 ? 1 : s.roughness) * (o.roughnessScale ?? 1)));
@@ -981,6 +989,20 @@ export class MaterialLibrary {
       polygonOffset: !!s.decal, polygonOffsetFactor: s.decal ? -2 : 0, polygonOffsetUnits: s.decal ? -2 : 0,
     });
     if (fogSpec) m.fog = false; // 部屋固有の霧を材質側で計算する（scene.fog を無視）
+    if (cutout) {
+      // 切り抜きの板: 絵の色をそのまま（色は白）、細部のデータテクスチャ（法線・粗さ・AO）は使わない。MSAA では縁を被覆率で滑らかに
+      m.color.set(0xffffff);
+      m.normalMap = null; m.roughnessMap = null; m.aoMap = null;
+      m.alphaTest = 0.4; m.alphaToCoverage = true;
+      m.side = THREE.DoubleSide;
+    }
+    if (cutout) {
+      // 切り抜きの板: 絵の色をそのまま（色は白）、細部のデータテクスチャ（法線・粗さ・AO）は使わない。MSAA では縁を被覆率で滑らかに
+      m.color.set(0xffffff);
+      m.normalMap = null; m.roughnessMap = null; m.aoMap = null;
+      m.alphaTest = 0.4; m.alphaToCoverage = true;
+      m.side = THREE.DoubleSide;
+    }
     // 器具の発光面を部屋の器具色（palette.lightColor。P1 の色温度）に合わせる: 発光色 × 正規化 tint（明るさは変えない）
     if (o.lightTint !== undefined && s.emission && !legacy && !s.atlas) m.emissive.multiply(normalizedTint(o.lightTint)); // 画面の絵・缶は器具の色に染めない
     const gradient = o.gradient;
@@ -1053,6 +1075,12 @@ export class MaterialLibrary {
   }
 }
 #include <opaque_fragment>`);
+      }
+      if (cutout && s.cutout === 'wheat') {
+        // 麦の揺れ（頂点の高さ² × 株の位置の位相）
+        shader.uniforms.surfaceTime = this.clock;
+        shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float surfaceTime;');
+        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n${WHEAT_WIND_GLSL}`);
       }
       if (s.flow && !flat) {
         shader.uniforms.surfaceTime = this.clock;
@@ -1154,8 +1182,19 @@ vNightPhase = fract(sin(dot(nightCell, vec2(12.9898, 78.233))) * 43758.5453);`);
     const family = flat ? 'flat' : legacy ? 'legacy' : cc0 ? (cc0Albedo ? 'cc0' : 'cc0paint') : authored ? 'authored' : 'plain';
     // physical の種類（glass / water / gloss / carPaint）は three 側のキー（clearcoat / transmission の有無）で分かれるが、可読性のため明示する
     const phys = !physical ? '' : waterSpec ? (waterSpec.depthFromFloor ? '-water-depth' : '-water') : s.glass ? '-glass' : s.gloss ? '-gloss' : '-coat';
-    m.customProgramCacheKey = () => `liminal-pbr-v4-grime:${grime ?? 'none'}${winRoom ? '-winroom' : ''}-${varied || worn ? SURFACE_VARIATION_KEY : 'plain'}-${varied ? 'macro' : 'nomacro'}-${family}-${blendParams ? 'tile' : 'notile'}-${pom ? 'pom' : 'nopom'}-${s.flow && !flat ? 'flow' : 'static'}-${s.grid && !flat && !legacy && !cc0 ? s.grid.join(',') : 'nogrid'}-${gradient ? 'grad' : 'nograd'}-${fogSpec ? 'roomfog' : 'scenefog'}${night ? '-night' : ''}${phys}${s.texture === 'water' && !flat && !legacy ? '-water' : ''}`;
+    m.customProgramCacheKey = () => `liminal-pbr-v4-grime:${grime ?? 'none'}${winRoom ? '-winroom' : ''}-${varied || worn ? SURFACE_VARIATION_KEY : 'plain'}-${varied ? 'macro' : 'nomacro'}-${family}-${blendParams ? 'tile' : 'notile'}-${pom ? 'pom' : 'nopom'}-${s.flow && !flat ? 'flow' : 'static'}-${s.grid && !flat && !legacy && !cc0 ? s.grid.join(',') : 'nogrid'}-${gradient ? 'grad' : 'nograd'}-${fogSpec ? 'roomfog' : 'scenefog'}${night ? '-night' : ''}${phys}${s.texture === 'water' && !flat && !legacy ? '-water' : ''}${cutout ? `-cutout-${s.cutout}` : ''}`;
     return m;
+  }
+
+  /** 切り抜きの板の絵（起動後 1 回だけ描く。document が無い環境では null = 板は色だけ） */
+  private readonly cutoutCache = new Map<string, THREE.Texture | null>();
+  private cutoutTexture(kind: 'wheat'): THREE.Texture | null {
+    if (!this.cutoutCache.has(kind)) {
+      const t = createWheatTexture();
+      if (t) { t.anisotropy = Math.min(4, this.anisotropy); this.track(t); }
+      this.cutoutCache.set(kind, t);
+    }
+    return this.cutoutCache.get(kind) ?? null;
   }
 
   /**
@@ -1272,10 +1311,13 @@ vNightPhase = fract(sin(dot(nightCell, vec2(12.9898, 78.233))) * 43758.5453);`);
     shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 bakedLight; varying vec3 vBakedLight; varying vec3 vRoomPos; varying float vRoomFogDepth;');
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvBakedLight = bakedLight;\nvRoomPos = transformed;');
     shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvRoomFogDepth = -mvPosition.z;');
-    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vBakedLight; varying vec3 vRoomPos; varying float vRoomFogDepth; uniform int surfaceDiagnostic; uniform vec3 colorMask; uniform float liminalIblDiffuse; uniform float liminalDirectDiffuse;');
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vBakedLight; varying vec3 vRoomPos; varying float vRoomFogDepth; uniform int surfaceDiagnostic; uniform vec3 colorMask; uniform float liminalIblDiffuse; uniform float liminalDirectDiffuse;\n' + SPEC_CAP_GLSL);
     // 環境マップの拡散（一様な照度）は焼き込みと二重になるので倍率を掛ける（lights_fragment_maps で iblIrradiance が決まった直後）
     shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\niblIrradiance *= liminalIblDiffuse;');
-    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\nreflectedLight.directDiffuse *= liminalDirectDiffuse;\nreflectedLight.indirectDiffuse += ${c.baked} * BRDF_Lambert( diffuseColor.rgb );`);
+    // 鏡面反射（動的光 + 環境マップ）は膝 SPEC_KNEE から上を SPEC_MAX へ柔らかく頭打ち。懐中電灯は視線と同軸なので、ガラス・艶床・画面・水に
+    // 正対すると GGX の峰（粗さ 0.1 で数千倍）がそのまま映り、環境マップの器具も粗さ 0.06 のガラスには点のまま映る。
+    // それが にじみ（glow / ハレーション）で大きな白い円になっていた（C09 の夜景窓・L04 の床・展示ケース）
+    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\nreflectedLight.directDiffuse *= liminalDirectDiffuse;\nreflectedLight.directSpecular = liminalSpecCap(reflectedLight.directSpecular);\nreflectedLight.indirectSpecular = liminalSpecCap(reflectedLight.indirectSpecular);\n#ifdef USE_CLEARCOAT\nclearcoatSpecularDirect = liminalSpecCap(clearcoatSpecularDirect);\nclearcoatSpecularIndirect = liminalSpecCap(clearcoatSpecularIndirect);\n#endif\nreflectedLight.indirectDiffuse += ${c.baked} * BRDF_Lambert( diffuseColor.rgb );`);
     // 色マスク（ColorMissing）は map_fragment の直後（diffuseColor 確定後）
     shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= colorMask;');
     // 色マスクは発光にも掛ける（ColorMissing E20 で発光箔・サインの欠損チャンネルだけが残らないように。uniform は同じ）
@@ -1814,6 +1856,10 @@ function isBigImage(image: TexImageSource | null | undefined): boolean {
   return w * h >= 768 * 768;
 }
 
+/** 鏡面反射（動的光・環境マップ）の頭打ち（線形 HDR、露出前）: SPEC_KNEE までそのまま、その上は SPEC_MAX に漸近。色相は保つ */
+const SPEC_KNEE = 0.4, SPEC_MAX = 1.0;
+const SPEC_CAP_GLSL = `vec3 liminalSpecCap(vec3 s) { float m = max(max(s.r, s.g), s.b); if (m <= ${SPEC_KNEE.toFixed(2)}) return s; float e = m - ${SPEC_KNEE.toFixed(2)}; float c = ${SPEC_KNEE.toFixed(2)} + e / (1.0 + e / ${(SPEC_MAX - SPEC_KNEE).toFixed(2)}); return s * (c / m); }`;
+
 /**
  * 圧縮テクスチャ（KTX2Loader の CompressedTexture、または既に写した Texture）の中身を dst へ写す。src が圧縮でなければ何もしない。
  * Cc0Set の元テクスチャは 1 px の仮画像で作った THREE.Texture で、派生 clone が Source を共有しているため、型は変えずに
@@ -2148,7 +2194,13 @@ vec3 liminalNight() {
     vec4 nearL = texture2D(nightNear, uvn);
     col = mix(col, nearL.rgb, nearL.a);
   }
-  return pow(col, vec3(2.2));
+  vec3 lin = pow(col, vec3(2.2));
+  // 写真の月・近い街灯（白く潰れた円）は線形 0.25 から上を 0.55 へ頭打ち（発光 1.15 × 露出でも にじみの閾値 0.8 に届かない。街の灯は点として残る）
+  if (nightPhoto > 0.5) {
+    float m = max(max(lin.r, lin.g), lin.b);
+    if (m > 0.25) { float e = m - 0.25; lin *= (0.25 + e / (1.0 + e / 0.3)) / m; }
+  }
+  return lin;
 }`;
 
 interface NightLayers { far: { value: THREE.Texture }; near: { value: THREE.Texture }; photo: { value: number }; bands: { value: number } }

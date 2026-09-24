@@ -16,14 +16,17 @@ import { CONTENT_ODDITIES } from './contents';
 import { SURFACE_ODDITIES } from './surfaces';
 import { TRACE_ODDITIES } from './traces';
 import { SPACE_ODDITIES, isLargeEmpty } from './space';
-import { monument } from './monument';
+import { fillOpenSpace, monument, placeGiantMonument } from './monument';
+import { DISORDER_ODDITIES } from './disorder';
 
 export interface OddRecord { theme: string | null; accents: string[]; notes: string[] }
 export type OddLayout = RoomLayout & { oddity?: OddRecord };
 
 const DISABLED = typeof window !== 'undefined' && typeof window.location !== 'undefined' && new URLSearchParams(window.location.search).has('noodd');
+/** 開発用: `?odd=<id>`（例 disorder.scatter）でその奇妙さを主題として必ず試す（撮影・確認用） */
+const FORCED = typeof window !== 'undefined' && typeof window.location !== 'undefined' ? new URLSearchParams(window.location.search).get('odd') : null;
 
-export const ALL_ODDITIES: Oddity[] = [...LAYOUT_ODDITIES, ...CONTENT_ODDITIES, ...SURFACE_ODDITIES, ...TRACE_ODDITIES, ...SPACE_ODDITIES, monument];
+export const ALL_ODDITIES: Oddity[] = [...LAYOUT_ODDITIES, ...CONTENT_ODDITIES, ...SURFACE_ODDITIES, ...TRACE_ODDITIES, ...SPACE_ODDITIES, monument, ...DISORDER_ODDITIES];
 
 /** 希少度ごとの予算 */
 const BUDGET: Record<string, { normal: number; theme: number; accents: [number, number] }> = {
@@ -43,13 +46,18 @@ export function applyOddity(L: RoomLayout, p: GenParams): void {
   const rec: OddRecord = { theme: null, accents: [], notes: [] };
   (L as OddLayout).oddity = rec;
   const c = ctxOf(L, p, rng);
+  // 広い部屋の中央の巨大モニュメント（Legendary は必ず、他は大部屋で 5 割。正常判定より先 = 「正常な部屋」でも置く）
+  if (placeGiantMonument(c)) rec.notes.push('giant monument');
   // 広くて空の部屋（Legendary / Mythic 以外）は「ただの広い空間」にしない: 正常判定を飛ばし、space の主題を必ず 1 つ入れる
   const exemptWide = p.def.rarity === 'Legendary' || p.def.rarity === 'Mythic';
   const largeEmpty = !exemptWide && isLargeEmpty(c);
-  if (!largeEmpty && rng.chance(budget.normal)) { rec.notes.push('normal room'); return; }
+  if (!FORCED && !largeEmpty && rng.chance(budget.normal)) { rec.notes.push('normal room'); fillOpenSpace(c); rec.notes.push(...c.notes); return; }
   const used = new Set<OddCategory>();
   // 主題
-  if (largeEmpty) {
+  const forced = FORCED ? ALL_ODDITIES.find((o) => o.id === FORCED) : undefined;
+  if (forced) {
+    rec.theme = tryApply(c, [forced], 'strong', used);
+  } else if (largeEmpty) {
     rec.theme = tryApply(c, [...SPACE_ODDITIES, monument], 'strong', used) ?? tryApply(c, ALL_ODDITIES.filter((o) => o.theme), 'strong', used);
     rec.notes.push('large empty room');
   } else if (rng.chance(budget.theme)) {
@@ -62,6 +70,8 @@ export function applyOddity(L: RoomLayout, p: GenParams): void {
     const id = tryApply(c, ALL_ODDITIES.filter((o) => !used.has(o.category)), 'weak', used);
     if (id) rec.accents.push(id);
   }
+  // 広く空いた床のモニュメント（主題・添え物とは別枠）
+  fillOpenSpace(c);
   rec.notes.push(...c.notes);
 }
 

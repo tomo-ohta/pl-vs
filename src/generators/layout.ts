@@ -25,7 +25,9 @@ export type MatId =
   // 住宅街の外壁（第15回。提供素材の日本の外壁 + ambientCG）。屋内の壁と材質を分ける
   | 'sidingWood' | 'sidingMetal'
   // 提供素材の段積み画像（public/textures/generated）: ゲーム筐体の画面・机上 CRT の画面・自販機の缶（第16回）
-  | 'screenArcade' | 'screenPc' | 'canLabel';
+  | 'screenArcade' | 'screenPc' | 'canLabel'
+  // 麦の株（L03。切り抜きの板 3 枚 + 風。src/render/Wheat.ts）（第17回）
+  | 'wheat';
 
 export interface Box {
   min: Vec3;
@@ -101,8 +103,10 @@ export interface InstanceSpec {
    * 箱の代わりにコード生成の家電を描く（src/render/props/ApplianceGeometry.ts。正面 = 局所 +z、原点 = 底面の中心、size = [幅, 高さ, 奥行き]）。
    * mat は本体の材質、accent は発光部（画面・看板・商品窓の奥）
    */
-  shape?: 'vending' | 'washer' | 'dryer' | 'crtPc' | 'arcade';
+  shape?: 'vending' | 'washer' | 'dryer' | 'crtPc' | 'arcade' | 'exhibit';
   accent?: MatId;
+  /** shape 'exhibit' の品目（src/render/props/MuseumObjects.ts の ExhibitKind: 'kettle' / 'phone' / …） */
+  variant?: string;
   /** 画面の絵の番号（arcade = ゲーム画面 0..7、crtPc = パソコン画面 0..3、vending = 缶の並びの組 0..3）。無ければ従来の無地の発光 */
   screen?: number;
 }

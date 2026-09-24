@@ -49,8 +49,9 @@ export class Hud {
     return !this.debug.hidden;
   }
 
+  /** 左上の部屋名・レア度・発見数は常に表示（第17回でユーザー指示により、デバッグ HUD 限定から戻した） */
   private syncInfo(): void {
-    for (const el of this.info) el.hidden = this.debug.hidden;
+    for (const el of this.info) el.hidden = false;
   }
 }
 

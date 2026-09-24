@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MatId } from '../../generators/layout';
 import { chamferBoxGeometry } from '../ChamferBox';
+import { buildExhibit, isExhibitKind } from './MuseumObjects';
 
 /**
  * 家電のコード生成（見た目専用。当たり判定は生成器の箱のまま）。InstanceSpec.shape（並べる物は InstancedMesh で 1 台分の形を共有）と、
@@ -17,7 +18,7 @@ import { chamferBoxGeometry } from '../ChamferBox';
  * - arcade: ゲーム筐体。側面の輪郭（足元の蹴込み・操作盤の張り出し・傾いた画面・看板の庇）を押し出した本体、画面・看板（accent の発光）、
  *   レバー（軸 + 玉）とボタン 4 つ、コイン扉（投入口の赤い灯）
  */
-export type ApplianceShape = 'vending' | 'washer' | 'dryer' | 'crtPc' | 'arcade';
+export type ApplianceShape = 'vending' | 'washer' | 'dryer' | 'crtPc' | 'arcade' | 'exhibit';
 
 export interface ApplianceOptions {
   /** 本体の材質（既定は種類ごと） */
@@ -26,6 +27,8 @@ export interface ApplianceOptions {
   accent?: MatId;
   /** 画面の絵の番号（arcade 0..7 = screenArcade、crtPc 0..3 = screenPc、vending 0..3 = 缶 canLabel の並びの組）。無ければ無地 */
   screen?: number;
+  /** 'exhibit' の品目（MuseumObjects.ts の ExhibitKind） */
+  variant?: string;
 }
 
 /** 段積み画像のマス（列 c・上からの段 r）へ、ジオメトリの UV（0..1）を写す。crop = 使う範囲 [u0, v0, u1, v1]（マス内の割合） */
@@ -68,7 +71,7 @@ function canUV(g: THREE.BufferGeometry, index: number): void {
 
 /** 種類ごとに使う材質（RoomBuilder.materialPlan の事前コンパイル用） */
 export function applianceMats(shape: ApplianceShape, o: ApplianceOptions = {}): MatId[] {
-  const parts = buildAppliance(shape, shape === 'crtPc' ? [0.42, 0.36, 0.4] : [0.9, 1.8, 0.8], o);
+  const parts = buildAppliance(shape, shape === 'crtPc' ? [0.42, 0.36, 0.4] : shape === 'exhibit' ? [0.3, 0.3, 0.3] : [0.9, 1.8, 0.8], o);
   const mats = [...parts.keys()];
   for (const g of parts.values()) g.dispose();
   return mats;
@@ -83,11 +86,12 @@ export function buildAppliance(shape: ApplianceShape, size: readonly number[], o
     case 'dryer': washer(K, w, h, d, true, o); break;
     case 'crtPc': crtPc(K, w, h, d, o); break;
     case 'arcade': arcade(K, w, h, d, o); break;
+    case 'exhibit': if (o.variant && isExhibitKind(o.variant)) buildExhibit(K, o.variant); break;
   }
   return K.done();
 }
 
-class Kit {
+export class Kit {
   private readonly parts = new Map<MatId, THREE.BufferGeometry[]>();
   add(g: THREE.BufferGeometry, mat: MatId): void {
     const flat = g.index ? g.toNonIndexed() : g;
@@ -150,6 +154,29 @@ class Kit {
     g.rotateX(-ang);
     const nz = Math.cos(ang), ny = Math.sin(ang); // 面の法線（正面寄り・上向き）
     g.translate(0, (yb + yt) / 2 + ny * off, (zb + zt) / 2 + nz * off);
+    this.add(g, mat);
+  }
+  /** y 軸まわりの回転体。pts = [半径, 高さ] の列（下 → 上）。c = 中心の移動量 */
+  lathe(pts: [number, number][], mat: MatId, seg = 20, c: readonly number[] = [0, 0, 0]): void {
+    const g = new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(Math.max(0, r), y)), seg);
+    g.translate(c[0], c[1], c[2]);
+    this.add(g, mat);
+  }
+  /** 点列を通る管（Catmull-Rom）。closed で輪 */
+  tube(pts: readonly (readonly number[])[], r: number, mat: MatId, seg = 16, radial = 6, closed = false): void {
+    const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(p[0], p[1], p[2])), closed);
+    this.add(new THREE.TubeGeometry(curve, seg, r, radial, closed), mat);
+  }
+  /** 水平な輪（y 軸まわり。中心 c）。arc で円弧 */
+  hring(r: number, tube: number, c: readonly number[], mat: MatId, seg = 20, arc = Math.PI * 2): void {
+    const g = new THREE.TorusGeometry(r, tube, 4, seg, arc);
+    g.rotateX(Math.PI / 2);
+    g.translate(c[0], c[1], c[2]);
+    this.add(g, mat);
+  }
+  /** 任意のジオメトリを変換して足す（f で回転・移動） */
+  geom(g: THREE.BufferGeometry, mat: MatId, f?: (g: THREE.BufferGeometry) => void): void {
+    f?.(g);
     this.add(g, mat);
   }
   done(): Map<MatId, THREE.BufferGeometry> {
@@ -225,9 +252,13 @@ function washer(K: Kit, w: number, h: number, d: number, dryer: boolean, o: Appl
   // 丸窓
   const cy = dryer ? h * 0.52 : h * 0.44, r = Math.min(w, h) * 0.27;
   K.ring(r, 0.022, [0, cy, fz + 0.012], 'stainless');
-  // 丸窓のガラスは描かない（透過ガラスは InstancedMesh で黒く塗れる）。縁の内側から奥のドラムが見える
-  K.cyl(r - 0.035, 0.14, 'z', [0, cy, fz - 0.07], 'metalDark', 16, true); // 奥のドラム（ガラス越しに見える筒）
-  K.disc(r - 0.035, [0, cy, fz - 0.139], 'shelfMetal', 16); // ドラムの底
+  // 丸窓: 本体は奥行きいっぱいの箱なので、窓は前面に重ねて描く（旧: 本体の中のドラムが前面に隠れ、枠の内側が本体の色のままだった）。
+  // 黒いゴムのパッキン → 暗い艶ガラス（screenDark。透過ガラスは InstancedMesh で黒く塗れるので使わない）→ ガラス越しのドラムの縁と、
+  // 底の穴あき板の影（少し明るい金属の輪と小さな円）
+  K.disc(r + 0.004, [0, cy, fz + 0.002], 'rubber', 24);
+  K.disc(r - 0.028, [0, cy, fz + 0.005], 'screenDark', 24);
+  K.ring(r * 0.66, 0.006, [0, cy, fz + 0.006], 'metalDark');
+  K.disc(r * 0.18, [0, cy - r * 0.08, fz + 0.0055], 'metalDark', 12);
   K.box(-r - 0.04, -r - 0.015, cy - 0.05, cy + 0.05, fz, fz + 0.02, 'metal'); // 蝶番
   K.box(r + 0.005, r + 0.03, cy - 0.03, cy + 0.03, fz, fz + 0.025, 'metalDark'); // 取っ手
   // 操作パネル（洗濯機は上、乾燥機は下）

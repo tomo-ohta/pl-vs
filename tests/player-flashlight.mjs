@@ -27,8 +27,13 @@ assert(direction().distanceTo(paused) < 1e-10, 'Menu pause must stop sway');
 camera.position.set(100, 2, 100); camera.rotation.y = Math.PI;
 torch.update(camera, 1 / 60, true, true);
 assert(direction().angleTo(new THREE.Vector3(0, 0, 1)) < .004, 'Teleport must clear stale aim');
+// 近接減光: 照らした面の照度（強度 / 距離²）は 4 m より近くで一定（壁・床に寄っても白く飛ばない）
+const illuminance = (d) => { for (let i = 0; i < 90; i++) torch.update(camera, 1 / 30, true, false, d); return torch.light.intensity / (d * d); };
+const e4 = illuminance(4), e1 = illuminance(1), e05 = illuminance(0.5);
+assert(Math.abs(e1 / e4 - 1) < 0.05 && Math.abs(e05 / e4 - 1) < 0.05, `Near surfaces must not get brighter (E 4 m ${e4.toFixed(2)}, 1 m ${e1.toFixed(2)}, 0.5 m ${e05.toFixed(2)})`);
+assert(e4 < 7, 'Illuminance at the reference distance stays moderate');
 torch.update(camera, 1 / 60, false);
 assert(torch.light.visible && torch.light.intensity === 0 && !torch.light.shadow.autoUpdate, 'Disabled torch stays in the light count (no program rebuild) but emits nothing');
 torch.dispose();
 assert.equal(scene.children.length, 0, 'Disposal must release light and target');
-console.log('Flashlight: bounded lag, settling, walking sway, pause, teleport, disable and disposal passed');
+console.log('Flashlight: bounded lag, settling, walking sway, pause, teleport, constant near illuminance, disable and disposal passed');

@@ -1364,6 +1364,9 @@ export class Game {
       }
       if (ok && t0 < best) best = t0;
     }
+    // 画面中央の深度（LensPass の統計。描かれている物すべて = 当たり判定の無い展示ケース・モニュメント・ガラス・麦も含む）の近い方
+    const lens = this.postfx.lensPass?.centerDistance;
+    if (lens !== undefined && Number.isFinite(lens) && lens > 0.05) best = Math.min(best, lens);
     return best >= 6 ? Infinity : best;
   }
 

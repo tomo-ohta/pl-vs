@@ -323,6 +323,7 @@ export function clearDoorways(L: RoomLayout, sockets: Socket[], fromIndex: numbe
     zones.push({ min: [cx - hx, s.pos[1] - 0.1, cz - hz], max: [cx + hx, s.pos[1] + 2.2, cz + hz] });
   }
   const keep: Box[] = L.boxes.slice(0, fromIndex);
+  const removed: Box[] = [];
   for (const b of L.boxes.slice(fromIndex)) {
     if (!b.solid) {
       keep.push(b);
@@ -330,6 +331,16 @@ export function clearDoorways(L: RoomLayout, sockets: Socket[], fromIndex: numbe
     }
     const hit = zones.some((z) => b.min[0] < z.max[0] && b.max[0] > z.min[0] && b.min[1] < z.max[1] && b.max[1] > z.min[1] && b.min[2] < z.max[2] && b.max[2] > z.min[2]);
     if (!hit) keep.push(b);
+    else removed.push(b);
+  }
+  // 取り除いた本体に付いていた非ソリッドの部品（前面の発光箔・取っ手・ラベルなど。同じ propGroup か、本体の外 6 cm 以内に
+  // 収まる箔）も捨てる。本体だけを消すと、自販機の前面箔が「ただの発光する板」として扉の前に残っていた（U04）
+  if (removed.length) {
+    const groups = new Set(removed.map((b) => b.propGroup).filter((g): g is string => !!g));
+    const attached = (b: Box) => (b.propGroup !== undefined && groups.has(b.propGroup))
+      || removed.some((r) => b.min[0] >= r.min[0] - 0.06 && b.max[0] <= r.max[0] + 0.06 && b.min[1] >= r.min[1] - 0.06 && b.max[1] <= r.max[1] + 0.06 && b.min[2] >= r.min[2] - 0.06 && b.max[2] <= r.max[2] + 0.06);
+    L.boxes = keep.filter((b, i) => i < fromIndex || b.solid || !attached(b));
+    return;
   }
   L.boxes = keep;
 }
