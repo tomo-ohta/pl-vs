@@ -59,7 +59,11 @@ import {
   doorMatOf, floorKindOf, isSfxKind, playDoor, playElevator, playFootstep, playLand, playNamed, playUi,
   type DoorMat, type DoorSfxKind, type ElevatorSfxKind, type FloorKind, type MoveRank, type SfxContext, type UiSfxKind,
 } from './Sfx';
+
 import { createShared, type LayerDest, type SharedSources } from './Synth';
+
+/** 全体音量の既定値（Settings の DEFAULT_SETTINGS.masterVolume と同じ）。ambientLevel の換算の基準 */
+const NOISE_REF_MASTER = 0.25;
 
 /** Tier ごとの同時発音上限（rules.json 性能予算「音」行） */
 export const VOICE_BUDGET: Record<QualityTier['id'], number> = { low: 8, mid: 12, high: 20 };
@@ -124,7 +128,7 @@ export class AudioEngine {
   private reverb: IReverb | null = null;
   private mixer: AmbientMixer | null = null;
   private tier: QualityTier = QUALITY_TIERS.high;
-  private volumes = { masterVolume: 0.8, ambientVolume: 1.0, sfxVolume: 1.0 };
+  private volumes = { masterVolume: 0.25, ambientVolume: 1.0, sfxVolume: 1.0 };
   private hidden = false;
   private room: RoomState = { roomId: undefined, floor: 'concrete', doorMat: 'wood', silent: false, label: '' };
   private pendingRoom: { def: RoomDefinition | null; layout: RoomLayout; opts: RoomAudioOptions } | null = null;
@@ -534,7 +538,7 @@ export class AudioEngine {
    * 環境音バスの現在の大きさの推定（0〜1）。解析ノードは使わず、稼働中の環境音レイヤー（プリセットの gain 上位 budget 本、
    * 幻聴を除く）とループ再生（play(loop) の gain）の gain の二乗和の平方根 bus を `1 - exp(-bus / 1.4)` で 0〜1 に写し、
    * 環境音・全体音量（線形）を掛けたもの。非表示（ambientBus 0）・ctx 未生成 / 停止中は 0。入室のクロスフェードと同じ 1.2 s で追従。
-   * 目安（既定音量 0.8）: 「無音に近い」（subRumble -30 dB）≈ 0.02 / hvac 1 本（gain 0.5）≈ 0.24 / レイヤー 1 本 gain 1 ≈ 0.41 /
+   * 目安（全体音量が既定 0.25 以上 = 旧既定 0.8 相当）: 「無音に近い」（subRumble -30 dB）≈ 0.02 / hvac 1 本（gain 0.5）≈ 0.24 / レイヤー 1 本 gain 1 ≈ 0.41 /
    * 空調 + ハム + PC ファンの 3 本 ≈ 0.57 / 乗車のループ音（gain 0.7）が重なると +0.1 前後
    */
   get ambientLevel(): number {
@@ -556,7 +560,9 @@ export class AudioEngine {
     }
     for (const l of this.loops) if (l.handle.active) sum += l.gain * l.gain;
     const bus = Math.sqrt(sum);
-    const vol = this.volumes.ambientVolume * this.volumes.masterVolume;
+    // 画面のノイズ連動（VideoPass.setAudioNoise）の調整は旧既定の全体音量 0.8 で行ったので、全体音量は既定（0.25）以上で 0.8 相当、
+    // それより下は比例して弱める（既定の見た目を保ったまま、消音ではノイズの連動も消える）
+    const vol = this.volumes.ambientVolume * Math.min(1, this.volumes.masterVolume / NOISE_REF_MASTER) * 0.8;
     return Math.max(0, Math.min(1, (1 - Math.exp(-bus / 1.4)) * vol));
   }
 

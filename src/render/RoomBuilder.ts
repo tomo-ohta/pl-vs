@@ -48,6 +48,9 @@ import { applyBuildModifiers } from '../modifiers';
 import { particleList } from '../generators/particles';
 import type { RuntimeContext } from '../modifiers/types';
 
+/** 通り抜けられる草木の材質（第18回: 温室などで草木に阻まれず歩けるように。鉢・植え床 plantSoil・幹（木材）・棚は当たる） */
+const PASSABLE_VEGETATION = new Set<MatId>(['plant', 'plantLeaf', 'grass', 'wheat']);
+
 export interface DoorObject {
   portal: Portal;
   pivot: THREE.Group;
@@ -441,7 +444,8 @@ export class RoomBuilder {
     const bake = new SurfaceLighting({ ...work, boxes: replaced.size ? displayBoxes.concat([...replaced]) : displayBoxes }, officeLighting, { ...(layout.lighting ?? {}), roll: !!roll });
     // InstancedMesh / glTF プロップの照明（担当 P3）: 到着前は bake.sample の定数値、ライトマップ到着で足元の床の値へフェード
     const shading = new InstanceLighting();
-    for (const original of workBoxes) if (original.solid) colliders.push(aabbToWorld(original, p));
+    // 草木（葉の塊・生垣・樹冠・下草）は通り抜けられる（当たり判定を作らない。配置の判定では solid のまま = 他の物は重ならない）
+    for (const original of workBoxes) if (original.solid && !PASSABLE_VEGETATION.has(original.mat)) colliders.push(aabbToWorld(original, p));
 
     // チャンク格子
     const chunkSize = layout.chunkSize ?? DEFAULT_CHUNK;
@@ -981,7 +985,7 @@ export class RoomBuilder {
         const c = Math.abs(Math.cos(t.yaw)), sn = Math.abs(Math.sin(t.yaw));
         const hx = (c * sx + sn * sz) / 2 * s, hz = (sn * sx + c * sz) / 2 * s;
         probes[i * 5] = t.pos[0]; probes[i * 5 + 1] = t.pos[1]; probes[i * 5 + 2] = t.pos[2]; probes[i * 5 + 3] = hx; probes[i * 5 + 4] = hz;
-        if (spec.solid && bi === 0) {
+        if (spec.solid && bi === 0 && !PASSABLE_VEGETATION.has(spec.mat)) {
           colliders.push(aabbToWorld({ min: [t.pos[0] - hx, t.pos[1], t.pos[2] - hz], max: [t.pos[0] + hx, t.pos[1] + sy * s, t.pos[2] + hz] }, placement));
         }
       });

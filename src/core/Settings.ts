@@ -56,7 +56,7 @@ export const SETTINGS_KEY_V2 = 'liminal.settings.v2';
 export const SETTINGS_KEY_V1 = 'liminal.settings.v1';
 
 export const DEFAULT_SETTINGS: Readonly<SettingsData> = {
-  masterVolume: 0.8,
+  masterVolume: 0.25,
   ambientVolume: 1.0,
   sfxVolume: 1.0,
   lookSensitivity: 1.0,
