@@ -27,13 +27,17 @@
  */
 import * as THREE from 'three';
 import { addSurfaceAppearance, usesSurfaceVariation, usesSurfaceWear, SURFACE_VARIATION_KEY } from './SurfaceAppearance';
+import { addSurfaceGrime, grimeClass } from './SurfaceGrime';
+import { addWindowRoom, WINDOW_ROOM_MATS, type WindowRoomPhoto } from './WindowRoom';
+import { createWheatTexture, WHEAT_WIND_GLSL } from './Wheat';
 import { createSurfaceMaps, hasAuthoredDetail, type DetailKind } from './SurfaceDetail';
 import { ImageRequestQueue } from './textureQueue';
 import { CC0_INDEX_FILE, CC0_MATERIALS_URL, CC0_SMALL_MATERIALS_URL, CC0_VARIANTS, DEFAULT_BLEND, TONE_TABLE, variantHash, type Cc0Index, type Cc0IndexEntry, type Cc0Variant } from './cc0Materials';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import type { MatId, Palette } from '../generators/layout';
 import type { QualityTier, QualityTierId, Vec3 } from '../core/types';
-import { SMALL_TEXTURES } from '../core/device';
+import { KTX2_TEXTURES, SMALL_TEXTURES } from '../core/device';
 
 export type TextureId = 'wallpaper' | 'carpet' | 'concrete' | 'wood' | 'ceiling' | 'tile' | 'metal' | 'linoleum' | 'cardboard' | 'foliage' | 'diffuser' | 'water' | 'sky' | 'night';
 /** ガラスの定義（V06 手順 1: 通常ガラス / 車窓 / 暗い窓を別定義にし、金属度で反射を足す代用をやめる） */
@@ -89,7 +93,13 @@ interface Surface {
   gloss?: GlossSpec;
   /** 水面（透過 + 反射 + 水深減衰。MeshPhysicalMaterial になる） */
   water?: WaterSpec;
+  /** 提供素材の段積み画像（public/textures/generated/<atlas>）を map（と発光）に使う。UV はジオメトリが段のマスを指す（繰り返さない） */
+  atlas?: GeneratedAtlas;
+  /** 切り抜きの板（alphaTest + alphaToCoverage、両面、風の揺れ）。絵は手続きで描く（'wheat' = src/render/Wheat.ts） */
+  cutout?: 'wheat';
 }
+/** tools/build-generated-textures.mjs が作る段積み画像 */
+type GeneratedAtlas = 'screens-arcade' | 'screens-pc' | 'cans';
 /** Exhaustive shared material table. Pattern dimensions are measured in meters. */
 export const SURFACES: Record<MatId, Surface> = {
   floorCarpetRed: { texture: 'carpet', color: 0x805349, meters: 1, roughness: .98, bump: .004 },
@@ -111,8 +121,9 @@ export const SURFACES: Record<MatId, Surface> = {
   doorWood: { texture: 'wood', color: 0xb09576, meters: 1.1, roughness: .43, bump: .0008 },
   doorMetal: { detail: 'paint', albedo: false, texture: 'metal', color: 0xaab5ae, meters: 1, roughness: .46, bump: .001, metalness: 0 },
   trim: { texture: 'wood', color: 0x776653, meters: 1.1, roughness: .43, bump: .002 },
-  // 通常の窓・扉ガラス: 透過 + 弱い反射、金属度 0（拡散板 lightPanel 系とは別定義。texture は albedo:false なので使わない）
-  glass: { detail: 'glass', albedo: false, texture: 'diffuser', color: 0xdce8e4, meters: .35, roughness: .06, bump: .0002, metalness: 0, opacity: .2, glass: { transmission: .9, ior: 1.5, thickness: .01, reflect: 1.6 } },
+  // 通常の窓・扉ガラス: 透過 + 弱い反射、金属度 0（拡散板 lightPanel 系とは別定義。texture は albedo:false なので使わない）。
+  // 反射 1.6 では天井の器具の映り込みが HDR 0.8（露出後ほぼ白）になり、夜景の窓の上半分が白く飛んでいた（C09）ので 0.6
+  glass: { detail: 'glass', albedo: false, texture: 'diffuser', color: 0xdce8e4, meters: .35, roughness: .06, bump: .0002, metalness: 0, opacity: .2, glass: { transmission: .9, ior: 1.5, thickness: .01, reflect: .6 } },
   lightPanel: { texture: 'diffuser', color: 0xedf0d9, meters: .24, roughness: .45, bump: .001, emission: 2.5 },
   lightWarm: { texture: 'diffuser', color: 0xffd29a, meters: .24, roughness: .45, bump: .001, emission: 2.3 },
   lightOff: { texture: 'diffuser', color: 0x979c8f, meters: .24, roughness: .6, bump: .001 },
@@ -181,6 +192,14 @@ export const SURFACES: Record<MatId, Surface> = {
   seatRed: { texture: 'carpet', color: 0x7a1f2a, meters: .45, roughness: .95, bump: .005 },
   lockerBlue: { texture: 'metal', color: 0x6f86a8, meters: 1, roughness: .42, bump: .0008, metalness: .25 },
   screenDark: { texture: 'metal', color: 0x0e1014, meters: 1, roughness: .15, bump: 0, metalness: .2 },
+  // 提供素材の画面の絵（ゲーム筐体・机上の CRT）: 絵そのものを発光させる（白の発光 × map）。拡散は暗いガラス（室内光で絵が白く霞まない）、艶で粗さは低め
+  screenArcade: { texture: 'diffuser', color: 0x2a2a2a, emissiveColor: 0xffffff, meters: 1, roughness: .18, bump: 0, emission: 1.25, atlas: 'screens-arcade' },
+  screenPc: { texture: 'diffuser', color: 0x2a2a2a, emissiveColor: 0xffffff, meters: 1, roughness: .18, bump: 0, emission: 1.0, atlas: 'screens-pc' },
+  // 自販機の缶のラベル（奥の発光パネルに照らされる分を弱い発光で足す）
+  canLabel: { texture: 'diffuser', color: 0xffffff, emissiveColor: 0xffffff, meters: 1, roughness: .3, bump: 0, metalness: .25, emission: .35, atlas: 'cans' },
+  // 麦の株（L03）: 板の絵は茎・葉・穂・芒（Wheat.ts）。弱い自己発光（絵 × 0.14）で高い天井灯だけの暗い倉庫でも金色が沈まない。
+  // legacy / untextured は従来どおり color の箱
+  wheat: { texture: 'foliage', color: 0xd4b060, emissiveColor: 0xffffff, meters: 1, roughness: .85, bump: 0, emission: .14, doubleSide: true, cutout: 'wheat' },
   /** 偽の空（FakeSky）。天井箔として貼る。両面・大きなパターン */
   // 空箔（FakeSky）: 'diffuser' は拡散板の格子が空に見えないため、生成した低周波ノイズ 'sky'（雲の濃淡）を 40 m で貼る（FakeSky が offset を流す）
   skyOvercast: { texture: 'sky', color: 0xb9c0c8, meters: 40, roughness: 1, bump: 0, emission: 1.1, doubleSide: true },
@@ -188,8 +207,8 @@ export const SURFACES: Record<MatId, Surface> = {
   skyNoon: { texture: 'sky', color: 0x8fb8ea, meters: 40, roughness: 1, bump: 0, emission: 1.4, doubleSide: true },
   /** 浅水（ShallowWater）。床の上に貼る水面（透過。水深 = 部屋座標 y。岸際は透明） */
   // 出所の無い水たまり（oddity）。透過（transmission）を使わない Standard: Common の部屋にも置くので、透過パスの毎フレームの追加描画を避ける
-  puddle: { texture: 'water', color: 0x7f9a98, meters: 2, roughness: .05, bump: .001, opacity: .55, flow: .8 },
-  waterShallow: { texture: 'water', color: 0xdce9e6, meters: 2.5, roughness: .05, bump: .0015, flow: 1.4, water: { transmission: .88, ior: 1.33, attenuationColor: 0x5aa39a, attenuationDistance: 1.0, reflect: 1.8, thickness: 1, depthFromFloor: true, albedoMix: .65 } },
+  puddle: { texture: 'water', color: 0x7f9a98, meters: 2, roughness: .1, bump: .001, opacity: .55, flow: .8 },
+  waterShallow: { texture: 'water', color: 0xdce9e6, meters: 2.5, roughness: .08, bump: .0015, flow: 1.4, water: { transmission: .88, ior: 1.33, attenuationColor: 0x5aa39a, attenuationDistance: 1.0, reflect: 1.8, thickness: 1, depthFromFloor: true, albedoMix: .65 } },
   /** 水の壁（WaterWall）。開口を塞ぐ縦の水面（両面。厚みは一定 0.3 m） */
   waterWall: { texture: 'water', color: 0xc4dcd8, meters: 2, roughness: .05, bump: .002, flow: 2.2, doubleSide: true, water: { transmission: .85, ior: 1.33, attenuationColor: 0x2f7a74, attenuationDistance: .6, reflect: 1.8, thickness: .3, albedoMix: .6 } },
   /** ブロブ影デカール（InvertedShadow） */
@@ -198,9 +217,12 @@ export const SURFACES: Record<MatId, Surface> = {
   untextured: { texture: 'ceiling', color: 0xf2f2ee, meters: 1, roughness: 1, bump: 0, flat: true },
   floorAsphalt: { texture: 'concrete', color: 0x55575a, meters: 2.5, roughness: .92, bump: .008 },
   wallBrick: { texture: 'concrete', color: 0x9c6a56, meters: 1.5, roughness: .9, bump: .01, grid: [.22, .07] },
+  /** 住宅の外壁: 木のサイディング（横張り）/ トタンの波板。CC0 素材が無ければ生成テクスチャの木・金属 */
+  sidingWood: { texture: 'wood', color: 0xd9d3c6, meters: 2, roughness: .78, bump: .008 },
+  sidingMetal: { texture: 'metal', color: 0xa9aca9, meters: 1.5, roughness: .55, bump: .01, metalness: .25 },
   windowLit: { texture: 'diffuser', color: 0xffd9a0, meters: .6, roughness: .3, bump: .0005, emission: 1.8 },
   // 外から見た消灯した窓: 暗い室内（透過は僅か）+ 反射が主
-  windowDark: { detail: 'glass', albedo: false, texture: 'metal', color: 0x1a2024, meters: 1, roughness: .08, bump: .0001, metalness: 0, glass: { transmission: .2, ior: 1.5, thickness: .02, reflect: 2.2 } },
+  windowDark: { detail: 'glass', albedo: false, texture: 'metal', color: 0x1a2024, meters: 1, roughness: .08, bump: .0001, metalness: 0, glass: { transmission: .2, ior: 1.5, thickness: .02, reflect: 1.2 } },
   /** ナトリウム灯（街灯）。橙色の発光 */
   sodiumLight: { texture: 'diffuser', color: 0xffa040, meters: .24, roughness: .4, bump: .001, emission: 2.8 },
   signPlate: { texture: 'linoleum', color: 0xf0f0e8, meters: .5, roughness: .5, bump: .001 },
@@ -416,11 +438,17 @@ export class MaterialLibrary {
   readonly uploadStats = { count: 0, lightmaps: 0 };
   /** 読込済みテクスチャの先行アップロード待ち行列（Game.step が毎フレーム renderer.initTexture で 1〜2 枚ずつ流す） */
   readonly uploads = new TextureUploadQueue();
+  /** CC0 の KTX2 読込（configure で renderer の対応形式を調べてから作る。無ければ JPEG）。トランスコードは Web Worker（public/basis/） */
+  private ktx2: KTX2Loader | null = null;
+  /** CC0 と同じ KTX2Loader（PropCatalog の GLTFLoader が KHR_texture_basisu に使う。configure 前・KTX2 無効なら null） */
+  get ktx2Loader(): KTX2Loader | null { return this.ktx2; }
   private readonly clock = { value: 0 };
   private readonly diagnostic = { value: 0 };
   private readonly surfaceVariation = { value: 1 };
   private readonly surfaceEnvironment = { value: 1 };
   private readonly surfaceWear = { value: 1 };
+  /** 汚れ層（SurfaceGrime）の強さ。Tier で変える（low 0.6 / 他 1）。uniform なので再コンパイル無し */
+  private readonly surfaceGrime = { value: 1 };
   /** 品質 Tier（0 low / 1 mid / 2 high）。2 層混合は 1 以上、視差は 2 で有効。uniform なので切替で再コンパイルしない */
   private readonly materialQuality = { value: 2 };
   private environment: THREE.WebGLRenderTarget | null = null;
@@ -466,6 +494,14 @@ export class MaterialLibrary {
   }
 
   configure(renderer: THREE.WebGLRenderer): void {
+    if (KTX2_TEXTURES && !this.ktx2 && typeof document !== 'undefined') {
+      try {
+        this.ktx2 = new KTX2Loader().setTranscoderPath(`${baseUrl()}basis/`).setWorkerLimit(2).detectSupport(renderer);
+      } catch (e) {
+        console.warn('[cc0] KTX2 unavailable, using JPEG', e);
+        this.ktx2 = null;
+      }
+    }
     const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     this.anisotropy = anisotropy;
     for (const t of [...this.textures.values(), ...this.dataTextures.values(), ...this.normalTextures.values(), ...this.aoTextures.values()]) { t.anisotropy = anisotropy; if (t.image) t.needsUpdate = true; }
@@ -548,6 +584,7 @@ export class MaterialLibrary {
   setTier(tier: QualityTier | QualityTierId): void {
     const id = typeof tier === 'string' ? tier : tier.id;
     this.materialQuality.value = id === 'high' ? 2 : id === 'mid' ? 1 : 0;
+    this.surfaceGrime.value = id === 'low' ? 0.6 : 1;
     // low はライトマップ無し（頂点焼き込みのみ）なので環境マップの拡散と動的光の拡散を多めに残す
     this.iblDiffuse.value = id === 'low' ? 0.35 : 0.12;
     this.directDiffuse.value = id === 'low' ? 0.8 : 0.4;
@@ -833,6 +870,22 @@ export class MaterialLibrary {
    * LoadingManager には「予約した時点」で itemStart を通し、完了（成功・恒久的失敗のどちらでも）で itemEnd を返す。
    * こうしないと、待ち行列で後回しにした分が始まる前に itemsLoaded === itemsTotal となり、onLoad（= ready）が早く解決してしまう。
    */
+  /** KTX2 を 1 枚読む（JPEG と同じ待ち行列・優先度・再試行）。失敗したら onError（呼び出し側が JPEG に戻す） */
+  private loadCc0Ktx2(set: Cc0Set, url: string, onLoad: (t: THREE.CompressedTexture) => void, onError: () => void): void {
+    const loader = this.ktx2;
+    if (!loader) { onError(); return; }
+    const priority = this.isRetained(set) ? 0 : set.loadPriority;
+    this.manager.itemStart(url);
+    this.imageQueue.loadWith(url, priority, (u) => loader.loadAsync(u), (t) => {
+      this.manager.itemEnd(url);
+      onLoad(t as THREE.CompressedTexture);
+    }, (err) => {
+      console.warn('[cc0] KTX2 load failed, falling back to JPEG', url, err);
+      this.manager.itemEnd(url);
+      onError();
+    });
+  }
+
   private loadCc0Image(set: Cc0Set, url: string, onLoad: (image: TexImageSource) => void, onError: () => void): void {
     // 今すぐ要るもの（構築済みの部屋が参照するセット・初回使用）を先に流し、2 hop 先の先読みは後ろに回す
     const priority = this.isRetained(set) ? 0 : set.loadPriority;
@@ -862,6 +915,7 @@ export class MaterialLibrary {
     const onFail = (_failed: Cc0Set) => this.refreshCc0Status(); // 失敗したセットは availableVariants から外れる（材質は代替の単色のまま）
     const host: Cc0Host = {
       loadImage: (set, url, onLoad, onError) => this.loadCc0Image(set, url, onLoad, onError),
+      loadCompressed: this.ktx2 ? (set, url, onLoad, onError) => this.loadCc0Ktx2(set, url, onLoad, onError) : null,
       track: (t) => this.track(t),
       enqueueUpload: (set, t, big) => { if (L2_FLAGS.queue) this.uploads.enqueue(t, { big, priority: this.isRetained(set) ? 1 : 2 }); },
       cancelUpload: (t) => this.uploads.cancel(t),
@@ -903,7 +957,9 @@ export class MaterialLibrary {
     if (o.colorScale !== undefined) color.multiplyScalar(o.colorScale);
     // 夜景（windowNight）: 1 枚貼りではなく、面の奥に置いた層（遠景 45 m / 近景 12 m）を視線で視差サンプルして発光にする（legacy / untextured は従来の 1 枚貼り）
     const night = s.texture === 'night' && !flat && !legacy;
-    const map = night ? null : cc0 ? (cc0Albedo ? cc0.color : null) : flat || s.albedo===false ? null : legacy ? this.legacyTexture(s.texture) : this.textures.get(s.texture);
+    const atlas = s.atlas && !flat && !legacy ? this.generatedAtlas(s.atlas) : null;
+    const cutout = s.cutout && !flat && !legacy ? this.cutoutTexture(s.cutout) : null;
+    const map = night ? null : cutout ? cutout : atlas ? atlas : cc0 ? (cc0Albedo ? cc0.color : null) : flat || s.albedo===false ? null : legacy ? this.legacyTexture(s.texture) : this.textures.get(s.texture);
     const detail = flat || legacy || cc0 ? undefined : this.dataTextures.get(s.detail??s.texture);
     // CC0 の Roughness はそのまま roughnessMap に（係数 1 × 部屋別の倍率）。生成側は従来の s.roughness × 倍率
     const roughness = Math.max(.04, Math.min(1, (cc0 ? 1 : s.roughness) * (o.roughnessScale ?? 1)));
@@ -933,8 +989,22 @@ export class MaterialLibrary {
       polygonOffset: !!s.decal, polygonOffsetFactor: s.decal ? -2 : 0, polygonOffsetUnits: s.decal ? -2 : 0,
     });
     if (fogSpec) m.fog = false; // 部屋固有の霧を材質側で計算する（scene.fog を無視）
+    if (cutout) {
+      // 切り抜きの板: 絵の色をそのまま（色は白）、細部のデータテクスチャ（法線・粗さ・AO）は使わない。MSAA では縁を被覆率で滑らかに
+      m.color.set(0xffffff);
+      m.normalMap = null; m.roughnessMap = null; m.aoMap = null;
+      m.alphaTest = 0.4; m.alphaToCoverage = true;
+      m.side = THREE.DoubleSide;
+    }
+    if (cutout) {
+      // 切り抜きの板: 絵の色をそのまま（色は白）、細部のデータテクスチャ（法線・粗さ・AO）は使わない。MSAA では縁を被覆率で滑らかに
+      m.color.set(0xffffff);
+      m.normalMap = null; m.roughnessMap = null; m.aoMap = null;
+      m.alphaTest = 0.4; m.alphaToCoverage = true;
+      m.side = THREE.DoubleSide;
+    }
     // 器具の発光面を部屋の器具色（palette.lightColor。P1 の色温度）に合わせる: 発光色 × 正規化 tint（明るさは変えない）
-    if (o.lightTint !== undefined && s.emission && !legacy) m.emissive.multiply(normalizedTint(o.lightTint));
+    if (o.lightTint !== undefined && s.emission && !legacy && !s.atlas) m.emissive.multiply(normalizedTint(o.lightTint)); // 画面の絵・缶は器具の色に染めない
     const gradient = o.gradient;
     const gradFrom = gradient ? new THREE.Color(SURFACES[gradient.from].color) : null;
     const gradTo = gradient ? new THREE.Color(SURFACES[gradient.to].color) : null;
@@ -972,6 +1042,8 @@ export class MaterialLibrary {
     const authored = hasAuthoredDetail(s.texture);
     const varied = !flat && !legacy && usesSurfaceVariation(id);
     const worn = !flat && !legacy && usesSurfaceWear(id);
+    const grime = !flat && !legacy ? grimeClass(id) : null;
+    const winRoom = !flat && !legacy && WINDOW_ROOM_MATS.has(id);
     const toned = !flat && !legacy;
     const common: CommonInjection = { baked: legacy ? 'floor(vBakedLight * 4.0 + 0.5) / 4.0' : 'vBakedLight', mask, fog: fogSpec ? { color: fogColor, near: fogSpec.near, far: fogSpec.far } : null };
     // 部屋トーン（色相 ±3°・明度 ±4%）: 線形 RGB の色相回転行列 × 明度。トーン 0 は単位行列
@@ -993,6 +1065,22 @@ export class MaterialLibrary {
         shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvWaterWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWaterGeoN = normalize(mat3(modelMatrix) * objectNormal);');
         shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${WATER_PARS_GLSL}`);
         shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = liminalWaterNormal(normal);');
+        // 映り込みの白飛び対策: 鏡に近い水面は天井灯・懐中電灯の鏡面反射が HDR で数十倍になり、ブルームで面全体が白く抜ける。
+        // 水面の出力だけ、最大成分が膝（WATER_GLARE_KNEE）を超えた分を上限（WATER_GLARE_MAX）へ漸近させる（色相は保つ）
+        shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `{
+  float waterPeak = max(outgoingLight.r, max(outgoingLight.g, outgoingLight.b));
+  if (waterPeak > ${WATER_GLARE_KNEE.toFixed(2)}) {
+    float over = waterPeak - ${WATER_GLARE_KNEE.toFixed(2)};
+    outgoingLight *= (${WATER_GLARE_KNEE.toFixed(2)} + over / (1.0 + over / ${(WATER_GLARE_MAX - WATER_GLARE_KNEE).toFixed(2)})) / waterPeak;
+  }
+}
+#include <opaque_fragment>`);
+      }
+      if (cutout && s.cutout === 'wheat') {
+        // 麦の揺れ（頂点の高さ² × 株の位置の位相）
+        shader.uniforms.surfaceTime = this.clock;
+        shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float surfaceTime;');
+        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n${WHEAT_WIND_GLSL}`);
       }
       if (s.flow && !flat) {
         shader.uniforms.surfaceTime = this.clock;
@@ -1022,6 +1110,8 @@ export class MaterialLibrary {
         const layers = this.nightLayers();
         shader.uniforms.nightFar = layers.far;
         shader.uniforms.nightNear = layers.near;
+        shader.uniforms.nightPhoto = layers.photo;
+        shader.uniforms.nightBands = layers.bands;
         // 部屋ごとの位相 vNightPhase: 部屋グループの world 位置（modelMatrix の平行移動。2 m 格子に丸める）のハッシュ。
         // windowNight は共有 variant（ライトマップ対象外）なので uniform ではなく頂点で決める → 隣の部屋の窓に同じ街並みが並ばない
         shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vNightWorld; varying vec3 vNightNormal; varying float vNightPhase;');
@@ -1074,6 +1164,10 @@ vNightPhase = fract(sin(dot(nightCell, vec2(12.9898, 78.233))) * 43758.5453);`);
       }
       // 2 層混合の重みと視差の UV オフセットは map_fragment より前に 1 回だけ求める（全マップのサンプルが使う）
       if (blendParams || pom) shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `${TILE_MAIN_GLSL(!!blendParams, pom)}\n#include <map_fragment>`);
+      // 汚れ層は addSurfaceAppearance（map_fragment の include を展開して消す）より前に、include の直後へ足す
+      if (grime) addSurfaceGrime(shader, grime, this.surfaceGrime);
+      // 窓の部屋は窓板の発光（1.8）より暗く（部屋の中は照明から離れるほど暗い）
+      if (winRoom) addWindowRoom(shader, id === 'windowLit', 1.1, this.windowRoomPhoto());
       if (varied || worn) addSurfaceAppearance(shader, varied, this.surfaceVariation, this.surfaceWear, this.surfaceEnvironment);
       // 最後に: map / normalMap / roughnessMap / aoMap のサンプルを liminalSample（視差オフセット + 2 層混合）に差し替える。
       // addSurfaceAppearance が展開した map_fragment も、未展開の #include も同じ正規表現で拾えるよう先に展開する
@@ -1088,19 +1182,113 @@ vNightPhase = fract(sin(dot(nightCell, vec2(12.9898, 78.233))) * 43758.5453);`);
     const family = flat ? 'flat' : legacy ? 'legacy' : cc0 ? (cc0Albedo ? 'cc0' : 'cc0paint') : authored ? 'authored' : 'plain';
     // physical の種類（glass / water / gloss / carPaint）は three 側のキー（clearcoat / transmission の有無）で分かれるが、可読性のため明示する
     const phys = !physical ? '' : waterSpec ? (waterSpec.depthFromFloor ? '-water-depth' : '-water') : s.glass ? '-glass' : s.gloss ? '-gloss' : '-coat';
-    m.customProgramCacheKey = () => `liminal-pbr-v4-${varied || worn ? SURFACE_VARIATION_KEY : 'plain'}-${varied ? 'macro' : 'nomacro'}-${family}-${blendParams ? 'tile' : 'notile'}-${pom ? 'pom' : 'nopom'}-${s.flow && !flat ? 'flow' : 'static'}-${s.grid && !flat && !legacy && !cc0 ? s.grid.join(',') : 'nogrid'}-${gradient ? 'grad' : 'nograd'}-${fogSpec ? 'roomfog' : 'scenefog'}${night ? '-night' : ''}${phys}${s.texture === 'water' && !flat && !legacy ? '-water' : ''}`;
+    m.customProgramCacheKey = () => `liminal-pbr-v4-grime:${grime ?? 'none'}${winRoom ? '-winroom' : ''}-${varied || worn ? SURFACE_VARIATION_KEY : 'plain'}-${varied ? 'macro' : 'nomacro'}-${family}-${blendParams ? 'tile' : 'notile'}-${pom ? 'pom' : 'nopom'}-${s.flow && !flat ? 'flow' : 'static'}-${s.grid && !flat && !legacy && !cc0 ? s.grid.join(',') : 'nogrid'}-${gradient ? 'grad' : 'nograd'}-${fogSpec ? 'roomfog' : 'scenefog'}${night ? '-night' : ''}${phys}${s.texture === 'water' && !flat && !legacy ? '-water' : ''}${cutout ? `-cutout-${s.cutout}` : ''}`;
     return m;
   }
 
+  /** 切り抜きの板の絵（起動後 1 回だけ描く。document が無い環境では null = 板は色だけ） */
+  private readonly cutoutCache = new Map<string, THREE.Texture | null>();
+  private cutoutTexture(kind: 'wheat'): THREE.Texture | null {
+    if (!this.cutoutCache.has(kind)) {
+      const t = createWheatTexture();
+      if (t) { t.anisotropy = Math.min(4, this.anisotropy); this.track(t); }
+      this.cutoutCache.set(kind, t);
+    }
+    return this.cutoutCache.get(kind) ?? null;
+  }
+
+  /**
+   * 提供素材の段積み画像（tools/build-generated-textures.mjs → public/textures/generated/<name>(-sm).ktx2 / .jpg）。
+   * 1 px の仮画像の Texture をすぐ返し、届いたら中身を差し替える（材質は作り直さない）。KTX2 が読めなければ JPEG
+   */
+  private readonly generatedTextures = new Map<string, { tex: THREE.Texture; ready: (() => void)[]; loaded: boolean }>();
+  private generatedAtlas(name: string, onReady?: () => void): THREE.Texture {
+    let e = this.generatedTextures.get(name);
+    if (!e) {
+      const t = new THREE.Texture();
+      const img = solidImage([24, 24, 28]);
+      if (img) { t.image = img; t.needsUpdate = true; }
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+      t.anisotropy = Math.min(4, this.anisotropy);
+      t.name = `generated/${name}`;
+      this.track(t);
+      const entry = { tex: t, ready: [] as (() => void)[], loaded: false };
+      e = entry;
+      this.generatedTextures.set(name, entry);
+      if (typeof document !== 'undefined') {
+        const file = `${baseUrl()}textures/generated/${name}${SMALL_TEXTURES ? '-sm' : ''}`;
+        const arrive = () => { t.dispose(); t.needsUpdate = true; entry.loaded = true; for (const f of entry.ready.splice(0)) f(); };
+        const jpeg = () => new THREE.ImageLoader().load(`${file}.jpg`, (image) => { t.image = image; arrive(); }, undefined, () => console.warn(`[generated] ${name} unavailable`));
+        if (this.ktx2) this.ktx2.load(`${file}.ktx2`, (ct) => { adoptCompressed(t, ct); ct.dispose(); arrive(); }, undefined, jpeg);
+        else jpeg();
+      }
+    }
+    if (onReady) { if (e.loaded) onReady(); else e.ready.push(onReady); }
+    return e.tex;
+  }
+
+  /** 窓の奥の部屋の写真（WindowRoom）。届くまでは手続きの部屋（winPhotoOn = 0）。`?winroom=gen` で比較用に写真を使わない */
+  private windowPhotoCache: WindowRoomPhoto | null = null;
+  private windowRoomPhoto(): WindowRoomPhoto {
+    if (!this.windowPhotoCache) {
+      const photo: WindowRoomPhoto = { winPhoto: { value: null }, winPhotoOn: { value: 0 } };
+      this.windowPhotoCache = photo;
+      if (typeof location === 'undefined' || !/[?&]winroom=gen(&|$)/.test(location.search)) {
+        photo.winPhoto.value = this.generatedAtlas('window-rooms', () => { photo.winPhotoOn.value = 1; });
+      }
+    }
+    return this.windowPhotoCache;
+  }
+
   /** 夜景の視差層（起動後 1 回だけ生成。遠景 = 空 + 遠いビル + 街灯の滲み、近景 = 手前のビルのシルエット（アルファ）） */
-  private nightLayerCache: { far: { value: THREE.Texture }; near: { value: THREE.Texture } } | null = null;
-  private nightLayers(): { far: { value: THREE.Texture }; near: { value: THREE.Texture } } {
+  private nightLayerCache: NightLayers | null = null;
+  private nightLayers(): NightLayers {
     if (!this.nightLayerCache) {
       const { far, near } = createNightLayers();
       this.track(far); this.track(near);
-      this.nightLayerCache = { far: { value: far }, near: { value: near } };
+      this.nightLayerCache = { far: { value: far }, near: { value: near }, photo: { value: 0 }, bands: { value: 1 } };
+      this.loadNightPhoto(this.nightLayerCache);
     }
     return this.nightLayerCache;
+  }
+
+  /**
+   * 遠景を CC0 の夜の街の写真（tools/build-night-views.mjs の段積み画像）に差し替える。届くまでは生成した遠景のまま（`?night=gen` で比較用に写真を使わない）。
+   * 無い / 失敗したら生成した遠景のまま（uniform を変えるだけなので再コンパイル無し）
+   */
+  private loadNightPhoto(layers: NightLayers): void {
+    if (typeof fetch !== 'function' || typeof document === 'undefined') return;
+    if (/[?&]night=gen(&|$)/.test(location.search)) return; // 比較用: 生成した遠景のまま
+    const dir = `${baseUrl()}textures/night/`;
+    const name = SMALL_TEXTURES ? 'atlas-sm' : 'atlas';
+    void (async () => {
+      try {
+        const res = await fetch(`${dir}index.json`, { cache: 'no-cache' });
+        if (!res.ok || !/json/i.test(res.headers.get('content-type') ?? '')) return;
+        const info = (await res.json()) as { bands?: number };
+        let tex: THREE.Texture;
+        try {
+          if (!this.ktx2) throw new Error('no ktx2');
+          tex = await this.ktx2.loadAsync(`${dir}${name}.ktx2`);
+        } catch {
+          tex = await new THREE.TextureLoader().loadAsync(`${dir}${name}.jpg`);
+        }
+        // 生成した遠景と同じ扱い（sRGB の値をそのまま読み、シェーダが pow 2.2 で線形へ）。写真は左右が繋がらないので鏡像で繰り返す
+        tex.colorSpace = THREE.NoColorSpace;
+        tex.wrapS = THREE.MirroredRepeatWrapping;
+        tex.wrapT = THREE.ClampToEdgeWrapping;
+        tex.anisotropy = 4;
+        tex.name = 'cc0/night/atlas';
+        tex.needsUpdate = true;
+        this.track(tex);
+        layers.far.value = tex;
+        layers.bands.value = Math.max(1, info.bands ?? 1);
+        layers.photo.value = 1;
+      } catch (e) {
+        console.warn('[night] photo atlas unavailable, using generated skyline', e);
+      }
+    })();
   }
 
   /**
@@ -1123,10 +1311,13 @@ vNightPhase = fract(sin(dot(nightCell, vec2(12.9898, 78.233))) * 43758.5453);`);
     shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 bakedLight; varying vec3 vBakedLight; varying vec3 vRoomPos; varying float vRoomFogDepth;');
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvBakedLight = bakedLight;\nvRoomPos = transformed;');
     shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvRoomFogDepth = -mvPosition.z;');
-    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vBakedLight; varying vec3 vRoomPos; varying float vRoomFogDepth; uniform int surfaceDiagnostic; uniform vec3 colorMask; uniform float liminalIblDiffuse; uniform float liminalDirectDiffuse;');
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vBakedLight; varying vec3 vRoomPos; varying float vRoomFogDepth; uniform int surfaceDiagnostic; uniform vec3 colorMask; uniform float liminalIblDiffuse; uniform float liminalDirectDiffuse;\n' + SPEC_CAP_GLSL);
     // 環境マップの拡散（一様な照度）は焼き込みと二重になるので倍率を掛ける（lights_fragment_maps で iblIrradiance が決まった直後）
     shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\niblIrradiance *= liminalIblDiffuse;');
-    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\nreflectedLight.directDiffuse *= liminalDirectDiffuse;\nreflectedLight.indirectDiffuse += ${c.baked} * BRDF_Lambert( diffuseColor.rgb );`);
+    // 鏡面反射（動的光 + 環境マップ）は膝 SPEC_KNEE から上を SPEC_MAX へ柔らかく頭打ち。懐中電灯は視線と同軸なので、ガラス・艶床・画面・水に
+    // 正対すると GGX の峰（粗さ 0.1 で数千倍）がそのまま映り、環境マップの器具も粗さ 0.06 のガラスには点のまま映る。
+    // それが にじみ（glow / ハレーション）で大きな白い円になっていた（C09 の夜景窓・L04 の床・展示ケース）
+    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\nreflectedLight.directDiffuse *= liminalDirectDiffuse;\nreflectedLight.directSpecular = liminalSpecCap(reflectedLight.directSpecular);\nreflectedLight.indirectSpecular = liminalSpecCap(reflectedLight.indirectSpecular);\n#ifdef USE_CLEARCOAT\nclearcoatSpecularDirect = liminalSpecCap(clearcoatSpecularDirect);\nclearcoatSpecularIndirect = liminalSpecCap(clearcoatSpecularIndirect);\n#endif\nreflectedLight.indirectDiffuse += ${c.baked} * BRDF_Lambert( diffuseColor.rgb );`);
     // 色マスク（ColorMissing）は map_fragment の直後（diffuseColor 確定後）
     shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= colorMask;');
     // 色マスクは発光にも掛ける（ColorMissing E20 で発光箔・サインの欠損チャンネルだけが残らないように。uniform は同じ）
@@ -1448,6 +1639,8 @@ function hueMatrix(hueDeg: number, light: number): THREE.Matrix3 {
 interface Cc0Host {
   /** 1 枚読む。並列数制限とリトライは MaterialLibrary 側の待ち行列が持つ */
   loadImage(set: Cc0Set, url: string, onLoad: (image: TexImageSource) => void, onError: () => void): void;
+  /** KTX2 を 1 枚読む（KTX2 が使えない環境では null）。失敗時は onError（Cc0Set が JPEG に戻す） */
+  loadCompressed: ((set: Cc0Set, url: string, onLoad: (t: THREE.CompressedTexture) => void, onError: () => void) => void) | null;
   track(t: THREE.Texture): void;
   /** 読込完了したテクスチャを先行アップロードの待ち行列へ（big: 1024² 級） */
   enqueueUpload(set: Cc0Set, t: THREE.Texture, big: boolean): void;
@@ -1508,7 +1701,8 @@ class Cc0Set {
     }
     this.started = true;
     const avg = parseHex(this.entry.avg) ?? [128, 128, 128];
-    const make = (file: string, kind: string, srgb: boolean, placeholder: [number, number, number]) => {
+    const ktx = this.entry.ktx2;
+    const make = (file: string, kind: string, srgb: boolean, placeholder: [number, number, number], ktxFile?: string) => {
       const t = new THREE.Texture();
       // 読込前・失敗時の 1 px（Source を共有する派生 clone にも同じ画像が入る）
       const img = solidImage(placeholder);
@@ -1535,14 +1729,27 @@ class Cc0Set {
         if (this.resident) this.host.enqueueUpload(this, t, isBigImage(image));
       };
       const onError = () => { if (!this.failed) { this.failed = true; this.onFail(this); } };
-      this.host.loadImage(this, this.base + file, onLoad, onError);
+      // KTX2（圧縮のまま GPU へ。展開済み RGBA の 1/4〜1/8）: 届いたら圧縮データを t に写す（派生 clone は touch が写す）。
+      // 読めなければ JPEG に戻す
+      const onCompressed = (ct: THREE.CompressedTexture) => {
+        if (this.disposed) { ct.dispose(); return; }
+        adoptCompressed(t, ct);
+        ct.dispose();
+        t.dispose();
+        t.needsUpdate = true;
+        this.arrived++;
+        this.touch();
+        if (this.resident) this.host.enqueueUpload(this, t, isBigImage(t.image as TexImageSource));
+      };
+      if (ktxFile && this.host.loadCompressed) this.host.loadCompressed(this, this.base + ktxFile, onCompressed, () => this.host.loadImage(this, this.base + file, onLoad, onError));
+      else this.host.loadImage(this, this.base + file, onLoad, onError);
       return t;
     };
-    this.color = make(this.entry.color, 'color', true, avg);
-    this.normal = make(this.entry.normal, 'normal-GL', false, [128, 128, 255]);
-    this.roughness = make(this.entry.roughness, 'roughness', false, [180, 180, 180]);
-    this.ao = this.entry.ao ? make(this.entry.ao, 'ao-uv0', false, [255, 255, 255]) : null;
-    this.height = this.wantHeight && this.entry.displacement ? make(this.entry.displacement, 'height', false, [128, 128, 128]) : null;
+    this.color = make(this.entry.color, 'color', true, avg, ktx?.color);
+    this.normal = make(this.entry.normal, 'normal-GL', false, [128, 128, 255], ktx?.normal);
+    this.roughness = make(this.entry.roughness, 'roughness', false, [180, 180, 180], ktx?.roughness);
+    this.ao = this.entry.ao ? make(this.entry.ao, 'ao-uv0', false, [255, 255, 255], ktx?.ao) : null;
+    this.height = this.wantHeight && this.entry.displacement ? make(this.entry.displacement, 'height', false, [128, 128, 128], ktx?.displacement) : null;
     // 既に作ってあった派生（読込前に derive された場合）へ元テクスチャを渡す
     for (const [key, d] of this.derived) this.fill(key, d);
   }
@@ -1583,6 +1790,7 @@ class Cc0Set {
     const make = (t: THREE.Texture | null) => {
       if (!t) return null;
       const c = t.clone(); // flipY / wrap / filter も写す（GL テクスチャの cache key が元と揃い、GPU 上は 1 枚になる）
+      adoptCompressed(c, t); // clone は isCompressedTexture を写さない
       c.repeat.set(repeat, repeat);
       c.rotation = rotate ? Math.PI / 2 : 0;
       c.needsUpdate = !!t.image; // Source を共有するので読込済みなら次の描画で使える
@@ -1627,6 +1835,7 @@ class Cc0Set {
       for (const [b, k] of bases) {
         const t = d[k];
         if (!t || !b || t === b || !t.image) continue;
+        adoptCompressed(t, b);
         t.flipY = b.flipY;
         t.dispose();
         t.needsUpdate = true;
@@ -1645,6 +1854,31 @@ function isBigImage(image: TexImageSource | null | undefined): boolean {
   const w = (image as { width?: number } | null)?.width ?? 0;
   const h = (image as { height?: number } | null)?.height ?? 0;
   return w * h >= 768 * 768;
+}
+
+/** 鏡面反射（動的光・環境マップ）の頭打ち（線形 HDR、露出前）: SPEC_KNEE までそのまま、その上は SPEC_MAX に漸近。色相は保つ */
+const SPEC_KNEE = 0.4, SPEC_MAX = 1.0;
+const SPEC_CAP_GLSL = `vec3 liminalSpecCap(vec3 s) { float m = max(max(s.r, s.g), s.b); if (m <= ${SPEC_KNEE.toFixed(2)}) return s; float e = m - ${SPEC_KNEE.toFixed(2)}; float c = ${SPEC_KNEE.toFixed(2)} + e / (1.0 + e / ${(SPEC_MAX - SPEC_KNEE).toFixed(2)}); return s * (c / m); }`;
+
+/**
+ * 圧縮テクスチャ（KTX2Loader の CompressedTexture、または既に写した Texture）の中身を dst へ写す。src が圧縮でなければ何もしない。
+ * Cc0Set の元テクスチャは 1 px の仮画像で作った THREE.Texture で、派生 clone が Source を共有しているため、型は変えずに
+ * three が圧縮の経路で扱う属性（isCompressedTexture / mipmaps / format / type）だけを持たせる。圧縮は flipY できないので
+ * 上下は tools/build-ktx2.mjs が焼き込み済み（JPEG の flipY 読込と同じ向き）
+ */
+function adoptCompressed(dst: THREE.Texture, src: THREE.Texture): void {
+  const s = src as THREE.Texture & { isCompressedTexture?: boolean };
+  if (!s.isCompressedTexture || dst === src) return;
+  (dst as THREE.Texture & { isCompressedTexture?: boolean }).isCompressedTexture = true;
+  if (src.image !== dst.image) dst.image = src.image;
+  dst.mipmaps = src.mipmaps;
+  dst.format = src.format;
+  dst.type = src.type;
+  dst.generateMipmaps = false;
+  dst.minFilter = src.mipmaps && src.mipmaps.length > 1 ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
+  dst.magFilter = THREE.LinearFilter;
+  dst.flipY = false;
+  dst.unpackAlignment = 1;
 }
 
 /** 読込済みの画像か（1 px の仮画像ではない） */
@@ -1892,6 +2126,10 @@ export const WATER_RIPPLES = 8;
  * 減衰 0.9 s、前線の外側は無し）から高さ勾配を解析的に求め、world の法線 (−dh/dx, 1, −dh/dz) を view 空間へ回して
  * normal_fragment_maps の結果に足す。水平な面（幾何法線 y > 0.5）にだけ効く（E09 の縦の水壁は法線マップだけ）
  */
+/** 水面の出力（線形 HDR）の膝と上限。膝までは素通し、上は上限へ漸近（白飛び対策。docs 無し、値は C02 の天井灯 ≈ 2.4 を基準） */
+const WATER_GLARE_KNEE = 0.8;
+const WATER_GLARE_MAX = 1.6;
+
 const WATER_PARS_GLSL = `
 varying vec3 vWaterWorld; varying vec3 vWaterGeoN;
 uniform float surfaceTime; uniform vec4 waterRipples[${WATER_RIPPLES}]; uniform float waterWaves;
@@ -1929,7 +2167,7 @@ vec3 liminalWaterNormal(vec3 n) {
 
 const NIGHT_PARS_GLSL = `
 varying vec3 vNightWorld; varying vec3 vNightNormal; varying float vNightPhase;
-uniform sampler2D nightFar; uniform sampler2D nightNear;
+uniform sampler2D nightFar; uniform sampler2D nightNear; uniform float nightPhoto; uniform float nightBands;
 vec3 liminalNight() {
   vec3 D = normalize(vNightWorld - cameraPosition);
   vec3 N = normalize(vNightNormal);
@@ -1940,13 +2178,32 @@ vec3 liminalNight() {
   // 部屋ごとの位相（u オフセット）。遠景と近景で別の量ずらすと建物の重なりも変わる
   vec3 pf = vNightWorld + D * (45.0 / denom);
   vec2 uvf = vec2(dot(pf, T) / 80.0 + vNightPhase, clamp((pf.y - horizon) / 40.0 + 0.5, 0.002, 0.998));
-  vec3 col = texture2D(nightFar, uvf).rgb;
+  vec3 col;
+  if (nightPhoto > 0.5) {
+    // 写真の段積み（1 段 = 横 110°・縦 ±24°。45 m 先の 110 m × 40 m）。部屋の位相で段を選び、段内は端で折り返す
+    float band = min(floor(vNightPhase * nightBands), nightBands - 1.0);
+    vec2 uvp = vec2(dot(pf, T) / 110.0 + 0.5 + vNightPhase * 0.3, clamp((pf.y - horizon) / 40.0 + 0.5, 0.01, 0.99));
+    col = texture2D(nightFar, vec2(uvp.x, (band + uvp.y) / nightBands)).rgb;
+  } else {
+    col = texture2D(nightFar, uvf).rgb;
+  }
   vec3 pn = vNightWorld + D * (12.0 / denom);
   vec2 uvn = vec2(dot(pn, T) / 40.0 + vNightPhase * 1.7, clamp((pn.y - horizon) / 40.0 + 0.5, 0.002, 0.998));
-  vec4 nearL = texture2D(nightNear, uvn);
-  col = mix(col, nearL.rgb, nearL.a);
-  return pow(col, vec3(2.2));
+  // 手前のビルの生成シルエットは写真と並ぶと作り物に見えるので、写真のときは描かない（写真だけで 45 m 先の視差は出る）
+  if (nightPhoto < 0.5) {
+    vec4 nearL = texture2D(nightNear, uvn);
+    col = mix(col, nearL.rgb, nearL.a);
+  }
+  vec3 lin = pow(col, vec3(2.2));
+  // 写真の月・近い街灯（白く潰れた円）は線形 0.25 から上を 0.55 へ頭打ち（発光 1.15 × 露出でも にじみの閾値 0.8 に届かない。街の灯は点として残る）
+  if (nightPhoto > 0.5) {
+    float m = max(max(lin.r, lin.g), lin.b);
+    if (m > 0.25) { float e = m - 0.25; lin *= (0.25 + e / (1.0 + e / 0.3)) / m; }
+  }
+  return lin;
 }`;
+
+interface NightLayers { far: { value: THREE.Texture }; near: { value: THREE.Texture }; photo: { value: number }; bands: { value: number } }
 
 /**
  * 夜景の視差層。far: 1024 × 512 px = 80 m × 40 m（v 0.5 が地平線。空のグラデーション・遠いビル・街灯の滲み・地面）、

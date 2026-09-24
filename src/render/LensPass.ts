@@ -22,6 +22,7 @@
 import * as THREE from 'three';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import type { FilmPreset } from './FilmPreset';
+import { hideOverrideExcluded } from './OverridePassExclusion';
 import {
   LensBlurShader, LensBrightShader, LensCompositeShader, LensDownsampleShader, LensFlareShader, LensReduceShader, LensStatShader,
 } from './shaders/LensShader';
@@ -478,11 +479,13 @@ export class LensPass extends Pass {
     const override = scene.overrideMaterial;
     scene.background = null;
     scene.overrideMaterial = this.depthMat;
+    const restore = hideOverrideExcluded();
     try {
       renderer.setRenderTarget(this.rtDepth);
       renderer.clear(true, true, false);
       renderer.render(scene, this.camera);
     } finally {
+      restore();
       scene.overrideMaterial = override;
       scene.background = bg;
     }

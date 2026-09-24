@@ -1,0 +1,31 @@
+{
+ "bands": 3,
+ "spanDeg": 110,
+ "halfVerticalDeg": 24,
+ "sources": [
+  {
+   "id": "shanghai_bund",
+   "center": 0.62,
+   "below": "cut",
+   "exposure": 1,
+   "source": "https://polyhaven.com/a/shanghai_bund",
+   "license": "CC0-1.0"
+  },
+  {
+   "id": "modern_buildings_night",
+   "center": 0.12,
+   "below": "keep",
+   "exposure": 0.8,
+   "source": "https://polyhaven.com/a/modern_buildings_night",
+   "license": "CC0-1.0"
+  },
+  {
+   "id": "neuer_zollhof",
+   "center": 0.63,
+   "below": "cut",
+   "exposure": 0.55,
+   "source": "https://polyhaven.com/a/neuer_zollhof",
+   "license": "CC0-1.0"
+  }
+ ]
+}

@@ -1,6 +1,6 @@
 {
  "license": "CC0-1.0",
- "fetchedAt": "2026-09-17T06:05:13",
+ "fetchedAt": "2026-09-24T04:13:19",
  "sources": {
   "polyhaven": "https://polyhaven.com/license",
   "ambientcg": "https://ambientcg.com/license"
@@ -213,10 +213,16 @@
    "gltf": "models/SchoolChair_01/SchoolChair_01_1k.gltf",
    "files": [
     "SchoolChair_01_1k.gltf",
-    "SchoolChair_01_nor_gl_1k.jpg",
-    "SchoolChair_01_diff_1k.jpg",
-    "SchoolChair_01_arm_1k.jpg",
+    "textures/SchoolChair_01_nor_gl_1k.jpg",
+    "textures/SchoolChair_01_diff_1k.jpg",
+    "textures/SchoolChair_01_arm_1k.jpg",
     "SchoolChair_01.bin"
+   ],
+   "triangles": 5072,
+   "dimensionsMm": [
+    565.8532977104187,
+    675.2548813819885,
+    1006.035539903678
    ],
    "source": "https://polyhaven.com/a/SchoolChair_01",
    "license": "CC0-1.0"
@@ -228,9 +234,15 @@
    "files": [
     "plastic_monobloc_chair_01_1k.gltf",
     "plastic_monobloc_chair_01.bin",
-    "plastic_monobloc_chair_01_arm_1k.jpg",
-    "plastic_monobloc_chair_01_diff_1k.jpg",
-    "plastic_monobloc_chair_01_nor_gl_1k.jpg"
+    "textures/plastic_monobloc_chair_01_arm_1k.jpg",
+    "textures/plastic_monobloc_chair_01_diff_1k.jpg",
+    "textures/plastic_monobloc_chair_01_nor_gl_1k.jpg"
+   ],
+   "triangles": 3356,
+   "dimensionsMm": [
+    641.8611407279968,
+    627.5919079780579,
+    879.8411972820759
    ],
    "source": "https://polyhaven.com/a/plastic_monobloc_chair_01",
    "license": "CC0-1.0"
@@ -255,10 +267,16 @@
    "gltf": "models/sofa_02/sofa_02_1k.gltf",
    "files": [
     "sofa_02_1k.gltf",
-    "sofa_02_diff_1k.jpg",
-    "sofa_02_arm_1k.jpg",
-    "sofa_02_nor_gl_1k.jpg",
+    "textures/sofa_02_diff_1k.jpg",
+    "textures/sofa_02_arm_1k.jpg",
+    "textures/sofa_02_nor_gl_1k.jpg",
     "sofa_02.bin"
+   ],
+   "triangles": 2728,
+   "dimensionsMm": [
+    1807.1673512458801,
+    817.7513778209686,
+    709.4888985157013
    ],
    "source": "https://polyhaven.com/a/sofa_02",
    "license": "CC0-1.0"
@@ -269,13 +287,19 @@
    "gltf": "models/modern_arm_chair_01/modern_arm_chair_01_1k.gltf",
    "files": [
     "modern_arm_chair_01_1k.gltf",
-    "modern_arm_chair_01_pillow_nor_gl_1k.jpg",
-    "modern_arm_chair_01_legs_nor_gl_1k.jpg",
-    "modern_arm_chair_01_pillow_arm_1k.jpg",
-    "modern_arm_chair_01_legs_diff_1k.jpg",
-    "modern_arm_chair_01_legs_arm_1k.jpg",
+    "textures/modern_arm_chair_01_pillow_nor_gl_1k.jpg",
+    "textures/modern_arm_chair_01_legs_nor_gl_1k.jpg",
+    "textures/modern_arm_chair_01_pillow_arm_1k.jpg",
+    "textures/modern_arm_chair_01_legs_diff_1k.jpg",
+    "textures/modern_arm_chair_01_legs_arm_1k.jpg",
     "modern_arm_chair_01.bin",
-    "modern_arm_chair_01_pillow_diff_1k.jpg"
+    "textures/modern_arm_chair_01_pillow_diff_1k.jpg"
+   ],
+   "triangles": 8916,
+   "dimensionsMm": [
+    820.3444182872772,
+    986.5616858005524,
+    1022.8520567470696
    ],
    "source": "https://polyhaven.com/a/modern_arm_chair_01",
    "license": "CC0-1.0"
@@ -901,29 +925,41 @@
    "license": "CC0-1.0"
   },
   "television_02": {
-   "group": "appliances/misc",
+   "group": "electronics",
    "resolution": "1k",
    "gltf": "models/television_02/television_02_1k.gltf",
    "files": [
     "television_02_1k.gltf",
-    "television_02_nor_gl_1k.jpg",
-    "television_02_diff_1k.jpg",
-    "television_02_arm_1k.jpg",
+    "textures/television_02_nor_gl_1k.jpg",
+    "textures/television_02_diff_1k.jpg",
+    "textures/television_02_arm_1k.jpg",
     "television_02.bin"
+   ],
+   "triangles": 2310,
+   "dimensionsMm": [
+    399.74847435951233,
+    350.19391775131226,
+    411.41476929375244
    ],
    "source": "https://polyhaven.com/a/television_02",
    "license": "CC0-1.0"
   },
   "Television_01": {
-   "group": "appliances/misc",
+   "group": "electronics",
    "resolution": "1k",
    "gltf": "models/Television_01/Television_01_1k.gltf",
    "files": [
     "Television_01_1k.gltf",
     "Television_01.bin",
-    "Television_01_arm_1k.jpg",
-    "Television_01_diff_1k.jpg",
-    "Television_01_nor_gl_1k.jpg"
+    "textures/Television_01_arm_1k.jpg",
+    "textures/Television_01_diff_1k.jpg",
+    "textures/Television_01_nor_gl_1k.jpg"
+   ],
+   "triangles": 1918,
+   "dimensionsMm": [
+    599.9999642372131,
+    470.8106815814972,
+    456.84892892313655
    ],
    "source": "https://polyhaven.com/a/Television_01",
    "license": "CC0-1.0"
@@ -1041,6 +1077,46 @@
     "plunger_arm_1k.jpg"
    ],
    "source": "https://polyhaven.com/a/plunger",
+   "license": "CC0-1.0"
+  },
+  "covered_car": {
+   "group": "vehicles",
+   "resolution": "1k",
+   "gltf": "models/covered_car/covered_car_1k.gltf",
+   "files": [
+    "covered_car_1k.gltf",
+    "covered_car.bin",
+    "textures/covered_car_nor_gl_1k.jpg",
+    "textures/covered_car_arm_1k.jpg",
+    "textures/covered_car_diff_1k.jpg"
+   ],
+   "triangles": 12592,
+   "dimensionsMm": [
+    1788.962960243225,
+    4380.25426864624,
+    1411.1130833625793
+   ],
+   "source": "https://polyhaven.com/a/covered_car",
+   "license": "CC0-1.0"
+  },
+  "metal_stool_01": {
+   "group": "seating",
+   "resolution": "1k",
+   "gltf": "models/metal_stool_01/metal_stool_01_1k.gltf",
+   "files": [
+    "metal_stool_01_1k.gltf",
+    "textures/metal_stool_01_nor_gl_1k.jpg",
+    "textures/metal_stool_01_diff_1k.jpg",
+    "textures/metal_stool_01_arm_1k.jpg",
+    "metal_stool_01.bin"
+   ],
+   "triangles": 8334,
+   "dimensionsMm": [
+    351.9909083843231,
+    354.570209980011,
+    882.7742969733663
+   ],
+   "source": "https://polyhaven.com/a/metal_stool_01",
    "license": "CC0-1.0"
   }
  },
@@ -1786,6 +1862,99 @@
    "zip": "materials/OfficeCeiling006/OfficeCeiling006_1K-JPG.zip",
    "source": "https://ambientcg.com/a/OfficeCeiling006",
    "license": "CC0-1.0"
+  },
+  "WoodSiding008": {
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/WoodSiding008/WoodSiding008_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/WoodSiding008/WoodSiding008_1K-JPG_Color.jpg",
+    "Displacement": "materials/WoodSiding008/WoodSiding008_1K-JPG_Displacement.jpg",
+    "Metalness": "materials/WoodSiding008/WoodSiding008_1K-JPG_Metalness.jpg",
+    "NormalGL": "materials/WoodSiding008/WoodSiding008_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/WoodSiding008/WoodSiding008_1K-JPG_Roughness.jpg"
+   },
+   "source": "https://ambientcg.com/a/WoodSiding008",
+   "license": "CC0-1.0"
+  },
+  "WoodSiding013": {
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/WoodSiding013/WoodSiding013_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/WoodSiding013/WoodSiding013_1K-JPG_Color.jpg",
+    "Displacement": "materials/WoodSiding013/WoodSiding013_1K-JPG_Displacement.jpg",
+    "NormalGL": "materials/WoodSiding013/WoodSiding013_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/WoodSiding013/WoodSiding013_1K-JPG_Roughness.jpg"
+   },
+   "source": "https://ambientcg.com/a/WoodSiding013",
+   "license": "CC0-1.0"
+  },
+  "CorrugatedSteel005": {
+   "resolution": "1K",
+   "maps": {
+    "AmbientOcclusion": "materials/CorrugatedSteel005/CorrugatedSteel005_1K-JPG_AmbientOcclusion.jpg",
+    "Color": "materials/CorrugatedSteel005/CorrugatedSteel005_1K-JPG_Color.jpg",
+    "Displacement": "materials/CorrugatedSteel005/CorrugatedSteel005_1K-JPG_Displacement.jpg",
+    "Metalness": "materials/CorrugatedSteel005/CorrugatedSteel005_1K-JPG_Metalness.jpg",
+    "NormalGL": "materials/CorrugatedSteel005/CorrugatedSteel005_1K-JPG_NormalGL.jpg",
+    "Roughness": "materials/CorrugatedSteel005/CorrugatedSteel005_1K-JPG_Roughness.jpg"
+   },
+   "source": "https://ambientcg.com/a/CorrugatedSteel005",
+   "license": "CC0-1.0"
+  },
+  "JP_SidingWoodWhite": {
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/JP_SidingWoodWhite/JP_SidingWoodWhite_Color.jpg",
+    "NormalGL": "materials/JP_SidingWoodWhite/JP_SidingWoodWhite_NormalGL.jpg",
+    "Roughness": "materials/JP_SidingWoodWhite/JP_SidingWoodWhite_Roughness.jpg",
+    "AmbientOcclusion": "materials/JP_SidingWoodWhite/JP_SidingWoodWhite_AmbientOcclusion.jpg"
+   },
+   "source": "assets/generated/1. 日本の住宅の外壁（継ぎ目なく並べられる素材）/white-wood-grain.png",
+   "license": "user-provided (AI generated; see generation.json)"
+  },
+  "JP_SidingStoneGrey": {
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/JP_SidingStoneGrey/JP_SidingStoneGrey_Color.jpg",
+    "NormalGL": "materials/JP_SidingStoneGrey/JP_SidingStoneGrey_NormalGL.jpg",
+    "Roughness": "materials/JP_SidingStoneGrey/JP_SidingStoneGrey_Roughness.jpg",
+    "AmbientOcclusion": "materials/JP_SidingStoneGrey/JP_SidingStoneGrey_AmbientOcclusion.jpg"
+   },
+   "source": "assets/generated/1. 日本の住宅の外壁（継ぎ目なく並べられる素材）/light-grey-stone.png",
+   "license": "user-provided (AI generated; see generation.json)"
+  },
+  "JP_TileBrickBeige": {
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/JP_TileBrickBeige/JP_TileBrickBeige_Color.jpg",
+    "NormalGL": "materials/JP_TileBrickBeige/JP_TileBrickBeige_NormalGL.jpg",
+    "Roughness": "materials/JP_TileBrickBeige/JP_TileBrickBeige_Roughness.jpg",
+    "AmbientOcclusion": "materials/JP_TileBrickBeige/JP_TileBrickBeige_AmbientOcclusion.jpg"
+   },
+   "source": "assets/generated/1. 日本の住宅の外壁（継ぎ目なく並べられる素材）/beige-brick-tile.png",
+   "license": "user-provided (AI generated; see generation.json)"
+  },
+  "JP_SidingRibbedBrown": {
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/JP_SidingRibbedBrown/JP_SidingRibbedBrown_Color.jpg",
+    "NormalGL": "materials/JP_SidingRibbedBrown/JP_SidingRibbedBrown_NormalGL.jpg",
+    "Roughness": "materials/JP_SidingRibbedBrown/JP_SidingRibbedBrown_Roughness.jpg",
+    "AmbientOcclusion": "materials/JP_SidingRibbedBrown/JP_SidingRibbedBrown_AmbientOcclusion.jpg"
+   },
+   "source": "assets/generated/1. 日本の住宅の外壁（継ぎ目なく並べられる素材）/dark-brown-ribbed.png",
+   "license": "user-provided (AI generated; see generation.json)"
+  },
+  "JP_Fukitsuke": {
+   "resolution": "1K",
+   "maps": {
+    "Color": "materials/JP_Fukitsuke/JP_Fukitsuke_Color.jpg",
+    "NormalGL": "materials/JP_Fukitsuke/JP_Fukitsuke_NormalGL.jpg",
+    "Roughness": "materials/JP_Fukitsuke/JP_Fukitsuke_Roughness.jpg",
+    "AmbientOcclusion": "materials/JP_Fukitsuke/JP_Fukitsuke_AmbientOcclusion.jpg"
+   },
+   "source": "assets/generated/1. 日本の住宅の外壁（継ぎ目なく並べられる素材）/off-white-fukitsuke.png",
+   "license": "user-provided (AI generated; see generation.json)"
   }
  },
  "totalBytes": 16337565,
@@ -2014,6 +2183,26 @@
    "source": "https://polyhaven.com/a/rubber_tiles",
    "license": "CC0-1.0",
    "bytes": 2505100
+  }
+ },
+ "hdris": {
+  "shanghai_bund": {
+   "file": "hdris/shanghai_bund.jpg",
+   "kind": "tonemapped",
+   "source": "https://polyhaven.com/a/shanghai_bund",
+   "license": "CC0-1.0"
+  },
+  "modern_buildings_night": {
+   "file": "hdris/modern_buildings_night.jpg",
+   "kind": "tonemapped",
+   "source": "https://polyhaven.com/a/modern_buildings_night",
+   "license": "CC0-1.0"
+  },
+  "neuer_zollhof": {
+   "file": "hdris/neuer_zollhof.jpg",
+   "kind": "tonemapped",
+   "source": "https://polyhaven.com/a/neuer_zollhof",
+   "license": "CC0-1.0"
   }
  }
 }

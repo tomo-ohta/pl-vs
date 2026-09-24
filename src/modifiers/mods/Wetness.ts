@@ -39,7 +39,8 @@ const Wetness: ModifierImpl = {
       const home = rects.find((r) => rain.x0 < r.x1 && rain.x1 > r.x0 && rain.z0 < r.z1 && rain.z1 > r.z0) ?? rects[0];
       const pool = rectIntersect(rect(rain.x0 + 0.3, rain.z0 + 0.3, rain.x1 - 0.3, rain.z1 - 0.3), inner(home, WALL_T + 0.1));
       if (pool) {
-        const poolBox: Box = box([pool.x0, 0.004, pool.z0], [pool.x1, 0.012, pool.z1], 'water', false);
+        // 'puddle': RoomBuilder が箱の足跡に収まる不定形の面で描く（'water' の箱だと角のある長方形になる）
+        const poolBox: Box = box([pool.x0, 0.004, pool.z0], [pool.x1, 0.012, pool.z1], 'puddle', false);
         L.boxes.push(poolBox);
       }
       if (bool(params.puddles, true)) {

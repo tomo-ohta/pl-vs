@@ -38,3 +38,16 @@
 - 帯（ExtrudeGeometry、非インデックス）と他プリミティブ（インデックス付き）を同じ材質で結合すると `mergeGeometries` が失敗して材質グループごと消えていた → 非インデックスに揃えて結合。
 - 配置の yaw 回転が描画（makeRotationY）と逆向きだった → 修正（yaw 90° / 270° で当たり判定と刻印がずれる）。
 - 展示光 1.2 m 角 → 0.45 m 角（近距離の白飛び）。屋内の足跡半径は高さの 0.45 倍かつ部屋の短辺の 1/3 以内。
+
+## 第17回（2026-09-24）: 種類・頻度・巨大モニュメント
+- 追加の文法（`extra.ts`）: monolith（3 段の基壇・黒い石板・平行な板の隙間の青い光・もたれた板・浮いた横板・倒れた板・漂う黒い立方体）、chairTower（机の上に椅子を正立 / 逆さ / 横倒しで積む・頂の上に浮く逆さの椅子・周りに倒れた椅子）、doorRing（中心を向いた扉 5〜8 枚。4 割強が開き、奥は光る板・1 枚は浮き 1 枚は傾く・中央に床へ寝かせた扉と漏れる光）、lampGrove（折れた街灯 6〜11 本・灯体は下 / 上 / 横向き・垂れた電線）、colossus（下記）。部品の組の姿勢は Euler 'YXZ' と 3×3 行列の往復で合成する（`placeGroup`）。
+- 増幅は種類別に弱める（monolith 0.55 / chairTower 0.35 / doorRing 0.3 / lampGrove 0.4。colossus は増幅しない）。組み立ての最後に `fitEnvelope` で高さ（屋外は 1.12 倍）と水平半径 × 1.8 に収める（屋内で天井を突き抜ける・床に潜る部品を直した。既存の 6 文法にも掛かる）。
+- 頻度: `space.monument` の重み 4 → 7。主題とは別枠の空き地（`fillOpenSpace` / `openSquares`: 1 m 格子の最大空き正方形を動的計画法で 3 つまで。一辺 7 m 以上、2 基目以降は 9 m 以上）。
+- 巨大（`placeGiantMonument`）: 正常判定より先に走る。半径 = min(12, 短辺 / 4, 高さ × 0.65)、中央から半径の半分ずつずらして 13 箇所、駄目なら 0.75 / 0.55 倍に縮める。動線（入口 → 出口の直線）には掛かってよく、足跡の家具と柱（水平 4 m 以内・高さ 2 m 以上、シェル側を含む）を取り除く。水・滑る床のゾーンの上にも置ける（L09 の湯船）。周りに見えない面光源 4 と点光源 2（正面は暖色、背後は青）。
+
+## 第17回 追記: 重厚な材質・流線と絡み合い
+- ユーザー指示: 材質は木・石・金属の重厚なものにし、発光は不要。基本図形（箱・円）ばかりが目立つので、流線型・不規則・絡み合った構造を増やす。既存の種類も対象。巨大（colossus）は現状を残す（ユーザー確認済み）。
+- 部品の追加（`MonumentGeometry.ts`）: knot（TorusKnotGeometry、size[2] = p × 10 + q）、rock（正二十面体 分割 2 を方向ノイズ 7 葉で ±28% 歪ませて [w, h, d] に伸ばす。形は位置のハッシュ）、lathe（path の [半径, 高さ] の回転体）。全部品の UV は部屋座標 / 材質の meters で面の向きごとに投影。
+- 文法の追加（`extra2.ts`）: knot / roots / braid / cairn。既存 4 種（monolith / chairTower / doorRing / lampGrove）は光の板・灯を外し、絡む帯・鉄線・木の手すり・ねじれた支柱を足した。
+- 後処理（`index.ts`）: amplify の形を曲がった管・結び目・石塊へ、`roughen`（cubeCluster 45% / ribbon 50% / colorStack 35% / monolith 25% / stoneFrame 22%）、`heavyMaterials`（HEAVY_REMAP）。seed 10 本の分布: knot 34 / braid 31 / cairn 25 / chairTower 20 / doorRing 18 / ribbon 17 / monolith 16 / stoneFrame 14 / officeTotem 13 / roots 13 / lampGrove 12 / steel 6 / colorStack 4 / cubeCluster 1、巨大 54。
+- （同日）ユーザー判断で形の追加（extra2.ts の 4 種・roughen・増幅の曲がった管 / 結び目 / 石塊）は取り消し、形は第17回前半の版に戻した。材質だけ HEAVY_REMAP で木・石・金属（発光なし）。巨大（colossus）は元のまま。

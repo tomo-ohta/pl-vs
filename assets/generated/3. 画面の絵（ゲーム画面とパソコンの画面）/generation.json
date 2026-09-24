@@ -1,0 +1,105 @@
+{
+  "tool": "built-in image_gen",
+  "date": "2026-09-24",
+  "count": 12,
+  "export": "Generated artwork exported to requested pixel dimensions using macOS sips; original generated files retained at source paths.",
+  "notes": "Static PNG textures. INSERT COIN and terminal cursor do not animate. Fictional game and computer screen designs, not captures of real games or operating systems. 320x240 describes visual style, not a verified original framebuffer.",
+  "assets": [
+    {
+      "name": "arcade-01-space-shooter",
+      "width": 512,
+      "height": 512,
+      "prompt": "Generate ONE standalone 512 x 512 square raster image. Screenshot of a fictional 1990s arcade video game attract mode screen, vertical space shooter with small original geometric ships and bullets, low-resolution pixel art evoking 320x240 upscaled with visible hard-edged pixels, bright saturated colors on black, a simple title logo made ONLY of abstract geometric shapes, the exact words \"INSERT COIN\" at the bottom, a numeric score counter at the top, full frame, no bezel, no cabinet, no reflections. Completely original fictional graphics, no imitation of any existing game, characters or distinctive game layout. Art fills the entire square canvas; no border or real-world objects. Pixel art only, no smoothing or photographic shading. Avoid: real game titles, real characters, brand logos, copyrighted art, photo of a cabinet, screen bezel, curved glass reflections, people, watermark. Output resolution exactly 512 x 512.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-68dbb3f2-b8e5-4491-b6e3-674b31c1c64d.png",
+      "file": "arcade-01-space-shooter.png"
+    },
+    {
+      "name": "arcade-02-palm-racing",
+      "width": 512,
+      "height": 512,
+      "prompt": "Generate ONE standalone 512 x 512 square raster image. Screenshot of a fictional 1990s arcade video game attract mode screen, side-scrolling racing game with a road and palm trees and original tiny vehicles, low-resolution pixel art evoking 320x240 upscaled with visible hard-edged pixels, bright saturated colors on black, a simple title logo made ONLY of abstract geometric shapes, the exact words \"INSERT COIN\" at the bottom, a numeric score counter at the top, full frame, no bezel, no cabinet, no reflections. Completely original fictional graphics, no imitation of any existing game, characters or distinctive game layout. Art fills the entire square canvas; no border or real-world objects. Pixel art only, no smoothing or photographic shading. Avoid: real game titles, real characters, brand logos, copyrighted art, photo of a cabinet, screen bezel, curved glass reflections, people, watermark. Output resolution exactly 512 x 512.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-13159384-e5a5-45f4-8d14-f5f29306484f.png",
+      "file": "arcade-02-palm-racing.png"
+    },
+    {
+      "name": "arcade-03-falling-blocks",
+      "width": 512,
+      "height": 512,
+      "prompt": "Generate ONE standalone 512 x 512 square raster image. Screenshot of a fictional 1990s arcade video game attract mode screen, puzzle game with falling colored blocks shaped as original irregular clusters, avoid familiar tetromino designs, low-resolution pixel art evoking 320x240 upscaled with visible hard-edged pixels, bright saturated colors on black, a simple title logo made ONLY of abstract geometric shapes, the exact words \"INSERT COIN\" at the bottom, a numeric score counter at the top, full frame, no bezel, no cabinet, no reflections. Completely original fictional graphics, no imitation of any existing game, characters or distinctive game layout. Art fills the entire square canvas; no border or real-world objects. Pixel art only, no smoothing or photographic shading. Avoid: real game titles, real characters, brand logos, copyrighted art, photo of a cabinet, screen bezel, curved glass reflections, people, watermark. Output resolution exactly 512 x 512.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-b670d6df-6ba6-4a9d-b846-37b962ef5a9e.png",
+      "file": "arcade-03-falling-blocks.png"
+    },
+    {
+      "name": "arcade-04-silhouette-fighter",
+      "width": 512,
+      "height": 512,
+      "prompt": "Generate ONE standalone 512 x 512 square raster image. Screenshot of a fictional 1990s arcade video game attract mode screen, fighting game with two completely original faceless silhouetted robotic characters on a minimal neon arena, low-resolution pixel art evoking 320x240 upscaled with visible hard-edged pixels, bright saturated colors on black, a simple title logo made ONLY of abstract geometric shapes, the exact words \"INSERT COIN\" at the bottom, a numeric score counter at the top, full frame, no bezel, no cabinet, no reflections. Completely original fictional graphics, no imitation of any existing game, characters or distinctive game layout. Art fills the entire square canvas; no border or real-world objects. Pixel art only, no smoothing or photographic shading. Avoid: real game titles, real characters, brand logos, copyrighted art, photo of a cabinet, screen bezel, curved glass reflections, people, watermark. Output resolution exactly 512 x 512.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-173d5844-6a98-41b8-9984-c4028155121d.png",
+      "file": "arcade-04-silhouette-fighter.png"
+    },
+    {
+      "name": "arcade-05-abstract-maze",
+      "width": 512,
+      "height": 512,
+      "prompt": "Generate ONE standalone 512 x 512 square raster image. Screenshot of a fictional 1990s arcade video game attract mode screen, maze game with dots and ghosts-like abstract enemies made of asymmetric triangles; player is a small diamond, no familiar round mouth character, low-resolution pixel art evoking 320x240 upscaled with visible hard-edged pixels, bright saturated colors on black, a simple title logo made ONLY of abstract geometric shapes, the exact words \"INSERT COIN\" at the bottom, a numeric score counter at the top, full frame, no bezel, no cabinet, no reflections. Completely original fictional graphics, no imitation of any existing game, characters or distinctive game layout. Art fills the entire square canvas; no border or real-world objects. Pixel art only, no smoothing or photographic shading. Avoid: real game titles, real characters, brand logos, copyrighted art, photo of a cabinet, screen bezel, curved glass reflections, people, watermark. Output resolution exactly 512 x 512.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-2ba3bc42-1ad7-4160-8386-67998e810cd9.png",
+      "file": "arcade-05-abstract-maze.png"
+    },
+    {
+      "name": "arcade-06-undersea",
+      "width": 512,
+      "height": 512,
+      "prompt": "Generate ONE standalone 512 x 512 square raster image. Screenshot of a fictional 1990s arcade video game attract mode screen, underwater action game with a tiny original submarine and geometric mechanical sea creatures, low-resolution pixel art evoking 320x240 upscaled with visible hard-edged pixels, bright saturated colors on black, a simple title logo made ONLY of abstract geometric shapes, the exact words \"INSERT COIN\" at the bottom, a numeric score counter at the top, full frame, no bezel, no cabinet, no reflections. Completely original fictional graphics, no imitation of any existing game, characters or distinctive game layout. Art fills the entire square canvas; no border or real-world objects. Pixel art only, no smoothing or photographic shading. Avoid: real game titles, real characters, brand logos, copyrighted art, photo of a cabinet, screen bezel, curved glass reflections, people, watermark. Output resolution exactly 512 x 512.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-a39dad90-5759-49a7-ace8-07deb2005062.png",
+      "file": "arcade-06-undersea.png"
+    },
+    {
+      "name": "arcade-07-orbital-pinball",
+      "width": 512,
+      "height": 512,
+      "prompt": "Generate ONE standalone 512 x 512 square raster image. Screenshot of a fictional 1990s arcade video game attract mode screen, futuristic orbital pinball game with luminous ramps and polygonal targets, low-resolution pixel art evoking 320x240 upscaled with visible hard-edged pixels, bright saturated colors on black, a simple title logo made ONLY of abstract geometric shapes, the exact words \"INSERT COIN\" at the bottom, a numeric score counter at the top, full frame, no bezel, no cabinet, no reflections. Completely original fictional graphics, no imitation of any existing game, characters or distinctive game layout. Art fills the entire square canvas; no border or real-world objects. Pixel art only, no smoothing or photographic shading. Avoid: real game titles, real characters, brand logos, copyrighted art, photo of a cabinet, screen bezel, curved glass reflections, people, watermark. Output resolution exactly 512 x 512.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-aa87aa07-1c60-4fe7-ae2d-875cc60901d5.png",
+      "file": "arcade-07-orbital-pinball.png"
+    },
+    {
+      "name": "arcade-08-crystal-platformer",
+      "width": 512,
+      "height": 512,
+      "prompt": "Generate ONE standalone 512 x 512 square raster image. Screenshot of a fictional 1990s arcade video game attract mode screen, side-view platform game with an original small one-wheeled robot exploring floating crystalline platforms, low-resolution pixel art evoking 320x240 upscaled with visible hard-edged pixels, bright saturated colors on black, a simple title logo made ONLY of abstract geometric shapes, the exact words \"INSERT COIN\" at the bottom, a numeric score counter at the top, full frame, no bezel, no cabinet, no reflections. Completely original fictional graphics, no imitation of any existing game, characters or distinctive game layout. Art fills the entire square canvas; no border or real-world objects. Pixel art only, no smoothing or photographic shading. Avoid: real game titles, real characters, brand logos, copyrighted art, photo of a cabinet, screen bezel, curved glass reflections, people, watermark. Output resolution exactly 512 x 512.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-d242d75d-cfd7-472b-8f36-e1707ee18e85.png",
+      "file": "arcade-08-crystal-platformer.png"
+    },
+    {
+      "name": "computer-01-green-terminal",
+      "width": 512,
+      "height": 384,
+      "prompt": "Generate ONE standalone landscape 512 x 384 raster image, exactly 4:3. Full-screen capture of a fictional early-1990s computer display, green monochrome text terminal with a bright block cursor and short lines of fictional system messages such as \"NODE READY\", \"BUFFER OK\", \"LINK IDLE\" and \"WAITING\"; black background, low resolution with visible scanline-friendly hard-edged pixels, limited color palette, no real operating system logos or brand names, no monitor bezel, flat. Direct digital framebuffer capture, full bleed, no physical monitor, no glass reflection, no perspective, no glow outside the lettering, no vignette, no photographic background. Avoid actual OS branding or recognizable proprietary screen designs, people, watermark, border. Output resolution exactly 512 x 384.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-477d274c-a84e-4599-9c60-36fc0e1e0a57.png",
+      "file": "computer-01-green-terminal.png"
+    },
+    {
+      "name": "computer-02-blue-spreadsheet",
+      "width": 512,
+      "height": 384,
+      "prompt": "Generate ONE standalone landscape 512 x 384 raster image, exactly 4:3. Full-screen capture of a fictional early-1990s computer display, blue text-mode spreadsheet with a grid of numbers, pale cyan grid lines and small white monospaced numeric cell contents, low resolution with visible scanline-friendly hard-edged pixels, limited color palette, no real operating system logos or brand names, no monitor bezel, flat. Direct digital framebuffer capture, full bleed, no physical monitor, no glass reflection, no perspective, no glow outside the lettering, no vignette, no photographic background. Avoid actual OS branding or recognizable proprietary screen designs, people, watermark, border. Output resolution exactly 512 x 384.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-c0f3b16b-6950-499d-a409-69a5a406161c.png",
+      "file": "computer-02-blue-spreadsheet.png"
+    },
+    {
+      "name": "computer-03-grey-desktop",
+      "width": 512,
+      "height": 384,
+      "prompt": "Create one 4:3 flat digital screenshot of a completely invented 1991 workstation desktop. Target 512x384 pixels. Only four shades of grey, crisp low-resolution pixel graphics. Grey workspace with 3 plain outlined folder icons along RIGHT edge. Two generic rectangular floating utility panels at center. Each panel has a narrow VERTICAL label strip on its LEFT with only a small diamond close control at the BOTTOM of that strip, not conventional title bars. One panel contains simple black geometric charts, another contains three rows of tiny generic file glyphs. A compact three-button tool palette floats at bottom center, detached from all edges. No top menu bar, no bottom taskbar, no start menu, no blue titlebars, no traffic-light buttons, no real OS logos, no brand names, no familiar real OS UI layout. Minimal text such as DATA and FILES only. Flat full-frame framebuffer capture, no monitor bezel, no perspective, no reflections, no texture or photographic background. Early 1990s generic low resolution grey windowed desktop with folder icons, original fictional interface.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-42fb927e-149a-4d94-935c-f1e7bbddeae5.png",
+      "file": "computer-03-grey-desktop.png"
+    },
+    {
+      "name": "computer-04-no-signal",
+      "width": 512,
+      "height": 384,
+      "prompt": "Generate ONE standalone landscape 512 x 384 raster image, exactly 4:3. Full-screen capture of a fictional early-1990s computer display, black screen showing only the exact words \"NO SIGNAL\" in the center, in plain white monospaced pixel lettering; no cursor, icons or other marks, low resolution with visible scanline-friendly hard-edged pixels, limited color palette, no real operating system logos or brand names, no monitor bezel, flat. Direct digital framebuffer capture, full bleed, no physical monitor, no glass reflection, no perspective, no glow outside the lettering, no vignette, no photographic background. Avoid actual OS branding or recognizable proprietary screen designs, people, watermark, border. Output resolution exactly 512 x 384.",
+      "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-53aa64f0-ada1-4fc7-9b06-8cd5e11ef64f.png",
+      "file": "computer-04-no-signal.png"
+    }
+  ]
+}

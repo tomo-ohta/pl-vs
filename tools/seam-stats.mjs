@@ -42,6 +42,10 @@ const WITH_MODS = opt('no-mods', false) === false;
 // --take-seams: 意図的 Seam 扉（Legendary 遠方配置・エレベーター以外の hook）も通常の扉と同じく未踏破なら進む（プレイヤーに近い踏破）。
 // 既定（無し）は従来どおり行き止まりで戻る先も無いときだけ通る（dead-end 計測の基準を変えないため）
 const TAKE_SEAMS = opt('take-seams', false) !== false;
+// --monument-detail: 巨大モニュメントの無い Legendary の部屋を stderr に出す
+const MON_DETAIL = opt('monument-detail', false) !== false;
+// --check-vending: 本体の無い自販機の前面箔（U04 の「ただの発光する板」）を stderr に出す
+const CHECK_VENDING = opt('check-vending', false) !== false;
 
 // ------------------------------------------------------------ 束ね（rolldown）
 const tmp = mkdtempSync(join(tmpdir(), 'seamstats-'));
@@ -192,6 +196,43 @@ function measure(M, seed, n) {
     if (!nd.isAdapter && nd.placement) {
       const L = world.layoutFor(nd);
       r.area += L.footprint.reduce((a, q) => a + (q.x1 - q.x0) * (q.z1 - q.z0), 0);
+      // モニュメント（第17回）: レア度ごとに 部屋数 / 置かれた部屋 / 基数 / 巨大（colossus）
+      if (nd.visited) {
+        const k = ROOM_BY_ID.get(nd.definitionId)?.rarity ?? '?';
+        const m = (r.monuments ??= {})[k] ??= { rooms: 0, withMon: 0, count: 0, giant: 0 };
+        const mons = (L.monuments ?? []).filter((x) => x.kind !== 'clutter');
+        const clutter = (L.monuments ?? []).filter((x) => x.kind === 'clutter').length;
+        (r.clutterRooms ??= {})[k] = ((r.clutterRooms ??= {})[k] ?? 0) + (clutter ? 1 : 0);
+        m.rooms++;
+        const od = [L.oddity?.theme, ...(L.oddity?.accents ?? [])].filter((x) => x && x.startsWith('disorder.'));
+        for (const x of od) (r.disorder ??= {})[x] = ((r.disorder ??= {})[x] ?? 0) + 1;
+        if (od.length) (r.disorderRooms ??= {})[k] = ((r.disorderRooms ??= {})[k] ?? 0) + 1;
+        // 乱れで動かした物の種類（disorder.ts のメモ `disorder kinds: washer×40 table×3`）
+        for (const nt of L.oddity?.notes ?? []) {
+          if (!nt.startsWith('disorder kinds: ')) continue;
+          for (const tok of nt.slice(16).split(' ')) { const [kk, vv] = tok.split('×'); if (kk && vv) (r.disorderKinds ??= {})[kk] = ((r.disorderKinds ??= {})[kk] ?? 0) + Number(vv); }
+        }
+        if (mons.length) m.withMon++;
+        m.count += mons.length;
+        m.giant += mons.filter((x) => x.kind === 'colossus').length;
+        for (const x of mons) (r.monumentKinds ??= {})[x.kind] = (r.monumentKinds[x.kind] ?? 0) + 1;
+        if (CHECK_VENDING) {
+          // 自販機の前面の発光箔（lightPanel の縦の薄板）で、隣に自販機の本体（kind 'vending' のソリッド）が無いもの
+          const bodies = L.boxes.filter((b) => b.solid && b.kind === 'vending');
+          for (const f of L.boxes) {
+            if (f.solid || f.mat !== 'lightPanel' || f.max[1] - f.min[1] < 0.9 || f.min[1] > 1.0 || Math.min(f.max[0] - f.min[0], f.max[2] - f.min[2]) > 0.05) continue;
+            const near = bodies.some((b) => f.min[0] < b.max[0] + 0.08 && f.max[0] > b.min[0] - 0.08 && f.min[2] < b.max[2] + 0.08 && f.max[2] > b.min[2] - 0.08);
+            if (!near) {
+              console.error(`[vending?] seed ${seed} ${nd.definitionId} ${nd.roomId} plate ${f.min.map((v) => v.toFixed(2))} .. ${f.max.map((v) => v.toFixed(2))} odd ${JSON.stringify(L.oddity?.theme)} ${JSON.stringify(L.oddity?.accents)}`);
+              for (const b of L.boxes) if (b !== f && b.min[0] < f.max[0] + 1.2 && b.max[0] > f.min[0] - 1.2 && b.min[2] < f.max[2] + 1.2 && b.max[2] > f.min[2] - 1.2 && b.min[1] < 2 && b.max[1] > 0.3) console.error(`   near ${b.mat} ${b.kind ?? ''} ${b.solid ? 'S' : '-'} ${b.min.map((v) => v.toFixed(2))} .. ${b.max.map((v) => v.toFixed(2))}`);
+            }
+          }
+        }
+        if (MON_DETAIL && k === 'Legendary' && !mons.some((x) => x.kind === 'colossus')) {
+          const q = L.footprint[0];
+          console.error(`[giant?] ${nd.definitionId} short ${q ? Math.min(q.x1 - q.x0, q.z1 - q.z0).toFixed(1) : '-'} h ${L.height.toFixed(1)} notes ${(L.oddity?.notes ?? []).filter((t) => /giant|monument|normal/.test(t)).join(' | ')}`);
+        }
+      }
     }
   }
   r.avgArea = r.rooms ? Math.round(r.area / r.rooms) : 0;
@@ -269,6 +310,18 @@ function summarize(rows) {
     avgArea: Math.round(rows.reduce((a, r) => a + r.avgArea, 0) / rows.length),
     ms: sum('ms'),
   };
+  s.monuments = {};
+  s.monumentKinds = {};
+  for (const r of rows) {
+    for (const [k, v] of Object.entries(r.monuments ?? {})) { const t = s.monuments[k] ??= { rooms: 0, withMon: 0, count: 0, giant: 0 }; for (const f2 of ['rooms', 'withMon', 'count', 'giant']) t[f2] += v[f2]; }
+    for (const [k, v] of Object.entries(r.monumentKinds ?? {})) s.monumentKinds[k] = (s.monumentKinds[k] ?? 0) + v;
+  }
+  s.disorder = {}; s.disorderRooms = {}; s.disorderKinds = {};
+  for (const r of rows) {
+    for (const [k, v] of Object.entries(r.disorderKinds ?? {})) s.disorderKinds[k] = (s.disorderKinds[k] ?? 0) + v;
+    for (const [k, v] of Object.entries(r.disorder ?? {})) s.disorder[k] = (s.disorder[k] ?? 0) + v;
+    for (const [k, v] of Object.entries(r.disorderRooms ?? {})) s.disorderRooms[k] = (s.disorderRooms[k] ?? 0) + v;
+  }
   s.rarity = {};
   s.rarityPlaced = {};
   for (const r of rows) {
@@ -310,6 +363,12 @@ function markdown(s, rows) {
   };
   lines.push(`| 踏破した部屋のレア度（件・%） | ${rarLine(s.rarity)} |`);
   lines.push(`| 配置された部屋のレア度（件・%） | ${rarLine(s.rarityPlaced)} |`);
+  const monLine = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'].map((k) => { const m = s.monuments?.[k]; return m ? `${k} ${m.withMon}/${m.rooms}（${f(per100(m.withMon, m.rooms))}%、${m.count} 基、巨大 ${m.giant}）` : `${k} -`; }).join(' / ');
+  lines.push(`| モニュメントのある部屋（踏破した部屋） | ${monLine} |`);
+  lines.push(`| 乱れ（転倒・散乱・積み重なり・重なり）のある部屋 | ${['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'].map((k) => `${k} ${s.disorderRooms?.[k] ?? 0}/${s.monuments?.[k]?.rooms ?? 0}（${f(per100(s.disorderRooms?.[k] ?? 0, s.monuments?.[k]?.rooms ?? 0))}%）`).join(' / ')} |`);
+  lines.push(`| 乱れで動かした物（種類 × 個数） | ${Object.entries(s.disorderKinds ?? {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(' / ')} |`);
+  lines.push(`| 乱れの内訳 | ${Object.entries(s.disorder ?? {}).map(([k, v]) => `${k.replace('disorder.', '')} ${v}`).join(' / ')} |`);
+  lines.push(`| モニュメントの種類（基） | ${Object.entries(s.monumentKinds ?? {}).map(([k, v]) => `${k} ${v}`).join(' / ')} |`);
   lines.push(`| 所要時間（ms、決定論の 2 回目を除く） | ${s.ms} |`);
   lines.push('');
   lines.push(`| seed | 踏破 | ノード | 部屋 | 前室 | seam | dead-end | 施錠/扉 | 重なり | 決定論 | load不一致 |`);

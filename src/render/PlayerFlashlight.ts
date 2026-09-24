@@ -1,10 +1,18 @@
 import * as THREE from 'three';
 
+/** 照度を一定に保つ距離（m）。これより遠い面は距離² で暗くなる */
+const NEAR_REF = 4;
+/**
+ * 強度（カンデラ相当）。NEAR_REF での照度 = 88 / 16 = 5.5（旧 114 / 3 m = 12.7 の約 4 割）。明るい床・漆喰（反射率 0.8）でも
+ * 露出後 0.4 前後に収まり、にじみ（LensPass の glow）の閾値 0.8 を超えにくい
+ */
+const BASE_INTENSITY = 88;
+
 /** A carried torch: position follows the player, aim follows the displayed camera with inertia. */
 export class PlayerFlashlight {
   // 半角 43°（旧 26°）・ペナンブラ 1.0（縁まで滑らか）・放射状の減衰マップ（中心 32% に芯、そこから縁へ薄い裾）で、
   // 照らした場所の円形の縁を消し、周囲がわずかに明るくなる「拡散した光」にする
-  readonly light = new THREE.SpotLight(0xffeed5, 95, 22, Math.PI / 4.2, 1.0, 2);
+  readonly light = new THREE.SpotLight(0xffeed5, BASE_INTENSITY, 22, Math.PI / 4.2, 1.0, 2);
   private readonly aim = new THREE.Quaternion();
   private readonly wanted = new THREE.Quaternion();
   private readonly sway = new THREE.Quaternion();
@@ -62,15 +70,19 @@ export class PlayerFlashlight {
     return tex;
   }
 
-  /** 正面の面までの距離に応じた減光の現在値（1 = 遠い、0.12 = 密着） */
+  /** 正面の面までの距離に応じた減光の現在値（1 = 遠い。NEAR_REF より近いと距離² に比例して下がる） */
   private nearScale = 1;
   /**
-   * @param hitDistance 視線方向の最寄りの面までの距離（m。無ければ Infinity）。近い壁・扉に光が集中して白飛びしないよう、
-   *   3 m 以内で強度を距離の 1.8 乗で落とす（0.5 m で 7%、1 m で 14%、2 m で 48%）。変化は 0.12 s で追従
+   * @param hitDistance 視線方向の最寄りの面までの距離（m。無ければ Infinity）。照らした面の明るさ（照度 = 強度 / 距離²）が
+   *   NEAR_REF m より近くで一定になるよう、強度を (距離 / NEAR_REF)² に比例させる（家庭用ビデオの自動絞りのように、壁・床に寄っても
+   *   白く飛ばない）。変化は 0.12 s で追従（近づく = 暗くする側は 0.06 s で速く）
    */
   update(camera: THREE.Camera, dt: number, enabled: boolean, low = false, hitDistance = Infinity): void {
-    this.light.visible = enabled;
-    if (!enabled) { this.reset(); return; }
+    // 消灯は強度 0 と影マップの更新停止で表す（visible = false にすると numSpotLights / 影の本数が変わり、見えている全材質の
+    // シェーダが作り直される。R キーの切り替えやタイトル画面からの開始で 100 ms 級の停止になっていた）
+    this.light.visible = true;
+    this.light.shadow.autoUpdate = enabled;
+    if (!enabled) { this.light.intensity = 0; this.reset(); return; }
     const step = Math.min(Math.max(dt, 0), .05);
     const distance = this.previous.distanceTo(camera.position);
     if (!this.initialized || distance > 3) {
@@ -95,10 +107,11 @@ export class PlayerFlashlight {
     this.forward.set(0, 0, -1).applyQuaternion(this.aim);
     this.light.target.position.copy(this.light.position).addScaledVector(this.forward, 12);
     // MaterialLibrary applies diffuse scale .8 on low versus .4 on other tiers.
-    // 近接減光: 正面の面が 3 m より近いほど弱く。マップで中心が 0.7 に落ちるぶんは 1.2 倍（従来より少し暗く、白飛びしにくい）
-    const target = Number.isFinite(hitDistance) ? Math.max(0.07, Math.min(1, Math.pow(hitDistance / 3, 1.8))) : 1;
-    this.nearScale += (target - this.nearScale) * Math.min(1, step / 0.12);
-    this.light.intensity = (low ? 47.5 : 95) * 1.2 * this.nearScale;
+    // 近接減光: 照度を NEAR_REF より近くで一定に（旧: 3 m 以内で距離の 1.8 乗・下限 7% → 0.5 m で照度が 4 m の 5 倍になり白飛びしていた）
+    const d = Number.isFinite(hitDistance) ? Math.max(0.2, hitDistance) : Infinity;
+    const target = Math.min(1, (d / NEAR_REF) ** 2);
+    this.nearScale += (target - this.nearScale) * Math.min(1, step / (target < this.nearScale ? 0.06 : 0.12));
+    this.light.intensity = (low ? BASE_INTENSITY / 2 : BASE_INTENSITY) * this.nearScale;
   }
 
   dispose(): void { this.light.removeFromParent(); this.light.target.removeFromParent(); this.light.map?.dispose(); this.light.dispose(); }

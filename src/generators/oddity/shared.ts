@@ -20,7 +20,7 @@ export { alongFace, freeRuns, innerFaces, insideRects, inner, box, WALL_T, boxes
 export type { Face, Rect, Box, MatId, RoomLayout, InstanceSpec, SignSpec, Socket, Vec3, Dir, AABB, Rng, GenParams };
 
 export type Strength = 'weak' | 'strong';
-export type OddCategory = 'layout' | 'contents' | 'surface' | 'light' | 'trace' | 'space';
+export type OddCategory = 'layout' | 'contents' | 'surface' | 'light' | 'trace' | 'space' | 'disorder';
 
 /** 1 つの仕掛け。applicable で部屋に合うかを判定し、apply で足す（strong = 主題、weak = 添え物） */
 export interface Oddity {

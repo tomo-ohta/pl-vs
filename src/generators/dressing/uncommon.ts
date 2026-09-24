@@ -18,7 +18,7 @@ import { dirVec, type Dir, type Socket } from '../../core/types';
 import type { Rng } from '../../core/rng';
 import { across, along, inner, rect, rectArea, wallSpans, type Rect } from '../footprint';
 import { alongFace, doorZones, freeRuns, hitsZone, insideRects, signAt, tubePair, type Face } from '../furniture';
-import { box, kinded, WALL_T, type Box, type GenParams, type InstanceSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
+import { box, kinded, splitScreens, WALL_T, type Box, type GenParams, type InstanceSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
 
 /** テスト用スイッチ: false にすると何もしない（Node ハーネスの before / after 比較。ブラウザでは開発用 `?nodress=1` で無効化 = 構築時間の基準） */
 export const DRESS_UNCOMMON = { enabled: !(typeof location !== 'undefined' && /[?&]nodress=1/.test(location.search)) };
@@ -553,41 +553,204 @@ function hotelSconcesRight(c: Ctx, y: number): void {
   }
 }
 
-// ---- U03 無人エスカレーター: 器具を消し、側壁に上るエスカレーター（青白の段差灯・手すり灯）だけを光らせる
+// ---- U03 無人エスカレーター: 器具を消し、床一面に張り巡らせた動く歩道の網と、側壁に上るエスカレーター（青白の段差灯・手すり灯）だけを光らせる
 
-/** ExternalForce（U03 conveyor 0.8、lanes 1、幅 1.0）が主矩形に置くベルト帯を先読みする（同じ式。乱数は使わない） */
-function u03LaneRect(L: RoomLayout): Rect | null {
-  const main = L.footprint[0];
-  if (!main) return null;
-  const entry = L.sockets.find((s) => s.id === 'entry');
-  const exit = L.sockets.find((s) => s.id !== 'entry' && s.type !== 'hole');
-  let v: [number, number] = [0, 1];
-  if (entry && exit) {
-    const dx = exit.pos[0] - entry.pos[0];
-    const dz = exit.pos[2] - entry.pos[2];
-    if (Math.abs(dx) > 0.5 || Math.abs(dz) > 0.5) v = Math.abs(dz) >= Math.abs(dx) ? [0, Math.sign(dz)] : [Math.sign(dx), 0];
+/** 動く歩道の格子（m）と帯の幅 */
+const U03_CELL = 1.0;
+const U03_BELT_W = 0.9;
+
+/**
+ * 動く歩道（第17回改 2）: 1 m 格子の上を「歩く」経路を何本も引き、経路の直線区間ごとに動く帯を張る。
+ * 経路は 3〜9 マス進んでは左右へ曲がり（逆戻りしない）、壁・扉前・床穴・エスカレーター・他の経路に当たると曲がるか終わる。
+ * 曲がるマスは「曲がる床」（1 マス。内側の角を中心に 1/4 円の流れ。力は 3 × 3 の小区画ごとに円弧の接線方向）で、縦と横の帯を滑らかにつなぐ。
+ * 曲がる床も両縁に発光帯（弧）を持ち、扇形の外は周囲の床のタイルが見える
+ * 他の経路の直線区間に正面から当たったら 4 割でその帯を横切る（こちらの帯はその 1 マスだけ途切れ、向こう側で続く = 十字）。
+ * 他の経路の横に出たら 5 割でそこで合流して終わる。流れは経路の進む向き、速さ（0.6〜1.4 m/s）は経路ごと。
+ * 帯は kind 'lane'（vector・speed・clearSolids、曲がる床は turn / 力だけの小区画は noBelt）で出し、ExternalForce（conveyor）が force ゾーンとベルト面に写す
+ */
+function u03Belts(c: Ctx, avoid: AABB[]): number {
+  const { L, rng } = c;
+  const main = c.rects[0];
+  if (!main) return 0;
+  const ir = inner(main, WALL_T + 0.4);
+  const nx = Math.floor((ir.x1 - ir.x0) / U03_CELL), nz = Math.floor((ir.z1 - ir.z0) / U03_CELL);
+  if (nx < 4 || nz < 4) return 0;
+  const ox = ir.x0 + ((ir.x1 - ir.x0) - nx * U03_CELL) / 2, oz = ir.z0 + ((ir.z1 - ir.z0) - nz * U03_CELL) / 2;
+  const cellRect = (i: number, j: number): Rect => ({ x0: ox + i * U03_CELL, z0: oz + j * U03_CELL, x1: ox + (i + 1) * U03_CELL, z1: oz + (j + 1) * U03_CELL });
+  // 塞がったマス: 扉前・床穴・エスカレーター・シェル側の柱
+  const blockers: AABB[] = [...c.zones, ...avoid, ...L.holes.map((h) => ({ min: [h.min[0] - 0.6, -1, h.min[2] - 0.6], max: [h.max[0] + 0.6, 3, h.max[2] + 0.6] }) as AABB)];
+  for (const b of L.boxes.slice(0, c.start)) if (b.solid && b.max[1] - b.min[1] > 0.5 && b.max[1] > 0.3 && b.min[1] < 2 && b.min[0] > ir.x0 - 0.5 && b.max[0] < ir.x1 + 0.5 && b.min[2] > ir.z0 - 0.5 && b.max[2] < ir.z1 + 0.5) blockers.push(b);
+  const owner = new Int16Array(nx * nz).fill(-1); // -2 = 塞がり、>= 0 = 経路番号
+  /** マスの向き（経路の進む向きの番号 0..3）。曲がるマスは -1（横切れない） */
+  const straightDir = new Int8Array(nx * nz).fill(-1);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const r = cellRect(i, j);
+    if (blockers.some((z) => z.min[0] < r.x1 && z.max[0] > r.x0 && z.min[2] < r.z1 && z.max[2] > r.z0 && z.min[1] < 1.2)) owner[j * nx + i] = -2;
   }
-  const ir = inner(main, WALL_T + 0.3);
-  const alongX = Math.abs(v[0]) > Math.abs(v[1]);
-  const a0 = (alongX ? ir.x0 : ir.z0) + 0.8;
-  const a1 = (alongX ? ir.x1 : ir.z1) - 0.8;
-  if (a1 - a0 < 4) return null;
-  const c0 = alongX ? ir.z0 : ir.x0;
-  const c1 = alongX ? ir.z1 : ir.x1;
-  if (c1 - c0 < 1.0) return null;
-  let center = (c0 + c1) / 2;
-  if (entry && entry.type !== 'hole') {
-    const d = dirVec(entry.dir);
-    const onEnd = alongX ? Math.abs(d[0]) > 0.5 : Math.abs(d[2]) > 0.5;
-    if (onEnd) center = alongX ? entry.pos[2] : entry.pos[0];
+  const DIRS: [number, number][] = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  const at = (i: number, j: number) => (i < 0 || j < 0 || i >= nx || j >= nz ? -2 : owner[j * nx + i]);
+  /** マス (i, j) に経路 p が入れるか。'join' = 他の経路の横（そこで合流して終われる） */
+  const test = (i: number, j: number, p: number, fromI: number, fromJ: number): 'ok' | 'join' | 'no' => {
+    if (at(i, j) !== -1) return 'no';
+    let other = false;
+    for (const [dx, dz] of DIRS) {
+      const ni = i + dx, nj = j + dz;
+      if (ni === fromI && nj === fromJ) continue;
+      const o = at(ni, nj);
+      if (o === p) return 'no'; // 自分の横へ折り返さない
+      if (o >= 0) other = true;
+    }
+    return other ? 'join' : 'ok';
+  };
+  const speeds = [0.6, 0.8, 1.0, 1.4];
+  // 経路 = マスの列。null は「他の帯を横切った切れ目」
+  const paths: { cells: ([number, number] | null)[]; speed: number }[] = [];
+  let taken = 0;
+  const free0 = owner.reduce((a, v) => a + (v === -1 ? 1 : 0), 0);
+  const setDir = (cells: ([number, number] | null)[]) => {
+    for (let k = 0; k < cells.length; k++) {
+      const q = cells[k];
+      if (!q) continue;
+      const prev = cells[k - 1], next = cells[k + 1];
+      const din = prev ? DIRS.findIndex(([dx, dz]) => dx === q[0] - prev[0] && dz === q[1] - prev[1]) : -1;
+      const dout = next ? DIRS.findIndex(([dx, dz]) => dx === next[0] - q[0] && dz === next[1] - q[1]) : -1;
+      straightDir[q[1] * nx + q[0]] = din >= 0 && dout >= 0 && din !== dout ? -1 : (dout >= 0 ? dout : din);
+    }
+  };
+  for (let attempt = 0; attempt < 100 && taken < free0 * 0.34; attempt++) {
+    const p = paths.length;
+    const si = rng.int(0, nx - 1), sj = rng.int(0, nz - 1);
+    if (test(si, sj, p, -9, -9) !== 'ok') continue;
+    const cells: ([number, number] | null)[] = [[si, sj]];
+    owner[sj * nx + si] = p;
+    let d = rng.int(0, 3), run = rng.int(3, 9), ci = si, cj = sj;
+    let count = 1;
+    while (count < 42) {
+      const tryDirs = run > 0 ? [d] : [];
+      const turns = rng.chance(0.5) ? [(d + 1) % 4, (d + 3) % 4] : [(d + 3) % 4, (d + 1) % 4];
+      if (run <= 0 && rng.chance(0.25)) tryDirs.push(d);
+      tryDirs.push(...turns);
+      let moved = false, joined = false;
+      for (const nd of tryDirs) {
+        const ni = ci + DIRS[nd][0], nj = cj + DIRS[nd][1];
+        // 十字: 正面の他の経路の直線区間（向きが直交）を 1 マス飛び越える。直前のマスが曲がりでないこと（曲がる床の直後に切れ目を作らない）
+        const o = at(ni, nj);
+        if (nd === d && o >= 0 && o !== p && straightDir[nj * nx + ni] >= 0 && straightDir[nj * nx + ni] % 2 !== nd % 2 && cells.length >= 2 && cells[cells.length - 2] && rng.chance(0.4)) {
+          const bi = ni + DIRS[nd][0], bj = nj + DIRS[nd][1];
+          if (test(bi, bj, p, ni, nj) === 'ok') {
+            cells.push(null, [bi, bj]);
+            owner[bj * nx + bi] = p;
+            ci = bi; cj = bj; run = Math.max(run - 2, 2); count++;
+            moved = true;
+            break;
+          }
+        }
+        const t = test(ni, nj, p, ci, cj);
+        if (t === 'no') continue;
+        if (t === 'join' && !rng.chance(0.5)) continue;
+        if (nd !== d) run = rng.int(3, 9);
+        d = nd; ci = ni; cj = nj;
+        owner[nj * nx + ni] = p;
+        cells.push([ni, nj]);
+        run--; count++;
+        moved = true;
+        joined = t === 'join';
+        break;
+      }
+      if (!moved || joined) break;
+    }
+    if (count < 4) { for (const q of cells) if (q) owner[q[1] * nx + q[0]] = -1; continue; }
+    setDir(cells);
+    paths.push({ cells, speed: rng.pick(speeds) });
+    taken += count;
   }
-  center = Math.min(c1 - 0.5, Math.max(c0 + 0.5, center));
-  return alongX ? { x0: a0, z0: center - 0.5, x1: a1, z1: center + 0.5 } : { x0: center - 0.5, z0: a0, x1: center + 0.5, z1: a1 };
+  // 経路 → 直線区間（帯）と曲がる床。切れ目（null）で区切る
+  L.zones ??= [];
+  const runs: { r: Rect; v: [number, number, number]; speed: number }[] = [];
+  const turnsOut: { i: number; j: number; a: [number, number]; b: [number, number]; speed: number }[] = [];
+  for (const path of paths) {
+    const chunks: [number, number][][] = [[]];
+    for (const q of path.cells) { if (q) chunks[chunks.length - 1].push(q); else chunks.push([]); }
+    for (const cs of chunks) {
+      if (!cs.length) continue;
+      const dirAt = (k: number): [number, number] => k + 1 < cs.length ? [cs[k + 1][0] - cs[k][0], cs[k + 1][1] - cs[k][1]] : k > 0 ? [cs[k][0] - cs[k - 1][0], cs[k][1] - cs[k - 1][1]] : [1, 0];
+      const isTurn = (k: number) => k > 0 && k + 1 < cs.length && (dirAt(k - 1)[0] !== dirAt(k)[0] || dirAt(k - 1)[1] !== dirAt(k)[1]);
+      let k0 = -1;
+      const flush = (k1: number) => {
+        if (k0 < 0) return;
+        const [dx, dz] = dirAt(k0);
+        const a = cellRect(cs[k0][0], cs[k0][1]), b = cellRect(cs[k1][0], cs[k1][1]);
+        const x0 = Math.min(a.x0, b.x0), x1 = Math.max(a.x1, b.x1), z0 = Math.min(a.z0, b.z0), z1 = Math.max(a.z1, b.z1);
+        const inset = (U03_CELL - U03_BELT_W) / 2;
+        runs.push({ r: dx !== 0 ? { x0, z0: z0 + inset, x1, z1: z1 - inset } : { x0: x0 + inset, z0, x1: x1 - inset, z1 }, v: [dx, 0, dz], speed: path.speed });
+        k0 = -1;
+      };
+      for (let k = 0; k < cs.length; k++) {
+        if (isTurn(k)) {
+          flush(k - 1);
+          turnsOut.push({ i: cs[k][0], j: cs[k][1], a: dirAt(k - 1), b: dirAt(k), speed: path.speed });
+          continue;
+        }
+        if (k0 < 0) k0 = k;
+      }
+      flush(cs.length - 1);
+    }
+  }
+  if (!runs.length) return 0;
+  // 帯と曲がる床に掛かる内装のソリッド（床から 1.5 m 未満に掛かるもの）は取り除く
+  const areas: Rect[] = [...runs.map((k) => k.r), ...turnsOut.map((t) => cellRect(t.i, t.j))];
+  const keepBoxes: Box[] = L.boxes.slice(0, c.start);
+  for (const b of L.boxes.slice(c.start)) {
+    if (b.solid && b.min[1] < 1.5 && areas.some((r) => b.min[0] < r.x1 - 0.05 && b.max[0] > r.x0 + 0.05 && b.min[2] < r.z1 - 0.05 && b.max[2] > r.z0 + 0.05)) continue;
+    keepBoxes.push(b);
+  }
+  L.boxes.length = 0;
+  L.boxes.push(...keepBoxes);
+  let lane = 0;
+  for (const k of runs) {
+    const { r } = k;
+    L.zones.push({ kind: 'lane', aabb: { min: [r.x0, -0.2, r.z0], max: [r.x1, 1.2, r.z1] }, vector: k.v, params: { lane: lane++, speed: k.speed, clearSolids: true, belt: true } });
+    // ベルトの台（暗いゴム）と両縁の青い灯
+    L.boxes.push(box([r.x0, 0, r.z0], [r.x1, 0.015, r.z1], 'rubber', false));
+    if (k.v[0] !== 0) {
+      L.boxes.push(box([r.x0, 0.005, r.z0], [r.x1, 0.035, r.z0 + 0.05], 'ledBlue', false));
+      L.boxes.push(box([r.x0, 0.005, r.z1 - 0.05], [r.x1, 0.035, r.z1], 'ledBlue', false));
+    } else {
+      L.boxes.push(box([r.x0, 0.005, r.z0], [r.x0 + 0.05, 0.035, r.z1], 'ledBlue', false));
+      L.boxes.push(box([r.x1 - 0.05, 0.005, r.z0], [r.x1, 0.035, r.z1], 'ledBlue', false));
+    }
+    c.extraZones.push({ min: [r.x0 - 0.3, -0.2, r.z0 - 0.3], max: [r.x1 + 0.3, 2.5, r.z1 + 0.3] });
+  }
+  // 曲がる床: 内側の角（入る辺と出る辺が接する角）を中心に 1/4 円。力は 3 × 3 の小区画ごとに円弧の接線、見た目は扇形のベルト面（ExternalForce）
+  for (const t of turnsOut) {
+    const r = cellRect(t.i, t.j);
+    const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
+    const center: [number, number] = [cx + (-t.a[0] + t.b[0]) * U03_CELL / 2, cz + (-t.a[1] + t.b[1]) * U03_CELL / 2];
+    // 回る向き: 入口の辺の中点で接線が a を向く側
+    const ex = cx - t.a[0] * U03_CELL / 2, ez = cz - t.a[1] * U03_CELL / 2;
+    const rx = ex - center[0], rz = ez - center[1];
+    const ccw = -rz * t.a[0] + rx * t.a[1] > 0 ? 1 : -1; // (x, z) → (−z, x) が a と同じ向きなら +1
+    L.zones.push({ kind: 'lane', aabb: { min: [r.x0, -0.2, r.z0], max: [r.x1, 1.2, r.z1] }, vector: [t.b[0], 0, t.b[1]], params: { lane: lane++, speed: 0, beltSpeed: t.speed, clearSolids: true, turn: { center, a: t.a, b: t.b, ccw, cell: U03_CELL } } });
+    const n = 3, h = U03_CELL / n;
+    for (let si = 0; si < n; si++) for (let sj = 0; sj < n; sj++) {
+      const px = r.x0 + (si + 0.5) * h, pz = r.z0 + (sj + 0.5) * h;
+      const qx = px - center[0], qz = pz - center[1];
+      const l = Math.hypot(qx, qz) || 1;
+      L.zones.push({ kind: 'lane', aabb: { min: [px - h / 2, -0.2, pz - h / 2], max: [px + h / 2, 1.2, pz + h / 2] }, vector: [(-qz / l) * ccw, 0, (qx / l) * ccw], params: { lane: -1, speed: t.speed, clearSolids: true, noBelt: true } });
+    }
+    // 扇形の外（外側の角・内側の角）は周囲の床のまま（ゴムの台は敷かない）。両縁の発光帯は ExternalForce が弧で描く
+    c.extraZones.push({ min: [r.x0 - 0.3, -0.2, r.z0 - 0.3], max: [r.x1 + 0.3, 2.5, r.z1 + 0.3] });
+  }
+  // 帯の上の青い灯（長い区間の中点から 5 箇所まで）
+  const lit = [...runs].sort((a, b) => (b.r.x1 - b.r.x0 + b.r.z1 - b.r.z0) - (a.r.x1 - a.r.x0 + a.r.z1 - a.r.z0)).slice(0, 5);
+  for (const { r } of lit) L.lights.push({ pos: [(r.x0 + r.x1) / 2, 2.3, (r.z0 + r.z1) / 2], color: 0x79b9cf, intensity: 0.55, distance: 7 });
+  c.note(`U03: walkway paths ${paths.length}, turns ${turnsOut.length}, cells ${taken}/${free0}`);
+  return runs.length;
 }
 
 function u03(c: Ctx): void {
   const { L } = c;
-  // 周囲暗転: 天窓帯・吊りパネルを消灯、点光源は捨てる（ExternalForce がベルト沿いの青い光を足し、ここでエスカレーターの 2 灯を足す）
+  // 周囲暗転: 天窓帯・吊りパネルを消灯、点光源は捨てる（網の交点の青い光とエスカレーターの 2 灯だけ）
   setPanels(c, 'lightOff');
   for (let i = c.start; i < L.boxes.length; i++) {
     const b = L.boxes[i];
@@ -598,21 +761,16 @@ function u03(c: Ctx): void {
   L.palette.lightColor = 0x9fd0ff;
   L.palette.lightIntensity = 0.6;
   L.palette.ambient = 0x262a33;
-  // ExternalForce のベルト帯（+ 隣の停止ベルト候補）は避ける
-  const lane = u03LaneRect(L);
-  if (lane) {
-    c.extraZones.push({ min: [lane.x0 - 0.4, -0.2, lane.z0 - 0.4], max: [lane.x1 + 0.4, 2.5, lane.z1 + 0.4] });
-    const alongX = lane.x1 - lane.x0 > lane.z1 - lane.z0;
-    const ir = inner(c.rects[0], WALL_T + 0.3);
-    const w = alongX ? lane.z1 - lane.z0 : lane.x1 - lane.x0;
-    const cand: Rect[] = alongX
-      ? [{ x0: lane.x0, z0: lane.z1 + 1.5, x1: lane.x1, z1: lane.z1 + 1.5 + w }, { x0: lane.x0, z0: lane.z0 - 1.5 - w, x1: lane.x1, z1: lane.z0 - 1.5 }]
-      : [{ x0: lane.x1 + 1.5, z0: lane.z0, x1: lane.x1 + 1.5 + w, z1: lane.z1 }, { x0: lane.x0 - 1.5 - w, z0: lane.z0, x1: lane.x0 - 1.5, z1: lane.z1 }];
-    const fits = (r: Rect) => r.x0 >= ir.x0 && r.x1 <= ir.x1 && r.z0 >= ir.z0 && r.z1 <= ir.z1 && !L.sockets.some((s) => s.pos[0] > r.x0 - 1 && s.pos[0] < r.x1 + 1 && s.pos[2] > r.z0 - 1 && s.pos[2] < r.z1 + 1);
-    const dec = cand.find(fits);
-    if (dec) c.extraZones.push({ min: [dec.x0 - 0.3, -0.2, dec.z0 - 0.3], max: [dec.x1 + 0.3, 2.5, dec.z1 + 0.3] });
-  }
-  if (!placeEscalator(c, lane)) c.note('U03: escalator omitted (no free side wall)');
+  // 先に側壁のエスカレーターを置き、その足跡（+ 乗り口 1.2 m）を避けて動く歩道の網を張る
+  const before = L.boxes.length;
+  const esc = placeEscalator(c, null);
+  if (!esc) c.note('U03: escalator omitted (no free side wall)');
+  const escBoxes = L.boxes.slice(before).filter((b) => b.solid);
+  const avoid: AABB[] = escBoxes.length
+    ? [{ min: [Math.min(...escBoxes.map((b) => b.min[0])) - 1.2, 0, Math.min(...escBoxes.map((b) => b.min[2])) - 1.2], max: [Math.max(...escBoxes.map((b) => b.max[0])) + 1.2, 4, Math.max(...escBoxes.map((b) => b.max[2])) + 1.2] }]
+    : [];
+  const n = u03Belts(c, avoid);
+  c.note(`U03: moving walkways ${n}`);
 }
 
 /** 側壁に沿って上るエスカレーター。段は床から積んだソリッド、両側のステンレスの腰板、段の縁と手すり下の青い灯、上の踊り場 */
@@ -1247,9 +1405,8 @@ function u13(c: Ctx): void {
 function u14(c: Ctx): void {
   const { L, rng } = c;
   const desks = L.boxes.slice(c.start).filter((b) => b.solid && b.kind === 'desk' && b.max[1] - b.min[1] > 0.6 && b.max[1] - b.min[1] < 0.9);
-  const body: InstanceSpec = { mat: 'signPlate', size: [0.4, 0.34, 0.38], transforms: [] };
-  const screen: InstanceSpec = { mat: 'screenDark', size: [0.34, 0.26, 0.02], transforms: [] };
-  const kb: InstanceSpec = { mat: 'furnitureDark', size: [0.42, 0.025, 0.15], transforms: [] };
+  // CRT モニター + キーボード + マウスは 1 台分をコード生成の家電（shape 'crtPc'。正面 = 局所 +z = 座る側）で描く
+  const pc: InstanceSpec = { mat: 'signPlate', size: [0.42, 0.36, 0.4], transforms: [], shape: 'crtPc', accent: 'screenDark' };
   const phone: InstanceSpec = { mat: 'metalDark', size: [0.2, 0.05, 0.22], transforms: [] };
   const handset: InstanceSpec = { mat: 'metalDark', size: [0.05, 0.21, 0.06], transforms: [] };
   let stations = 0;
@@ -1269,9 +1426,9 @@ function u14(c: Ctx): void {
         const mx = alongX ? a : cc + off;
         const mz = alongX ? cc + off : a;
         const yaw = alongX ? 0 : Math.PI / 2;
-        body.transforms.push({ pos: [mx, top, mz], yaw });
-        screen.transforms.push({ pos: [alongX ? mx : mx + side * 0.2, top + 0.05, alongX ? mz + side * 0.2 : mz], yaw });
-        kb.transforms.push({ pos: [alongX ? mx : mx + side * 0.44, top, alongX ? mz + side * 0.44 : mz], yaw });
+        // 座る側（キーボードの側）= side の向き。alongX なら ±z、そうでなければ ±x
+        const facing = alongX ? (side > 0 ? 0 : Math.PI) : side * Math.PI / 2;
+        pc.transforms.push({ pos: [mx, top, mz], yaw: facing });
         if ((k + (side > 0 ? 0 : 1)) % 2 === 0) {
           const px = alongX ? a + 0.5 : cc + off + side * 0.1;
           const pz = alongX ? cc + off + side * 0.1 : a + 0.5;
@@ -1282,7 +1439,9 @@ function u14(c: Ctx): void {
       }
     }
   }
-  for (const s of [body, screen, kb, phone, handset]) pushInstances(L, rng, s);
+  for (const s of [pc, phone, handset]) pushInstances(L, rng, s);
+  // 画面はパソコンの絵 4 種（screen 0..3）と電源の切れた画面に分ける。台ごとの選択は位置のハッシュ（乱数列は従来どおり 1 回の shuffle）
+  splitScreens(L, pc, [0, 1, 2, 3, -1]);
   // 本棚（空き壁に 2〜3 台）と観葉植物（隅）
   let shelves = 0;
   for (const f of [...c.faces].sort((a, b) => (b.a1 - b.a0) - (a.a1 - a.a0))) {

@@ -78,6 +78,8 @@ export class RoomStreamingManager {
     this.scene.add(b.group);
     this.scene.add(b.doorGroup);
     this.built.set(b.roomId, b);
+    this.adoptedAt.set(b.roomId, performance.now());
+    this.compiled.delete(b.roomId);
     this.uncompiled.push(b);
     this.buildCount++;
   }
@@ -88,6 +90,27 @@ export class RoomStreamingManager {
   private job: RoomBuildJob | null = null;
   /** 構築済みでまだシェーダをコンパイルしていない部屋 */
   private readonly uncompiled: BuiltRoom[] = [];
+  /** 非同期コンパイルが終わった部屋（isCompiled）。初めて見える瞬間の同期コンパイル待ちを避けるため、Game は扉の保留と表示に使う */
+  private readonly compiled = new Set<string>();
+  private readonly adoptedAt = new Map<string, number>();
+  /** コンパイルが終わった部屋が増えた（Game が updateVisibility をやり直す）。consumeCompiled で読むと false に戻る */
+  private compiledChanged = false;
+  /** コンパイル完了を待つ上限（ms）。KHR_parallel_shader_compile の無い環境・コンテキスト喪失でも部屋が出なくならないように */
+  static COMPILE_WAIT_MAX_MS = 2000;
+
+  /** 部屋のシェーダの非同期コンパイルが終わったか（または待ちの上限を過ぎたか）。未構築なら false */
+  isCompiled(roomId: string): boolean {
+    if (!this.built.has(roomId)) return false;
+    if (this.compiled.has(roomId)) return true;
+    const at = this.adoptedAt.get(roomId);
+    return at === undefined || performance.now() - at > RoomStreamingManager.COMPILE_WAIT_MAX_MS;
+  }
+
+  consumeCompiled(): boolean {
+    const c = this.compiledChanged;
+    this.compiledChanged = false;
+    return c;
+  }
   /**
    * 後回し構築に 1 フレームで使う時間（ms）。分割構築はこの予算で中断し次のフレームに続ける（箱 1,900 個の食堂 = 660 ms が
    * 約 30 フレームに分かれる）。見えている部屋の同期構築（ensure）には効かない
@@ -97,6 +120,22 @@ export class RoomStreamingManager {
   enqueue(roomId: string): void {
     if (this.built.has(roomId) || this.pending.includes(roomId) || this.job?.roomId === roomId) return;
     this.pending.push(roomId);
+  }
+
+  /**
+   * 後回し構築の先頭へ回す（扉を開ける直前・見えるようになった部屋）。構築済み・分割構築の途中なら何もしない
+   * （途中の部屋は次のフレームで続きから進む）
+   */
+  prioritize(roomId: string): void {
+    if (this.built.has(roomId) || this.job?.roomId === roomId) return;
+    const i = this.pending.indexOf(roomId);
+    if (i >= 0) this.pending.splice(i, 1);
+    this.pending.unshift(roomId);
+  }
+
+  /** 構築済みか、分割構築の途中・後回しの待ちにあるか */
+  isBuiltOrQueued(roomId: string): boolean {
+    return this.built.has(roomId) || this.job?.roomId === roomId || this.pending.includes(roomId);
   }
 
   /** keep に無い保留を取り消す（分割構築の途中も捨てる） */
@@ -179,9 +218,15 @@ export class RoomStreamingManager {
         b.group.visible = true;
         b.doorGroup.visible = true;
         try {
-          void renderer.compileAsync(b.group, camera, this.scene).catch(() => { /* 途中で dispose された等は無視 */ });
-          void renderer.compileAsync(b.doorGroup, camera, this.scene).catch(() => { /* 同上 */ });
-        } catch { /* WebGL コンテキスト喪失などは無視 */ }
+          const done = Promise.allSettled([renderer.compileAsync(b.group, camera, this.scene), renderer.compileAsync(b.doorGroup, camera, this.scene)]);
+          void done.then(() => {
+            if (this.built.get(b.roomId) !== b) return; // 途中で作り直された / 捨てられた
+            this.compiled.add(b.roomId);
+            this.compiledChanged = true;
+          });
+        } catch {
+          this.compiled.add(b.roomId); // WebGL コンテキスト喪失など。待たない
+        }
         b.group.visible = vis[0];
         b.doorGroup.visible = vis[1];
       }
@@ -397,7 +442,7 @@ export class RoomStreamingManager {
     }
     this.shadowMapSize = tier.shadowMapSize;
     this.shadowSlots.update(shadowEntries, tier.shadowLights, dt, (l) => this.setupShadow(l), releaseShadowMap);
-    this.padVisibleLights(visible, tier.maxLights, this.shadowSlots.holders.length, tier.shadowLights);
+    this.padVisibleLights(visible, tier.maxLights, this.shadowSlots.holders.length, tier.shadowLights, shadowEntries.map((e) => e.light));
   }
 
   /** 影スロットを得たライトの影パラメータ（castShadow を立てる直前） */
@@ -420,7 +465,7 @@ export class RoomStreamingManager {
    * 影を落とす本数も shadowLimit に固定する: 実ライトの影が不足する分はダミーに castShadow を立てる
    * （16 px のキューブ影マップを最初の 1 回だけ描き、以後は更新しない。intensity 0 なので寄与は無い）
    */
-  private padVisibleLights(realVisible: number, limit: number, realShadow: number, shadowLimit: number): void {
+  private padVisibleLights(realVisible: number, limit: number, realShadow: number, shadowLimit: number, realPoints: THREE.PointLight[] = []): void {
     this.ensurePadLights(limit);
     const need = Math.max(0, limit - realVisible);
     const needShadow = Math.max(0, Math.min(need, shadowLimit - realShadow));
@@ -428,7 +473,35 @@ export class RoomStreamingManager {
       this.padLights[i].visible = i < need;
       this.padLights[i].castShadow = i < needShadow;
     }
+    // 実ライトで本数の上限が埋まっていて影スロットが空いている（受け渡しの途中・影の候補が遠い）と、ダミーで影の本数を補えず
+    // numPointLightShadows が 1 → 0 に変わり、見えている全材質のプログラムが作り直される（1 回 90〜250 ms の停止）。
+    // その間だけ、影を持たない可視の実ライトに影の濃さ 0 の castShadow を貸して本数を保つ（見た目は変わらない）
+    let deficit = shadowLimit - realShadow - needShadow;
+    const holders = this.shadowSlots.holders;
+    const next = new Set<THREE.PointLight>();
+    if (deficit > 0) {
+      // 借りているライトを先に使い続ける（毎フレームの付け外しと影マップの作り直しを避ける）
+      const order = [...realPoints.filter((l) => this.borrowedShadow.has(l)), ...realPoints.filter((l) => !this.borrowedShadow.has(l))];
+      for (const l of order) {
+        if (deficit <= 0) break;
+        if (holders.includes(l) || (l.castShadow && !this.borrowedShadow.has(l))) continue;
+        if (!this.borrowedShadow.has(l)) this.setupShadow(l);
+        l.shadow.intensity = 0;
+        l.castShadow = true;
+        next.add(l);
+        deficit--;
+      }
+    }
+    for (const l of this.borrowedShadow) {
+      if (next.has(l) || holders.includes(l)) continue; // 影スロットを得たライトは LightBudget に任せる
+      l.castShadow = false;
+      releaseShadowMap(l);
+    }
+    this.borrowedShadow = next;
   }
+
+  /** padVisibleLights が影の本数を保つために castShadow を貸している実ライト */
+  private borrowedShadow = new Set<THREE.PointLight>();
 
   /** ダミーライトを limit 本まで作る（scene に入れる） */
   private ensurePadLights(limit: number): void {

@@ -11,12 +11,14 @@
  *       見た目: 床上の暗いベルト箔（'rubber'）+ 縁の帯（speed < 2 は 'ledBlue' の発光縁 = エスカレーター、他は 'yellowLine' = 車線）。
  *       帯に重なる内装のソリッド（柱・間仕切り・家具）は取り除く。U03 では停止した装飾ベルトを 1 本並べ、帯に沿った青い照明を足す。
  *   ゾーン: { kind: 'force', aabb, vector（ローカル）, params: { speed, mode, lane } }。RoomBuilder が yaw で回してワールド化する。
- * build: conveyor の帯ごとに「流れる」ベルト面を 1 枚置く（自前の CanvasTexture のスラット模様を毎フレーム UV オフセットで流す。
+ * build: conveyor の帯に「流れる」ベルト面を置く（速さごとに 1 メッシュへ結合。自前の CanvasTexture のスラット模様を毎フレーム UV オフセットで流す。
  *   ジオメトリは増やさずテクスチャのオフセットだけ動かす。RoomEffect として built.effects へ）。
+ *   U03 は生成側（dressing/uncommon.ts u03Belts）が動く歩道の網を kind 'lane'（clearSolids）で出し、ここで force ゾーンに写して帯の上を空ける。
  * onEnter / onExit: 風音（'wind' / 'windStrong'）またはベルト駆動音（'conveyor'）のループ。
  * onConnect: R18「風向と逆方向ほどレア出口率上昇」は抽選バイアスの拡張点のみ（upwind を計算するが指示は返さない。v1 では実装しない）。
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { AABB } from '../../core/aabb';
 import { dirVec, type Vec3 } from '../../core/types';
 import { inner, type Rect } from '../../generators/footprint';
@@ -192,6 +194,91 @@ function beltGeometry(r: Rect, vector: Vec3): THREE.BufferGeometry {
   return g;
 }
 
+/** 曲がる床（U03 u03Belts）: 内側の角 center、入る向き a、出る向き b、回る向き ccw（+1 = x → z 回り）、マスの一辺 */
+interface TurnSpec { center: [number, number]; a: [number, number]; b: [number, number]; ccw: number; cell: number }
+
+/**
+ * 曲がる床の扇形のベルト面（半径 0.05〜0.95 マス = 直線の帯の幅と揃える、角度 90° を 10 分割）。
+ * uv の v は流れの向きに増える（中央の半径の弧長 / SLAT_PITCH）ので、直線の帯と同じオフセットで同じ速さに流れる。スラットは放射状
+ */
+function turnGeometry(t: TurnSpec): THREE.BufferGeometry {
+  const [cx, cz] = t.center;
+  const mid = (d: [number, number], sgn: number): [number, number] => {
+    // 入る辺 / 出る辺の中点（マスの中心 = 中心 + (a − b) / 2 × cell の逆算）
+    const mx = cx + (t.a[0] - t.b[0]) * t.cell / 2, mz = cz + (t.a[1] - t.b[1]) * t.cell / 2;
+    return [mx + sgn * d[0] * t.cell / 2, mz + sgn * d[1] * t.cell / 2];
+  };
+  const e = mid(t.a, -1), x = mid(t.b, 1);
+  const th0 = Math.atan2(e[1] - cz, e[0] - cx);
+  let th1 = Math.atan2(x[1] - cz, x[0] - cx);
+  // ccw = +1 は角度が増える向き（(x, z) → (−z, x)）
+  while (t.ccw > 0 ? th1 <= th0 : th1 >= th0) th1 += t.ccw > 0 ? Math.PI * 2 : -Math.PI * 2;
+  const segs = 10, r0 = 0.05 * t.cell, r1 = 0.95 * t.cell;
+  const pos: number[] = [], nrm: number[] = [], uv: number[] = [];
+  const vert = (th: number, r: number, k: number) => {
+    pos.push(cx + Math.cos(th) * r, BELT_Y, cz + Math.sin(th) * r);
+    nrm.push(0, 1, 0);
+    uv.push((r - r0) / (r1 - r0), (k / segs) * (Math.PI / 2) * (t.cell / 2) / SLAT_PITCH);
+  };
+  for (let k = 0; k <= segs; k++) { const th = th0 + (th1 - th0) * (k / segs); vert(th, r0, k); vert(th, r1, k); }
+  const idx: number[] = [];
+  for (let k = 0; k < segs; k++) {
+    const a = k * 2, b = a + 1, c2 = a + 2, d = a + 3;
+    // 上向き（+Y）の面になる巻き順を選ぶ
+    const p = (i: number) => [pos[i * 3], pos[i * 3 + 2]];
+    const [ax, az] = p(a), [bx, bz] = p(b), [cx2, cz2] = p(c2);
+    const up = (bx - ax) * (cz2 - az) - (bz - az) * (cx2 - ax) < 0;
+    if (up) idx.push(a, b, c2, b, d, c2); else idx.push(a, c2, b, b, c2, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  return g;
+}
+
+/**
+ * 曲がる床の両縁の発光帯（直線の帯の縁と同じ幅 5 cm・高さ 3.5 cm の弧。上面と内外の側面）。半径 0.05〜0.10 と 0.90〜0.95 マス
+ */
+function turnEdgeGeometry(t: TurnSpec): THREE.BufferGeometry {
+  const [cx, cz] = t.center;
+  const mx = cx + (t.a[0] - t.b[0]) * t.cell / 2, mz = cz + (t.a[1] - t.b[1]) * t.cell / 2;
+  const e: [number, number] = [mx - t.a[0] * t.cell / 2, mz - t.a[1] * t.cell / 2];
+  const x: [number, number] = [mx + t.b[0] * t.cell / 2, mz + t.b[1] * t.cell / 2];
+  const th0 = Math.atan2(e[1] - cz, e[0] - cx);
+  let th1 = Math.atan2(x[1] - cz, x[0] - cx);
+  while (t.ccw > 0 ? th1 <= th0 : th1 >= th0) th1 += t.ccw > 0 ? Math.PI * 2 : -Math.PI * 2;
+  const segs = 12, y0 = 0.005, y1 = 0.035;
+  const pos: number[] = [], nrm: number[] = [], uv: number[] = [], idx: number[] = [];
+  const quad = (p: number[][], n: number[]) => {
+    const b = pos.length / 3;
+    for (const q of p) { pos.push(q[0], q[1], q[2]); nrm.push(n[0], n[1], n[2]); uv.push(0, 0); }
+    // 法線 n の側から見て表になる巻き順
+    const [a, bb, c] = p;
+    const ux = bb[0] - a[0], uy = bb[1] - a[1], uz = bb[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    const cxp = uy * vz - uz * vy, cyp = uz * vx - ux * vz, czp = ux * vy - uy * vx;
+    if (cxp * n[0] + cyp * n[1] + czp * n[2] >= 0) idx.push(b, b + 1, b + 2, b, b + 2, b + 3); else idx.push(b, b + 2, b + 1, b, b + 3, b + 2);
+  };
+  for (const [ra, rb] of [[0.05, 0.1], [0.9, 0.95]]) {
+    const r0 = ra * t.cell, r1 = rb * t.cell;
+    for (let k = 0; k < segs; k++) {
+      const a0 = th0 + (th1 - th0) * (k / segs), a1 = th0 + (th1 - th0) * ((k + 1) / segs);
+      const P = (r: number, a: number, y: number) => [cx + Math.cos(a) * r, y, cz + Math.sin(a) * r];
+      quad([P(r0, a0, y1), P(r1, a0, y1), P(r1, a1, y1), P(r0, a1, y1)], [0, 1, 0]);
+      const mid = (a0 + a1) / 2;
+      quad([P(r1, a0, y0), P(r1, a1, y0), P(r1, a1, y1), P(r1, a0, y1)], [Math.cos(mid), 0, Math.sin(mid)]);
+      quad([P(r0, a0, y0), P(r0, a0, y1), P(r0, a1, y1), P(r0, a1, y0)], [-Math.cos(mid), 0, -Math.sin(mid)]);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  return g;
+}
+
 const ExternalForce: ModifierImpl = {
   id: 'ExternalForce',
   defaults: { mode: 'wind', speed: 1.0 },
@@ -213,8 +300,13 @@ const ExternalForce: ModifierImpl = {
     if (laneZones.length > 0) {
       laneZones.forEach((z, i) => {
         const v = normalize([z.vector![0], 0, z.vector![2]]);
-        L.zones!.push({ kind: 'force', aabb: { min: [z.aabb.min[0], ZONE_Y0, z.aabb.min[2]], max: [z.aabb.max[0], ZONE_Y1, z.aabb.max[2]] }, vector: v, params: { speed: num(z.params?.speed, speed), mode: 'conveyor', lane: i } });
+        // 曲がる床（U03）: turn は見た目の扇形（力は 0 = speed 0）、noBelt は力だけの小区画（ベルト面を描かない）
+        const lane = z.params?.noBelt ? -1 : i;
+        L.zones!.push({ kind: 'force', aabb: { min: [z.aabb.min[0], ZONE_Y0, z.aabb.min[2]], max: [z.aabb.max[0], ZONE_Y1, z.aabb.max[2]] }, vector: v, params: { speed: num(z.params?.speed, speed), mode: 'conveyor', lane, turn: z.params?.turn, beltSpeed: z.params?.beltSpeed } });
       });
+      // 生成側が帯の上を空けるよう求めた車線（U03 の動く歩道の網）: 後段（奇妙さ生成など）が置いたソリッドを取り除く
+      const clear = laneZones.filter((z) => z.params?.clearSolids);
+      if (clear.length) clearLanes(L, clear.map((z, i) => ({ rect: { x0: z.aabb.min[0], z0: z.aabb.min[2], x1: z.aabb.max[0], z1: z.aabb.max[2] }, vector: [0, 0, 1] as Vec3, lane: i })));
       return;
     }
     const lanes = Math.max(1, Math.min(4, Math.round(num(params.lanes, speed >= 4 ? 2 : 1))));
@@ -257,39 +349,60 @@ const ExternalForce: ModifierImpl = {
   build(built, L, ctx) {
     const lanes = (L.zones ?? []).filter((z) => z.kind === 'force' && z.params?.mode === 'conveyor' && typeof z.params?.lane === 'number' && (z.params.lane as number) >= 0 && z.vector);
     if (lanes.length === 0) return;
-    const speed = num(lanes[0].params?.speed, 1);
-    const escalator = speed < 2;
-    const shared = slatTexture(escalator);
-    const items: { tex: THREE.Texture; dir: 1 | -1 }[] = [];
-    let first = true;
+    // 帯は速さごとに 1 枚のメッシュへ結合し、テクスチャ 1 枚のオフセットで流す（uv の v は各帯の vector の向きに増えるので、
+    // 同じオフセットでも帯ごとの向きに流れる。U03 の網は帯が数十本あるので、帯ごとのメッシュ・材質では描画呼び出しが増えすぎる）
+    const bySpeed = new Map<number, THREE.BufferGeometry[]>();
     for (const z of lanes) {
+      const sp = Math.round(num(z.params?.beltSpeed, num(z.params?.speed, 1)) * 100) / 100;
       const r: Rect = { x0: z.aabb.min[0], z0: z.aabb.min[2], x1: z.aabb.max[0], z1: z.aabb.max[2] };
-      const v = z.vector!;
-      const tex = first ? shared : shared.clone();
-      first = false;
+      const turn = z.params?.turn as TurnSpec | undefined;
+      (bySpeed.get(sp) ?? bySpeed.set(sp, []).get(sp)!).push(turn ? turnGeometry(turn) : beltGeometry(r, z.vector!));
+    }
+    // 曲がる床の両縁の発光帯（直線の帯の縁の箱と同じ ledBlue の材質。1 メッシュに結合）
+    const edges = lanes.map((z) => z.params?.turn as TurnSpec | undefined).filter((t): t is TurnSpec => !!t).map(turnEdgeGeometry);
+    if (edges.length) {
+      const eg = edges.length === 1 ? edges[0] : mergeGeometries(edges, false);
+      if (edges.length > 1) for (const g of edges) g.dispose();
+      if (eg) {
+        eg.computeBoundingSphere();
+        const mesh = new THREE.Mesh(eg, ctx.materials.get('ledBlue'));
+        mesh.name = 'belt/turn-edges';
+        mesh.matrixAutoUpdate = false;
+        mesh.updateMatrix();
+        built.group.add(mesh);
+      }
+    }
+    const items: { tex: THREE.Texture; rate: number }[] = [];
+    let base: THREE.CanvasTexture | null = null;
+    for (const [speed, geos] of bySpeed) {
+      const escalator = speed < 2;
+      if (!base) base = slatTexture(escalator);
+      const tex = items.length === 0 ? base : base.clone();
       tex.needsUpdate = true;
       const mat = new THREE.MeshStandardMaterial({
         map: tex, color: 0xffffff, roughness: 0.75, metalness: 0.25,
         emissive: escalator ? 0x33555c : 0x000000, emissiveMap: escalator ? tex : null, emissiveIntensity: escalator ? 0.35 : 0,
       });
-      const mesh = new THREE.Mesh(beltGeometry(r, v), mat);
-      mesh.name = `belt/${z.params?.lane}`;
+      const geo = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
+      if (geos.length > 1) for (const g of geos) g.dispose();
+      if (!geo) continue;
+      geo.computeBoundingSphere();
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = `belt/${speed}`;
       mesh.userData.disposable = [mat, tex];
       mesh.matrixAutoUpdate = false;
       mesh.updateMatrix();
       built.group.add(mesh);
-      items.push({ tex, dir: 1 });
+      items.push({ tex, rate: speed / SLAT_PITCH });
     }
     // uv の v は常に vector の向きに増えるので、オフセットを減らせば模様が vector の向きへ流れる
-    const rate = speed / SLAT_PITCH;
     const effect: RoomEffect = {
       update(dt) {
-        for (const it of items) it.tex.offset.y = (it.tex.offset.y - rate * dt) % 1;
+        for (const it of items) it.tex.offset.y = (it.tex.offset.y - it.rate * dt) % 1;
       },
       dispose() { /* material / texture は RoomBuilder.dispose の traverse（userData.disposable）で解放 */ },
     };
     built.effects.push(effect);
-    void ctx;
   },
 
   onEnter(ctx, params) {

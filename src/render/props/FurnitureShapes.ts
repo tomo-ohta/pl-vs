@@ -180,7 +180,7 @@ function benchGroup(members: Box[], out: Box[]): boolean {
  * + 通気口 2 本 × 上下 + 取っ手（座板 + 縦のつまみ）。扉 1 枚 7 箱 = 84 三角形、列あたり + 4 箱
  * （通気口 3 本 × 上下では C11 の約 480 扉で部屋合計が 1.44 倍になったので 2 本 × 上下に減らした）
  */
-function lockerGroup(members: Box[], out: Box[]): boolean {
+export function lockerGroup(members: Box[], out: Box[]): boolean {
   const body = members.find((m) => m.kind === 'lockers');
   if (!body) return false;
   let k: 0 | 2 | null = null, sign: 1 | -1 = 1;

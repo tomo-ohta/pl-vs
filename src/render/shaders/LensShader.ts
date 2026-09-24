@@ -2,7 +2,7 @@
  * LensPass（src/render/LensPass.ts）用のシェーダ群。すべて線形 HDR のまま扱い、トーンマップ・sRGB 変換は OutputPass に任せる。
  *
  *   LensDownsampleShader  全解像度 → 1/4（4 タップの箱型 = 4×4 px の厳密な平均）
- *   LensBrightShader      1/4 → 1/8 + 明部抽出（閾値 1.0 前後の柔らかい膝。にじみ / フレアの元）
+ *   LensBrightShader      1/4 → 1/8 + 明部抽出（閾値 1.0 前後の柔らかい膝。輝度 3 以上は 6 へ頭打ち。にじみ / フレアの元）
  *   LensBlurShader        1/8 での分離ガウス（9 タップを線形補間で 5 タップに。spread で幅を伸ばす）
  *   LensFlareShader       ぼかした明部から横一線のストリークと中心対称のゴースト 2 個（1/8）
  *   LensStatShader        1/4 → 固定 32×18。1 セルあたり 4×4 の層化タップで平均色と log2 輝度の平均
@@ -74,6 +74,8 @@ export const LensBrightShader = {
               + texture2D(tDiffuse, vUv + vec2(-1.0,  1.0) * texel).rgb
               + texture2D(tDiffuse, vUv + vec2( 1.0,  1.0) * texel).rgb) * 0.25;
       float l = lensLum(c);
+      // 極端な明部（鏡面の峰・至近の光源）は輝度 3 から上を 6 へ頭打ちにしてから抽出する（にじみの面積が明るさに比例して際限なく広がらない）
+      if (l > 3.0) { float lc = 3.0 + (l - 3.0) / (1.0 + (l - 3.0) / 3.0); c *= lc / l; l = lc; }
       float soft = clamp(l - threshold + knee, 0.0, 2.0 * knee);
       soft = soft * soft / (4.0 * knee + 1e-4);
       float pass = max(soft, l - threshold);

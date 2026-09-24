@@ -46,8 +46,10 @@ interface Task {
   priority: number;
   /** 投入順（同じ優先度の中での順序を保つ） */
   seq: number;
-  resolve: (image: TexImageSource) => void;
+  resolve: (image: never) => void;
   reject: (err: unknown) => void;
+  /** 画像以外（KTX2 など）を読むときの取得処理。無ければ fetch + createImageBitmap */
+  fetcher?: (url: string) => Promise<unknown>;
 }
 
 export interface ImageRequestQueueOptions {
@@ -120,6 +122,12 @@ export class ImageRequestQueue {
     this.pump();
   }
 
+  /** 画像以外（KTX2 の CompressedTexture など）を、同じ並列数・優先度・再試行の下で読む。fetcher の失敗は load と同じ基準で再試行する */
+  loadWith<T>(url: string, priority: number, fetcher: (url: string) => Promise<T>, onLoad: (value: T) => void, onError: (err: unknown) => void): void {
+    this.waiting.push({ url, priority, seq: this.seq++, resolve: onLoad as (image: never) => void, reject: onError, fetcher });
+    this.pump();
+  }
+
   private pump(): void {
     while (this.running < this.maxConcurrent && this.waiting.length) {
       // 優先度（小さい順）→ 投入順。件数は高々数百なので毎回の線形探索で足りる
@@ -145,9 +153,9 @@ export class ImageRequestQueue {
     let lastError: unknown = null;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
-        const image = await this.fetchImage(task.url);
+        const image = task.fetcher ? await task.fetcher(task.url) : await this.fetchImage(task.url);
         this.stats.loaded++;
-        task.resolve(image);
+        task.resolve(image as never);
         return;
       } catch (err) {
         lastError = err;

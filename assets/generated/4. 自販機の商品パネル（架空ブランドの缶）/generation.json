@@ -1,0 +1,30 @@
+{
+  "tool": "built-in image_gen",
+  "date": "2026-09-24",
+  "file": "fictional-cans-8x4.png",
+  "size": [
+    1024,
+    512
+  ],
+  "grid": {
+    "columns": 8,
+    "rows": 4,
+    "cellWidth": 128,
+    "cellHeight": 128
+  },
+  "columnTypes": [
+    "green tea",
+    "black coffee",
+    "milk coffee",
+    "cola",
+    "orange soda",
+    "sports drink",
+    "mineral water",
+    "melon soda"
+  ],
+  "source": "/Users/tashi/.codex/generated_images/01a0a54e-aebf-7fb1-8d6f-d800ea237c5a/exec-c3b93f65-2238-40e1-8c90-a1cb2502327e.png",
+  "prompt": "Create exactly ONE product sprite sheet. Canvas aspect ratio exactly 2:1, requested final size 1024 x 512 pixels. PURE WHITE (#FFFFFF) background. PRECISE regular layout: exactly 8 columns and exactly 4 rows, total exactly 32 cans. Each equal square cell is 128x128 pixels in the requested output. No drawn grid lines. Cell centers in pixels: x=64,192,320,448,576,704,832,960; y=64,192,320,448. Place exactly ONE complete upright cylindrical beverage can at EACH of these 32 centers. Each can is the SAME apparent size: 62 px wide by 98 px high at output resolution, leaving white padding on all sides. No object crosses its cell boundary. Consistent level orthographic front elevation, perfectly straight-on, no top-down view, no perspective tilt. Only a narrow silver top rim and base, no visible elliptical top surfaces, no cast shadows on white, even diffuse studio lighting, restrained cylindrical shading on cans. Clean realistic product photography rendered as cutout sprites, crisp label detail.\n\nColumns in order, repeated for each of the four rows with a DIFFERENT original label design per row:\n1 green tea, muted green;\n2 black coffee, charcoal and silver;\n3 milk coffee, cream and tan;\n4 cola, burgundy and pale turquoise (no familiar cola color layout);\n5 orange soda, orange and white;\n6 sports drink, blue and yellow;\n7 mineral water in a CAN, white and light cyan;\n8 melon soda, bright mint green.\nUse completely fictional brand marks made from simple abstract shapes and two or three small katakana characters. Four distinct label-design families across the rows, all beverage cans same dimensions, ordinary Japanese vending-machine product style. No recognizable existing brands or trade dress.\nNegative prompt: real brand names, real logos, Coca-Cola, Pepsi, Suntory, Kirin, Asahi, Ito En, Boss, Georgia, perspective, overlapping cans, cropped cans, uneven grid, hands, text paragraphs, watermark, bottles, boxes, extra cans, missing cans, background shadows, decorative borders. Image must contain EXACTLY 8 columns and 4 rows of centered single cans with mathematically uniform whitespace; no row or column labels.",
+  "export": "Resized generated artwork to requested 1024x512 with macOS sips.",
+  "validation": "Visually verified 32 complete cans. Threshold-based bounds verification confirms every can fits inside its 128x128 cell with white padding. Minor few-pixel differences in can position and size remain. See grid-validation.json.",
+  "crop": "Zero-based column c and row r: x=c*128, y=r*128, width=128, height=128. Choose any three rows for a 3x8 vending machine."
+}

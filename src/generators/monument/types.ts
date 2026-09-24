@@ -7,8 +7,13 @@
 import type { Vec3 } from '../../core/types';
 import type { Box, MatId } from '../layout';
 
-export type MonumentKind = 'officeTotem' | 'stoneFrame' | 'ribbon' | 'cubeCluster' | 'colorStack' | 'steel';
-export const MONUMENT_KINDS: readonly MonumentKind[] = ['officeTotem', 'stoneFrame', 'ribbon', 'cubeCluster', 'colorStack', 'steel'];
+export type MonumentKind = 'officeTotem' | 'stoneFrame' | 'ribbon' | 'cubeCluster' | 'colorStack' | 'steel'
+  // 第17回の追加（extra.ts）。colossus は広い部屋の中央専用（通常の抽選には入れない）
+  | 'monolith' | 'chairTower' | 'doorRing' | 'lampGrove' | 'colossus'
+  // 散らかった物の山（奇妙さ生成 disorder.ts。部品の自由な回転を使うため MonumentSpec で描く。抽選・統計の対象外）
+  | 'clutter';
+/** 通常の抽選に使う種類（colossus を除く） */
+export const MONUMENT_KINDS: readonly MonumentKind[] = ['officeTotem', 'stoneFrame', 'ribbon', 'cubeCluster', 'colorStack', 'steel', 'monolith', 'chairTower', 'doorRing', 'lampGrove'];
 
 /**
  * プリミティブと size の意味:
@@ -21,8 +26,12 @@ export const MONUMENT_KINDS: readonly MonumentKind[] = ['officeTotem', 'stoneFra
  *  ribbon    [width, thickness]（`path` の曲線に沿って矩形断面を押し出した帯）
  *  tube      [radius]（`path` の曲線に沿う円管）
  *  plate     [w, h, thickness]（薄板。XY 平面に立つ。文字は signs 側）
+ *  knot      [radius, tube, p × 10 + q]（トーラスノット。p・q 省略 = 2, 3。無回転で XY 平面に広がる）
+ *  rock      [w, h, d]（不規則な塊: 歪ませた正二十面体。形は位置から決まる）
+ *  lathe     [0, 0, 0]（y 軸の回転体。path の [半径, 高さ, _] を下 → 上に）
+ *  appliance [w, h, d]（コード生成の家電 1 台。pos は底面の中心。形は appliance。乱れ（disorder.ts）が自販機・ゲーム機などを倒すとき）
  */
-export type MonumentPrim = 'box' | 'cylinder' | 'sphere' | 'ring' | 'stairs' | 'frame' | 'ribbon' | 'tube' | 'plate';
+export type MonumentPrim = 'box' | 'cylinder' | 'sphere' | 'ring' | 'stairs' | 'frame' | 'ribbon' | 'tube' | 'plate' | 'knot' | 'rock' | 'lathe' | 'appliance';
 
 export interface MonumentPart {
   prim: MonumentPrim;
@@ -34,6 +43,8 @@ export interface MonumentPart {
   size: Vec3;
   /** ribbon / tube の制御点（ローカル。CatmullRom で滑らかに通る） */
   path?: Vec3[];
+  /** prim 'appliance' の形（src/render/props/ApplianceGeometry.ts。mat = 本体の材質） */
+  appliance?: { shape: 'vending' | 'washer' | 'dryer' | 'crtPc' | 'arcade' | 'exhibit'; accent?: MatId; screen?: number; variant?: string };
 }
 
 /** 刻印板の文字（SignAtlas の plate）。pos はローカル、dir は文字面が向く方向のローカル Dir（0 = −Z 正面 … 配置時に回す） */
