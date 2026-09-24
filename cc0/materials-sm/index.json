@@ -10,7 +10,14 @@
   "roughness": "Asphalt031/Asphalt031_1K-JPG_Roughness.jpg",
   "ao": "Asphalt031/Asphalt031_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Asphalt031/Asphalt031_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Asphalt031/Asphalt031_1K-JPG_Color.ktx2",
+   "normal": "Asphalt031/Asphalt031_1K-JPG_NormalGL.ktx2",
+   "roughness": "Asphalt031/Asphalt031_1K-JPG_Roughness.ktx2",
+   "ao": "Asphalt031/Asphalt031_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Asphalt031/Asphalt031_1K-JPG_Displacement.ktx2"
+  }
  },
  "Bricks101": {
   "resolution": "1K",
@@ -23,7 +30,14 @@
   "roughness": "Bricks101/Bricks101_1K-JPG_Roughness.jpg",
   "ao": "Bricks101/Bricks101_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Bricks101/Bricks101_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Bricks101/Bricks101_1K-JPG_Color.ktx2",
+   "normal": "Bricks101/Bricks101_1K-JPG_NormalGL.ktx2",
+   "roughness": "Bricks101/Bricks101_1K-JPG_Roughness.ktx2",
+   "ao": "Bricks101/Bricks101_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Bricks101/Bricks101_1K-JPG_Displacement.ktx2"
+  }
  },
  "Carpet003": {
   "resolution": "1K",
@@ -36,7 +50,14 @@
   "roughness": "Carpet003/Carpet003_1K-JPG_Roughness.jpg",
   "ao": "Carpet003/Carpet003_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Carpet003/Carpet003_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Carpet003/Carpet003_1K-JPG_Color.ktx2",
+   "normal": "Carpet003/Carpet003_1K-JPG_NormalGL.ktx2",
+   "roughness": "Carpet003/Carpet003_1K-JPG_Roughness.ktx2",
+   "ao": "Carpet003/Carpet003_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Carpet003/Carpet003_1K-JPG_Displacement.ktx2"
+  }
  },
  "Carpet004": {
   "resolution": "2K",
@@ -49,7 +70,14 @@
   "roughness": "Carpet004/Carpet004_2K-JPG_Roughness.jpg",
   "ao": "Carpet004/Carpet004_2K-JPG_AmbientOcclusion.jpg",
   "displacement": "Carpet004/Carpet004_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Carpet004/Carpet004_2K-JPG_Color.ktx2",
+   "normal": "Carpet004/Carpet004_2K-JPG_NormalGL.ktx2",
+   "roughness": "Carpet004/Carpet004_2K-JPG_Roughness.ktx2",
+   "ao": "Carpet004/Carpet004_2K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Carpet004/Carpet004_2K-JPG_Displacement.ktx2"
+  }
  },
  "Carpet012": {
   "resolution": "1K",
@@ -62,7 +90,14 @@
   "roughness": "Carpet012/Carpet012_1K-JPG_Roughness.jpg",
   "ao": "Carpet012/Carpet012_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Carpet012/Carpet012_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Carpet012/Carpet012_1K-JPG_Color.ktx2",
+   "normal": "Carpet012/Carpet012_1K-JPG_NormalGL.ktx2",
+   "roughness": "Carpet012/Carpet012_1K-JPG_Roughness.ktx2",
+   "ao": "Carpet012/Carpet012_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Carpet012/Carpet012_1K-JPG_Displacement.ktx2"
+  }
  },
  "Carpet015": {
   "resolution": "1K",
@@ -75,7 +110,14 @@
   "roughness": "Carpet015/Carpet015_1K-JPG_Roughness.jpg",
   "ao": "Carpet015/Carpet015_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Carpet015/Carpet015_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Carpet015/Carpet015_1K-JPG_Color.ktx2",
+   "normal": "Carpet015/Carpet015_1K-JPG_NormalGL.ktx2",
+   "roughness": "Carpet015/Carpet015_1K-JPG_Roughness.ktx2",
+   "ao": "Carpet015/Carpet015_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Carpet015/Carpet015_1K-JPG_Displacement.ktx2"
+  }
  },
  "Carpet016": {
   "resolution": "2K",
@@ -88,7 +130,14 @@
   "roughness": "Carpet016/Carpet016_2K-JPG_Roughness.jpg",
   "ao": "Carpet016/Carpet016_2K-JPG_AmbientOcclusion.jpg",
   "displacement": "Carpet016/Carpet016_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Carpet016/Carpet016_2K-JPG_Color.ktx2",
+   "normal": "Carpet016/Carpet016_2K-JPG_NormalGL.ktx2",
+   "roughness": "Carpet016/Carpet016_2K-JPG_Roughness.ktx2",
+   "ao": "Carpet016/Carpet016_2K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Carpet016/Carpet016_2K-JPG_Displacement.ktx2"
+  }
  },
  "Concrete034": {
   "resolution": "1K",
@@ -100,7 +149,13 @@
   "normal": "Concrete034/Concrete034_1K-JPG_NormalGL.jpg",
   "roughness": "Concrete034/Concrete034_1K-JPG_Roughness.jpg",
   "displacement": "Concrete034/Concrete034_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Concrete034/Concrete034_1K-JPG_Color.ktx2",
+   "normal": "Concrete034/Concrete034_1K-JPG_NormalGL.ktx2",
+   "roughness": "Concrete034/Concrete034_1K-JPG_Roughness.ktx2",
+   "displacement": "Concrete034/Concrete034_1K-JPG_Displacement.ktx2"
+  }
  },
  "Concrete046": {
   "resolution": "1K",
@@ -112,7 +167,13 @@
   "normal": "Concrete046/Concrete046_1K-JPG_NormalGL.jpg",
   "roughness": "Concrete046/Concrete046_1K-JPG_Roughness.jpg",
   "displacement": "Concrete046/Concrete046_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Concrete046/Concrete046_1K-JPG_Color.ktx2",
+   "normal": "Concrete046/Concrete046_1K-JPG_NormalGL.ktx2",
+   "roughness": "Concrete046/Concrete046_1K-JPG_Roughness.ktx2",
+   "displacement": "Concrete046/Concrete046_1K-JPG_Displacement.ktx2"
+  }
  },
  "Concrete047A": {
   "resolution": "1K",
@@ -125,7 +186,14 @@
   "roughness": "Concrete047A/Concrete047A_1K-JPG_Roughness.jpg",
   "ao": "Concrete047A/Concrete047A_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Concrete047A/Concrete047A_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Concrete047A/Concrete047A_1K-JPG_Color.ktx2",
+   "normal": "Concrete047A/Concrete047A_1K-JPG_NormalGL.ktx2",
+   "roughness": "Concrete047A/Concrete047A_1K-JPG_Roughness.ktx2",
+   "ao": "Concrete047A/Concrete047A_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Concrete047A/Concrete047A_1K-JPG_Displacement.ktx2"
+  }
  },
  "Concrete048": {
   "resolution": "2K",
@@ -138,7 +206,14 @@
   "roughness": "Concrete048/Concrete048_2K-JPG_Roughness.jpg",
   "ao": "Concrete048/Concrete048_2K-JPG_AmbientOcclusion.jpg",
   "displacement": "Concrete048/Concrete048_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Concrete048/Concrete048_2K-JPG_Color.ktx2",
+   "normal": "Concrete048/Concrete048_2K-JPG_NormalGL.ktx2",
+   "roughness": "Concrete048/Concrete048_2K-JPG_Roughness.ktx2",
+   "ao": "Concrete048/Concrete048_2K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Concrete048/Concrete048_2K-JPG_Displacement.ktx2"
+  }
  },
  "Cork003": {
   "resolution": "1K",
@@ -150,7 +225,13 @@
   "normal": "Cork003/Cork003_1K-JPG_NormalGL.jpg",
   "roughness": "Cork003/Cork003_1K-JPG_Roughness.jpg",
   "displacement": "Cork003/Cork003_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Cork003/Cork003_1K-JPG_Color.ktx2",
+   "normal": "Cork003/Cork003_1K-JPG_NormalGL.ktx2",
+   "roughness": "Cork003/Cork003_1K-JPG_Roughness.ktx2",
+   "displacement": "Cork003/Cork003_1K-JPG_Displacement.ktx2"
+  }
  },
  "DiamondPlate009": {
   "resolution": "1K",
@@ -163,7 +244,14 @@
   "roughness": "DiamondPlate009/DiamondPlate009_1K-JPG_Roughness.jpg",
   "ao": "DiamondPlate009/DiamondPlate009_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "DiamondPlate009/DiamondPlate009_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "DiamondPlate009/DiamondPlate009_1K-JPG_Color.ktx2",
+   "normal": "DiamondPlate009/DiamondPlate009_1K-JPG_NormalGL.ktx2",
+   "roughness": "DiamondPlate009/DiamondPlate009_1K-JPG_Roughness.ktx2",
+   "ao": "DiamondPlate009/DiamondPlate009_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "DiamondPlate009/DiamondPlate009_1K-JPG_Displacement.ktx2"
+  }
  },
  "Fabric022": {
   "resolution": "1K",
@@ -175,7 +263,13 @@
   "normal": "Fabric022/Fabric022_1K-JPG_NormalGL.jpg",
   "roughness": "Fabric022/Fabric022_1K-JPG_Roughness.jpg",
   "displacement": "Fabric022/Fabric022_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Fabric022/Fabric022_1K-JPG_Color.ktx2",
+   "normal": "Fabric022/Fabric022_1K-JPG_NormalGL.ktx2",
+   "roughness": "Fabric022/Fabric022_1K-JPG_Roughness.ktx2",
+   "displacement": "Fabric022/Fabric022_1K-JPG_Displacement.ktx2"
+  }
  },
  "Fabric027": {
   "resolution": "1K",
@@ -187,7 +281,13 @@
   "normal": "Fabric027/Fabric027_1K-JPG_NormalGL.jpg",
   "roughness": "Fabric027/Fabric027_1K-JPG_Roughness.jpg",
   "displacement": "Fabric027/Fabric027_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Fabric027/Fabric027_1K-JPG_Color.ktx2",
+   "normal": "Fabric027/Fabric027_1K-JPG_NormalGL.ktx2",
+   "roughness": "Fabric027/Fabric027_1K-JPG_Roughness.ktx2",
+   "displacement": "Fabric027/Fabric027_1K-JPG_Displacement.ktx2"
+  }
  },
  "Fabric028": {
   "resolution": "1K",
@@ -199,7 +299,13 @@
   "normal": "Fabric028/Fabric028_1K-JPG_NormalGL.jpg",
   "roughness": "Fabric028/Fabric028_1K-JPG_Roughness.jpg",
   "displacement": "Fabric028/Fabric028_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Fabric028/Fabric028_1K-JPG_Color.ktx2",
+   "normal": "Fabric028/Fabric028_1K-JPG_NormalGL.ktx2",
+   "roughness": "Fabric028/Fabric028_1K-JPG_Roughness.ktx2",
+   "displacement": "Fabric028/Fabric028_1K-JPG_Displacement.ktx2"
+  }
  },
  "Fabric029": {
   "resolution": "1K",
@@ -211,7 +317,13 @@
   "normal": "Fabric029/Fabric029_1K-JPG_NormalGL.jpg",
   "roughness": "Fabric029/Fabric029_1K-JPG_Roughness.jpg",
   "displacement": "Fabric029/Fabric029_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Fabric029/Fabric029_1K-JPG_Color.ktx2",
+   "normal": "Fabric029/Fabric029_1K-JPG_NormalGL.ktx2",
+   "roughness": "Fabric029/Fabric029_1K-JPG_Roughness.ktx2",
+   "displacement": "Fabric029/Fabric029_1K-JPG_Displacement.ktx2"
+  }
  },
  "Fabric030": {
   "resolution": "1K",
@@ -224,7 +336,14 @@
   "roughness": "Fabric030/Fabric030_1K-JPG_Roughness.jpg",
   "ao": "Fabric030/Fabric030_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Fabric030/Fabric030_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Fabric030/Fabric030_1K-JPG_Color.ktx2",
+   "normal": "Fabric030/Fabric030_1K-JPG_NormalGL.ktx2",
+   "roughness": "Fabric030/Fabric030_1K-JPG_Roughness.ktx2",
+   "ao": "Fabric030/Fabric030_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Fabric030/Fabric030_1K-JPG_Displacement.ktx2"
+  }
  },
  "Grass005": {
   "resolution": "1K",
@@ -237,7 +356,14 @@
   "roughness": "Grass005/Grass005_1K-JPG_Roughness.jpg",
   "ao": "Grass005/Grass005_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Grass005/Grass005_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Grass005/Grass005_1K-JPG_Color.ktx2",
+   "normal": "Grass005/Grass005_1K-JPG_NormalGL.ktx2",
+   "roughness": "Grass005/Grass005_1K-JPG_Roughness.ktx2",
+   "ao": "Grass005/Grass005_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Grass005/Grass005_1K-JPG_Displacement.ktx2"
+  }
  },
  "Leather037": {
   "resolution": "1K",
@@ -249,7 +375,13 @@
   "normal": "Leather037/Leather037_1K-JPG_NormalGL.jpg",
   "roughness": "Leather037/Leather037_1K-JPG_Roughness.jpg",
   "displacement": "Leather037/Leather037_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Leather037/Leather037_1K-JPG_Color.ktx2",
+   "normal": "Leather037/Leather037_1K-JPG_NormalGL.ktx2",
+   "roughness": "Leather037/Leather037_1K-JPG_Roughness.ktx2",
+   "displacement": "Leather037/Leather037_1K-JPG_Displacement.ktx2"
+  }
  },
  "Marble012": {
   "resolution": "1K",
@@ -261,7 +393,13 @@
   "normal": "Marble012/Marble012_1K-JPG_NormalGL.jpg",
   "roughness": "Marble012/Marble012_1K-JPG_Roughness.jpg",
   "displacement": "Marble012/Marble012_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Marble012/Marble012_1K-JPG_Color.ktx2",
+   "normal": "Marble012/Marble012_1K-JPG_NormalGL.ktx2",
+   "roughness": "Marble012/Marble012_1K-JPG_Roughness.ktx2",
+   "displacement": "Marble012/Marble012_1K-JPG_Displacement.ktx2"
+  }
  },
  "Metal009": {
   "resolution": "1K",
@@ -273,7 +411,13 @@
   "normal": "Metal009/Metal009_1K-JPG_NormalGL.jpg",
   "roughness": "Metal009/Metal009_1K-JPG_Roughness.jpg",
   "displacement": "Metal009/Metal009_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Metal009/Metal009_1K-JPG_Color.ktx2",
+   "normal": "Metal009/Metal009_1K-JPG_NormalGL.ktx2",
+   "roughness": "Metal009/Metal009_1K-JPG_Roughness.ktx2",
+   "displacement": "Metal009/Metal009_1K-JPG_Displacement.ktx2"
+  }
  },
  "Metal027": {
   "resolution": "2K",
@@ -285,7 +429,13 @@
   "normal": "Metal027/Metal027_2K-JPG_NormalGL.jpg",
   "roughness": "Metal027/Metal027_2K-JPG_Roughness.jpg",
   "displacement": "Metal027/Metal027_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Metal027/Metal027_2K-JPG_Color.ktx2",
+   "normal": "Metal027/Metal027_2K-JPG_NormalGL.ktx2",
+   "roughness": "Metal027/Metal027_2K-JPG_Roughness.ktx2",
+   "displacement": "Metal027/Metal027_2K-JPG_Displacement.ktx2"
+  }
  },
  "Metal038": {
   "resolution": "1K",
@@ -297,7 +447,13 @@
   "normal": "Metal038/Metal038_1K-JPG_NormalGL.jpg",
   "roughness": "Metal038/Metal038_1K-JPG_Roughness.jpg",
   "displacement": "Metal038/Metal038_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Metal038/Metal038_1K-JPG_Color.ktx2",
+   "normal": "Metal038/Metal038_1K-JPG_NormalGL.ktx2",
+   "roughness": "Metal038/Metal038_1K-JPG_Roughness.ktx2",
+   "displacement": "Metal038/Metal038_1K-JPG_Displacement.ktx2"
+  }
  },
  "OfficeCeiling001": {
   "resolution": "2K",
@@ -310,7 +466,14 @@
   "roughness": "OfficeCeiling001/OfficeCeiling001_2K-JPG_Roughness.jpg",
   "ao": "OfficeCeiling001/OfficeCeiling001_2K-JPG_AmbientOcclusion.jpg",
   "displacement": "OfficeCeiling001/OfficeCeiling001_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "OfficeCeiling001/OfficeCeiling001_2K-JPG_Color.ktx2",
+   "normal": "OfficeCeiling001/OfficeCeiling001_2K-JPG_NormalGL.ktx2",
+   "roughness": "OfficeCeiling001/OfficeCeiling001_2K-JPG_Roughness.ktx2",
+   "ao": "OfficeCeiling001/OfficeCeiling001_2K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "OfficeCeiling001/OfficeCeiling001_2K-JPG_Displacement.ktx2"
+  }
  },
  "OfficeCeiling002": {
   "resolution": "2K",
@@ -323,7 +486,14 @@
   "roughness": "OfficeCeiling002/OfficeCeiling002_2K-JPG_Roughness.jpg",
   "ao": "OfficeCeiling002/OfficeCeiling002_2K-JPG_AmbientOcclusion.jpg",
   "displacement": "OfficeCeiling002/OfficeCeiling002_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "OfficeCeiling002/OfficeCeiling002_2K-JPG_Color.ktx2",
+   "normal": "OfficeCeiling002/OfficeCeiling002_2K-JPG_NormalGL.ktx2",
+   "roughness": "OfficeCeiling002/OfficeCeiling002_2K-JPG_Roughness.ktx2",
+   "ao": "OfficeCeiling002/OfficeCeiling002_2K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "OfficeCeiling002/OfficeCeiling002_2K-JPG_Displacement.ktx2"
+  }
  },
  "OfficeCeiling003": {
   "resolution": "1K",
@@ -336,7 +506,14 @@
   "roughness": "OfficeCeiling003/OfficeCeiling003_1K-JPG_Roughness.jpg",
   "ao": "OfficeCeiling003/OfficeCeiling003_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "OfficeCeiling003/OfficeCeiling003_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "OfficeCeiling003/OfficeCeiling003_1K-JPG_Color.ktx2",
+   "normal": "OfficeCeiling003/OfficeCeiling003_1K-JPG_NormalGL.ktx2",
+   "roughness": "OfficeCeiling003/OfficeCeiling003_1K-JPG_Roughness.ktx2",
+   "ao": "OfficeCeiling003/OfficeCeiling003_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "OfficeCeiling003/OfficeCeiling003_1K-JPG_Displacement.ktx2"
+  }
  },
  "OfficeCeiling005": {
   "resolution": "1K",
@@ -349,7 +526,14 @@
   "roughness": "OfficeCeiling005/OfficeCeiling005_1K-JPG_Roughness.jpg",
   "ao": "OfficeCeiling005/OfficeCeiling005_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "OfficeCeiling005/OfficeCeiling005_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "OfficeCeiling005/OfficeCeiling005_1K-JPG_Color.ktx2",
+   "normal": "OfficeCeiling005/OfficeCeiling005_1K-JPG_NormalGL.ktx2",
+   "roughness": "OfficeCeiling005/OfficeCeiling005_1K-JPG_Roughness.ktx2",
+   "ao": "OfficeCeiling005/OfficeCeiling005_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "OfficeCeiling005/OfficeCeiling005_1K-JPG_Displacement.ktx2"
+  }
  },
  "OfficeCeiling006": {
   "resolution": "1K",
@@ -362,7 +546,14 @@
   "roughness": "OfficeCeiling006/OfficeCeiling006_1K-JPG_Roughness.jpg",
   "ao": "OfficeCeiling006/OfficeCeiling006_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "OfficeCeiling006/OfficeCeiling006_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "OfficeCeiling006/OfficeCeiling006_1K-JPG_Color.ktx2",
+   "normal": "OfficeCeiling006/OfficeCeiling006_1K-JPG_NormalGL.ktx2",
+   "roughness": "OfficeCeiling006/OfficeCeiling006_1K-JPG_Roughness.ktx2",
+   "ao": "OfficeCeiling006/OfficeCeiling006_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "OfficeCeiling006/OfficeCeiling006_1K-JPG_Displacement.ktx2"
+  }
  },
  "PaintedMetal004": {
   "resolution": "1K",
@@ -374,7 +565,13 @@
   "normal": "PaintedMetal004/PaintedMetal004_1K-JPG_NormalGL.jpg",
   "roughness": "PaintedMetal004/PaintedMetal004_1K-JPG_Roughness.jpg",
   "displacement": "PaintedMetal004/PaintedMetal004_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "PaintedMetal004/PaintedMetal004_1K-JPG_Color.ktx2",
+   "normal": "PaintedMetal004/PaintedMetal004_1K-JPG_NormalGL.ktx2",
+   "roughness": "PaintedMetal004/PaintedMetal004_1K-JPG_Roughness.ktx2",
+   "displacement": "PaintedMetal004/PaintedMetal004_1K-JPG_Displacement.ktx2"
+  }
  },
  "PaintedMetal013": {
   "resolution": "1K",
@@ -387,7 +584,14 @@
   "roughness": "PaintedMetal013/PaintedMetal013_1K-JPG_Roughness.jpg",
   "ao": "PaintedMetal013/PaintedMetal013_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "PaintedMetal013/PaintedMetal013_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "PaintedMetal013/PaintedMetal013_1K-JPG_Color.ktx2",
+   "normal": "PaintedMetal013/PaintedMetal013_1K-JPG_NormalGL.ktx2",
+   "roughness": "PaintedMetal013/PaintedMetal013_1K-JPG_Roughness.ktx2",
+   "ao": "PaintedMetal013/PaintedMetal013_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "PaintedMetal013/PaintedMetal013_1K-JPG_Displacement.ktx2"
+  }
  },
  "PaintedPlaster010": {
   "resolution": "1K",
@@ -400,7 +604,14 @@
   "roughness": "PaintedPlaster010/PaintedPlaster010_1K-JPG_Roughness.jpg",
   "ao": "PaintedPlaster010/PaintedPlaster010_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "PaintedPlaster010/PaintedPlaster010_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "PaintedPlaster010/PaintedPlaster010_1K-JPG_Color.ktx2",
+   "normal": "PaintedPlaster010/PaintedPlaster010_1K-JPG_NormalGL.ktx2",
+   "roughness": "PaintedPlaster010/PaintedPlaster010_1K-JPG_Roughness.ktx2",
+   "ao": "PaintedPlaster010/PaintedPlaster010_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "PaintedPlaster010/PaintedPlaster010_1K-JPG_Displacement.ktx2"
+  }
  },
  "PaintedPlaster016": {
   "resolution": "1K",
@@ -413,7 +624,14 @@
   "roughness": "PaintedPlaster016/PaintedPlaster016_1K-JPG_Roughness.jpg",
   "ao": "PaintedPlaster016/PaintedPlaster016_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "PaintedPlaster016/PaintedPlaster016_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "PaintedPlaster016/PaintedPlaster016_1K-JPG_Color.ktx2",
+   "normal": "PaintedPlaster016/PaintedPlaster016_1K-JPG_NormalGL.ktx2",
+   "roughness": "PaintedPlaster016/PaintedPlaster016_1K-JPG_Roughness.ktx2",
+   "ao": "PaintedPlaster016/PaintedPlaster016_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "PaintedPlaster016/PaintedPlaster016_1K-JPG_Displacement.ktx2"
+  }
  },
  "PaintedPlaster017": {
   "resolution": "2K",
@@ -425,7 +643,13 @@
   "normal": "PaintedPlaster017/PaintedPlaster017_2K-JPG_NormalGL.jpg",
   "roughness": "PaintedPlaster017/PaintedPlaster017_2K-JPG_Roughness.jpg",
   "displacement": "PaintedPlaster017/PaintedPlaster017_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "PaintedPlaster017/PaintedPlaster017_2K-JPG_Color.ktx2",
+   "normal": "PaintedPlaster017/PaintedPlaster017_2K-JPG_NormalGL.ktx2",
+   "roughness": "PaintedPlaster017/PaintedPlaster017_2K-JPG_Roughness.ktx2",
+   "displacement": "PaintedPlaster017/PaintedPlaster017_2K-JPG_Displacement.ktx2"
+  }
  },
  "PavingStones136": {
   "resolution": "1K",
@@ -438,7 +662,14 @@
   "roughness": "PavingStones136/PavingStones136_1K-JPG_Roughness.jpg",
   "ao": "PavingStones136/PavingStones136_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "PavingStones136/PavingStones136_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "PavingStones136/PavingStones136_1K-JPG_Color.ktx2",
+   "normal": "PavingStones136/PavingStones136_1K-JPG_NormalGL.ktx2",
+   "roughness": "PavingStones136/PavingStones136_1K-JPG_Roughness.ktx2",
+   "ao": "PavingStones136/PavingStones136_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "PavingStones136/PavingStones136_1K-JPG_Displacement.ktx2"
+  }
  },
  "Plaster001": {
   "resolution": "2K",
@@ -450,7 +681,13 @@
   "normal": "Plaster001/Plaster001_2K-JPG_NormalGL.jpg",
   "roughness": "Plaster001/Plaster001_2K-JPG_Roughness.jpg",
   "displacement": "Plaster001/Plaster001_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Plaster001/Plaster001_2K-JPG_Color.ktx2",
+   "normal": "Plaster001/Plaster001_2K-JPG_NormalGL.ktx2",
+   "roughness": "Plaster001/Plaster001_2K-JPG_Roughness.ktx2",
+   "displacement": "Plaster001/Plaster001_2K-JPG_Displacement.ktx2"
+  }
  },
  "Plaster003": {
   "resolution": "1K",
@@ -462,7 +699,13 @@
   "normal": "Plaster003/Plaster003_1K-JPG_NormalGL.jpg",
   "roughness": "Plaster003/Plaster003_1K-JPG_Roughness.jpg",
   "displacement": "Plaster003/Plaster003_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Plaster003/Plaster003_1K-JPG_Color.ktx2",
+   "normal": "Plaster003/Plaster003_1K-JPG_NormalGL.ktx2",
+   "roughness": "Plaster003/Plaster003_1K-JPG_Roughness.ktx2",
+   "displacement": "Plaster003/Plaster003_1K-JPG_Displacement.ktx2"
+  }
  },
  "Plaster007": {
   "resolution": "1K",
@@ -475,7 +718,14 @@
   "roughness": "Plaster007/Plaster007_1K-JPG_Roughness.jpg",
   "ao": "Plaster007/Plaster007_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Plaster007/Plaster007_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Plaster007/Plaster007_1K-JPG_Color.ktx2",
+   "normal": "Plaster007/Plaster007_1K-JPG_NormalGL.ktx2",
+   "roughness": "Plaster007/Plaster007_1K-JPG_Roughness.ktx2",
+   "ao": "Plaster007/Plaster007_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Plaster007/Plaster007_1K-JPG_Displacement.ktx2"
+  }
  },
  "Plastic010": {
   "resolution": "1K",
@@ -487,7 +737,13 @@
   "normal": "Plastic010/Plastic010_1K-JPG_NormalGL.jpg",
   "roughness": "Plastic010/Plastic010_1K-JPG_Roughness.jpg",
   "displacement": "Plastic010/Plastic010_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Plastic010/Plastic010_1K-JPG_Color.ktx2",
+   "normal": "Plastic010/Plastic010_1K-JPG_NormalGL.ktx2",
+   "roughness": "Plastic010/Plastic010_1K-JPG_Roughness.ktx2",
+   "displacement": "Plastic010/Plastic010_1K-JPG_Displacement.ktx2"
+  }
  },
  "Road007": {
   "resolution": "1K",
@@ -499,7 +755,13 @@
   "normal": "Road007/Road007_1K-JPG_NormalGL.jpg",
   "roughness": "Road007/Road007_1K-JPG_Roughness.jpg",
   "displacement": "Road007/Road007_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Road007/Road007_1K-JPG_Color.ktx2",
+   "normal": "Road007/Road007_1K-JPG_NormalGL.ktx2",
+   "roughness": "Road007/Road007_1K-JPG_Roughness.ktx2",
+   "displacement": "Road007/Road007_1K-JPG_Displacement.ktx2"
+  }
  },
  "Rubber004": {
   "resolution": "1K",
@@ -511,7 +773,13 @@
   "normal": "Rubber004/Rubber004_1K-JPG_NormalGL.jpg",
   "roughness": "Rubber004/Rubber004_1K-JPG_Roughness.jpg",
   "displacement": "Rubber004/Rubber004_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Rubber004/Rubber004_1K-JPG_Color.ktx2",
+   "normal": "Rubber004/Rubber004_1K-JPG_NormalGL.ktx2",
+   "roughness": "Rubber004/Rubber004_1K-JPG_Roughness.ktx2",
+   "displacement": "Rubber004/Rubber004_1K-JPG_Displacement.ktx2"
+  }
  },
  "Snow010A": {
   "resolution": "1K",
@@ -524,7 +792,14 @@
   "roughness": "Snow010A/Snow010A_1K-JPG_Roughness.jpg",
   "ao": "Snow010A/Snow010A_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Snow010A/Snow010A_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Snow010A/Snow010A_1K-JPG_Color.ktx2",
+   "normal": "Snow010A/Snow010A_1K-JPG_NormalGL.ktx2",
+   "roughness": "Snow010A/Snow010A_1K-JPG_Roughness.ktx2",
+   "ao": "Snow010A/Snow010A_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Snow010A/Snow010A_1K-JPG_Displacement.ktx2"
+  }
  },
  "Terrazzo005": {
   "resolution": "1K",
@@ -536,7 +811,13 @@
   "normal": "Terrazzo005/Terrazzo005_1K-JPG_NormalGL.jpg",
   "roughness": "Terrazzo005/Terrazzo005_1K-JPG_Roughness.jpg",
   "displacement": "Terrazzo005/Terrazzo005_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Terrazzo005/Terrazzo005_1K-JPG_Color.ktx2",
+   "normal": "Terrazzo005/Terrazzo005_1K-JPG_NormalGL.ktx2",
+   "roughness": "Terrazzo005/Terrazzo005_1K-JPG_Roughness.ktx2",
+   "displacement": "Terrazzo005/Terrazzo005_1K-JPG_Displacement.ktx2"
+  }
  },
  "Tiles040": {
   "resolution": "1K",
@@ -548,7 +829,13 @@
   "normal": "Tiles040/Tiles040_1K-JPG_NormalGL.jpg",
   "roughness": "Tiles040/Tiles040_1K-JPG_Roughness.jpg",
   "displacement": "Tiles040/Tiles040_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Tiles040/Tiles040_1K-JPG_Color.ktx2",
+   "normal": "Tiles040/Tiles040_1K-JPG_NormalGL.ktx2",
+   "roughness": "Tiles040/Tiles040_1K-JPG_Roughness.ktx2",
+   "displacement": "Tiles040/Tiles040_1K-JPG_Displacement.ktx2"
+  }
  },
  "Tiles107": {
   "resolution": "2K",
@@ -561,7 +848,14 @@
   "roughness": "Tiles107/Tiles107_2K-JPG_Roughness.jpg",
   "ao": "Tiles107/Tiles107_2K-JPG_AmbientOcclusion.jpg",
   "displacement": "Tiles107/Tiles107_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Tiles107/Tiles107_2K-JPG_Color.ktx2",
+   "normal": "Tiles107/Tiles107_2K-JPG_NormalGL.ktx2",
+   "roughness": "Tiles107/Tiles107_2K-JPG_Roughness.ktx2",
+   "ao": "Tiles107/Tiles107_2K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Tiles107/Tiles107_2K-JPG_Displacement.ktx2"
+  }
  },
  "Tiles132A": {
   "resolution": "1K",
@@ -574,7 +868,14 @@
   "roughness": "Tiles132A/Tiles132A_1K-JPG_Roughness.jpg",
   "ao": "Tiles132A/Tiles132A_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Tiles132A/Tiles132A_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Tiles132A/Tiles132A_1K-JPG_Color.ktx2",
+   "normal": "Tiles132A/Tiles132A_1K-JPG_NormalGL.ktx2",
+   "roughness": "Tiles132A/Tiles132A_1K-JPG_Roughness.ktx2",
+   "ao": "Tiles132A/Tiles132A_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Tiles132A/Tiles132A_1K-JPG_Displacement.ktx2"
+  }
  },
  "Tiles133A": {
   "resolution": "1K",
@@ -587,7 +888,14 @@
   "roughness": "Tiles133A/Tiles133A_1K-JPG_Roughness.jpg",
   "ao": "Tiles133A/Tiles133A_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "Tiles133A/Tiles133A_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Tiles133A/Tiles133A_1K-JPG_Color.ktx2",
+   "normal": "Tiles133A/Tiles133A_1K-JPG_NormalGL.ktx2",
+   "roughness": "Tiles133A/Tiles133A_1K-JPG_Roughness.ktx2",
+   "ao": "Tiles133A/Tiles133A_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "Tiles133A/Tiles133A_1K-JPG_Displacement.ktx2"
+  }
  },
  "Tiles141": {
   "resolution": "2K",
@@ -599,7 +907,13 @@
   "normal": "Tiles141/Tiles141_2K-JPG_NormalGL.jpg",
   "roughness": "Tiles141/Tiles141_2K-JPG_Roughness.jpg",
   "displacement": "Tiles141/Tiles141_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Tiles141/Tiles141_2K-JPG_Color.ktx2",
+   "normal": "Tiles141/Tiles141_2K-JPG_NormalGL.ktx2",
+   "roughness": "Tiles141/Tiles141_2K-JPG_Roughness.ktx2",
+   "displacement": "Tiles141/Tiles141_2K-JPG_Displacement.ktx2"
+  }
  },
  "Wallpaper001A": {
   "resolution": "2K",
@@ -611,7 +925,13 @@
   "normal": "Wallpaper001A/Wallpaper001A_2K-JPG_NormalGL.jpg",
   "roughness": "Wallpaper001A/Wallpaper001A_2K-JPG_Roughness.jpg",
   "displacement": "Wallpaper001A/Wallpaper001A_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Wallpaper001A/Wallpaper001A_2K-JPG_Color.ktx2",
+   "normal": "Wallpaper001A/Wallpaper001A_2K-JPG_NormalGL.ktx2",
+   "roughness": "Wallpaper001A/Wallpaper001A_2K-JPG_Roughness.ktx2",
+   "displacement": "Wallpaper001A/Wallpaper001A_2K-JPG_Displacement.ktx2"
+  }
  },
  "Wallpaper001B": {
   "resolution": "1K",
@@ -623,7 +943,13 @@
   "normal": "Wallpaper001B/Wallpaper001B_1K-JPG_NormalGL.jpg",
   "roughness": "Wallpaper001B/Wallpaper001B_1K-JPG_Roughness.jpg",
   "displacement": "Wallpaper001B/Wallpaper001B_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Wallpaper001B/Wallpaper001B_1K-JPG_Color.ktx2",
+   "normal": "Wallpaper001B/Wallpaper001B_1K-JPG_NormalGL.ktx2",
+   "roughness": "Wallpaper001B/Wallpaper001B_1K-JPG_Roughness.ktx2",
+   "displacement": "Wallpaper001B/Wallpaper001B_1K-JPG_Displacement.ktx2"
+  }
  },
  "Wallpaper002A": {
   "resolution": "1K",
@@ -635,7 +961,13 @@
   "normal": "Wallpaper002A/Wallpaper002A_1K-JPG_NormalGL.jpg",
   "roughness": "Wallpaper002A/Wallpaper002A_1K-JPG_Roughness.jpg",
   "displacement": "Wallpaper002A/Wallpaper002A_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Wallpaper002A/Wallpaper002A_1K-JPG_Color.ktx2",
+   "normal": "Wallpaper002A/Wallpaper002A_1K-JPG_NormalGL.ktx2",
+   "roughness": "Wallpaper002A/Wallpaper002A_1K-JPG_Roughness.ktx2",
+   "displacement": "Wallpaper002A/Wallpaper002A_1K-JPG_Displacement.ktx2"
+  }
  },
  "Wood049": {
   "resolution": "2K",
@@ -647,7 +979,13 @@
   "normal": "Wood049/Wood049_2K-JPG_NormalGL.jpg",
   "roughness": "Wood049/Wood049_2K-JPG_Roughness.jpg",
   "displacement": "Wood049/Wood049_2K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Wood049/Wood049_2K-JPG_Color.ktx2",
+   "normal": "Wood049/Wood049_2K-JPG_NormalGL.ktx2",
+   "roughness": "Wood049/Wood049_2K-JPG_Roughness.ktx2",
+   "displacement": "Wood049/Wood049_2K-JPG_Displacement.ktx2"
+  }
  },
  "Wood051": {
   "resolution": "1K",
@@ -659,7 +997,13 @@
   "normal": "Wood051/Wood051_1K-JPG_NormalGL.jpg",
   "roughness": "Wood051/Wood051_1K-JPG_Roughness.jpg",
   "displacement": "Wood051/Wood051_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "Wood051/Wood051_1K-JPG_Color.ktx2",
+   "normal": "Wood051/Wood051_1K-JPG_NormalGL.ktx2",
+   "roughness": "Wood051/Wood051_1K-JPG_Roughness.ktx2",
+   "displacement": "Wood051/Wood051_1K-JPG_Displacement.ktx2"
+  }
  },
  "WoodFloor051": {
   "resolution": "1K",
@@ -672,7 +1016,14 @@
   "roughness": "WoodFloor051/WoodFloor051_1K-JPG_Roughness.jpg",
   "ao": "WoodFloor051/WoodFloor051_1K-JPG_AmbientOcclusion.jpg",
   "displacement": "WoodFloor051/WoodFloor051_1K-JPG_Displacement.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "WoodFloor051/WoodFloor051_1K-JPG_Color.ktx2",
+   "normal": "WoodFloor051/WoodFloor051_1K-JPG_NormalGL.ktx2",
+   "roughness": "WoodFloor051/WoodFloor051_1K-JPG_Roughness.ktx2",
+   "ao": "WoodFloor051/WoodFloor051_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "WoodFloor051/WoodFloor051_1K-JPG_Displacement.ktx2"
+  }
  },
  "american_walnut_veneer": {
   "resolution": "1K",
@@ -685,7 +1036,14 @@
   "roughness": "american_walnut_veneer/american_walnut_veneer_rough_1k.jpg",
   "ao": "american_walnut_veneer/american_walnut_veneer_ao_1k.jpg",
   "displacement": "american_walnut_veneer/american_walnut_veneer_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "american_walnut_veneer/american_walnut_veneer_diff_1k.ktx2",
+   "normal": "american_walnut_veneer/american_walnut_veneer_nor_gl_1k.ktx2",
+   "roughness": "american_walnut_veneer/american_walnut_veneer_rough_1k.ktx2",
+   "ao": "american_walnut_veneer/american_walnut_veneer_ao_1k.ktx2",
+   "displacement": "american_walnut_veneer/american_walnut_veneer_disp_1k.ktx2"
+  }
  },
  "beige_wall_001": {
   "resolution": "1K",
@@ -698,7 +1056,14 @@
   "roughness": "beige_wall_001/beige_wall_001_rough_1k.jpg",
   "ao": "beige_wall_001/beige_wall_001_ao_1k.jpg",
   "displacement": "beige_wall_001/beige_wall_001_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "beige_wall_001/beige_wall_001_diff_1k.ktx2",
+   "normal": "beige_wall_001/beige_wall_001_nor_gl_1k.ktx2",
+   "roughness": "beige_wall_001/beige_wall_001_rough_1k.ktx2",
+   "ao": "beige_wall_001/beige_wall_001_ao_1k.ktx2",
+   "displacement": "beige_wall_001/beige_wall_001_disp_1k.ktx2"
+  }
  },
  "beige_wall_002": {
   "resolution": "1K",
@@ -711,7 +1076,14 @@
   "roughness": "beige_wall_002/beige_wall_002_rough_1k.jpg",
   "ao": "beige_wall_002/beige_wall_002_ao_1k.jpg",
   "displacement": "beige_wall_002/beige_wall_002_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "beige_wall_002/beige_wall_002_diff_1k.ktx2",
+   "normal": "beige_wall_002/beige_wall_002_nor_gl_1k.ktx2",
+   "roughness": "beige_wall_002/beige_wall_002_rough_1k.ktx2",
+   "ao": "beige_wall_002/beige_wall_002_ao_1k.ktx2",
+   "displacement": "beige_wall_002/beige_wall_002_disp_1k.ktx2"
+  }
  },
  "concrete_floor_worn_001": {
   "resolution": "1K",
@@ -724,7 +1096,14 @@
   "roughness": "concrete_floor_worn_001/concrete_floor_worn_001_rough_1k.jpg",
   "ao": "concrete_floor_worn_001/concrete_floor_worn_001_ao_1k.jpg",
   "displacement": "concrete_floor_worn_001/concrete_floor_worn_001_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "concrete_floor_worn_001/concrete_floor_worn_001_diff_1k.ktx2",
+   "normal": "concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_1k.ktx2",
+   "roughness": "concrete_floor_worn_001/concrete_floor_worn_001_rough_1k.ktx2",
+   "ao": "concrete_floor_worn_001/concrete_floor_worn_001_ao_1k.ktx2",
+   "displacement": "concrete_floor_worn_001/concrete_floor_worn_001_disp_1k.ktx2"
+  }
  },
  "dark_paneled_wood": {
   "resolution": "1K",
@@ -737,7 +1116,14 @@
   "roughness": "dark_paneled_wood/dark_paneled_wood_rough_1k.jpg",
   "ao": "dark_paneled_wood/dark_paneled_wood_ao_1k.jpg",
   "displacement": "dark_paneled_wood/dark_paneled_wood_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "dark_paneled_wood/dark_paneled_wood_diff_1k.ktx2",
+   "normal": "dark_paneled_wood/dark_paneled_wood_nor_gl_1k.ktx2",
+   "roughness": "dark_paneled_wood/dark_paneled_wood_rough_1k.ktx2",
+   "ao": "dark_paneled_wood/dark_paneled_wood_ao_1k.ktx2",
+   "displacement": "dark_paneled_wood/dark_paneled_wood_disp_1k.ktx2"
+  }
  },
  "dirty_carpet": {
   "resolution": "1K",
@@ -750,7 +1136,14 @@
   "roughness": "dirty_carpet/dirty_carpet_rough_1k.jpg",
   "ao": "dirty_carpet/dirty_carpet_ao_1k.jpg",
   "displacement": "dirty_carpet/dirty_carpet_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "dirty_carpet/dirty_carpet_diff_1k.ktx2",
+   "normal": "dirty_carpet/dirty_carpet_nor_gl_1k.ktx2",
+   "roughness": "dirty_carpet/dirty_carpet_rough_1k.ktx2",
+   "ao": "dirty_carpet/dirty_carpet_ao_1k.ktx2",
+   "displacement": "dirty_carpet/dirty_carpet_disp_1k.ktx2"
+  }
  },
  "dirty_tiles": {
   "resolution": "1K",
@@ -763,7 +1156,14 @@
   "roughness": "dirty_tiles/dirty_tiles_rough_1k.jpg",
   "ao": "dirty_tiles/dirty_tiles_ao_1k.jpg",
   "displacement": "dirty_tiles/dirty_tiles_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "dirty_tiles/dirty_tiles_diff_1k.ktx2",
+   "normal": "dirty_tiles/dirty_tiles_nor_gl_1k.ktx2",
+   "roughness": "dirty_tiles/dirty_tiles_rough_1k.ktx2",
+   "ao": "dirty_tiles/dirty_tiles_ao_1k.ktx2",
+   "displacement": "dirty_tiles/dirty_tiles_disp_1k.ktx2"
+  }
  },
  "floor_tiles_06": {
   "resolution": "1K",
@@ -776,7 +1176,14 @@
   "roughness": "floor_tiles_06/floor_tiles_06_rough_1k.jpg",
   "ao": "floor_tiles_06/floor_tiles_06_ao_1k.jpg",
   "displacement": "floor_tiles_06/floor_tiles_06_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "floor_tiles_06/floor_tiles_06_diff_1k.ktx2",
+   "normal": "floor_tiles_06/floor_tiles_06_nor_gl_1k.ktx2",
+   "roughness": "floor_tiles_06/floor_tiles_06_rough_1k.ktx2",
+   "ao": "floor_tiles_06/floor_tiles_06_ao_1k.ktx2",
+   "displacement": "floor_tiles_06/floor_tiles_06_disp_1k.ktx2"
+  }
  },
  "laminate_floor_02": {
   "resolution": "1K",
@@ -789,7 +1196,14 @@
   "roughness": "laminate_floor_02/laminate_floor_02_rough_1k.jpg",
   "ao": "laminate_floor_02/laminate_floor_02_ao_1k.jpg",
   "displacement": "laminate_floor_02/laminate_floor_02_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "laminate_floor_02/laminate_floor_02_diff_1k.ktx2",
+   "normal": "laminate_floor_02/laminate_floor_02_nor_gl_1k.ktx2",
+   "roughness": "laminate_floor_02/laminate_floor_02_rough_1k.ktx2",
+   "ao": "laminate_floor_02/laminate_floor_02_ao_1k.ktx2",
+   "displacement": "laminate_floor_02/laminate_floor_02_disp_1k.ktx2"
+  }
  },
  "linoleum_brown": {
   "resolution": "1K",
@@ -802,7 +1216,14 @@
   "roughness": "linoleum_brown/linoleum_brown_rough_1k.jpg",
   "ao": "linoleum_brown/linoleum_brown_ao_1k.jpg",
   "displacement": "linoleum_brown/linoleum_brown_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "linoleum_brown/linoleum_brown_diff_1k.ktx2",
+   "normal": "linoleum_brown/linoleum_brown_nor_gl_1k.ktx2",
+   "roughness": "linoleum_brown/linoleum_brown_rough_1k.ktx2",
+   "ao": "linoleum_brown/linoleum_brown_ao_1k.ktx2",
+   "displacement": "linoleum_brown/linoleum_brown_disp_1k.ktx2"
+  }
  },
  "metal_plate": {
   "resolution": "1K",
@@ -815,7 +1236,14 @@
   "roughness": "metal_plate/metal_plate_rough_1k.jpg",
   "ao": "metal_plate/metal_plate_ao_1k.jpg",
   "displacement": "metal_plate/metal_plate_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "metal_plate/metal_plate_diff_1k.ktx2",
+   "normal": "metal_plate/metal_plate_nor_gl_1k.ktx2",
+   "roughness": "metal_plate/metal_plate_rough_1k.ktx2",
+   "ao": "metal_plate/metal_plate_ao_1k.ktx2",
+   "displacement": "metal_plate/metal_plate_disp_1k.ktx2"
+  }
  },
  "old_linoleum_flooring_01": {
   "resolution": "1K",
@@ -828,7 +1256,14 @@
   "roughness": "old_linoleum_flooring_01/old_linoleum_flooring_01_rough_1k.jpg",
   "ao": "old_linoleum_flooring_01/old_linoleum_flooring_01_ao_1k.jpg",
   "displacement": "old_linoleum_flooring_01/old_linoleum_flooring_01_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "old_linoleum_flooring_01/old_linoleum_flooring_01_diff_1k.ktx2",
+   "normal": "old_linoleum_flooring_01/old_linoleum_flooring_01_nor_gl_1k.ktx2",
+   "roughness": "old_linoleum_flooring_01/old_linoleum_flooring_01_rough_1k.ktx2",
+   "ao": "old_linoleum_flooring_01/old_linoleum_flooring_01_ao_1k.ktx2",
+   "displacement": "old_linoleum_flooring_01/old_linoleum_flooring_01_disp_1k.ktx2"
+  }
  },
  "painted_concrete": {
   "resolution": "1K",
@@ -841,7 +1276,14 @@
   "roughness": "painted_concrete/painted_concrete_rough_1k.jpg",
   "ao": "painted_concrete/painted_concrete_ao_1k.jpg",
   "displacement": "painted_concrete/painted_concrete_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "painted_concrete/painted_concrete_diff_1k.ktx2",
+   "normal": "painted_concrete/painted_concrete_nor_gl_1k.ktx2",
+   "roughness": "painted_concrete/painted_concrete_rough_1k.ktx2",
+   "ao": "painted_concrete/painted_concrete_ao_1k.ktx2",
+   "displacement": "painted_concrete/painted_concrete_disp_1k.ktx2"
+  }
  },
  "painted_plaster_wall": {
   "resolution": "1K",
@@ -854,7 +1296,14 @@
   "roughness": "painted_plaster_wall/painted_plaster_wall_rough_1k.jpg",
   "ao": "painted_plaster_wall/painted_plaster_wall_ao_1k.jpg",
   "displacement": "painted_plaster_wall/painted_plaster_wall_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "painted_plaster_wall/painted_plaster_wall_diff_1k.ktx2",
+   "normal": "painted_plaster_wall/painted_plaster_wall_nor_gl_1k.ktx2",
+   "roughness": "painted_plaster_wall/painted_plaster_wall_rough_1k.ktx2",
+   "ao": "painted_plaster_wall/painted_plaster_wall_ao_1k.ktx2",
+   "displacement": "painted_plaster_wall/painted_plaster_wall_disp_1k.ktx2"
+  }
  },
  "rubber_tiles": {
   "resolution": "1K",
@@ -867,6 +1316,163 @@
   "roughness": "rubber_tiles/rubber_tiles_rough_1k.jpg",
   "ao": "rubber_tiles/rubber_tiles_ao_1k.jpg",
   "displacement": "rubber_tiles/rubber_tiles_disp_1k.jpg",
-  "maxSize": 512
+  "maxSize": 512,
+  "ktx2": {
+   "color": "rubber_tiles/rubber_tiles_diff_1k.ktx2",
+   "normal": "rubber_tiles/rubber_tiles_nor_gl_1k.ktx2",
+   "roughness": "rubber_tiles/rubber_tiles_rough_1k.ktx2",
+   "ao": "rubber_tiles/rubber_tiles_ao_1k.ktx2",
+   "displacement": "rubber_tiles/rubber_tiles_disp_1k.ktx2"
+  }
+ },
+ "CorrugatedSteel005": {
+  "resolution": "1K",
+  "kind": "ambientcg",
+  "source": "https://ambientcg.com/a/CorrugatedSteel005",
+  "license": "CC0-1.0",
+  "color": "CorrugatedSteel005/CorrugatedSteel005_1K-JPG_Color.jpg",
+  "avg": "#999b9d",
+  "normal": "CorrugatedSteel005/CorrugatedSteel005_1K-JPG_NormalGL.jpg",
+  "roughness": "CorrugatedSteel005/CorrugatedSteel005_1K-JPG_Roughness.jpg",
+  "ao": "CorrugatedSteel005/CorrugatedSteel005_1K-JPG_AmbientOcclusion.jpg",
+  "displacement": "CorrugatedSteel005/CorrugatedSteel005_1K-JPG_Displacement.jpg",
+  "maxSize": 512,
+  "ktx2": {
+   "color": "CorrugatedSteel005/CorrugatedSteel005_1K-JPG_Color.ktx2",
+   "normal": "CorrugatedSteel005/CorrugatedSteel005_1K-JPG_NormalGL.ktx2",
+   "roughness": "CorrugatedSteel005/CorrugatedSteel005_1K-JPG_Roughness.ktx2",
+   "ao": "CorrugatedSteel005/CorrugatedSteel005_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "CorrugatedSteel005/CorrugatedSteel005_1K-JPG_Displacement.ktx2"
+  }
+ },
+ "WoodSiding008": {
+  "resolution": "1K",
+  "kind": "ambientcg",
+  "source": "https://ambientcg.com/a/WoodSiding008",
+  "license": "CC0-1.0",
+  "color": "WoodSiding008/WoodSiding008_1K-JPG_Color.jpg",
+  "avg": "#4c3e32",
+  "normal": "WoodSiding008/WoodSiding008_1K-JPG_NormalGL.jpg",
+  "roughness": "WoodSiding008/WoodSiding008_1K-JPG_Roughness.jpg",
+  "ao": "WoodSiding008/WoodSiding008_1K-JPG_AmbientOcclusion.jpg",
+  "displacement": "WoodSiding008/WoodSiding008_1K-JPG_Displacement.jpg",
+  "maxSize": 512,
+  "ktx2": {
+   "color": "WoodSiding008/WoodSiding008_1K-JPG_Color.ktx2",
+   "normal": "WoodSiding008/WoodSiding008_1K-JPG_NormalGL.ktx2",
+   "roughness": "WoodSiding008/WoodSiding008_1K-JPG_Roughness.ktx2",
+   "ao": "WoodSiding008/WoodSiding008_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "WoodSiding008/WoodSiding008_1K-JPG_Displacement.ktx2"
+  }
+ },
+ "WoodSiding013": {
+  "resolution": "1K",
+  "kind": "ambientcg",
+  "source": "https://ambientcg.com/a/WoodSiding013",
+  "license": "CC0-1.0",
+  "color": "WoodSiding013/WoodSiding013_1K-JPG_Color.jpg",
+  "avg": "#665844",
+  "normal": "WoodSiding013/WoodSiding013_1K-JPG_NormalGL.jpg",
+  "roughness": "WoodSiding013/WoodSiding013_1K-JPG_Roughness.jpg",
+  "ao": "WoodSiding013/WoodSiding013_1K-JPG_AmbientOcclusion.jpg",
+  "displacement": "WoodSiding013/WoodSiding013_1K-JPG_Displacement.jpg",
+  "maxSize": 512,
+  "ktx2": {
+   "color": "WoodSiding013/WoodSiding013_1K-JPG_Color.ktx2",
+   "normal": "WoodSiding013/WoodSiding013_1K-JPG_NormalGL.ktx2",
+   "roughness": "WoodSiding013/WoodSiding013_1K-JPG_Roughness.ktx2",
+   "ao": "WoodSiding013/WoodSiding013_1K-JPG_AmbientOcclusion.ktx2",
+   "displacement": "WoodSiding013/WoodSiding013_1K-JPG_Displacement.ktx2"
+  }
+ },
+ "JP_Fukitsuke": {
+  "resolution": "1K",
+  "kind": "ambientcg",
+  "source": "assets/generated/1. 日本の住宅の外壁（継ぎ目なく並べられる素材）/off-white-fukitsuke.png",
+  "license": "user-provided (AI generated; see generation.json)",
+  "color": "JP_Fukitsuke/JP_Fukitsuke_Color.jpg",
+  "avg": "#d9d4ca",
+  "normal": "JP_Fukitsuke/JP_Fukitsuke_NormalGL.jpg",
+  "roughness": "JP_Fukitsuke/JP_Fukitsuke_Roughness.jpg",
+  "ao": "JP_Fukitsuke/JP_Fukitsuke_AmbientOcclusion.jpg",
+  "maxSize": 512,
+  "ktx2": {
+   "color": "JP_Fukitsuke/JP_Fukitsuke_Color.ktx2",
+   "normal": "JP_Fukitsuke/JP_Fukitsuke_NormalGL.ktx2",
+   "roughness": "JP_Fukitsuke/JP_Fukitsuke_Roughness.ktx2",
+   "ao": "JP_Fukitsuke/JP_Fukitsuke_AmbientOcclusion.ktx2"
+  }
+ },
+ "JP_SidingRibbedBrown": {
+  "resolution": "1K",
+  "kind": "ambientcg",
+  "source": "assets/generated/1. 日本の住宅の外壁（継ぎ目なく並べられる素材）/dark-brown-ribbed.png",
+  "license": "user-provided (AI generated; see generation.json)",
+  "color": "JP_SidingRibbedBrown/JP_SidingRibbedBrown_Color.jpg",
+  "avg": "#51453c",
+  "normal": "JP_SidingRibbedBrown/JP_SidingRibbedBrown_NormalGL.jpg",
+  "roughness": "JP_SidingRibbedBrown/JP_SidingRibbedBrown_Roughness.jpg",
+  "ao": "JP_SidingRibbedBrown/JP_SidingRibbedBrown_AmbientOcclusion.jpg",
+  "maxSize": 512,
+  "ktx2": {
+   "color": "JP_SidingRibbedBrown/JP_SidingRibbedBrown_Color.ktx2",
+   "normal": "JP_SidingRibbedBrown/JP_SidingRibbedBrown_NormalGL.ktx2",
+   "roughness": "JP_SidingRibbedBrown/JP_SidingRibbedBrown_Roughness.ktx2",
+   "ao": "JP_SidingRibbedBrown/JP_SidingRibbedBrown_AmbientOcclusion.ktx2"
+  }
+ },
+ "JP_SidingStoneGrey": {
+  "resolution": "1K",
+  "kind": "ambientcg",
+  "source": "assets/generated/1. 日本の住宅の外壁（継ぎ目なく並べられる素材）/light-grey-stone.png",
+  "license": "user-provided (AI generated; see generation.json)",
+  "color": "JP_SidingStoneGrey/JP_SidingStoneGrey_Color.jpg",
+  "avg": "#a5a29d",
+  "normal": "JP_SidingStoneGrey/JP_SidingStoneGrey_NormalGL.jpg",
+  "roughness": "JP_SidingStoneGrey/JP_SidingStoneGrey_Roughness.jpg",
+  "ao": "JP_SidingStoneGrey/JP_SidingStoneGrey_AmbientOcclusion.jpg",
+  "maxSize": 512,
+  "ktx2": {
+   "color": "JP_SidingStoneGrey/JP_SidingStoneGrey_Color.ktx2",
+   "normal": "JP_SidingStoneGrey/JP_SidingStoneGrey_NormalGL.ktx2",
+   "roughness": "JP_SidingStoneGrey/JP_SidingStoneGrey_Roughness.ktx2",
+   "ao": "JP_SidingStoneGrey/JP_SidingStoneGrey_AmbientOcclusion.ktx2"
+  }
+ },
+ "JP_SidingWoodWhite": {
+  "resolution": "1K",
+  "kind": "ambientcg",
+  "source": "assets/generated/1. 日本の住宅の外壁（継ぎ目なく並べられる素材）/white-wood-grain.png",
+  "license": "user-provided (AI generated; see generation.json)",
+  "color": "JP_SidingWoodWhite/JP_SidingWoodWhite_Color.jpg",
+  "avg": "#cdcbc8",
+  "normal": "JP_SidingWoodWhite/JP_SidingWoodWhite_NormalGL.jpg",
+  "roughness": "JP_SidingWoodWhite/JP_SidingWoodWhite_Roughness.jpg",
+  "ao": "JP_SidingWoodWhite/JP_SidingWoodWhite_AmbientOcclusion.jpg",
+  "maxSize": 512,
+  "ktx2": {
+   "color": "JP_SidingWoodWhite/JP_SidingWoodWhite_Color.ktx2",
+   "normal": "JP_SidingWoodWhite/JP_SidingWoodWhite_NormalGL.ktx2",
+   "roughness": "JP_SidingWoodWhite/JP_SidingWoodWhite_Roughness.ktx2",
+   "ao": "JP_SidingWoodWhite/JP_SidingWoodWhite_AmbientOcclusion.ktx2"
+  }
+ },
+ "JP_TileBrickBeige": {
+  "resolution": "1K",
+  "kind": "ambientcg",
+  "source": "assets/generated/1. 日本の住宅の外壁（継ぎ目なく並べられる素材）/beige-brick-tile.png",
+  "license": "user-provided (AI generated; see generation.json)",
+  "color": "JP_TileBrickBeige/JP_TileBrickBeige_Color.jpg",
+  "avg": "#b7a690",
+  "normal": "JP_TileBrickBeige/JP_TileBrickBeige_NormalGL.jpg",
+  "roughness": "JP_TileBrickBeige/JP_TileBrickBeige_Roughness.jpg",
+  "ao": "JP_TileBrickBeige/JP_TileBrickBeige_AmbientOcclusion.jpg",
+  "maxSize": 512,
+  "ktx2": {
+   "color": "JP_TileBrickBeige/JP_TileBrickBeige_Color.ktx2",
+   "normal": "JP_TileBrickBeige/JP_TileBrickBeige_NormalGL.ktx2",
+   "roughness": "JP_TileBrickBeige/JP_TileBrickBeige_Roughness.ktx2",
+   "ao": "JP_TileBrickBeige/JP_TileBrickBeige_AmbientOcclusion.ktx2"
+  }
  }
 }

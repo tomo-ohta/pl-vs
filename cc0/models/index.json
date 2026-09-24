@@ -1,4 +1,64 @@
 {
+ "SchoolChair_01": {
+  "gltf": "models/SchoolChair_01/SchoolChair_01_1k.gltf",
+  "group": "seating",
+  "size": [
+   0.566,
+   1.006,
+   0.675
+  ],
+  "min": [
+   -0.283,
+   -0.002,
+   -0.338
+  ],
+  "max": [
+   0.283,
+   1.004,
+   0.338
+  ],
+  "triangles": 5072
+ },
+ "Television_01": {
+  "gltf": "models/Television_01/Television_01_1k.gltf",
+  "group": "electronics",
+  "size": [
+   0.6,
+   0.457,
+   0.471
+  ],
+  "min": [
+   -0.3,
+   0,
+   -0.258
+  ],
+  "max": [
+   0.3,
+   0.457,
+   0.212
+  ],
+  "triangles": 1918
+ },
+ "covered_car": {
+  "gltf": "models/covered_car/covered_car_1k.gltf",
+  "group": "vehicles",
+  "size": [
+   1.789,
+   1.411,
+   4.38
+  ],
+  "min": [
+   -0.847,
+   0,
+   -2.166
+  ],
+  "max": [
+   0.942,
+   1.411,
+   2.214
+  ],
+  "triangles": 12592
+ },
  "dining_table": {
   "gltf": "models/dining_table/dining_table_1k.gltf",
   "group": "tables/desks",
@@ -39,6 +99,46 @@
   ],
   "triangles": 6898
  },
+ "metal_stool_01": {
+  "gltf": "models/metal_stool_01/metal_stool_01_1k.gltf",
+  "group": "seating",
+  "size": [
+   0.352,
+   0.883,
+   0.355
+  ],
+  "min": [
+   -0.176,
+   0,
+   -0.177
+  ],
+  "max": [
+   0.176,
+   0.883,
+   0.177
+  ],
+  "triangles": 8334
+ },
+ "modern_arm_chair_01": {
+  "gltf": "models/modern_arm_chair_01/modern_arm_chair_01_1k.gltf",
+  "group": "seating",
+  "size": [
+   0.82,
+   1.023,
+   0.987
+  ],
+  "min": [
+   -0.407,
+   0,
+   -0.575
+  ],
+  "max": [
+   0.414,
+   1.023,
+   0.411
+  ],
+  "triangles": 8916
+ },
  "pachira_aquatica_01": {
   "gltf": "models/pachira_aquatica_01/pachira_aquatica_01_1k.gltf",
   "group": "waste/plants",
@@ -59,5 +159,65 @@
   ],
   "triangles": 23167,
   "part": "_a$"
+ },
+ "plastic_monobloc_chair_01": {
+  "gltf": "models/plastic_monobloc_chair_01/plastic_monobloc_chair_01_1k.gltf",
+  "group": "seating",
+  "size": [
+   0.642,
+   0.88,
+   0.628
+  ],
+  "min": [
+   -0.321,
+   0,
+   -0.336
+  ],
+  "max": [
+   0.321,
+   0.88,
+   0.292
+  ],
+  "triangles": 3356
+ },
+ "sofa_02": {
+  "gltf": "models/sofa_02/sofa_02_1k.gltf",
+  "group": "seating",
+  "size": [
+   1.807,
+   0.709,
+   0.818
+  ],
+  "min": [
+   -0.903,
+   0,
+   -0.478
+  ],
+  "max": [
+   0.904,
+   0.71,
+   0.34
+  ],
+  "triangles": 2728
+ },
+ "television_02": {
+  "gltf": "models/television_02/television_02_1k.gltf",
+  "group": "electronics",
+  "size": [
+   0.4,
+   0.411,
+   0.35
+  ],
+  "min": [
+   -0.202,
+   0,
+   -0.228
+  ],
+  "max": [
+   0.198,
+   0.411,
+   0.122
+  ],
+  "triangles": 2310
  }
 }
