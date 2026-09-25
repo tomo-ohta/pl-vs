@@ -114,7 +114,7 @@ export class SurfaceLighting {
     this.sampleOffset = s.offset;
     this.directionals = (opts.directional ?? []).map((d) => ({ dir: new THREE.Vector3(...d.dir).normalize(), color: new THREE.Color(d.color), power: d.intensity }));
     // 見た目用の細部（机の天板・棚板・柱）も遮蔽に含める（V04 手順 3）。光の遮蔽には isOccluder で更に絞る
-    this.blockers = layout.boxes.filter((b) => (b.solid || (!SURFACES[b.mat].emission && b.max[1] - b.min[1] > .025)) && b.mat !== 'glass' && b.mat !== 'water' && b.mat !== 'waterShallow' && b.mat !== 'waterWall' && !/^sky/.test(b.mat) && !SURFACES[b.mat].decal);
+    this.blockers = layout.boxes.filter((b) => (b.solid || (!SURFACES[b.mat].emission && b.max[1] - b.min[1] > .025)) && b.mat !== 'glass' && b.mat !== 'water' && b.mat !== 'waterShallow' && b.mat !== 'waterWall' && b.mat !== 'waterFilm' && !/^sky/.test(b.mat) && !SURFACES[b.mat].decal);
     this.ambient = new THREE.Color(layout.palette.ambient);
     this.skyAmbient = opts.skyAmbient ? new THREE.Color(opts.skyAmbient.color).multiplyScalar(opts.skyAmbient.intensity) : null;
     this.occlusion = opts.occlusion ?? true;

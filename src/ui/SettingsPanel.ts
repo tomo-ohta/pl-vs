@@ -36,17 +36,23 @@ interface SelectDef {
   bool?: boolean;
 }
 
-type RowDef = SliderDef | SelectDef;
+/** 見出し（第21回: メニューの「設定」タブで 音 / 操作 / 映像 / 開発 に分ける） */
+interface HeadDef { kind: 'head'; label: string }
+
+type RowDef = SliderDef | SelectDef | HeadDef;
 
 const ON_OFF = [{ value: 'on', label: 'オン' }, { value: 'off', label: 'オフ' }];
 const pct = (v: number): string => `${Math.round(v * 100)}%`;
 
 /** 表示順。音 → 視点 → 描画効果とカメラ挙動 → 開発用 */
 const ROWS: RowDef[] = [
+  { kind: 'head', label: '音' },
   { kind: 'slider', key: 'masterVolume', label: '全体音量', min: 0, max: 1, step: 0.01, format: pct },
   { kind: 'slider', key: 'ambientVolume', label: '環境音', min: 0, max: 1, step: 0.01, format: pct },
   { kind: 'slider', key: 'sfxVolume', label: '効果音', min: 0, max: 1, step: 0.01, format: pct },
+  { kind: 'head', label: '操作' },
   { kind: 'slider', key: 'lookSensitivity', label: '視点感度', min: 0.3, max: 3, step: 0.05, format: (v) => `×${v.toFixed(2)}` },
+  { kind: 'head', label: '映像' },
   {
     kind: 'select', key: 'postfx', label: '描画効果',
     options: [
@@ -69,6 +75,7 @@ const ROWS: RowDef[] = [
     note: 'テープ向け',
   },
   { kind: 'select', key: 'recOverlay', label: 'REC 表示', options: ON_OFF, bool: true },
+  { kind: 'head', label: '開発' },
   {
     kind: 'select', key: 'toneMapping', label: 'トーンマップ',
     options: [
@@ -91,16 +98,15 @@ export class SettingsPanel {
     injectStyle();
     this.el = document.createElement('div');
     this.el.id = 'settings-panel';
-    const title = document.createElement('div');
-    title.className = 'settings-title';
-    title.textContent = '設定';
-    this.el.appendChild(title);
-    for (const def of ROWS) this.el.appendChild(def.kind === 'slider' ? this.makeRow(def) : this.makeSelectRow(def));
+    for (const def of ROWS) {
+      if (def.kind === 'head') { const h = document.createElement('h3'); h.className = 'set-h'; h.textContent = def.label; this.el.appendChild(h); continue; }
+      this.el.appendChild(def.kind === 'slider' ? this.makeRow(def) : this.makeSelectRow(def));
+    }
 
     const reset = document.createElement('button');
     reset.type = 'button';
     reset.className = 'settings-reset';
-    reset.textContent = '既定に戻す';
+    reset.textContent = '設定を既定に戻す';
     reset.addEventListener('click', () => this.settings.reset());
     this.el.appendChild(reset);
 

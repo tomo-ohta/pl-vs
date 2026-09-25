@@ -18,7 +18,7 @@ import { wallSlots } from '../../modifiers/mods/GraphReference.wall';
 import { forwardSocket } from '../../modifiers/mods/LoopTopology.shared';
 import { wallBands } from '../common';
 import { along, across, buildShell, inFootprint, type Rect } from '../footprint';
-import { alongFace, chair, doorZones, freeRuns, hitsZone, innerFaces, insideRects, signAt, type Face } from '../furniture';
+import { alongFace, chair, keepOutZones, freeRuns, hitsZone, innerFaces, insideRects, signAt, type Face } from '../furniture';
 import { box, HOLE_SIZE, WALL_T, type Box, type GenParams, type InstanceSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
 
 // ---------------------------------------------------------------- 共通
@@ -51,7 +51,7 @@ function mkCtx(L: RoomLayout, p: GenParams, rng: Rng): Ctx {
   const landing = entry?.type === 'hole' ? aabbFromCenter(entry.pos[0], 0, entry.pos[2], 1.2, 1, 1.2) : null;
   return {
     L, p, rng, h: L.height, shell: L.shellCount ?? L.boxes.length, rects: L.footprint, faces: innerFaces(L.footprint),
-    zones: doorZones(L.sockets, landing), entry, budget: { boxes: BOX_BUDGET, lights: LIGHT_BUDGET },
+    zones: keepOutZones(L, landing), entry, budget: { boxes: BOX_BUDGET, lights: LIGHT_BUDGET },
   };
 }
 
@@ -490,11 +490,11 @@ function onRect(f: Face, r: Rect): boolean {
 // ---------------------------------------------------------------- M04 偽帰還口
 
 function dressM04(c: Ctx): void {
-  const { L, rng, h } = c;
+  const { L, h } = c;
   stripIslands(c);
   const fwd = forwardSocket(L);
   const fwdFace = fwd ? faceOfSocket(c, fwd) : undefined;
-  // 偽の出口（開いた扉の向こうに晴れた住宅街の絵）: 進行用扉と同じ壁を優先し、無ければ入口から遠い壁
+  // 偽の出口（開いた扉の向こうに晴れた住宅街。全天球の写真の投影）: 進行用扉と同じ壁を優先し、無ければ入口から遠い壁
   const others = c.faces.filter((f) => f !== fwdFace && !(c.entry && c.entry.type !== 'hole' && f.dir === 2)).sort((a, b) => faceDistFromEntry(c, b) - faceDistFromEntry(c, a));
   const cands = fwdFace ? [fwdFace, ...others] : others;
   let dioramaFace: Face | null = null;
@@ -513,19 +513,12 @@ function dressM04(c: Ctx): void {
       alongFace(f, t - dw / 2 - 0.1, 0.1, 0, 0.16, 0, dh + 0.1, 'trim', false),
       alongFace(f, t + dw / 2, 0.1, 0, 0.16, 0, dh + 0.1, 'trim', false),
       alongFace(f, t - dw / 2 - 0.1, dw + 0.2, 0, 0.16, dh, dh + 0.1, 'trim', false),
-      alongFace(f, t - dw / 2, dw, 0.012, 0.02, 0.02, dh, 'skyDay', false),
-      alongFace(f, t - dw / 2, dw, 0.02, 0.03, 0.02, 0.62, 'grass', false),
-      alongFace(f, t - dw / 2, dw, 0.03, 0.036, 0.02, 0.2, 'floorAsphalt', false),
-      alongFace(f, t - dw / 2, dw, 0.036, 0.046, 0.46, 0.5, 'whiteFabric', false),
+      // 扉の向こうの外（第22回）: 全天球の写真を地面の平らなドームに投影する板（src/render/OutsideView.ts）。見る位置で外の遠近が変わる。
+      // 旧: 空の箔・草・アスファルト・白い箱の家を 5 cm の厚みに重ねた絵（仮の素材に見えた）
+      alongFace(f, t - dw / 2, dw, 0.004, 0.012, 0.0, dh, 'outsideView', false),
+      // 敷居（外の地面と室内の床の境）
+      alongFace(f, t - dw / 2, dw, 0.012, 0.16, 0.0, 0.015, 'floorConcrete', false),
     ];
-    // 住宅の並び（白い箱 + 濃い屋根）
-    let hx = t - dw / 2 + 0.08;
-    while (hx + 0.22 < t + dw / 2 - 0.06) {
-      const hw = rng.float(0.18, 0.26), hh = rng.float(0.2, 0.3);
-      unit.push(alongFace(f, hx, hw, 0.03, 0.05, 0.62, 0.62 + hh, 'wallWhite', false));
-      unit.push(alongFace(f, hx - 0.015, hw + 0.03, 0.03, 0.052, 0.62 + hh, 0.62 + hh + 0.06, 'trim', false));
-      hx += hw + rng.float(0.06, 0.12);
-    }
     if (!add(c, unit)) return;
     // 開いた扉のパネル（枡に直交して室内へ。扉前・動線に掛かるなら置かない）
     placeUnit(c, [alongFace(f, t + dw / 2 - 0.04, 0.04, 0.16, 0.16 + dw - 0.06, 0.02, dh - 0.02, 'doorWood', true)]);

@@ -13,6 +13,9 @@ export type MonumentKind = 'officeTotem' | 'stoneFrame' | 'ribbon' | 'cubeCluste
   // 散らかった物の山（奇妙さ生成 disorder.ts。部品の自由な回転を使うため MonumentSpec で描く。抽選・統計の対象外）
   | 'clutter';
 /** 通常の抽選に使う種類（colossus を除く） */
+/** モニュメントの刻印（SignSpec.id の頭。NonEuclideanVolume が組み直しで捨てる目印） */
+export const MONUMENT_SIGN_PREFIX = 'monument:';
+
 export const MONUMENT_KINDS: readonly MonumentKind[] = ['officeTotem', 'stoneFrame', 'ribbon', 'cubeCluster', 'colorStack', 'steel', 'monolith', 'chairTower', 'doorRing', 'lampGrove'];
 
 /**

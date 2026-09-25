@@ -19,7 +19,7 @@ export type MatId =
   | 'plantLeaf' | 'plantSoil' | 'shelfMetal' | 'boxCardboard' | 'plant' | 'water' | 'carPaint' | 'carGlass' | 'rubber' | 'upholstery'
   // Phase 2 Modifier / 未実装 Generator 向け（v1.3 追加）
   | 'lightGreen' | 'lightYellow' | 'screenGlow' | 'skyOvercast' | 'skyDusk' | 'skyNoon'
-  | 'waterShallow' | 'waterWall' | 'puddle' | 'shadowDecal' | 'untextured'
+  | 'waterShallow' | 'waterWall' | 'waterFilm' | 'outsideView' | 'puddle' | 'shadowDecal' | 'untextured'
   | 'floorAsphalt' | 'wallBrick' | 'windowLit' | 'windowDark' | 'sodiumLight' | 'signPlate' | 'signEmissive'
   | 'ice' | 'snow' | 'grass'
   // 住宅街の外壁（第15回。提供素材の日本の外壁 + ambientCG）。屋内の壁と材質を分ける
@@ -255,6 +255,11 @@ export interface RoomLayout {
   particles?: ParticleSpec | ParticleSpec[];
   signs?: SignSpec[];
   decals?: DecalSpec[];
+  /**
+   * 通り抜けの予約（間仕切りの開口とその前後）。後段の配置（ドレッシング・奇妙さ・Modifier の家具）は扉前ゾーンと同じく避ける。
+   * 描画・当たり判定には使わない
+   */
+  passages?: AABB[];
   /** 謎の物体（モニュメント）。描画は src/render/MonumentGeometry.ts、当たり判定は kind 'colliderOnly' の箱で別に持つ */
   monuments?: MonumentSpec[];
   dynamics?: DynamicSpec[];

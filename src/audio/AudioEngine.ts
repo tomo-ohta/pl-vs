@@ -56,7 +56,7 @@ import { LoudnessSource, type MovementRank } from './LoudnessSource';
 import { mapPreset, isLayerId, type PresetMix } from './presetMap';
 import { createReverb, estimateRT60, type IReverb } from './Reverb';
 import {
-  doorMatOf, floorKindOf, isSfxKind, playDoor, playElevator, playFootstep, playLand, playNamed, playUi,
+  doorMatOf, floorKindOf, isSfxKind, playDoor, playElevator, playFootstep, playJump, playLand, playNamed, playRustle, playUi,
   type DoorMat, type DoorSfxKind, type ElevatorSfxKind, type FloorKind, type MoveRank, type SfxContext, type UiSfxKind,
 } from './Sfx';
 
@@ -64,6 +64,18 @@ import { createShared, type LayerDest, type SharedSources } from './Synth';
 
 /** 全体音量の既定値（Settings の DEFAULT_SETTINGS.masterVolume と同じ）。ambientLevel の換算の基準 */
 const NOISE_REF_MASTER = 0.25;
+/** 残響の出力がこれを超えたら暴走とみなす（通常の出力は 1 未満。振り切れた録音でも内部値は数十〜Infinity になる） */
+const REVERB_RUNAWAY = 4;
+/** 足音は環境音より何 dB 上に聞こえてほしいか（全体の出力で測った値の目安） */
+const STEP_MARGIN_DB = 12;
+/** 環境音バスの一律の下げ幅（線形。0.71 = -3 dB） */
+const AMBIENT_TRIM = 0.71;
+/** 足音の自動の持ち上げの上限（dB） */
+const STEP_BOOST_MAX_DB = 18;
+/** 持ち上げ前の歩きの一歩の大きさ（ambientBus の RMS と同じ尺度。素材 -13 dBFS × 基準 0.55 × 定位 -3 dB） */
+const STEP_REF_DB = -22;
+/** プレイヤーの動作音（足音・着地・ジャンプ・擦れ）の一律の下げ幅（線形。0.71 = -3 dB。第22回「全体的にもう少し小さくてよい」） */
+const PLAYER_SFX_TRIM = 0.71;
 
 /** Tier ごとの同時発音上限（rules.json 性能予算「音」行） */
 export const VOICE_BUDGET: Record<QualityTier['id'], number> = { low: 8, mid: 12, high: 20 };
@@ -125,6 +137,18 @@ export class AudioEngine {
   private sfxBus: GainNode | null = null;
   private reverbSend: GainNode | null = null;
   private reverbReturn: GainNode | null = null;
+  /** 残響の出力の監視（第19回。暴走・NaN を見つけたら残響を作り直す）。0.25 s ごとに 256 サンプルを見る */
+  private reverbProbe: AnalyserNode | null = null;
+  /** 環境音の実測（第20回の 2 回目。足音を埋もれさせない自動の持ち上げ量の入力）。0.2 s ごとに ambientBus の RMS を測り、τ 1.5 s で追従 */
+  private ambientProbe: AnalyserNode | null = null;
+  private ambientProbeBuf: Float32Array<ArrayBuffer> | null = null;
+  private ambientProbeNext = 0;
+  private ambientDb = -80;
+  /** 全体の出力の音割れ防止（足音を持ち上げても全体音量 100% で割れない） */
+  private limiter: DynamicsCompressorNode | null = null;
+  private reverbProbeBuf: Float32Array<ArrayBuffer> | null = null;
+  private reverbProbeNext = 0;
+  private reverbResets = 0;
   private reverb: IReverb | null = null;
   private mixer: AmbientMixer | null = null;
   private tier: QualityTier = QUALITY_TIERS.high;
@@ -181,7 +205,18 @@ export class AudioEngine {
     this.ambientBus.connect(this.master);
     this.sfxBus.connect(this.master);
     this.reverbReturn.connect(this.master);
-    this.master.connect(ctx.destination);
+    // 全体の出力 → 音割れ防止（ほぼ素通し。-2 dBFS を超えるときだけ強く抑える）→ スピーカー
+    this.limiter = ctx.createDynamicsCompressor();
+    this.limiter.threshold.value = -2;
+    this.limiter.knee.value = 0;
+    this.limiter.ratio.value = 20;
+    this.limiter.attack.value = 0.003;
+    this.limiter.release.value = 0.12;
+    this.master.connect(this.limiter).connect(ctx.destination);
+    this.ambientProbe = ctx.createAnalyser();
+    this.ambientProbe.fftSize = 2048;
+    this.ambientProbeBuf = new Float32Array(this.ambientProbe.fftSize);
+    this.ambientBus.connect(this.ambientProbe);
     this.buildReverb(this.tier.convolver);
     this.mixer = new AmbientMixer(ctx, this.sh, { dry: this.ambientBus, reverb: this.reverbSend }, this.assets);
     this.mixer.setBudget(Math.max(2, VOICE_BUDGET[this.tier.id] - SFX_RESERVE));
@@ -273,7 +308,8 @@ export class AudioEngine {
     };
     // 音量スライダーは聴感に合わせて 2 乗
     ramp(this.master, this.volumes.masterVolume ** 2);
-    ramp(this.ambientBus, this.hidden ? 0 : this.volumes.ambientVolume ** 2);
+    // 環境音は -3 dB（第20回の 2 回目。足音に対して大きすぎ、空調の部屋で足音が埋もれていた）
+    ramp(this.ambientBus, this.hidden ? 0 : this.volumes.ambientVolume ** 2 * AMBIENT_TRIM);
     ramp(this.sfxBus, this.volumes.sfxVolume ** 2);
   }
 
@@ -294,6 +330,11 @@ export class AudioEngine {
     this.reverb = createReverb(ctx, convolver);
     this.reverbSend.connect(this.reverb.input);
     this.reverb.output.connect(this.reverbReturn);
+    this.reverbProbe?.disconnect();
+    this.reverbProbe = ctx.createAnalyser();
+    this.reverbProbe.fftSize = 256;
+    this.reverbProbeBuf = new Float32Array(this.reverbProbe.fftSize);
+    this.reverb.output.connect(this.reverbProbe);
     const rt = this.pendingReverb ?? (keep ? { rt60: keep.rt60, preDelay: 0.01 } : { rt60: 0.8, preDelay: 0.01 });
     this.reverb.setRT60(rt.rt60, rt.preDelay, 0.01);
     this.pendingReverb = null;
@@ -346,6 +387,57 @@ export class AudioEngine {
     }
     if (this.sfxActive.length) this.sfxActive = this.sfxActive.filter((end) => end > now);
     this.events.prune(now);
+    this.watchReverb(now);
+    this.measureAmbient(now);
+  }
+
+  private measureAmbient(now: number): void {
+    const probe = this.ambientProbe, buf = this.ambientProbeBuf;
+    if (!probe || !buf || now < this.ambientProbeNext) return;
+    const dt = this.ambientProbeNext > 0 ? Math.min(1, now - this.ambientProbeNext + 0.2) : 1;
+    this.ambientProbeNext = now + 0.2;
+    probe.getFloatTimeDomainData(buf);
+    let e = 0;
+    for (let i = 0; i < buf.length; i++) e += buf[i] * buf[i];
+    const db = 10 * Math.log10(e / buf.length + 1e-12);
+    if (!Number.isFinite(db)) return;
+    this.ambientDb += (db - this.ambientDb) * Math.min(1, dt / 1.5);
+  }
+
+  /**
+   * プレイヤーの動作音（足音・着地・ジャンプ・擦れ）の持ち上げ量（線形倍率）。環境音の実測 + STEP_MARGIN_DB を、
+   * 通常の歩きの一歩の大きさ（STEP_REF_DB）が下回る分だけ上げる（0〜+STEP_BOOST_MAX_DB）。静かな部屋では 1（持ち上げない）。
+   * 第20回の 2 回目: 部屋によって環境音が 20 dB 以上違い、空調の大きい部屋では足音が環境音 +1.5 dB しかなく埋もれていた
+   */
+  get stepBoost(): number {
+    const db = Math.max(0, Math.min(STEP_BOOST_MAX_DB, this.ambientDb + STEP_MARGIN_DB - STEP_REF_DB));
+    return Math.pow(10, db / 20);
+  }
+
+  /** プレイヤーの動作音に掛ける倍率（stepBoost × 一律の下げ幅） */
+  private get playerGain(): number {
+    return this.stepBoost * PLAYER_SFX_TRIM;
+  }
+
+  /**
+   * 残響の見張り（保険）: 出力に NaN / Infinity、または |x| > REVERB_RUNAWAY（通常は 1 未満）があれば、残響を作り直す。
+   * 出力側は Gain だけなので、残響の中で数値が壊れると全体が無音のままになる（第19回の不具合の後半）。作り直せばすぐ戻る
+   */
+  private watchReverb(now: number): void {
+    const probe = this.reverbProbe, buf = this.reverbProbeBuf;
+    if (!probe || !buf || now < this.reverbProbeNext) return;
+    this.reverbProbeNext = now + 0.25;
+    probe.getFloatTimeDomainData(buf);
+    let peak = 0;
+    for (let i = 0; i < buf.length; i++) {
+      const v = buf[i];
+      if (!Number.isFinite(v)) { peak = Infinity; break; }
+      peak = Math.max(peak, Math.abs(v));
+    }
+    if (peak <= REVERB_RUNAWAY) return;
+    this.reverbResets++;
+    console.warn(`[AudioEngine] reverb runaway (peak ${peak}) → rebuild #${this.reverbResets}`);
+    this.buildReverb(this.tier.convolver);
   }
 
   // ---------------------------------------------------------------- 部屋
@@ -417,15 +509,17 @@ export class AudioEngine {
   }
 
   // ---------------------------------------------------------------- 効果音
-  private sfx(): SfxContext | null {
+  /** priority: 足音・着地・ジャンプ（プレイヤー自身の動作音）は予算を超えても鳴らす（落ちると「鳴ったり鳴らなかったり」に聞こえる。短く、同時に 2〜3 本まで） */
+  private sfx(priority = false): SfxContext | null {
     if (!this.ctx || !this.sh || !this.sfxBus || !this.reverbSend) return null;
-    if (this.sfxActive.length >= VOICE_BUDGET[this.tier.id]) return null; // 予算超過: 一発音は落とす
+    if (!priority && this.sfxActive.length >= VOICE_BUDGET[this.tier.id]) return null; // 予算超過: 一発音は落とす
     const ctx = this.ctx;
     return {
       ctx,
       sh: this.sh,
       dest: { dry: this.sfxBus, reverb: this.reverbSend },
       onVoice: (dur) => this.sfxActive.push(ctx.currentTime + dur),
+      samples: (prefix) => this.assets.variants(prefix),
     };
   }
 
@@ -438,21 +532,38 @@ export class AudioEngine {
    * 左右 ±0.15 の定位を交互に、ピッチ ±6% ランダム
    */
   footstep(floorMat: string | undefined, rank: MoveRank, crouching = false, wet?: boolean, pos?: Vec3): void {
-    const sc = this.sfx();
+    const sc = this.sfx(true);
     if (!sc) return;
     const floor = floorMat ? floorKindOf(floorMat, wet) : (wet ? 'wet' : this.room.floor);
     this.stepSide = -this.stepSide;
     const send = this.room.silent ? 0.9 : undefined;
-    playFootstep(sc, floor, rank, crouching, wet ?? this.room.floor === 'wet', { pos, pan: pos ? undefined : 0.15 * this.stepSide, send });
+    playFootstep(sc, floor, rank, crouching, wet ?? this.room.floor === 'wet', { pos, pan: pos ? undefined : 0.15 * this.stepSide, send, gain: this.playerGain });
     this.log(`footstep:${floor}:${rank}`, pos ?? this.listenerPos);
+  }
+
+  /** ジャンプの踏み切り（第20回）。floorMat は足元の材質（無ければ部屋の床） */
+  jump(floorMat?: string, pos?: Vec3): void {
+    const sc = this.sfx(true);
+    if (!sc) return;
+    const floor = floorMat ? floorKindOf(floorMat) : this.room.floor;
+    playJump(sc, floor, { pos, pan: pos ? undefined : 0, gain: this.playerGain });
+    this.log(`jump:${floor}`, pos ?? this.listenerPos);
+  }
+
+  /** 草木を通り抜ける擦れ（第20回）。strength 0〜1（走ると強い） */
+  rustle(strength: number, pos?: Vec3, tall = false): void {
+    const sc = this.sfx(true);
+    if (!sc) return;
+    playRustle(sc, strength, { pos, pan: pos ? undefined : 0.2 * this.stepSide, gain: Math.sqrt(this.stepBoost) * PLAYER_SFX_TRIM }, tall);
+    this.log('rustle', pos ?? this.listenerPos, strength);
   }
 
   /** 着地。speed = 着地時の |vel.y|（m/s） */
   land(speed: number, floorMat?: string, pos?: Vec3): void {
-    const sc = this.sfx();
+    const sc = this.sfx(true);
     if (!sc) return;
     const floor = floorMat ? floorKindOf(floorMat) : this.room.floor;
-    if (playLand(sc, speed, floor, { pos }) > 0) this.log(`land:${floor}`, pos ?? this.listenerPos, speed);
+    if (playLand(sc, speed, floor, { pos, gain: this.playerGain }) > 0) this.log(`land:${floor}`, pos ?? this.listenerPos, speed);
   }
 
   /** 扉。mat は palette.door（doorWood / doorMetal / glass）または 'wood' | 'metal' | 'glass'。pos は DoorObject.center */

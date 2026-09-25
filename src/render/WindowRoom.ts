@@ -49,6 +49,19 @@ vec3 liminalWindowRoom(float litMat) {
   vec3 tng = axisX ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
   vec3 d = normalize(vWinPos - vWinCam);
   float halfW = axisX ? H.z : H.x;
+  // 長い帯の窓（温室都市の外壁の 150 m の帯など）は幅 2.4 m 前後の窓に割る（第22回。1 枚の窓として扱うと、奥の部屋・写真が
+  // 帯の長さに引き伸ばされていた）。窓ごとに中心を置き直すので、点灯・写真・カーテンも窓ごとに変わる。境目は 5 cm の暗い方立て
+  float mull = 1.0;
+  if (halfW > 1.6) {
+    float aw = dot(vWinPos - C, tng);
+    float nP = max(1.0, floor(2.0 * halfW / 2.4 + 0.5));
+    float pw = 2.0 * halfW / nP;
+    float k = clamp(floor((aw + halfW) / pw), 0.0, nP - 1.0);
+    float ac = -halfW + (k + 0.5) * pw;
+    C += tng * ac;
+    halfW = 0.5 * pw;
+    mull = mix(0.12, 1.0, step(abs(aw - ac), halfW - 0.05));
+  }
   bool photo = winPhotoOn > 0.5;
   // 部屋: 横は窓幅の 1.6 倍（最低 1.6 m）、床は窓の下端 − 0.9 m、天井は床 + 2.6 m、奥行き WINDOW_ROOM_DEPTH。
   // 写真のときは窓面での幅 : 高さを写真と同じ 3 : 2 にする（幅 3.9 m）
@@ -84,7 +97,7 @@ vec3 liminalWindowRoom(float litMat) {
       vec3 lampC = r1 < 0.62 ? vec3(1.0, 0.72, 0.42) : vec3(0.86, 0.93, 1.0);
       col = mix(vec3(0.75, 0.68, 0.55), vec3(0.55, 0.6, 0.66), r2) * (0.85 + 0.15 * sin(u * 38.0 + r1 * 6.0)) * (lampC * lit * 0.55 + 0.02);
     }
-    return col;
+    return col * mull;
   }
   vec3 lampCol = r1 < 0.62 ? vec3(1.0, 0.72, 0.42) : (r1 < 0.9 ? vec3(0.86, 0.93, 1.0) : vec3(1.0, 0.86, 0.66));
   vec3 wallCol = mix(vec3(0.62, 0.58, 0.52), vec3(0.45, 0.5, 0.52), r2) * (0.8 + 0.3 * r3);
@@ -126,7 +139,7 @@ vec3 liminalWindowRoom(float litMat) {
     float slat = smoothstep(0.35, 0.5, fract((vWinPos.y - C.y) * 9.0));
     col = mix(col, vec3(0.7, 0.68, 0.62) * (lampCol * lit * 0.5 + 0.02), slat * 0.85);
   }
-  return col;
+  return col * mull;
 }
 `;
 

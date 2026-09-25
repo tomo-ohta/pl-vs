@@ -101,6 +101,11 @@ export function doorZones(sockets: Socket[], landing?: AABB | null, extra = 0.1)
   return zones;
 }
 
+/** 扉前ゾーン + 通り抜けの予約（L.passages。間仕切りの開口）。後段の配置が避ける領域 */
+export function keepOutZones(L: RoomLayout, landing?: AABB | null, extra = 0.1): AABB[] {
+  return [...doorZones(L.sockets, landing, extra), ...(L.passages ?? [])];
+}
+
 export function hitsZone(zones: AABB[], b: Box): boolean {
   return zones.some((z) => b.min[0] < z.max[0] && b.max[0] > z.min[0] && b.min[1] < z.max[1] && b.max[1] > z.min[1] && b.min[2] < z.max[2] && b.max[2] > z.min[2]);
 }
@@ -387,21 +392,35 @@ export function urinalRow(B: Box[], f: Face, a0: number, n: number): void {
   }
 }
 
-/** 洗濯機 0.6 × 0.6 × 0.85（白い筐体）+ 丸窓（glass、裏はドラムの暗色）+ 操作パネル。stacked なら上に乾燥機を重ねる */
+/**
+ * コインランドリーの業務用洗濯機（第22回に実寸へ: 幅 0.72 × 奥 0.75 × 高 1.05。以前の 0.6 × 0.6 × 0.85 は家庭用より小さく見えた）。
+ * 白い筐体 + 丸窓（glass、裏はドラムの暗色）+ 操作パネル。stacked なら上に乾燥機（高 0.85）を重ねる（上端 1.9 m）
+ */
+export const WASHER_W = 0.72;
+export const WASHER_D = 0.75;
+export const WASHER_H = 1.05;
+export const DRYER_H = 0.85;
+/** 壁（または島の中心線）から筐体の前面まで（背の隙間 0.03 + 奥行） */
+export const WASHER_OUT = 0.03 + WASHER_D;
+/** 列の間隔（隣との隙間 2 cm） */
+export const WASHER_PITCH = WASHER_W + 0.02;
 export function washer(B: Box[], f: Face, at: number, stacked = false): void {
-  const d0 = 0.03, d1 = 0.63;
+  const d0 = 0.03, d1 = WASHER_OUT, W = WASHER_W;
   const unit = (y: number, dryer: boolean) => {
+    const H = dryer ? DRYER_H : WASHER_H;
     const from = B.length;
-    B.push(alongFace(f, at, 0.6, d0, d1, y, y + 0.85, 'shelfMetal', true));
-    B.push(alongFace(f, at + 0.12, 0.36, d1, d1 + 0.012, y + 0.2, y + 0.56, 'metalDark', false));
+    B.push(alongFace(f, at, W, d0, d1, y, y + H, 'shelfMetal', true));
+    // 丸窓は筐体の幅の 60%（業務用の大きなドア）。乾燥機は上寄り、洗濯機は中央やや上
+    const win = W * 0.6, wy = dryer ? y + H * 0.3 : y + H * 0.28;
+    B.push(alongFace(f, at + (W - win) / 2, win, d1, d1 + 0.012, wy, wy + win, 'metalDark', false));
     // 丸窓は暗い艶ガラス（carGlass）。透過ガラス（glass）は transmission の再描画パスを増やすので使わない
-    B.push(alongFace(f, at + 0.15, 0.3, d1, d1 + 0.02, y + 0.23, y + 0.53, 'carGlass', false));
-    B.push(alongFace(f, at + 0.05, 0.5, d1, d1 + 0.01, y + (dryer ? 0.06 : 0.7), y + (dryer ? 0.16 : 0.8), 'metalDark', false));
+    B.push(alongFace(f, at + (W - win * 0.84) / 2, win * 0.84, d1, d1 + 0.02, wy + win * 0.08, wy + win * 0.92, 'carGlass', false));
+    B.push(alongFace(f, at + W * 0.08, W * 0.84, d1, d1 + 0.01, y + (dryer ? 0.06 : H - 0.17), y + (dryer ? 0.16 : H - 0.05), 'metalDark', false));
     // 表示用タグ（描画側 ApplianceFromBoxes が 1 台ずつコード生成の洗濯機 / 乾燥機に置き換える）
     tagGroup(B, from, gid(dryer ? 'dryer' : 'washer', f.dir, at, f.face, y), dryer ? 'dryer' : 'washer');
   };
   unit(0, false);
-  if (stacked) unit(0.85, true);
+  if (stacked) unit(WASHER_H, true);
 }
 
 /** トイレブース: 幅 0.9 × 奥 1.4、間仕切りは床から 0.15 浮き、高さ 2.05（扉 0.7 幅 × 高 1.9）。n 室を a0 から */

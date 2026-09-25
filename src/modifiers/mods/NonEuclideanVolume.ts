@@ -24,6 +24,7 @@
  * ドレッシング（generators/dressing/epic.ts の E08。Modifier より前に走る）の箱は `kind` が 'dress:' で始まる（PropRepetition.shared.isDress）。
  * 殻・内部とも L.boxes を組み直すが、その箱だけは残す: 内部では拡大後の座標に写す（mapDressBox: XZ の中心 × s、寸法はそのまま、
  * 天井付きのものは天井の高さの差だけ上げる）。殻ではそのまま。いずれも殻の内側（壁の内面 × 床〜天井）に clip し、潰れたものは捨てる。
+ * 奇妙さのモニュメント・乱れの物（L.monuments）とその刻印は捨てる（dropOddObjects。当たり判定は組み直しで落ちるので、残すと通り抜けられた）。
  * ドレッシング側は「拡大後に置きたい位置 ÷ s」に置く（epic.ts dressE08 の pre()）。
  */
 import { aabbFromCenter, type AABB } from '../../core/aabb';
@@ -36,6 +37,7 @@ import { box, DOOR_H, DOOR_W, HOLE_SIZE, lightPanel, socket, WALL_T, type Box, t
 import type { ModifierImpl } from '../types';
 import { num } from '../util';
 import { isDress } from './PropRepetition.shared';
+import { MONUMENT_SIGN_PREFIX } from '../../generators/monument/types';
 
 export const NEV_ID = 'NonEuclideanVolume';
 /** 殻の内側の扉（Seam）。この id を onConnect が見る */
@@ -99,6 +101,16 @@ function restoreDress(L: RoomLayout, dress: Box[], map: (b: Box) => Box): void {
     const m = clipDressBox(map(b), L.footprint, L.height);
     if (m) L.boxes.push(m);
   }
+}
+
+/**
+ * 奇妙さのモニュメントと乱れの物（L.monuments。kind 'clutter' を含む）を捨てる。殻・内部とも家具を作り直すので、元の配置に合わせて置いた物
+ * （乱れは元の家具そのもの）は意味を失う。当たり判定（kind 'colliderOnly'）と展示光（'emitOnly'）は 'dress:' ではないので組み直しで既に落ちる。
+ * 残すと当たり判定の無いモニュメントが元の位置に描かれ、通り抜けられた。instances を捨てるのと同じ扱い
+ */
+function dropOddObjects(L: RoomLayout): void {
+  L.monuments = undefined;
+  if (L.signs) L.signs = L.signs.filter((sg) => !sg.id?.startsWith(MONUMENT_SIGN_PREFIX));
 }
 
 // ---------------------------------------------------------------- ① 殻
@@ -168,6 +180,7 @@ function buildShellRoom(L: RoomLayout, p: GenParams, size: number): void {
   // ラベルは入口のもの（位置は入口相対なので据え置き）。v1.3 任意フィールドは殻に不要なので落とす
   L.zones = undefined;
   L.instances = undefined;
+  dropOddObjects(L);
   L.particles = undefined;
   L.decals = undefined;
   L.dynamics = undefined;
@@ -301,6 +314,7 @@ function expandInterior(L: RoomLayout, p: GenParams, s: number, rng: Rng): void 
   }
   L.zones = undefined;
   L.instances = undefined;
+  dropOddObjects(L);
   L.particles = undefined;
   L.decals = undefined;
   L.dynamics = undefined;

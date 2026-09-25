@@ -146,6 +146,8 @@ export function insideFootprint(L: RoomLayout, bb: AABB, margin = WALL_T): boole
 export function canPlaceSolid(L: RoomLayout, bb: AABB, solids: Box[] = interiorSolids(L), pad = 0.1): boolean {
   if (!insideFootprint(L, bb)) return false;
   if (blocksDoorway(bb, L.sockets)) return false;
+  // 間仕切りの開口とその前後（通り抜けの予約）
+  if (L.passages?.some((q) => overlapsAABB(q, bb, 0))) return false;
   if (L.holes.some((h) => overlapsAABB({ min: [h.min[0], -1, h.min[2]], max: [h.max[0], 3, h.max[2]] }, bb, 0.6))) return false;
   return !solids.some((s) => overlapsAABB(s, bb, pad));
 }

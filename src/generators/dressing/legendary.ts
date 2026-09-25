@@ -15,7 +15,7 @@ import type { AABB } from '../../core/aabb';
 import type { Dir, Vec3 } from '../../core/types';
 import type { Rng } from '../../core/rng';
 import { inner, rect, rectArea, type Rect } from '../footprint';
-import { alongFace, doorZones, freeRuns, hitsZone, innerFaces, insideRects, signAt, signOnWall, type Face } from '../furniture';
+import { alongFace, keepOutZones, freeRuns, hitsZone, innerFaces, insideRects, signAt, signOnWall, type Face } from '../furniture';
 import { car } from '../StreetGenerator.facade';
 import { courtyardEdges } from '../MegaStructureGenerator.common';
 import { box, snap, WALL_T, type Box, type GenParams, type InstanceSpec, type LightSpec, type MatId, type ParticleSpec, type RoomLayout, type SignSpec } from '../layout';
@@ -59,7 +59,7 @@ function ctxOf(L: RoomLayout, p: GenParams, rng: Rng): Ctx {
       lanes.push([a, [s.pos[0] + si[0] * 1.5, s.pos[2] + si[1] * 1.5]]);
     }
   }
-  return { L, p, rng, shell: L.shellCount ?? L.boxes.length, rects, h: L.height, zones: doorZones(L.sockets, null, 0.1), lanes, lightsAdded: 0 };
+  return { L, p, rng, shell: L.shellCount ?? L.boxes.length, rects, h: L.height, zones: keepOutZones(L, null, 0.1), lanes, lightsAdded: 0 };
 }
 
 function overlap3(a: AABB, b: AABB, eps = 0.01): boolean {
@@ -1550,14 +1550,14 @@ function dressL18(c: Ctx): void {
 }
 
 // ---------------------------------------------------------------- L19 凍結リゾート（MegaAtrium resort）
-// 凍結プールの上に青く光る薄い箔、天井のつらら（instances）、壁の氷壁、上階の暖色の室内窓（instances）、青い灯。雪と霧は Modifier。
+// 凍結プール（手続きの氷面）、天井のつらら（instances）、壁の氷壁、上階の暖色の室内窓（instances）、青い灯。雪と霧は Modifier。
 
 function dressL19(c: Ctx): void {
   const { L } = c;
   const main = c.rects[0];
   const h = c.h;
   const ices = L.boxes.filter((b) => !b.solid && b.mat === 'ice' && b.max[1] <= 0.05 && (b.max[0] - b.min[0]) * (b.max[2] - b.min[2]) > 20);
-  for (const ib of ices) push(c, box([ib.min[0] + 0.25, ib.max[1] + 0.002, ib.min[2] + 0.25], [ib.max[0] - 0.25, ib.max[1] + 0.012, ib.max[2] - 0.25], 'aquariumBlue', false));
+  // 第22回: 氷の上の青く光る半透明の箔は外した（氷面が「水色の板」に見えていた。氷は材質 'ice' の手続きの氷面 + 艶で見せる）
   const pool = ices[0];
   if (pool) addLight(c, { pos: [(pool.min[0] + pool.max[0]) / 2, 3.0, (pool.min[2] + pool.max[2]) / 2], color: 0x4a90ff, intensity: 1.2, distance: 22 });
   // つらら（天井。クラスタ）

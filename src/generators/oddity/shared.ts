@@ -12,7 +12,7 @@ import type { AABB } from '../../core/aabb';
 import { type Dir, type Socket, type Vec3 } from '../../core/types';
 import { box, WALL_T, type Box, type GenParams, type InstanceSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
 import { inner, type Rect } from '../footprint';
-import { alongFace, doorZones, freeRuns, hitsZone, innerFaces, insideRects, type Face } from '../furniture';
+import { alongFace, keepOutZones, freeRuns, hitsZone, innerFaces, insideRects, type Face } from '../furniture';
 import { boxesOverlap } from '../common';
 import { splitBoxXZ } from '../../modifiers/mods/EraPreset.shellSplit';
 
@@ -72,7 +72,7 @@ export function ctxOf(L: RoomLayout, p: GenParams, rng: Rng): Ctx {
   const notes: string[] = [];
   return {
     L, p, rng, rects, h: L.height, sockets: L.sockets,
-    zones: doorZones(L.sockets, null, 0.1), lanes: lanesOf(L.sockets),
+    zones: keepOutZones(L, null, 0.1), lanes: lanesOf(L.sockets),
     get start() { return L.shellCount ?? 0; },
     lights0: L.lights.length, boxes0: L.boxes.length,
     focus: focusRect(rects, entry), entry, notes,

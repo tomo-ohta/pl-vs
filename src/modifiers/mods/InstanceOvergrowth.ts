@@ -11,17 +11,18 @@
  *    旧: 茎 = plasticYellow の薄い箔 + 穂の小箱（箱の柱が並んで麦に見えなかった）。他の propId（foliage）の草は変えない。
  *    RoomBuilder が tier.instanceScale で等間隔に間引くので transforms はシャッフル済み。
  *  - 大きな植栽ユニット（生垣の株・プランター）は solid な 'plant' 箱（RoomBuilder が球体に描く）。数と位置は Tier に依らない。
- *  - 麦畑（L03）は既存家具を捨てて全面を株で埋め、農道（直線帯）を空ける。間隔は 0.42 m を基本に、上限 MAX_WHEAT 株で畑全体が埋まる値まで広げる
- *    （巨大な倉庫で最初の帯だけが埋まらないように）。農道の縁 0.5 m の株は背丈 72%。Tier の間引き（RoomBuilder）と rng の消費順（セルごと 4 回）は従来どおり。
+ *  - 麦畑（L03）は既存家具を捨て、畑の区画（農道の格子の間の低い草の箔）の中だけを区画の辺に揃えた格子で株で埋める（第22回。旧: 床全体を斜めの帯からの距離で間引き、
+ *    三角・菱形の畑になっていた）。間隔は 0.42 m を基本に、入口から遠い区画ほど粗く（上限 MAX_WHEAT 株に収まるまで）
+ *    区画の縁 0.6 m の株は背丈を低く（踏み分けの段）。Tier の間引き（RoomBuilder）は従来どおり。
  */
 import type { Vec3 } from '../../core/types';
 import type { Rng } from '../../core/rng';
-import { rectArea, type Rect } from '../../generators/footprint';
+import { rect, rectArea, type Rect } from '../../generators/footprint';
 import { box, type Box, type InstanceSpec, type RoomLayout } from '../../generators/layout';
 import type { ModifierImpl } from '../types';
 import { bool, num, str } from '../util';
 import {
-  boxBlocked, clamp, clearanceOf, innerRect, interiorBoxesOf, isFurniture, overlapsSolid, pointBlocked, pointInBoxXZ, pointSegDist2D, pushInstances, removeInterior, type Clearance,
+  boxBlocked, clamp, clearanceOf, innerRect, interiorBoxesOf, isFurniture, overlapsSolid, pointBlocked, pointInBoxXZ, pushInstances, removeInterior, type Clearance,
 } from './PropRepetition.shared';
 
 /** 1 spec あたりのインスタンス上限（巨大 footprint での暴走防止。Tier 間引きはこの後で RoomBuilder が行う） */
@@ -189,47 +190,57 @@ function layoutFoliage(L: RoomLayout, density: number, blocksPath: boolean, rng:
 function layoutWheat(L: RoomLayout, density: number, rng: Rng): void {
   // 倉庫の家具は捨てる（柱・壁・照明は残す）
   removeInterior(L, (b) => isFurniture(b));
-  const c: Clearance = clearanceOf(L, 1.0); // 農道 2 m
+  const c: Clearance = clearanceOf(L, 1.0); // 農道 2 m（木箱の目印の置き場の判定だけに使う）
   const solids = interiorBoxesOf(L).filter((b) => b.solid);
-  // 株（mat 'wheat' = 茎 16 本と穂を描いた板 3 枚の交差。src/render/Wheat.ts）を格子 0.42 m + 揺らぎで並べる。
-  // 巨大な倉庫（seed 7 の L03 は 197 × 113 m）では全面を 0.42 m で埋めると上限を超えるので、農道（入口 → 出口の帯）・出入口から
-  // 距離 near までは全株、その先は (near / 距離)² の割合に間引き、間引いた所は株を少し大きくして隙間を埋める。near は株の期待数が MAX_WHEAT に
-  // 収まる値を二分探索で決める（小さな部屋では near が大きくなり全面が 0.42 m）
-  const pitch = 0.42 / Math.sqrt(clamp(density, 0.2, 2.5));
-  const roadDist = (x: number, z: number) => {
-    let d = Infinity;
-    for (const l of c.lanes) d = Math.min(d, pointSegDist2D(x, z, l.a, l.b) - l.half);
-    return Math.max(0, Math.min(d, socketDistance(L, x, z)));
-  };
-  const cells: { x: number; z: number; d: number }[] = [];
-  for (const r of L.footprint) {
-    const ir = innerRect(r, 0.35);
-    for (let x = ir.x0 + pitch / 2; x < ir.x1; x += pitch) for (let z = ir.z0 + pitch / 2; z < ir.z1; z += pitch) cells.push({ x, z, d: roadDist(x, z) });
-  }
-  const expected = (near: number) => cells.reduce((a, q) => a + (q.d <= near ? 1 : (near / q.d) ** 2), 0);
+  // 第22回: 株は畑の区画（生成器が農道の格子の間に敷く低い草の箔 = L03 では黄土色）の中だけに、区画の辺に揃えた格子で植える。
+  // 以前は床全体の格子を「入口 → 出口の斜めの帯」からの距離で間引いていたので、斜めの帯に沿った三角・菱形の麦畑になり、
+  // 農道や区画の四角を無視していた。区画が無い部屋は床の矩形（壁から 2.5 m 内側）を 1 区画とする
+  const plots = L.boxes.filter((b) => !b.solid && (b.mat === 'grass' || b.mat === 'yellowLine') && b.max[1] <= 0.3 && b.min[1] < 0.05
+    && (b.max[0] - b.min[0]) >= 3 && (b.max[2] - b.min[2]) >= 3).map((b) => rect(b.min[0], b.min[2], b.max[0], b.max[2]));
+  if (!plots.length) for (const r of L.footprint) { const ir = innerRect(r, 2.5); if (ir.x1 - ir.x0 >= 3 && ir.z1 - ir.z0 >= 3) plots.push(ir); }
+  const entry = L.sockets.find((s) => s.id === 'entry') ?? L.sockets[0];
+  const ex = entry?.pos[0] ?? 0, ez = entry?.pos[2] ?? 0;
+  const basePitch = 0.42 / Math.sqrt(clamp(density, 0.2, 2.5));
+  // 区画ごとの間隔: 入口に近い区画は basePitch、遠い区画ほど粗く（区画の中は一様。境目は農道なので段差が見えない）。
+  // 株の総数が MAX_WHEAT に収まる near を二分探索で決める（粗い区画は株を大きくして隙間を埋める）
+  const info = plots.map((r) => {
+    const d = Math.hypot(clamp(ex, r.x0, r.x1) - ex, clamp(ez, r.z0, r.z1) - ez);
+    return { r, d, area: Math.max(0, r.x1 - r.x0 - 0.6) * Math.max(0, r.z1 - r.z0 - 0.6) };
+  }).sort((p1, p2) => p1.d - p2.d);
+  const MAX_COARSE = 1.9;
+  const pitchOf = (d: number, near: number) => basePitch * clamp(Math.sqrt(Math.max(d, 1) / near), 1, MAX_COARSE);
+  const expected = (near: number) => info.reduce((acc, q) => acc + q.area / pitchOf(q.d, near) ** 2, 0);
   let near = 400;
   if (expected(near) > MAX_WHEAT) {
-    let lo = 1, hi = 400;
+    let lo = 0.5, hi = 400;
     for (let it = 0; it < 24; it++) { const m = (lo + hi) / 2; if (expected(m) > MAX_WHEAT) hi = m; else lo = m; }
     near = lo;
   }
   const clumps: InstanceSpec = { mat: 'wheat', size: [0.62, 1.05, 0.62], transforms: [], solid: false };
-  for (const q of cells) {
-    const jx = rng.float(-0.3, 0.3) * pitch;
-    const jz = rng.float(-0.3, 0.3) * pitch;
-    const s = rng.float(0.82, 1.18);
-    const yaw = rng.float(0, Math.PI * 2);
-    const keep = q.d <= near ? 1 : (near / q.d) ** 2;
-    if (rng.float(0, 1) >= keep) continue;
-    if (clumps.transforms.length >= MAX_WHEAT) continue;
-    const x = q.x + jx, z = q.z + jz;
-    if (pointBlocked(c, x, z, 0.02)) continue;
-    if (solids.some((b) => pointInBoxXZ(b, x, z, 0.1))) continue;
-    // 間引いた所は株を大きく（面積の割合の平方根ぶん。背丈が不自然にならないよう 1.45 倍まで）
-    clumps.transforms.push({ pos: [x, 0, z], yaw, scale: s * Math.min(1.45, 1 / Math.sqrt(keep)) });
+  for (const q of info) {
+    const pitch = pitchOf(q.d, near);
+    const grow = Math.min(1.45, pitch / basePitch);
+    const { r } = q;
+    // 区画の縁から 0.3 m 内側（縁は ±0.12 m 揺らして定規で引いた線に見せない）
+    const nx = Math.max(1, Math.floor((r.x1 - r.x0 - 0.6) / pitch)), nz = Math.max(1, Math.floor((r.z1 - r.z0 - 0.6) / pitch));
+    const x0 = (r.x0 + r.x1) / 2 - ((nx - 1) * pitch) / 2, z0 = (r.z0 + r.z1) / 2 - ((nz - 1) * pitch) / 2;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+      const jx = rng.float(-0.3, 0.3) * pitch;
+      const jz = rng.float(-0.3, 0.3) * pitch;
+      const sc = rng.float(0.82, 1.18);
+      const yaw = rng.float(0, Math.PI * 2);
+      const ragged = rng.float(-0.12, 0.12);
+      if (clumps.transforms.length >= MAX_WHEAT) break;
+      const x = x0 + i * pitch + jx, z = z0 + j * pitch + jz;
+      const edge = Math.min(x - r.x0, r.x1 - x, z - r.z0, r.z1 - z);
+      if (edge < 0.3 + ragged) continue;
+      if (socketDistance(L, x, z) < 2.2) continue;
+      if (solids.some((b) => pointInBoxXZ(b, x, z, 0.1))) continue;
+      // 区画の縁 0.6 m は背丈を少し低く（踏み分けの段）
+      const edgeScale = edge < 0.9 ? 0.78 + 0.22 * clamp((edge - 0.3) / 0.6, 0, 1) : 1;
+      clumps.transforms.push({ pos: [x, 0, z], yaw, scale: sc * grow * edgeScale });
+    }
   }
-  // 農道の縁は株を半分の背丈にして、踏み分けた跡のように段を付ける（通路帯のすぐ外側 0.5 m）
-  for (const t of clumps.transforms) if (pointBlocked(c, t.pos[0], t.pos[2], 0.5)) t.scale = (t.scale ?? 1) * 0.72;
   pushInstances(L, rng, clumps);
   // 農道の交差点に目印（solid な木箱 = 倉庫の名残り）: 各出口の帯の外側に 1 つずつ
   for (const s of L.sockets) {

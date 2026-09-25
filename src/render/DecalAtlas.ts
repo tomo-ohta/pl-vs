@@ -918,7 +918,9 @@ export class DecalAtlas {
       tex.name = `decals/atlas${atlas}`;
       this.textures.push(tex);
     }
-    const common = { transparent: true, depthWrite: false, metalness: 0, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 };
+    // 深度のずらしは units だけ（第22回）: factor -2 は視線が寝るほど大きく手前へ出し、床から 4 mm 浮かせた汚れが 7 mm の点字帯（C07）より
+    // 手前に描かれて、境目が三角形ごとに入れ替わって激しく明滅していた。浮かせた 4 mm（DecalLayer の LIFT）だけで床とは分かれる
+    const common = { transparent: true, depthWrite: false, metalness: 0, vertexColors: true, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 };
     this.base.push(new THREE.MeshStandardMaterial({ ...common, name: 'decals/A', map: this.textures[0], roughness: 0.8 }));
     this.base.push(new THREE.MeshStandardMaterial({ ...common, name: 'decals/B', map: this.textures[1], roughness: 0.92 }));
     this.emissiveBase = new THREE.MeshStandardMaterial({ ...common, name: 'decals/A-emissive', map: this.textures[0], roughness: 0.45, emissive: 0xffffff, emissiveMap: this.textures[0], emissiveIntensity: 1.6 });

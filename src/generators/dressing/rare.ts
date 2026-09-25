@@ -14,7 +14,7 @@ import type { AABB } from '../../core/aabb';
 import { dirVec, type Dir, type Socket, type Vec3 } from '../../core/types';
 import { box, WALL_T, type Box, type GenParams, type InstanceSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
 import { inner, type Rect } from '../footprint';
-import { alongFace, doorZones, freeRuns, hitsZone, innerFaces, insideRects, signAt, signOnWall, type Face } from '../furniture';
+import { alongFace, keepOutZones, freeRuns, hitsZone, innerFaces, insideRects, signAt, signOnWall, type Face } from '../furniture';
 import { boxesOverlap, wallBands } from '../common';
 import { EXHIBIT_CAPTIONS, EXHIBIT_KINDS, EXHIBIT_SIZE, type ExhibitKind } from '../exhibits';
 
@@ -80,7 +80,7 @@ interface Ctx {
 
 function ctxOf(L: RoomLayout, p: GenParams, rng: Rng): Ctx {
   const rects = L.footprint.length ? L.footprint : [{ x0: L.bounds.min[0], z0: L.bounds.min[2], x1: L.bounds.max[0], z1: L.bounds.max[2] }];
-  return { L, p, rng, rects, h: L.height, sockets: L.sockets, zones: doorZones(L.sockets, null, 0.1), lanes: lanesOf(L.sockets), start: L.shellCount ?? 0, lights0: L.lights.length };
+  return { L, p, rng, rects, h: L.height, sockets: L.sockets, zones: keepOutZones(L, null, 0.1), lanes: lanesOf(L.sockets), start: L.shellCount ?? 0, lights0: L.lights.length };
 }
 
 function lanesOf(sockets: Socket[]): Lane[] {

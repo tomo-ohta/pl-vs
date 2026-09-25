@@ -6,7 +6,7 @@
  */
 import type { Dir } from '../../core/types';
 import { buildMonument, partBounds } from '../monument/index';
-import { MONUMENT_KINDS, type MonumentBuild, type MonumentKind, type MonumentOptions, type MonumentSpec } from '../monument/types';
+import { MONUMENT_KINDS, MONUMENT_SIGN_PREFIX, type MonumentBuild, type MonumentKind, type MonumentOptions, type MonumentSpec } from '../monument/types';
 import { WALL_T, budgetOk, canPlace, inner, isCorridor, mainRect, oddBox, pick, pushSign, type Box, type Ctx, type Oddity, type Rect, type Vec3 } from './shared';
 import { hitsZone, insideRects } from '../furniture';
 
@@ -120,11 +120,12 @@ export function placeMonument(c: Ctx, kind: MonumentKind, center: [number, numbe
   const top = Math.min(c.h - 0.05, o.height + 0.3);
   // 展示光は小さく（1.2 m 角では近距離で白飛びして形が潰れた。M1 の指摘）
   c.L.boxes.push({ ...oddBox([origin[0] - 0.22, top - 0.04, origin[2] - 0.22], [origin[0] + 0.22, top, origin[2] + 0.22], 'lightWarm', false), kind: 'emitOnly' });
-  for (const s of build.signs ?? []) {
+  (build.signs ?? []).forEach((s, i) => {
     const pos = toRoom(s.pos, q, origin);
     const dir = ((s.face + 2 + q) % 4) as Dir; // face 0 = −Z 正面 → Dir 2（−Z）を q 回転
-    pushSign(c, { text: s.text, sub: s.sub, pos, dir, width: s.width, kind: 'plate', color: s.color, background: s.background });
-  }
+    // id はモニュメントの刻印の印（NonEuclideanVolume が部屋を組み直すとき、モニュメントと一緒に捨てる）
+    pushSign(c, { id: `${MONUMENT_SIGN_PREFIX}${spec.id}:${i}`, text: s.text, sub: s.sub, pos, dir, width: s.width, kind: 'plate', color: s.color, background: s.background });
+  });
   c.note(`monument: ${kind} h=${o.height.toFixed(1)} parts=${build.parts.length} colliders=${colliders.length}`);
   return true;
 }

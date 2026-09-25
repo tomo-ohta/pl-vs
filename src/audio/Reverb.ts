@@ -172,12 +172,34 @@ export class ConvolverReverb implements IReverb {
 // ---------------------------------------------------------------- フィードバックディレイ（tier low）
 const COMB_DELAYS = [0.0297, 0.0371, 0.0411, 0.0437];
 const ALLPASS_DELAYS = [0.005, 0.0017];
+/** comb の高域減衰の遮断周波数（Hz）。RT60 > 2 s は暗く（DAMP_DARK）、それ以下は明るく（DAMP_BRIGHT） */
+const DAMP_DARK = 2500;
+const DAMP_BRIGHT = 3500;
+
+/**
+ * comb のループ内の高域減衰: どの周波数でも利得 ≤ 1 の 1 次ローパス（IIRFilterNode）。
+ * 第19回の不具合: 以前は BiquadFilter の lowpass（既定 Q = 1 dB）で、遮断周波数の近くに +2 dB の山があり、
+ * フィードバック 0.97 と掛けてループ利得が 1 を超えた（RT60 1.5 s で 1.09 → 約 2.7 kHz が毎秒 +26 dB で増え、
+ * 振り切れて音割れ → 数値が Infinity / NaN になって全体が無音）。tier low（スマホで重いとき）だけで起きた。
+ * IIRFilterNode が無い環境は Butterworth（Q = -3.01 dB。山なし）の biquad
+ */
+function dampingFilter(ctx: BaseAudioContext, fc: number): AudioNode {
+  const a = Math.exp((-2 * Math.PI * fc) / ctx.sampleRate);
+  const iir = (ctx as BaseAudioContext & { createIIRFilter?: BaseAudioContext['createIIRFilter'] }).createIIRFilter;
+  if (typeof iir === 'function') return iir.call(ctx, [1 - a], [1, -a]); // y[n] = (1-a)·x[n] + a·y[n-1]（DC 利得 1、単調減少）
+  const f = ctx.createBiquadFilter();
+  f.type = 'lowpass';
+  f.frequency.value = fc;
+  f.Q.value = -3.0103;
+  return f;
+}
 
 export class DelayReverb implements IReverb {
   readonly input: GainNode;
   readonly output: GainNode;
   private readonly ctx: BaseAudioContext;
-  private readonly combs: { delay: DelayNode; fb: GainNode; lp: BiquadFilterNode }[] = [];
+  /** dark / bright: 2 つの減衰フィルターの混合比（和は 1。利得 ≤ 1 のフィルターの凸結合なので、混ぜても ≤ 1） */
+  private readonly combs: { delay: DelayNode; fb: GainNode; dark: GainNode; bright: GainNode }[] = [];
   private readonly nodes: AudioNode[] = [];
   private readonly pre: DelayNode;
   private _rt60 = 0;
@@ -196,14 +218,18 @@ export class DelayReverb implements IReverb {
       const delay = ctx.createDelay(0.1);
       delay.delayTime.value = d;
       const fb = ctx.createGain();
-      const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass';
-      lp.frequency.value = 3500;
+      // ループ: delay → (暗い減衰 × dark + 明るい減衰 × bright) → fb（≤ 0.97）→ delay。ループ利得はどの周波数でも ≤ 0.97
+      const lpDark = dampingFilter(ctx, DAMP_DARK), lpBright = dampingFilter(ctx, DAMP_BRIGHT);
+      const dark = ctx.createGain(), bright = ctx.createGain();
+      dark.gain.value = 0;
+      bright.gain.value = 1;
       this.pre.connect(delay);
-      delay.connect(lp).connect(fb).connect(delay);
+      delay.connect(lpDark).connect(dark).connect(fb);
+      delay.connect(lpBright).connect(bright).connect(fb);
+      fb.connect(delay);
       delay.connect(sum);
-      this.combs.push({ delay, fb, lp });
-      this.nodes.push(delay, fb, lp);
+      this.combs.push({ delay, fb, dark, bright });
+      this.nodes.push(delay, fb, lpDark, lpBright, dark, bright);
     }
     // allpass 2 段（拡散）
     let node: AudioNode = sum;
@@ -239,7 +265,10 @@ export class DelayReverb implements IReverb {
       // g = 10^(-3·delay / RT60)
       const g = Math.pow(10, (-3 * c.delay.delayTime.value) / q);
       c.fb.gain.setTargetAtTime(Math.min(0.97, g), t, fadeSec / 3);
-      c.lp.frequency.setTargetAtTime(q > 2 ? 2500 : 3500, t, fadeSec / 3);
+      // 暗さの切り替えは混合比で（和を 1 に保つ = ループ利得 ≤ 0.97 のまま）
+      const k = q > 2 ? 1 : 0;
+      c.dark.gain.setTargetAtTime(k, t, fadeSec / 3);
+      c.bright.gain.setTargetAtTime(1 - k, t, fadeSec / 3);
     }
   }
 
