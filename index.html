@@ -11,8 +11,8 @@
     <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
     <meta name="referrer" content="no-referrer" />
     <title>Liminal - Phase 1</title>
-    <script type="module" crossorigin src="/pl-vs/assets/index-C9zi6Rqg.js"></script>
-    <link rel="stylesheet" crossorigin href="/pl-vs/assets/index-C3_11feJ.css">
+    <script type="module" crossorigin src="/pl-vs/assets/index-BTiLeM6f.js"></script>
+    <link rel="stylesheet" crossorigin href="/pl-vs/assets/index-CySepKQQ.css">
   </head>
   <body>
     <canvas id="game"></canvas>
@@ -31,10 +31,27 @@
     <!-- Mobile controls -->
     <div id="touch-ui" hidden>
       <div id="stick"><div id="stick-knob"></div></div>
-      <button id="btn-crouch" class="tbtn" type="button" aria-pressed="false">CROUCH</button>
-      <button id="btn-jump" class="tbtn" type="button">JUMP</button>
-      <button id="btn-dash" class="tbtn" type="button">DASH</button>
-      <button id="btn-menu" class="tbtn" type="button" aria-label="menu">&#9776;</button>
+      <!-- ボタン: ビデオカメラの画面の四隅の枠 + 動作の人型ピクトグラム（非常口の案内表示と同じ系統）+ 下に小さな文字（style.css .tbtn） -->
+      <button id="btn-crouch" class="tbtn" type="button" aria-pressed="false" aria-label="しゃがむ（切替）">
+        <svg class="tframe" viewBox="0 0 72 72" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="square"><path d="M4 14V4h10M58 4h10v10M68 58v10H58M14 68H4V58"/></svg>
+        <svg class="ticon" viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5h42" stroke-width="3.2" stroke-linecap="butt"/><g stroke-width="1.5" opacity=".8"><path d="M7 5.6l2.6-3.4M14 5.6l2.6-3.4M21 5.6l2.6-3.4M28 5.6l2.6-3.4M35 5.6l2.6-3.4M42 5.6l2.4-3.2"/></g><circle cx="28.5" cy="19" r="4.2" fill="currentColor" stroke="none"/><g stroke-width="4.4"><path d="M18 36.5q1-8 6-12"/><path d="M24 26l6.5 3.5"/><path d="M18 36.5 31 30l-.5 13.5h4.5"/><path d="M18 36.5l6 7"/><path d="M24 43.5 14 41l-3.5 3"/></g><path d="M3 46h42" stroke-width="1.8" opacity=".6"/></svg>
+        <span class="tlabel">しゃがむ</span>
+      </button>
+      <button id="btn-jump" class="tbtn" type="button" aria-label="ジャンプ">
+        <svg class="tframe" viewBox="0 0 72 72" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="square"><path d="M4 14V4h10M58 4h10v10M68 58v10H58M14 68H4V58"/></svg>
+        <svg class="ticon" viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="8" r="4.3" fill="currentColor" stroke="none"/><g stroke-width="4.6"><path d="M24 17v9"/><path d="M24 18.5 14 12"/><path d="M24 18.5 34 12"/><path d="M24 26l-6.5 3.5 1.5 6.5"/><path d="M24 26l6.5 3.5-1.5 6.5"/></g><ellipse cx="24" cy="44.5" rx="8.5" ry="1.8" fill="currentColor" stroke="none" opacity=".5"/></svg>
+        <span class="tlabel">ジャンプ</span>
+      </button>
+      <button id="btn-dash" class="tbtn" type="button" aria-label="ダッシュ">
+        <svg class="tframe" viewBox="0 0 72 72" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="square"><path d="M4 14V4h10M58 4h10v10M68 58v10H58M14 68H4V58"/></svg>
+        <svg class="ticon" viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="31" cy="8" r="4.3" fill="currentColor" stroke="none"/><g stroke-width="4.6"><path d="M28.5 15.5 23 27"/><path d="M27 17l6.5 4 4.5-3.5"/><path d="M26 17.5l-7 1.5-4 5"/><path d="M23 27l6.5 5-1.5 9"/><path d="M23 27l-5.5 7-8 .5"/></g><g stroke-width="2.2" opacity=".85"><path d="M3 15h8"/><path d="M1 22h9"/><path d="M4 29h6"/></g></svg>
+        <span class="tlabel">ダッシュ</span>
+      </button>
+      <button id="btn-menu" class="tbtn" type="button" aria-label="メニュー">
+        <svg class="tframe" viewBox="0 0 72 72" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="square"><path d="M4 14V4h10M58 4h10v10M68 58v10H58M14 68H4V58"/></svg>
+        <svg class="ticon" viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M11 14h26"/><path d="M11 24h26"/><path d="M11 34h26"/></svg>
+        <span class="tlabel">メニュー</span>
+      </button>
     </div>
 
     <!-- Start / lock overlay -->
@@ -43,32 +60,74 @@
         <h1>LIMINAL</h1>
         <p>クリックまたはタップで開始</p>
         <p class="small">PC: WASD 移動 / マウス 視点 / Space ジャンプ / Shift ダッシュ / Ctrl または C しゃがみ / E 扉を開ける / R 懐中電灯 / Esc メニュー</p>
-        <p class="small">スマホ: スワイプ 視点 / 左下スティック 移動 / 扉をタップ / 右下 ダッシュ・ジャンプ・CROUCH（しゃがみ切替） / 右上 メニュー</p>
+        <p class="small">スマホ: スワイプ 視点 / 左下スティック 移動 / 扉をタップ / 右下 ダッシュ・ジャンプ・しゃがむ（切替） / 右上 メニュー</p>
         <p class="small">低い開口はしゃがんで通れます。高い横長スロットはジャンプで乗ってからしゃがみます。</p>
       </div>
     </div>
 
-    <!-- Menu -->
+    <!-- Menu（第21回で刷新: タブ「マップ」「フロアリスト」「設定」。src/ui/MenuUI.ts） -->
     <div id="menu" hidden>
-      <div class="panel">
-        <h2>メニュー</h2>
-        <div class="row"><span>発見した部屋</span><span id="menu-count">0</span></div>
-        <div class="row"><span>worldSeed</span><span id="menu-seed" class="mono"></span></div>
-        <div class="row"><label for="quality">品質 Tier</label>
-          <select id="quality"><option value="auto">自動</option><option value="low">Low</option><option value="mid">標準</option><option value="high">PC</option></select></div>
-        <div id="map-tabs"></div>
-        <canvas id="fullmap" width="640" height="420"></canvas>
-        <canvas id="map3d" width="640" height="420" hidden></canvas>
-        <!-- 設定パネルの差し込み口（SettingsPanel が中身を作る） -->
-        <div id="settings-slot"></div>
-        <div class="buttons">
-          <button id="menu-resume" type="button">再開</button>
-          <button id="menu-save" type="button">セーブ</button>
-          <button id="menu-load" type="button">ロード</button>
-          <button id="menu-new" type="button">新しい世界</button>
-          <button id="menu-debug" type="button">デバッグ HUD</button>
+      <div class="menu-frame" role="dialog" aria-modal="true" aria-label="メニュー">
+        <i class="mf-corner tl"></i><i class="mf-corner tr"></i><i class="mf-corner bl"></i><i class="mf-corner br"></i>
+        <header class="menu-head">
+          <div class="menu-osd">
+            <span class="osd-pause mono">❚❚ PAUSE</span>
+            <span class="osd-where" id="menu-where"></span>
+            <button id="menu-resume" class="menu-resume" type="button" aria-label="再開">再開 <span aria-hidden="true">▶</span></button>
+          </div>
+          <nav class="menu-tabs" role="tablist" aria-label="メニュー">
+            <button type="button" role="tab" data-tab="map"><span class="tab-no mono">01</span>マップ</button>
+            <button type="button" role="tab" data-tab="floors"><span class="tab-no mono">02</span>フロアリスト</button>
+            <button type="button" role="tab" data-tab="settings"><span class="tab-no mono">03</span>設定</button>
+          </nav>
+        </header>
+        <main class="menu-body">
+          <section class="menu-pane" data-pane="map" id="pane-map" role="tabpanel"></section>
+          <section class="menu-pane" data-pane="floors" id="pane-floors" role="tabpanel" hidden></section>
+          <section class="menu-pane" data-pane="settings" id="pane-settings" role="tabpanel" hidden>
+            <div class="set-grid">
+              <div class="set-col">
+                <div id="settings-slot"></div>
+              </div>
+              <div class="set-col">
+                <div class="set-group">
+                  <h3 class="set-h">映像の品質</h3>
+                  <label class="settings-row"><span class="settings-label">品質</span>
+                    <select id="quality"><option value="auto">自動</option><option value="low">軽量</option><option value="mid">標準</option><option value="high">高品質（PC）</option></select><span class="settings-value mono"></span></label>
+                </div>
+                <div class="set-group">
+                  <h3 class="set-h">記録</h3>
+                  <div class="set-stat"><span>この世界で発見した部屋</span><span id="menu-count" class="mono">0</span></div>
+                  <div class="set-stat"><span>フロアリスト</span><span id="menu-codex" class="mono">0</span></div>
+                  <div class="set-stat"><span>世界のシード</span><span id="menu-seed" class="mono"></span></div>
+                  <div class="set-buttons">
+                    <button id="menu-save" type="button">セーブ</button>
+                    <button id="menu-load" type="button">ロード</button>
+                    <button id="menu-new" type="button" class="warn">新しい世界</button>
+                  </div>
+                </div>
+                <div class="set-group">
+                  <h3 class="set-h">開発</h3>
+                  <div class="set-buttons"><button id="menu-debug" type="button">デバッグ表示</button></div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+        <footer class="menu-foot mono" id="menu-foot"></footer>
+      </div>
+      <!-- フロアの詳細（フロアリストで長押し） -->
+      <div id="floor-pop" hidden role="dialog" aria-modal="true" aria-labelledby="fp-name">
+        <div class="fp-card">
+          <button type="button" class="fp-close" aria-label="閉じる">×</button>
+          <div class="fp-shot"><img alt="" /><span class="fp-rec mono">● REC</span></div>
+          <div class="fp-body">
+            <div class="fp-head"><span class="fp-rar mono"></span><span class="fp-id mono"></span></div>
+            <h3 id="fp-name" class="fp-name"></h3>
+            <dl class="fp-info"></dl>
+            <div class="fp-log mono"></div>
+          </div>
         </div>
-        <p class="small">通過した扉は数秒で自動的に閉じます。地図はフロアごとに表示します（踏破済みのフロアのみ）。「全体 3D」はドラッグで回転、ホイール / ピンチで拡大縮小。地図の「？」は投影できない接続です。</p>
       </div>
     </div>
 
