@@ -46,6 +46,10 @@ const TAKE_SEAMS = opt('take-seams', false) !== false;
 const MON_DETAIL = opt('monument-detail', false) !== false;
 // --check-vending: 本体の無い自販機の前面箔（U04 の「ただの発光する板」）を stderr に出す
 const CHECK_VENDING = opt('check-vending', false) !== false;
+// --reach: 入口から床の高さの各出口の前まで歩けるか（src/generators/reach.ts の近似: 0.1 m 格子・半幅 0.35 m・セルごとの立つ高さ・
+//   登れる段差 0.35 m・しゃがみ 0.85 m。跳び乗り・乗り物・可動壁は扱わない。奇妙さの取り消し判定と同じ関数）。
+//   REACH_DUMP=<roomId,...> でその部屋、REACH_DUMP=bad で届かない扉のある部屋の layout を scratch/ に書く
+const REACH = opt('reach', false) !== false;
 
 // ------------------------------------------------------------ 束ね（rolldown）
 const tmp = mkdtempSync(join(tmpdir(), 'seamstats-'));
@@ -62,6 +66,8 @@ writeFileSync(
     `export { RoomGraph } from '${src('world/RoomGraph')}';`,
     `export { ROOM_BY_ID } from '${src('data/index')}';`,
     `export { aabbOverlap } from '${src('core/aabb')}';`,
+    `export { partBounds } from '${src('generators/monument/index')}';`,
+    ...(REACH ? [`export { reachDoors } from '${src('generators/reach')}';`] : []),
     `export { registerModifier, registeredModifierIds } from '${src('modifiers/index')}';`,
     `export { installWorldHooks } from '${src('modifiers/hooks')}';`,
     `import { registerModifier as _reg } from '${src('modifiers/index')}';`,
@@ -70,6 +76,36 @@ writeFileSync(
     '',
   ].join('\n'),
 );
+
+/** 見た目の無い当たり判定（colliderOnly）のうち、モニュメントの部品・並べて描く物の外形（0.3 m の余裕）で覆われていない点がある箱 */
+function strayColliders(L, partBounds) {
+  const areas = [];
+  for (const m of L.monuments ?? []) {
+    const c = Math.cos(m.yaw ?? 0), sn = Math.sin(m.yaw ?? 0);
+    for (const p of m.parts) {
+      const b = partBounds(p);
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const x of [b.min[0], b.max[0]]) for (const z of [b.min[2], b.max[2]]) {
+        for (const [wx, wz] of [[x * c + z * sn, -x * sn + z * c], [x * c - z * sn, x * sn + z * c]]) { x0 = Math.min(x0, wx); x1 = Math.max(x1, wx); z0 = Math.min(z0, wz); z1 = Math.max(z1, wz); }
+      }
+      areas.push([m.pos[0] + x0, m.pos[1] + b.min[1], m.pos[2] + z0, m.pos[0] + x1, m.pos[1] + b.max[1], m.pos[2] + z1]);
+    }
+  }
+  for (const sp of L.instances ?? []) for (const t of sp.transforms) {
+    const r = Math.hypot(sp.size[0], sp.size[2]) / 2 * (t.scale ?? 1);
+    areas.push([t.pos[0] - r, t.pos[1], t.pos[2] - r, t.pos[0] + r, t.pos[1] + sp.size[1] * (t.scale ?? 1), t.pos[2] + r]);
+  }
+  const E = 0.3, n = 4;
+  const hit = (x, y, z) => areas.some((a) => x >= a[0] - E && x <= a[3] + E && y >= a[1] - E && y <= a[4] + E && z >= a[2] - E && z <= a[5] + E);
+  return L.boxes.slice(L.shellCount ?? 0).filter((b) => {
+    if (!b.solid || b.kind !== 'colliderOnly') return false;
+    const y = (b.min[1] + b.max[1]) / 2;
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
+      if (!hit(b.min[0] + (b.max[0] - b.min[0]) * i / n, y, b.min[2] + (b.max[2] - b.min[2]) * j / n)) return true;
+    }
+    return false;
+  });
+}
 
 async function bundle() {
   const rolldownPath = join(projectRoot, 'node_modules', 'rolldown', 'dist', 'index.mjs');
@@ -196,6 +232,26 @@ function measure(M, seed, n) {
     if (!nd.isAdapter && nd.placement) {
       const L = world.layoutFor(nd);
       r.area += L.footprint.reduce((a, q) => a + (q.x1 - q.x0) * (q.z1 - q.z0), 0);
+      if (REACH && nd.visited) {
+        const bad = M.reachDoors(L)?.blocked ?? [];
+        if (process.env.REACH_DUMP && (process.env.REACH_DUMP.split(',').includes(nd.roomId) || (process.env.REACH_DUMP === 'bad' && bad.length))) writeFileSync(join(ROOT, 'scratch', process.env.REACH_DUMP === 'bad' ? `layout-s${seed}-${nd.definitionId}-${nd.roomId}.json` : `layout-${nd.roomId}.json`), JSON.stringify(L));
+        if (bad.length) { (r.unreach ??= {})[nd.definitionId] = ((r.unreach ??= {})[nd.definitionId] ?? 0) + 1; console.error(`[reach?] seed ${seed} ${nd.definitionId} ${nd.roomId} ${bad.join(',')} odd ${[L.oddity?.theme, ...(L.oddity?.accents ?? [])].filter(Boolean).join(',')}`); }
+        r.reachRooms = (r.reachRooms ?? 0) + 1;
+        // 奇妙さが扉への道を塞いで取り消された回数（src/generators/oddity/index.ts の guarded / tryApply）
+        const undone = (L.oddity?.notes ?? []).filter((x) => x.includes('undone (blocked a door)'));
+        if (undone.length) { r.undoneRooms = (r.undoneRooms ?? 0) + 1; console.error(`[undone] seed ${seed} ${nd.definitionId} ${nd.roomId} ${undone.map((x) => x.split(':')[0]).join(',')}`); }
+      }
+      // 見えない壁（第18回）: 見た目の無い当たり判定（colliderOnly）が、モニュメントの部品・並べて描く物の外形から外れていないか
+      {
+        const stray = strayColliders(L, M.partBounds);
+        r.strayColliders = (r.strayColliders ?? 0) + stray.length;
+        for (const b of stray) {
+          const a = (b.max[0] - b.min[0]) * (b.max[2] - b.min[2]);
+          if (a > (r.strayMax?.a ?? 0)) r.strayMax = { a, room: `${nd.definitionId} ${nd.roomId}` };
+          if (a >= 1) console.error(`[collider?] seed ${seed} ${nd.definitionId} ${nd.roomId} ${b.min.map((v) => v.toFixed(2))} .. ${b.max.map((v) => v.toFixed(2))} area ${a.toFixed(1)}`);
+          if (a >= 1 && process.env.STRAY_DEBUG) console.error(`   notes ${(L.oddity?.notes ?? []).join(' | ')}\n   parts near ${(L.monuments ?? []).flatMap((m) => m.parts.filter((pt) => Math.abs(pt.pos[0] + m.pos[0] - (b.min[0] + b.max[0]) / 2) < 2 && Math.abs(pt.pos[2] + m.pos[2] - (b.min[2] + b.max[2]) / 2) < 2).map((pt) => `${m.kind}:${pt.prim}:${pt.mat}@${pt.pos.map((v) => v.toFixed(2))} s${pt.size.map((v) => v.toFixed(2))} r${(pt.rot ?? [0, 0, 0]).map((v) => v.toFixed(2))}`)).slice(0, 6).join(' ; ')}`);
+        }
+      }
       // モニュメント（第17回）: レア度ごとに 部屋数 / 置かれた部屋 / 基数 / 巨大（colossus）
       if (nd.visited) {
         const k = ROOM_BY_ID.get(nd.definitionId)?.rarity ?? '?';
@@ -318,6 +374,11 @@ function summarize(rows) {
   }
   s.disorder = {}; s.disorderRooms = {}; s.disorderKinds = {};
   for (const r of rows) {
+    s.strayColliders = (s.strayColliders ?? 0) + (r.strayColliders ?? 0);
+    s.reachRooms = (s.reachRooms ?? 0) + (r.reachRooms ?? 0);
+    s.undoneRooms = (s.undoneRooms ?? 0) + (r.undoneRooms ?? 0);
+    for (const [k, v] of Object.entries(r.unreach ?? {})) (s.unreach ??= {})[k] = ((s.unreach ??= {})[k] ?? 0) + v;
+    if ((r.strayMax?.a ?? 0) > (s.strayMax?.a ?? 0)) s.strayMax = r.strayMax;
     for (const [k, v] of Object.entries(r.disorderKinds ?? {})) s.disorderKinds[k] = (s.disorderKinds[k] ?? 0) + v;
     for (const [k, v] of Object.entries(r.disorder ?? {})) s.disorder[k] = (s.disorder[k] ?? 0) + v;
     for (const [k, v] of Object.entries(r.disorderRooms ?? {})) s.disorderRooms[k] = (s.disorderRooms[k] ?? 0) + v;
@@ -366,6 +427,9 @@ function markdown(s, rows) {
   const monLine = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'].map((k) => { const m = s.monuments?.[k]; return m ? `${k} ${m.withMon}/${m.rooms}（${f(per100(m.withMon, m.rooms))}%、${m.count} 基、巨大 ${m.giant}）` : `${k} -`; }).join(' / ');
   lines.push(`| モニュメントのある部屋（踏破した部屋） | ${monLine} |`);
   lines.push(`| 乱れ（転倒・散乱・積み重なり・重なり）のある部屋 | ${['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'].map((k) => `${k} ${s.disorderRooms?.[k] ?? 0}/${s.monuments?.[k]?.rooms ?? 0}（${f(per100(s.disorderRooms?.[k] ?? 0, s.monuments?.[k]?.rooms ?? 0))}%）`).join(' / ')} |`);
+  if (s.reachRooms) lines.push(`| 入口から歩いて行けない扉のある部屋（--reach、近似。stderr に [reach?]） | ${Object.values(s.unreach ?? {}).reduce((a, b) => a + b, 0)}/${s.reachRooms}（${Object.entries(s.unreach ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => `${k} ${v}`).join(' / ')}） |`);
+  if (s.reachRooms) lines.push(`| 扉への道を塞いで取り消した奇妙さのある部屋（--reach。stderr に [undone]） | ${s.undoneRooms ?? 0}/${s.reachRooms} |`);
+  lines.push(`| 見た目から外れた見えない当たり判定（colliderOnly。stderr に 1 m² 以上を [collider?]） | ${s.strayColliders ?? 0} 個${s.strayMax ? `（最大 ${s.strayMax.a.toFixed(1)} m² ${s.strayMax.room}）` : ''} |`);
   lines.push(`| 乱れで動かした物（種類 × 個数） | ${Object.entries(s.disorderKinds ?? {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(' / ')} |`);
   lines.push(`| 乱れの内訳 | ${Object.entries(s.disorder ?? {}).map(([k, v]) => `${k.replace('disorder.', '')} ${v}`).join(' / ')} |`);
   lines.push(`| モニュメントの種類（基） | ${Object.entries(s.monumentKinds ?? {}).map(([k, v]) => `${k} ${v}`).join(' / ')} |`);

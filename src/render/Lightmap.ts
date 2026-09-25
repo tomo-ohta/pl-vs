@@ -54,7 +54,7 @@ const MIN_ATLAS = 16;
 /** ライトマップの対象にする箱か（外殻・大きな家具。発光箔・ガラス・水・空・デカールは対象外） */
 export function isLightmapTarget(b: Box, emission: boolean, decal: boolean): boolean {
   if (emission || decal) return false;
-  if (b.mat === 'glass' || b.mat === 'water' || b.mat === 'waterShallow' || b.mat === 'waterWall' || /^sky/.test(b.mat) || b.mat === 'carGlass') return false;
+  if (b.mat === 'glass' || b.mat === 'water' || b.mat === 'waterShallow' || b.mat === 'waterWall' || b.mat === 'waterFilm' || /^sky/.test(b.mat) || b.mat === 'carGlass') return false;
   const sx = b.max[0] - b.min[0], sy = b.max[1] - b.min[1], sz = b.max[2] - b.min[2];
   const diag = Math.hypot(sx, sy, sz);
   if (b.solid && diag >= 2) return true;

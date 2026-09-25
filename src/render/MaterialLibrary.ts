@@ -30,6 +30,8 @@ import { addSurfaceAppearance, usesSurfaceVariation, usesSurfaceWear, SURFACE_VA
 import { addSurfaceGrime, grimeClass } from './SurfaceGrime';
 import { addWindowRoom, WINDOW_ROOM_MATS, type WindowRoomPhoto } from './WindowRoom';
 import { createWheatTexture, WHEAT_WIND_GLSL } from './Wheat';
+import { createIceMaps, type IceMaps } from './IceTexture';
+import { addOutsideView, loadOutsidePano, OUTSIDE_VIEW_MAT, type OutsideUniforms } from './OutsideView';
 import { createSurfaceMaps, hasAuthoredDetail, type DetailKind } from './SurfaceDetail';
 import { ImageRequestQueue } from './textureQueue';
 import { CC0_INDEX_FILE, CC0_MATERIALS_URL, CC0_SMALL_MATERIALS_URL, CC0_VARIANTS, DEFAULT_BLEND, TONE_TABLE, variantHash, type Cc0Index, type Cc0IndexEntry, type Cc0Variant } from './cc0Materials';
@@ -89,6 +91,10 @@ interface Surface {
   decal?: boolean;
   /** 水面と同じ UV 流れアニメーション */
   flow?: number;
+  /** UV の流れの向きと速さ（UV/s。flow より優先）。縦の水（水壁・水膜）は下向きに流す */
+  flowVec?: [number, number];
+  /** 縦の面を「流れ落ちる水」の法線で揺らす（water テクスチャの材質。水壁・水膜） */
+  fall?: boolean;
   /** 艶床（clearcoat。MeshPhysicalMaterial になる） */
   gloss?: GlossSpec;
   /** 水面（透過 + 反射 + 水深減衰。MeshPhysicalMaterial になる） */
@@ -97,6 +103,8 @@ interface Surface {
   atlas?: GeneratedAtlas;
   /** 切り抜きの板（alphaTest + alphaToCoverage、両面、風の揺れ）。絵は手続きで描く（'wheat' = src/render/Wheat.ts） */
   cutout?: 'wheat';
+  /** 手続きで描く色・法線・粗さの 1 組（'ice' = src/render/IceTexture.ts）。CC0 セットより優先 */
+  procedural?: 'ice';
 }
 /** tools/build-generated-textures.mjs が作る段積み画像 */
 type GeneratedAtlas = 'screens-arcade' | 'screens-pc' | 'cans';
@@ -183,6 +191,8 @@ export const SURFACES: Record<MatId, Surface> = {
   aquariumBlue: { detail: 'glass', albedo: false, texture: 'diffuser', color: 0x1f5fbf, meters: .35, roughness: .1, bump: .0002, metalness: 0, opacity: .55, emission: .9, emissiveColor: 0x2a6fd8 },
   // 窓・偽出口の昼光。1.6 では露出が飽和して白く抜ける（R14 / M04 / M08）ので 1.1（担当 R / M の依頼）
   skyDay: { texture: 'sky', color: 0x9cc4ff, meters: 40, roughness: 1, bump: 0, emission: 1.1 },
+  // 偽の外（M04 の扉の向こう。第22回）: 全天球の写真を地面の平らなドームに投影する板（src/render/OutsideView.ts）。色は発光で出す
+  outsideView: { texture: 'sky', color: 0x9cc4ff, meters: 40, roughness: 1, bump: 0, emission: 1.0, emissiveColor: 0xffffff },
   // 机上の液晶（E09）。screenGlow は白い板に見えるため青白く弱い発光にした
   screenLcd: { texture: 'diffuser', color: 0x9fc8ff, meters: .5, roughness: .3, bump: .0005, emission: 0.9 },
   // 像・胸像の白大理石（E06）。単一光でもシルエットにならない明るい白 + 低い粗さ
@@ -210,7 +220,12 @@ export const SURFACES: Record<MatId, Surface> = {
   puddle: { texture: 'water', color: 0x7f9a98, meters: 2, roughness: .1, bump: .001, opacity: .55, flow: .8 },
   waterShallow: { texture: 'water', color: 0xdce9e6, meters: 2.5, roughness: .08, bump: .0015, flow: 1.4, water: { transmission: .88, ior: 1.33, attenuationColor: 0x5aa39a, attenuationDistance: 1.0, reflect: 1.8, thickness: 1, depthFromFloor: true, albedoMix: .65 } },
   /** 水の壁（WaterWall）。開口を塞ぐ縦の水面（両面。厚みは一定 0.3 m） */
-  waterWall: { texture: 'water', color: 0xc4dcd8, meters: 2, roughness: .05, bump: .002, flow: 2.2, doubleSide: true, water: { transmission: .85, ior: 1.33, attenuationColor: 0x2f7a74, attenuationDistance: .6, reflect: 1.8, thickness: .3, albedoMix: .6 } },
+  waterWall: { texture: 'water', color: 0xc4dcd8, meters: 2, roughness: .05, bump: .002, flow: 2.2, flowVec: [0, .45], fall: true, doubleSide: true, water: { transmission: .85, ior: 1.33, attenuationColor: 0x2f7a74, attenuationDistance: .6, reflect: 1.8, thickness: .3, albedoMix: .6 } },
+  /**
+   * 壁を流れ落ちる水の膜（第22回。E09 垂直水面オフィスの壁一面）: 壁の手前 1 cm の薄い板。透過（transmission）は使わない半透明の Standard
+   * （部屋の壁一面に貼るので、透過の追加描画を避ける）。落ちる水の法線（fall）と下向きの UV の流れで、器具・懐中電灯の映り込みが流れ落ちる
+   */
+  waterFilm: { texture: 'water', color: 0x5f7f82, meters: 1.6, roughness: .04, bump: .002, opacity: .42, flowVec: [0, .38], fall: true },
   /** ブロブ影デカール（InvertedShadow） */
   shadowDecal: { texture: 'concrete', color: 0x000000, meters: 2, roughness: 1, bump: 0, opacity: .5, decal: true },
   /** 白無地（RenderStyle untextured） */
@@ -227,7 +242,9 @@ export const SURFACES: Record<MatId, Surface> = {
   sodiumLight: { texture: 'diffuser', color: 0xffa040, meters: .24, roughness: .4, bump: .001, emission: 2.8 },
   signPlate: { texture: 'linoleum', color: 0xf0f0e8, meters: .5, roughness: .5, bump: .001 },
   signEmissive: { texture: 'diffuser', color: 0x6fdc8c, meters: .3, roughness: .4, bump: .0005, emission: 2.0 },
-  ice: { texture: 'tile', color: 0xcfe6f2, meters: 1.5, roughness: .06, bump: .002, metalness: 0 },
+  // 氷（第22回）: 手続きの氷面（黒氷と白い濁り・霜・ひび・気泡・擦り傷）+ clearcoat の艶。粗さは絵の粗さ（G）× 1。
+  // 絵の無い環境（legacy / untextured / Node）は color の水色
+  ice: { texture: 'tile', color: 0xcfe6f2, meters: 6, roughness: 1, bump: .002, metalness: 0, gloss: { clearcoat: .9, roughness: .04 }, procedural: 'ice' },
   snow: { texture: 'carpet', color: 0xf4f6f8, meters: 1, roughness: .98, bump: .006 },
   grass: { texture: 'foliage', color: 0x7f9a4e, meters: 1, roughness: .8, bump: .009 },
 };
@@ -949,7 +966,9 @@ export class MaterialLibrary {
     // CC0 セット（写真計測 PBR）。legacy / untextured は従来どおり生成テクスチャ側の経路
     const bind: Cc0Variant | undefined = vi >= 0 ? CC0_VARIANTS[id]?.[vi] : undefined;
     const boundSet = bind ? this.cc0Sets.get(bind.set) : undefined;
-    const cc0Set = flat || legacy || !boundSet || boundSet.failed ? undefined : boundSet;
+    if (id === OUTSIDE_VIEW_MAT && !flat && !legacy) return this.outsideViewMaterial();
+    const proc = s.procedural && !flat && !legacy ? this.proceduralMaps(s.procedural) : null;
+    const cc0Set = flat || legacy || proc || !boundSet || boundSet.failed ? undefined : boundSet;
     const cc0Bind = cc0Set ? bind : undefined;
     const cc0Albedo = !!cc0Set && !!cc0Bind && cc0Bind.albedo !== false;
     const cc0 = cc0Set && cc0Bind ? cc0Set.derive(s.meters / cc0Bind.meters, !!cc0Bind.rotate, cc0Albedo) : null;
@@ -959,8 +978,8 @@ export class MaterialLibrary {
     const night = s.texture === 'night' && !flat && !legacy;
     const atlas = s.atlas && !flat && !legacy ? this.generatedAtlas(s.atlas) : null;
     const cutout = s.cutout && !flat && !legacy ? this.cutoutTexture(s.cutout) : null;
-    const map = night ? null : cutout ? cutout : atlas ? atlas : cc0 ? (cc0Albedo ? cc0.color : null) : flat || s.albedo===false ? null : legacy ? this.legacyTexture(s.texture) : this.textures.get(s.texture);
-    const detail = flat || legacy || cc0 ? undefined : this.dataTextures.get(s.detail??s.texture);
+    const map = night ? null : proc ? proc.map : cutout ? cutout : atlas ? atlas : cc0 ? (cc0Albedo ? cc0.color : null) : flat || s.albedo===false ? null : legacy ? this.legacyTexture(s.texture) : this.textures.get(s.texture);
+    const detail = flat || legacy || cc0 || proc ? undefined : this.dataTextures.get(s.detail??s.texture);
     // CC0 の Roughness はそのまま roughnessMap に（係数 1 × 部屋別の倍率）。生成側は従来の s.roughness × 倍率
     const roughness = Math.max(.04, Math.min(1, (cc0 ? 1 : s.roughness) * (o.roughnessScale ?? 1)));
     const fogSpec = o.fog;
@@ -976,11 +995,11 @@ export class MaterialLibrary {
     const m = new (physical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial)({
       name: id, color, map,
       roughness, metalness: legacy ? 0 : cc0 ? cc0Bind?.metalness ?? 0 : s.metalness ?? 0,
-      normalMap: cc0 ? cc0.normal : detail && s.bump>0 ? this.normalTextures.get(s.detail??s.texture) : null,
-      normalScale: cc0 ? new THREE.Vector2(cc0NormalScale, cc0NormalScale) : new THREE.Vector2(s.bump/s.meters,s.bump/s.meters),
+      normalMap: proc ? proc.normal : cc0 ? cc0.normal : detail && s.bump>0 ? this.normalTextures.get(s.detail??s.texture) : null,
+      normalScale: proc ? new THREE.Vector2(.6, .6) : cc0 ? new THREE.Vector2(cc0NormalScale, cc0NormalScale) : new THREE.Vector2(s.bump/s.meters,s.bump/s.meters),
       aoMap: cc0 ? cc0.ao : detail ? this.aoTextures.get(s.detail??s.texture) : null, aoMapIntensity: cc0 ? cc0Bind?.aoIntensity ?? 1 : 1,
-      roughnessMap: cc0 ? cc0.roughness : detail ?? null,
-      envMap: legacy ? null : this.environment?.texture ?? null, envMapIntensity: legacy ? 0 : .24 * (o.envMapIntensity ?? 1),
+      roughnessMap: proc ? proc.roughness : cc0 ? cc0.roughness : detail ?? null,
+      envMap: legacy ? null : this.environment?.texture ?? null, envMapIntensity: legacy ? 0 : .24 * (proc ? 2.2 : 1) * (o.envMapIntensity ?? 1),
       transparent: s.opacity !== undefined, opacity: s.opacity ?? 1,
       depthWrite: s.opacity === undefined, side: s.opacity !== undefined || s.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
       emissive: s.emission ? (s.emissiveColor ?? s.color) : 0, emissiveMap: s.emission && !flat ? map : null,
@@ -989,6 +1008,7 @@ export class MaterialLibrary {
       polygonOffset: !!s.decal, polygonOffsetFactor: s.decal ? -2 : 0, polygonOffsetUnits: s.decal ? -2 : 0,
     });
     if (fogSpec) m.fog = false; // 部屋固有の霧を材質側で計算する（scene.fog を無視）
+    if (proc) m.color.setScalar(o.colorScale ?? 1); // 手続きの絵は色を持つので白（部屋別の明るさだけ掛ける）
     if (cutout) {
       // 切り抜きの板: 絵の色をそのまま（色は白）、細部のデータテクスチャ（法線・粗さ・AO）は使わない。MSAA では縁を被覆率で滑らかに
       m.color.set(0xffffff);
@@ -1061,6 +1081,7 @@ export class MaterialLibrary {
         shader.uniforms.surfaceTime = this.clock;
         shader.uniforms.waterRipples = this.waterRipples;
         shader.uniforms.waterWaves = { value: s.opacity !== undefined ? 0.7 : 1.0 };
+        shader.uniforms.waterFall = { value: s.fall ? 1.0 : 0.0 };
         shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWaterWorld; varying vec3 vWaterGeoN;');
         shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvWaterWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWaterGeoN = normalize(mat3(modelMatrix) * objectNormal);');
         shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${WATER_PARS_GLSL}`);
@@ -1082,10 +1103,11 @@ export class MaterialLibrary {
         shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float surfaceTime;');
         shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n${WHEAT_WIND_GLSL}`);
       }
-      if (s.flow && !flat) {
+      if ((s.flow || s.flowVec) && !flat) {
         shader.uniforms.surfaceTime = this.clock;
+        const [fu, fv] = s.flowVec ?? [0.006 * (s.flow ?? 0), 0.003 * (s.flow ?? 0)];
         shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float surfaceTime;');
-        shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>\n#ifdef USE_MAP\nvMapUv += vec2(surfaceTime * ${(0.006 * s.flow).toFixed(4)}, surfaceTime * ${(0.003 * s.flow).toFixed(4)});\n#endif\n#ifdef USE_NORMALMAP\nvNormalMapUv += vec2(surfaceTime * ${(0.006 * s.flow).toFixed(4)}, surfaceTime * ${(0.003 * s.flow).toFixed(4)});\n#endif`);
+        shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>\n#ifdef USE_MAP\nvMapUv += vec2(surfaceTime * ${fu.toFixed(4)}, surfaceTime * ${fv.toFixed(4)});\n#endif\n#ifdef USE_NORMALMAP\nvNormalMapUv += vec2(surfaceTime * ${fu.toFixed(4)}, surfaceTime * ${fv.toFixed(4)});\n#endif`);
       }
       // トーン / 2 層混合 / 視差の宣言。injectCommon より先に置く（後から置換したものほど #include の直後に入るので、
       // vRoomPos などの varying 宣言（injectCommon）がこの関数群より前に来る）
@@ -1182,8 +1204,31 @@ vNightPhase = fract(sin(dot(nightCell, vec2(12.9898, 78.233))) * 43758.5453);`);
     const family = flat ? 'flat' : legacy ? 'legacy' : cc0 ? (cc0Albedo ? 'cc0' : 'cc0paint') : authored ? 'authored' : 'plain';
     // physical の種類（glass / water / gloss / carPaint）は three 側のキー（clearcoat / transmission の有無）で分かれるが、可読性のため明示する
     const phys = !physical ? '' : waterSpec ? (waterSpec.depthFromFloor ? '-water-depth' : '-water') : s.glass ? '-glass' : s.gloss ? '-gloss' : '-coat';
-    m.customProgramCacheKey = () => `liminal-pbr-v4-grime:${grime ?? 'none'}${winRoom ? '-winroom' : ''}-${varied || worn ? SURFACE_VARIATION_KEY : 'plain'}-${varied ? 'macro' : 'nomacro'}-${family}-${blendParams ? 'tile' : 'notile'}-${pom ? 'pom' : 'nopom'}-${s.flow && !flat ? 'flow' : 'static'}-${s.grid && !flat && !legacy && !cc0 ? s.grid.join(',') : 'nogrid'}-${gradient ? 'grad' : 'nograd'}-${fogSpec ? 'roomfog' : 'scenefog'}${night ? '-night' : ''}${phys}${s.texture === 'water' && !flat && !legacy ? '-water' : ''}${cutout ? `-cutout-${s.cutout}` : ''}`;
+    m.customProgramCacheKey = () => `liminal-pbr-v4-grime:${grime ?? 'none'}${winRoom ? '-winroom' : ''}-${varied || worn ? SURFACE_VARIATION_KEY : 'plain'}-${varied ? 'macro' : 'nomacro'}-${family}-${blendParams ? 'tile' : 'notile'}-${pom ? 'pom' : 'nopom'}-${(s.flow || s.flowVec) && !flat ? `flow${s.flowVec ? s.flowVec.join(',') : ''}` : 'static'}-${s.grid && !flat && !legacy && !cc0 ? s.grid.join(',') : 'nogrid'}-${gradient ? 'grad' : 'nograd'}-${fogSpec ? 'roomfog' : 'scenefog'}${night ? '-night' : ''}${phys}${s.texture === 'water' && !flat && !legacy ? '-water' : ''}${cutout ? `-cutout-${s.cutout}` : ''}${proc ? `-proc-${s.procedural}` : ''}`;
     return m;
+  }
+
+  /** 偽の外の板（M04）。写真の uniform は 1 組だけ（初回に読み始め、届くまで手続きの代わりの絵） */
+  private outsideUniforms: OutsideUniforms | null = null;
+  private outsideViewMaterial(): THREE.MeshStandardMaterial {
+    this.outsideUniforms ??= loadOutsidePano(baseUrl());
+    const u = this.outsideUniforms;
+    const m = new THREE.MeshStandardMaterial({ name: OUTSIDE_VIEW_MAT, color: 0x000000, roughness: 1, metalness: 0, emissive: 0xffffff, emissiveIntensity: 1, envMapIntensity: 0 });
+    m.fog = false; // 部屋の霧を外の景色に掛けない
+    m.onBeforeCompile = (shader) => addOutsideView(shader, u);
+    m.customProgramCacheKey = () => 'liminal-outside-v1';
+    return m;
+  }
+
+  /** 手続きの色・法線・粗さ（起動後、最初に使う材質で 1 回だけ描く。document が無い環境では null = 従来の材質） */
+  private readonly proceduralCache = new Map<string, IceMaps | null>();
+  private proceduralMaps(kind: 'ice'): IceMaps | null {
+    if (!this.proceduralCache.has(kind)) {
+      const maps = createIceMaps();
+      if (maps) for (const t of [maps.map, maps.normal, maps.roughness]) { t.anisotropy = Math.min(8, this.anisotropy); this.track(t); }
+      this.proceduralCache.set(kind, maps);
+    }
+    return this.proceduralCache.get(kind) ?? null;
   }
 
   /** 切り抜きの板の絵（起動後 1 回だけ描く。document が無い環境では null = 板は色だけ） */
@@ -2124,7 +2169,7 @@ export const WATER_RIPPLES = 8;
 /**
  * 水面の法線の揺らぎ。手続きの小波 3 方向（波長 0.9 / 0.55 / 1.4 m、振幅 6 / 4 / 8 mm）と、足音の波紋（波長 0.25 m、速さ 1.2 m/s、
  * 減衰 0.9 s、前線の外側は無し）から高さ勾配を解析的に求め、world の法線 (−dh/dx, 1, −dh/dz) を view 空間へ回して
- * normal_fragment_maps の結果に足す。水平な面（幾何法線 y > 0.5）にだけ効く（E09 の縦の水壁は法線マップだけ）
+ * normal_fragment_maps の結果に足す。水平な面（幾何法線 y > 0.5）にだけ効く。縦の面は fall の材質だけ「流れ落ちる水」（liminalFallNormal）
  */
 /** 水面の出力（線形 HDR）の膝と上限。膝までは素通し、上は上限へ漸近（白飛び対策。docs 無し、値は C02 の天井灯 ≈ 2.4 を基準） */
 const WATER_GLARE_KNEE = 0.8;
@@ -2132,14 +2177,46 @@ const WATER_GLARE_MAX = 1.6;
 
 const WATER_PARS_GLSL = `
 varying vec3 vWaterWorld; varying vec3 vWaterGeoN;
-uniform float surfaceTime; uniform vec4 waterRipples[${WATER_RIPPLES}]; uniform float waterWaves;
+uniform float surfaceTime; uniform vec4 waterRipples[${WATER_RIPPLES}]; uniform float waterWaves; uniform float waterFall;
 vec2 liminalWaveGrad(vec2 p, vec2 dir, float lambda, float amp, float omega, float t) {
   float k = 6.2831853 / lambda;
   float ph = dot(p, dir) * k + omega * t;
   return dir * (amp * k * cos(ph));
 }
+// 流れ落ちる水（縦の面）: 高さ h = amp · sin(k (y + v t) + a sin(bu u + c))。戻り値は (dh/du, dh/dy)
+vec2 liminalFallGrad(float u, float y, float t, float lambda, float amp, float speed, float bu, float a, float c) {
+  float k = 6.2831853 / lambda;
+  float wob = bu * u + c;
+  float ph = k * (y + speed * t) + a * sin(wob);
+  float cp = cos(ph);
+  return vec2(amp * cp * a * bu * cos(wob), amp * k * cp);
+}
+// 縦の面の水（第22回。E09 の水壁・壁の水膜）: 下へ流れる細かい波（波長 0.11〜0.6 m、落ちる速さ 1.1〜3 m/s）を、壁に沿った方向の
+// 「筋」（流れの太いところ・細いところ）で強弱を付ける。器具・懐中電灯の映り込みが縦に伸びて流れ落ちる
+vec3 liminalFallNormal(vec3 n, vec3 gn) {
+  vec3 up = vec3(0.0, 1.0, 0.0);
+  vec3 T = normalize(cross(up, gn));
+  float u = dot(vWaterWorld, T), y = vWaterWorld.y, t = surfaceTime;
+  // 流れの太さのむら（壁に沿って不規則に。落ちる波は太い流れの所にだけ立つ）
+  float s1 = 0.5 + 0.5 * sin(u * 3.7 + sin(u * 1.3 + 0.4) * 2.3);
+  float s2 = 0.5 + 0.5 * sin(u * 9.1 + 1.3 + sin(u * 2.9) * 1.9);
+  float s3 = s1 * (0.35 + 0.65 * s2);
+  vec2 g = vec2(0.0);
+  g += liminalFallGrad(u, y, t, 0.62, 0.0036 * s3, 1.2, 2.1, 2.2, 0.0);
+  g += liminalFallGrad(u, y, t, 0.33, 0.0024 * s3, 1.9, 4.7, 1.9, 1.7);
+  g += liminalFallGrad(u, y, t, 0.17, 0.0012 * s2, 2.6, 8.3, 1.4, 4.2);
+  // 縦の細い流れ（筋）: 壁に沿った方向の尾根。大きく蛇行し、太さのむらで強弱が付く。映り込みが縦に伸びる
+  float mu = u + 0.12 * sin(y * 1.3 + u * 0.7) + 0.05 * sin(y * 4.1 - u * 2.3);
+  g.x += 0.0009 * (0.3 + 0.7 * s1) * (6.2831853 / 0.13) * cos(6.2831853 * mu / 0.13);
+  g.x += 0.0006 * (0.3 + 0.7 * s2) * (6.2831853 / 0.071) * cos(6.2831853 * mu / 0.071 + 1.3 + sin(u * 0.9));
+  vec3 wn = normalize(gn - T * g.x - up * g.y);
+  vec3 vn = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
+  vec3 vgn = normalize((viewMatrix * vec4(gn, 0.0)).xyz);
+  return normalize(n + (vn - vgn));
+}
 vec3 liminalWaterNormal(vec3 n) {
   vec3 gn = normalize(vWaterGeoN);
+  if (waterFall > 0.5 && abs(gn.y) < 0.5) return liminalFallNormal(n, gn);
   if (gn.y < 0.5 || waterWaves <= 0.0) return n;
   vec2 p = vWaterWorld.xz;
   float t = surfaceTime;

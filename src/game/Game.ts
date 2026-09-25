@@ -19,7 +19,7 @@
  */
 import * as THREE from 'three';
 import { aabbContains } from '../core/aabb';
-import { QUALITY_TIERS, dirVec, mobileTier, toWorld, type QualityTier, type QualityTierId, type Rarity, type RoomDefinition, type RoomInstance, type Portal, type Vec3 } from '../core/types';
+import { QUALITY_TIERS, dirVec, mobileTier, toLocal, toWorld, type QualityTier, type QualityTierId, type Rarity, type RoomDefinition, type RoomInstance, type Portal, type Vec3 } from '../core/types';
 import { randomWorldSeed } from '../core/rng';
 import { ROOM_BY_ID } from '../data';
 import { InputController, type InputState } from '../input/InputController';
@@ -39,7 +39,8 @@ import { SaveManager } from '../save/SaveManager';
 import { RoomStreamingManager } from '../streaming/RoomStreamingManager';
 import { Hud } from '../ui/Hud';
 import { drawMap, levelOf } from '../ui/Minimap';
-import { MapPanel } from '../ui/MapPanel';
+import { MenuUI } from '../ui/MenuUI';
+import { FloorCodex } from '../ui/FloorCodex';
 import { SettingsPanel } from '../ui/SettingsPanel';
 import { RoomGraph } from '../world/RoomGraph';
 import { WorldManager, isDoorLike } from '../world/WorldManager';
@@ -52,6 +53,8 @@ import { IS_MOBILE } from '../core/device';
 import type { RoomLayout } from '../generators/layout';
 
 type State = 'start' | 'playing' | 'menu' | 'transition' | 'riding';
+/** 初めてのフロアの画像を撮るまでの待ち（s。部屋の構築・焼き込みが落ち着くまで） */
+const THUMB_DELAY = 2.5;
 
 /** 環境（霧・背景・半球光）の補間目標 */
 interface EnvTarget {
@@ -271,7 +274,13 @@ export class Game {
   private frameTimes: number[] = [];
   private tierCooldown = 0;
   private readonly minimap = document.getElementById('minimap') as HTMLCanvasElement;
-  private readonly mapPanel = new MapPanel(document.getElementById('map-tabs')!, document.getElementById('fullmap') as HTMLCanvasElement, document.getElementById('map3d') as HTMLCanvasElement);
+  /** フロアリストの記録（世界をまたいで残る。第21回） */
+  readonly codex = new FloorCodex();
+  /** メニュー（タブ: マップ / フロアリスト / 設定。第21回） */
+  private readonly menuUI = new MenuUI(this.codex);
+  private get mapPanel() { return this.menuUI.map; }
+  /** 初めてのフロアの画像を撮る予約（入室の THUMB_DELAY s 後、プレイ中なら） */
+  private pendingThumb: { defId: string; roomId: string; due: number } | null = null;
   private readonly fade = document.getElementById('fade')!;
   private readonly menuEl = document.getElementById('menu')!;
   private readonly startEl = document.getElementById('start')!;
@@ -361,11 +370,15 @@ export class Game {
     this.postfx = new PostFX(this.renderer, this.scene, this.camera);
     this.player.onStride = (rank) => {
       if (rank === 'still') return;
-      this.audio.footstep(undefined, rank, this.player.crouching, this.player.inWaterZone || undefined);
+      // 足元の面（第20回）: 金属の足場・木の台・水の中などを部屋の床と別に鳴らす。草木の中なら擦れも
+      const surf = this.surfaceUnderPlayer();
+      this.audio.footstep(this.player.inWaterZone ? 'waterShallow' : surf.mat, rank, this.player.crouching);
+      if (surf.foliage >= 0.3) this.audio.rustle(Math.min(1, surf.foliage * (rank === 'dash' ? 1 : 0.6)), undefined, surf.tall);
       // 水の中の一歩ごとに水面へ波紋（MaterialLibrary の水材質の共有 uniform）
       if (this.player.inWaterZone) this.materials.addRipple(this.player.pos.x, this.player.pos.z, rank === 'dash' ? 1.4 : 1.0);
     };
-    this.player.onLand = (speed) => this.audio.land(speed);
+    this.player.onLand = (speed) => this.audio.land(speed, this.player.inWaterZone ? 'waterShallow' : this.surfaceUnderPlayer().mat);
+    this.player.onJump = () => this.audio.jump(this.player.inWaterZone ? 'waterShallow' : this.surfaceUnderPlayer().mat);
 
     this.scene.add(this.hemi);
     this.scene.add(this.proxy.mesh);
@@ -496,6 +509,57 @@ export class Game {
     };
   }
 
+  /**
+   * 足元の面（第20回。足音の床種を部屋の床ではなく踏んでいる物で決める）: 現在部屋の layout で、足の真下にあるソリッドな箱のうち
+   * 上面が足の高さ（-0.3〜+0.15 m）に最も近いものの材質。無ければ undefined（部屋の床）。
+   * foliage: 通り抜けられる草木（plant / plantLeaf / grass / wheat の箱と並べて描く物）が体に掛かっている量（0〜1 程度）
+   */
+  private surfaceUnderPlayer(): { mat?: string; foliage: number; tall: boolean } {
+    const id = this.currentRoomId;
+    const node = id ? this.world.graph.nodes.get(id) : undefined;
+    if (!node?.placement) return { foliage: 0, tall: false };
+    const L = this.world.layoutFor(node);
+    const [x, y, z] = toLocal(node.placement, [this.player.pos.x, this.player.pos.y, this.player.pos.z]);
+    let best: string | undefined;
+    let bestD = Infinity;
+    let overlay: string | undefined;
+    let overlayD: number | undefined;
+    let foliage = 0;
+    let tallN = 0; // 麦・背の高い草の株（擦れは「背の高い草の中」の録音に）
+    const R = 0.35;
+    for (const b of L.boxes) {
+      const veg = b.mat === 'plant' || b.mat === 'plantLeaf' || b.mat === 'grass' || b.mat === 'wheat';
+      if (veg && b.max[1] > y + 0.1 && b.min[1] < y + 1.3 && x > b.min[0] - R && x < b.max[0] + R && z > b.min[2] - R && z < b.max[2] + R) foliage += 0.5;
+      if (veg || b.mat === 'void' || x < b.min[0] - 0.02 || x > b.max[0] + 0.02 || z < b.min[2] - 0.02 || z > b.max[2] + 0.02) continue;
+      const d = y - b.max[1];
+      if (!b.solid) {
+        // 床に貼った薄い板（氷・敷物・水たまり・雪の吹きだまり）は、足の高さにあれば下の床より優先。
+        // 細い帯（床の線・目地・見切り。短辺 0.25 m 未満）は踏んでも床の音のまま（第22回: 線をまたぐたびに一歩だけ別の床の音になった）
+        if (b.max[1] - b.min[1] < 0.1 && Math.abs(d) < 0.12 && Math.min(b.max[0] - b.min[0], b.max[2] - b.min[2]) >= 0.25 && (b.max[0] - b.min[0]) * (b.max[2] - b.min[2]) > 0.25 && (overlayD === undefined || Math.abs(d) < overlayD)) { overlayD = Math.abs(d); overlay = b.mat; }
+        continue;
+      }
+      if (d < -0.15 || d > 0.3) continue;
+      if (Math.abs(d) < bestD) { bestD = Math.abs(d); best = b.mat; }
+    }
+    if (overlay) best = overlay;
+    // 動く床（ExternalForce の conveyor）の上はゴムのベルト
+    if (L.zones?.some((zn) => zn.kind === 'force' && zn.params?.mode === 'conveyor' && x > zn.aabb.min[0] && x < zn.aabb.max[0] && z > zn.aabb.min[2] && z < zn.aabb.max[2] && y < zn.aabb.max[1] && y > zn.aabb.min[1] - 0.2)) best = 'rubber';
+    for (const sp of L.instances ?? []) {
+      if (sp.mat !== 'plant' && sp.mat !== 'grass' && sp.mat !== 'wheat') continue;
+      const r = Math.max(sp.size[0], sp.size[2]) * 0.4 + 0.2; // 葉の塊の芯と脚が触れる距離
+      for (const t of sp.transforms) {
+        const s = t.scale ?? 1;
+        if (Math.abs(t.pos[0] - x) < r * s && Math.abs(t.pos[2] - z) < r * s && t.pos[1] < y + 1.3 && t.pos[1] + sp.size[1] * s > y + 0.1) {
+          // 膝より低い下草はわずか（床一面の下草で毎歩鳴らない）。麦・葉の塊は脚に擦れる
+          foliage += sp.size[1] * s < 0.3 ? 0.06 : sp.mat === 'wheat' ? 0.25 : 0.35;
+          if (sp.mat === 'wheat' || sp.size[1] * s > 0.9) tallN++;
+          if (foliage >= 1) break;
+        }
+      }
+    }
+    return { mat: best, foliage: Math.min(1, foliage), tall: tallN >= 2 };
+  }
+
   enterRoom(roomId: string): void {
     const node = this.world.graph.get(roomId);
     const prev = this.currentRoomId;
@@ -533,6 +597,12 @@ export class Game {
     }
     this.refreshStreaming();
     this.hud.setRoom(def, node.isAdapter, node.fallback);
+    // フロアリスト: 入室を記録。画像がまだ無いフロアは少し待って（構築・焼き込みが落ち着いてから）撮る
+    if (def && prev !== roomId) {
+      const isNew = this.codex.record(def.id, levelOf(this.world, roomId));
+      if (!this.codex.hasThumb(def.id)) this.pendingThumb = { defId: def.id, roomId, due: performance.now() / 1000 + THUMB_DELAY };
+      if (isNew) this.hud.setHint(`新しいフロアを記録: ${def.name}`);
+    }
     // 環境（霧・背景・半球光）と音
     const built = this.streaming.built.get(roomId) ?? null;
     const layout = this.world.layoutFor(node);
@@ -1269,12 +1339,14 @@ export class Game {
     this.menuEl.hidden = false;
     this.audio.ui('open');
     document.getElementById('menu-count')!.textContent = String(this.world.graph.visitedCount);
-    this.mapPanel.show(this.world, this.currentRoomId, { x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw }, this.mapPanelOpts());
+    // 記録を始める前のセーブで踏破済みの部屋もフロアリストに載せる
+    this.codex.mergeWorld([...this.world.graph.nodes.values()].filter((n) => n.visited && !n.isAdapter && ROOM_BY_ID.has(n.definitionId)).map((n) => ({ id: n.definitionId, level: levelOf(this.world, n.roomId) })));
+    this.menuUI.show({ world: this.world, currentRoomId: this.currentRoomId, player: { x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw }, mapOpts: this.mapPanelOpts() });
   }
 
   closeMenu(): void {
     if (this.state !== 'menu') return;
-    this.mapPanel.hide();
+    this.menuUI.hide();
     this.menuEl.hidden = true;
     this.state = 'playing';
     this.input.enabled = true;
@@ -1510,7 +1582,7 @@ export class Game {
     if (input.flashlight && this.state === 'playing') { this.flashlightOn = !this.flashlightOn; this.hud.setHint(this.flashlightOn ? '懐中電灯: オン' : '懐中電灯: オフ'); }
     if (input.menu) {
       if (this.state === 'playing') this.openMenu();
-      else if (this.state === 'menu') this.closeMenu();
+      else if (this.state === 'menu' && !this.menuUI.closePop()) this.closeMenu();
     }
     const now = performance.now() / 1000;
     // 手持ち揺れ・ロール・視線の遅れは乗車中（PlayerRide が微振動を担当）と E03（layout.roll）では掛けない
@@ -1574,7 +1646,7 @@ export class Game {
     }
     if (this.state === 'menu') {
       this.mapPanel.setView(this.mapPanelOpts());
-      this.mapPanel.update();
+      this.menuUI.update();
     }
     this.materials.update(dt);
     const cam = this.camera.position;
@@ -1589,7 +1661,34 @@ export class Game {
     this.updateRecOverlay(dt);
     // 読込済みテクスチャの先行アップロード（1 フレームに数枚。更新に余裕があるフレームだけ。docs/perf-room-switch.md）
     this.materials.uploads.flush(this.renderer, performance.now() - stepStart);
-    if (renderNow) this.renderFrame();
+    if (renderNow) {
+      this.renderFrame();
+      this.captureThumbIfDue(now);
+    }
+  }
+
+  /**
+   * フロアリストの画像（第21回）: 予約したフロアにプレイ中のまま THUMB_DELAY s いたら、描いた直後の画面を 480×270 の JPEG にする
+   * （描画直後の同じタスクなら preserveDrawingBuffer なしで読める。REC 表示は DOM なので写らない）
+   */
+  private captureThumbIfDue(now: number): void {
+    const p = this.pendingThumb;
+    if (!p || now < p.due || this.state !== 'playing') return;
+    if (this.currentRoomId !== p.roomId || this.codex.hasThumb(p.defId)) { this.pendingThumb = null; return; }
+    this.pendingThumb = null;
+    try {
+      const src = this.renderer.domElement;
+      const W = 480, H = 270;
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const g = c.getContext('2d');
+      if (!g || !src.width || !src.height) return;
+      // 中央を 16:9 で切り出す
+      const sa = src.width / src.height, ta = W / H;
+      const sw = sa > ta ? src.height * ta : src.width, sh = sa > ta ? src.height : src.width / ta;
+      g.drawImage(src, (src.width - sw) / 2, (src.height - sh) / 2, sw, sh, 0, 0, W, H);
+      this.codex.setThumb(p.defId, c.toDataURL('image/jpeg', 0.72));
+    } catch { /* 読めない環境（コンテキスト喪失など）は次の入室で */ }
   }
 
   private runModifierUpdates(dt: number, now: number): void {

@@ -166,7 +166,7 @@ const SKIRT_OUT = 0.018;
 const CROWN_H = 0.055;
 const CROWN_OUT = 0.009;
 /** 壁面に貼れない材質（窓・ガラス・虚空・掲示面・サイン板） */
-const BLOCK_MATS = new Set(['windowDark', 'windowNight', 'windowLit', 'glass', 'void', 'noticeGreen', 'signPlate', 'signEmissive', 'water', 'waterShallow', 'waterWall', 'carGlass']);
+const BLOCK_MATS = new Set(['windowDark', 'windowNight', 'windowLit', 'glass', 'void', 'noticeGreen', 'signPlate', 'signEmissive', 'water', 'waterShallow', 'waterWall', 'waterFilm', 'outsideView', 'skyDay', 'carGlass']);
 /** 天井の器具（シミを避ける） */
 const LUMINAIRE = /^(light|sodium|led|screenGlow|window|sky)/;
 

@@ -13,6 +13,7 @@ export class AssetManifest {
   private buffers = new Map<string, AudioBuffer>();
   private loaded = false;
   private decoding: Promise<void> | null = null;
+  private readonly variantCache = new Map<string, { size: number; list: AudioBuffer[] }>();
 
   constructor(url?: string) {
     this.url = url ?? `${baseUrl()}audio/manifest.json`;
@@ -34,6 +35,19 @@ export class AssetManifest {
       }
     } catch {
       /* 表なし = 全合成 */
+    }
+    // 足音・動作音（第20回。tools/build-footsteps.mjs が作る steps/index.json。キーは step.<床種>.<n> / move.<動作>.<n>）。無ければ合成の足音
+    try {
+      const dir = this.url.slice(0, this.url.lastIndexOf('/') + 1);
+      const res = await fetch(`${dir}steps/index.json`, { cache: 'no-cache' });
+      if (res.ok) {
+        const json = (await res.json()) as unknown;
+        if (json && typeof json === 'object') {
+          for (const [k, v] of Object.entries(json as Record<string, unknown>)) if (typeof v === 'string' && v && !this.files.has(k)) this.files.set(k, v);
+        }
+      }
+    } catch {
+      /* 足音の表なし */
     }
   }
 
@@ -65,6 +79,16 @@ export class AssetManifest {
 
   has(key: string): boolean {
     return this.buffers.has(key);
+  }
+
+  /** キーの頭が prefix のデコード済みバッファ（足音の変種 step.concrete.* など）。結果はキャッシュ（デコードが進むと作り直す） */
+  variants(prefix: string): AudioBuffer[] {
+    const hit = this.variantCache.get(prefix);
+    if (hit && hit.size === this.buffers.size) return hit.list;
+    const list: AudioBuffer[] = [];
+    for (const [k, b] of this.buffers) if (k.startsWith(prefix)) list.push(b);
+    this.variantCache.set(prefix, { size: this.buffers.size, list });
+    return list;
   }
 
   get keys(): string[] {

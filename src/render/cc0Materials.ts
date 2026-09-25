@@ -278,7 +278,7 @@ export const CC0_VARIANTS: Partial<Record<MatId, Cc0Variant[]>> = {
   ],
   grass: [{ set: 'Grass005', meters: 2, tint: [.9, .9, .9] }],
   snow: [{ set: 'Snow010A', meters: 2, tint: [1.2, 1.08, 1] }],
-  ice: [{ set: 'Marble012', meters: 2, tint: [1.12, 1.4, 1.4] }],
+  // ice: 第22回から手続きの氷（src/render/IceTexture.ts）。大理石の水色染めは凍っているように見えなかった
   // boxCardboard / plant / yellowLine / placeholder / signPlate / 発光・ガラス・水・空: CC0 セットが無いので従来の生成テクスチャ
 };
 

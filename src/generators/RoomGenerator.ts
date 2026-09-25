@@ -12,7 +12,7 @@ import type { Rng } from '../core/rng';
 import type { Dir } from '../core/types';
 import type { AABB } from '../core/aabb';
 import {
-  bench, booths, chair, counter, doorZones, freeRuns, hitsZone, innerFaces, insideRects, lineFace, linkedSeats, lockersAlong, longTable, signAt, signOnWall, sinkRow, tubePair, urinalRow, vending, washer,
+  bench, booths, chair, counter, doorZones, freeRuns, hitsZone, innerFaces, insideRects, lineFace, linkedSeats, lockersAlong, longTable, signAt, signOnWall, sinkRow, tubePair, urinalRow, vending, washer, WASHER_OUT, WASHER_PITCH,
   windowGlazing, windowSocket,
   type Face, type WindowOpening,
 } from './furniture';
@@ -502,16 +502,16 @@ function furnishLaundry(R: RefCtx): void {
   const longFaces = facesOf(R, (f) => f.horizontal === alongX);
   longFaces.forEach((f, idx) => {
     for (const [a0, a1] of freeRuns(f, R.sockets, 1.0)) {
-      const n = Math.floor((a1 - a0 - 0.2) / 0.62);
+      const n = Math.floor((a1 - a0 - 0.2) / WASHER_PITCH);
       if (n <= 0) continue;
-      const start = (a0 + a1) / 2 - (n * 0.62 - 0.02) / 2;
-      for (let k = 0; k < n; k++) placeUnit(R, (T) => washer(T, f, start + k * 0.62, idx === 1 || k % 3 === 2));
+      const start = (a0 + a1) / 2 - (n * WASHER_PITCH - 0.02) / 2;
+      for (let k = 0; k < n; k++) placeUnit(R, (T) => washer(T, f, start + k * WASHER_PITCH, idx === 1 || k % 3 === 2));
     }
   });
-  // 広い部屋: 背中合わせの洗濯機の島（奥行 0.66 × 2）を通路 3.2 m 以上で並べ、通路の中央に折り畳み台を置く
+  // 広い部屋: 背中合わせの洗濯機の島（奥行 WASHER_OUT × 2）を通路 3.2 m 以上で並べ、通路の中央に折り畳み台を置く
   const shortLen = alongX ? r.z1 - r.z0 : r.x1 - r.x0;
-  const inS0 = (alongX ? r.z0 : r.x0) + WALL_T + 0.66, inS1 = (alongX ? r.z1 : r.x1) - WALL_T - 0.66;
-  const aisleMin = 3.2, islandD = 1.32;
+  const inS0 = (alongX ? r.z0 : r.x0) + WALL_T + WASHER_OUT, inS1 = (alongX ? r.z1 : r.x1) - WALL_T - WASHER_OUT;
+  const aisleMin = 3.2, islandD = WASHER_OUT * 2;
   const islands = Math.max(0, Math.floor((inS1 - inS0 - aisleMin) / (islandD + aisleMin)));
   const aisleW = (inS1 - inS0 - islands * islandD) / (islands + 1);
   // 島の入口側は 4.0 m 空ける（入口正面に島の妻面が来ても距離を保つ。店の前室の感じ）
@@ -521,13 +521,13 @@ function furnishLaundry(R: RefCtx): void {
     const center = inS0 + aisleW * (i + 1) + islandD * i + islandD / 2;
     for (const inward of [1, -1] as const) {
       const f = lineFace(alongX, center, inward, l0, l1);
-      const n = Math.floor((l1 - l0 - 0.2) / 0.62);
-      const start = (l0 + l1) / 2 - (n * 0.62 - 0.02) / 2;
-      for (let k = 0; k < n; k++) placeUnit(R, (T) => washer(T, f, start + k * 0.62, k % 4 === 1));
+      const n = Math.floor((l1 - l0 - 0.2) / WASHER_PITCH);
+      const start = (l0 + l1) / 2 - (n * WASHER_PITCH - 0.02) / 2;
+      for (let k = 0; k < n; k++) placeUnit(R, (T) => washer(T, f, start + k * WASHER_PITCH, k % 4 === 1));
     }
   }
   for (let i = 0; i <= islands; i++) aisleCenters.push(inS0 + aisleW * i + islandD * i + aisleW / 2);
-  if (shortLen - 0.3 >= 0.66 * 2 + 1.2 * 2 + 0.8) {
+  if (shortLen - 0.3 >= WASHER_OUT * 2 + 1.2 * 2 + 0.8) {
     const longLen = l1 - l0;
     const n = Math.max(1, Math.floor((longLen + 0.6) / 2.6));
     const start = (l0 + l1) / 2 - (n * 2.6 - 0.6) / 2 + 1.0;

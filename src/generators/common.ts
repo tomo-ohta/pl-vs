@@ -124,6 +124,8 @@ export interface FurnishCtx {
 function free(c: FurnishCtx, x: number, z: number, radius = 1.6): boolean {
   if (!clearOfSockets(c.keep, x, z, radius)) return false;
   if (c.landing && x > c.landing.min[0] - 1 && x < c.landing.max[0] + 1 && z > c.landing.min[2] - 1 && z < c.landing.max[2] + 1) return false;
+  // 間仕切りの開口（通り抜けの予約）の近く
+  if (c.L.passages?.some((q) => x > q.min[0] - 1 && x < q.max[0] + 1 && z > q.min[2] - 1 && z < q.max[2] + 1)) return false;
   return true;
 }
 
@@ -195,14 +197,45 @@ export function patternRows(c: FurnishCtx, o: { spacing: number; depth: number; 
   }
 }
 
-/** 間仕切り壁（部屋を 2〜4 区画に分ける。1.4m の通り抜けを残す） */
+/** 間仕切りの開口を通る人の帯（開口の中心 ±0.45 m × 壁の前後 PASS_DEPTH）。この帯に既存のソリッドが無い位置に開口を開ける */
+const PASS_HALF = 0.45;
+const PASS_DEPTH = 1.6;
+
+/** 間仕切り（alongX: z = t に x 方向へ伸びる）の開口を a に開けたとき、開口を通る帯に段差より高いソリッドが無いか */
+function passClear(c: FurnishCtx, alongX: boolean, t: number, a: number): boolean {
+  const lo: [number, number] = alongX ? [a - PASS_HALF, t - PASS_DEPTH] : [t - PASS_DEPTH, a - PASS_HALF];
+  const hi: [number, number] = alongX ? [a + PASS_HALF, t + PASS_DEPTH] : [t + PASS_DEPTH, a + PASS_HALF];
+  const from = c.L.shellCount ?? 0;
+  for (let i = from; i < c.L.boxes.length; i++) {
+    const b = c.L.boxes[i];
+    if (!b.solid || b.max[1] <= 0.35 || b.min[1] >= 1.7) continue;
+    if (b.min[0] < hi[0] && b.max[0] > lo[0] && b.min[2] < hi[1] && b.max[2] > lo[1]) return false;
+  }
+  return true;
+}
+
+/**
+ * 間仕切り壁（部屋を 2〜4 区画に分ける。1.6m の通り抜けを残す）。
+ * 開口は乱数で決めた位置から 0.25 m 刻みで左右に探し、先に置いた家具（机の列・柱）で塞がらない位置に開ける（見つからなければ乱数の位置）。
+ * 開口とその前後は L.passages に予約し、後段の配置（free() / ドレッシング / 奇妙さ）が避ける
+ */
 export function patternPartitions(c: FurnishCtx, count: number, height: number, mat: MatId): void {
   const r = c.rects[0];
   const ir = inner(r, 0);
   const alongX = c.rng.chance(0.5);
   for (let i = 1; i <= count; i++) {
     const t = alongX ? ir.z0 + ((ir.z1 - ir.z0) * i) / (count + 1) : ir.x0 + ((ir.x1 - ir.x0) * i) / (count + 1);
-    const gapAt = alongX ? c.rng.float(ir.x0 + 1.5, ir.x1 - 1.5) : c.rng.float(ir.z0 + 1.5, ir.z1 - 1.5);
+    const g0 = alongX ? ir.x0 + 1.5 : ir.z0 + 1.5, g1 = alongX ? ir.x1 - 1.5 : ir.z1 - 1.5;
+    const drawn = c.rng.float(g0, g1);
+    let gapAt = drawn;
+    for (let k = 0; k * 0.25 <= g1 - g0; k++) {
+      const a = drawn + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.25;
+      if (a < g0 || a > g1) continue;
+      if (passClear(c, alongX, t, a)) { gapAt = a; break; }
+    }
+    (c.L.passages ??= []).push(alongX
+      ? { min: [gapAt - 0.8, 0, t - PASS_DEPTH], max: [gapAt + 0.8, 2.2, t + PASS_DEPTH] }
+      : { min: [t - PASS_DEPTH, 0, gapAt - 0.8], max: [t + PASS_DEPTH, 2.2, gapAt + 0.8] });
     const segs: [number, number][] = alongX ? [[ir.x0 + 0.15, gapAt - 0.8], [gapAt + 0.8, ir.x1 - 0.15]] : [[ir.z0 + 0.15, gapAt - 0.8], [gapAt + 0.8, ir.z1 - 0.15]];
     for (const [a, b] of segs) {
       if (b - a < 0.3) continue;
@@ -222,8 +255,9 @@ export function patternPartitions(c: FurnishCtx, count: number, height: number, 
         }
       }
       for (const [p0, p1] of pieces) {
-        if (alongX) c.L.boxes.push(box([p0, 0, t - 0.06], [p1, height, t + 0.06], mat));
-        else c.L.boxes.push(box([t - 0.06, 0, p0], [t + 0.06, height, p1], mat));
+        const b = alongX ? box([p0, 0, t - 0.06], [p1, height, t + 0.06], mat) : box([t - 0.06, 0, p0], [t + 0.06, height, p1], mat);
+        b.kind = 'partition';
+        c.L.boxes.push(b);
       }
     }
   }

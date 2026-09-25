@@ -50,7 +50,7 @@ const MAT_IDS = new Set<string>([
   'ceilingWhite', 'ceilingDark', 'ceilingTile', 'doorWood', 'doorMetal', 'trim', 'glass', 'lightPanel', 'lightWarm', 'lightOff', 'ledBlue',
   'columnConcrete', 'furnitureDark', 'furnitureLight', 'metal', 'yellowLine', 'placeholder', 'void',
   'shelfMetal', 'boxCardboard', 'plant', 'water', 'carPaint', 'carGlass', 'rubber', 'upholstery',
-  'lightGreen', 'lightYellow', 'screenGlow', 'skyOvercast', 'skyDusk', 'skyNoon', 'waterShallow', 'waterWall', 'shadowDecal', 'untextured',
+  'lightGreen', 'lightYellow', 'screenGlow', 'skyOvercast', 'skyDusk', 'skyNoon', 'waterShallow', 'waterWall', 'waterFilm', 'outsideView', 'shadowDecal', 'untextured',
   'floorAsphalt', 'wallBrick', 'windowLit', 'windowDark', 'sodiumLight', 'signPlate', 'signEmissive', 'ice', 'snow', 'grass',
 ]);
 

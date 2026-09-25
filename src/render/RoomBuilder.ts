@@ -598,7 +598,7 @@ export class RoomBuilder {
         applyMetricUV(g, b.mat);
       } else g = surfaceBox(b, { legacy });
       // 窓の奥の部屋（WindowRoom）: 窓の箱の中心と半分の寸法。同じ材質で結合する全ジオメトリに要るので、分割片（part.geometry）にも元の箱で付ける
-      if (!legacy && WINDOW_ROOM_MATS.has(b.mat)) attachWindowRoom(g, part.b.min, part.b.max);
+      if (!legacy && (WINDOW_ROOM_MATS.has(b.mat) || b.mat === 'outsideView')) attachWindowRoom(g, part.b.min, part.b.max);
       mark('geo');
       // uv1（ライトマップ）。結合する全ジオメトリが同じ属性集合を持つ必要があるので、対象外の箱にも黒テクセルの uv1 を付ける
       let lmRanges: [number, number][] | null = null;

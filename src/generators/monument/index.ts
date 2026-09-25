@@ -23,7 +23,42 @@ export function buildMonument(kind: MonumentKind, rng: Rng, o: MonumentOptions):
     heavyMaterials(base);
   }
   fitEnvelope(base, o);
+  trimColliders(base);
   return base;
+}
+
+/**
+ * 当たり判定を、最終的な部品の外形との重なりだけに切り詰める（第18回）。種類ごとの当たり判定は組み立て直後の部品に合わせてあり、
+ * 増幅・fitEnvelope で部品を動かす / 捨てると元の場所に見えない壁が残っていた（steel で最大 29 m²）。
+ * 当たり判定 × 部品の外接箱の積を新しい当たり判定にする（元の当たり判定より大きくはならない）。他の箱に含まれる箱は捨てる
+ */
+function trimColliders(b: MonumentBuild): void {
+  if (!b.colliders?.length) return;
+  const parts = b.parts.map((p) => partBounds(p));
+  // 点が部品の外形（5 cm の余裕）に入るか。破片をまとめた箱が覆われているかの判定に使う
+  const hit = (x: number, y: number, z: number) => parts.some((q) => x >= q.min[0] - 0.05 && x <= q.max[0] + 0.05 && y >= q.min[1] - 0.05 && y <= q.max[1] + 0.05 && z >= q.min[2] - 0.05 && z <= q.max[2] + 0.05);
+  const covered = (a: Box) => {
+    const y = (a.min[1] + a.max[1]) / 2;
+    for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) if (!hit(a.min[0] + (a.max[0] - a.min[0]) * i / 4, y, a.min[2] + (a.max[2] - a.min[2]) * j / 4)) return false;
+    return true;
+  };
+  const out: Box[] = [];
+  for (const c of b.colliders) {
+    const pieces: Box[] = [];
+    for (const q of parts) {
+      const min: [number, number, number] = [Math.max(c.min[0], q.min[0]), Math.max(c.min[1], q.min[1]), Math.max(c.min[2], q.min[2])];
+      const max: [number, number, number] = [Math.min(c.max[0], q.max[0]), Math.min(c.max[1], q.max[1]), Math.min(c.max[2], q.max[2])];
+      // 細かすぎる破片（床面積 0.05 m² 未満 = 22 cm 角ほど）は作らない（数が増えるだけで歩行を妨げない）
+      if (max[0] - min[0] < 0.05 || max[1] - min[1] < 0.05 || max[2] - min[2] < 0.05 || (max[0] - min[0]) * (max[2] - min[2]) < 0.05) continue;
+      pieces.push({ ...c, min, max });
+    }
+    if (pieces.length < 2) { out.push(...pieces); continue; }
+    // 破片をまとめた外接箱が部品で覆われていれば 1 つにまとめる（元の当たり判定とほぼ同じ数に保つ）
+    const u: Box = { ...c, min: [Math.min(...pieces.map((q) => q.min[0])), Math.min(...pieces.map((q) => q.min[1])), Math.min(...pieces.map((q) => q.min[2]))], max: [Math.max(...pieces.map((q) => q.max[0])), Math.max(...pieces.map((q) => q.max[1])), Math.max(...pieces.map((q) => q.max[2]))] };
+    if (covered(u)) out.push(u); else out.push(...pieces);
+  }
+  const inside = (a: Box, o: Box) => a !== o && [0, 1, 2].every((k) => a.min[k] >= o.min[k] - 1e-6 && a.max[k] <= o.max[k] + 1e-6);
+  b.colliders = out.filter((a, i) => !out.some((o, j) => inside(a, o) && (!inside(o, a) || j < i)));
 }
 
 /**

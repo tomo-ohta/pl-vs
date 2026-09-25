@@ -17,7 +17,7 @@ import type { AABB } from '../../core/aabb';
 import { dirVec, type Dir, type Socket } from '../../core/types';
 import type { Rng } from '../../core/rng';
 import { across, along, inner, rect, rectArea, wallSpans, type Rect } from '../footprint';
-import { alongFace, doorZones, freeRuns, hitsZone, insideRects, signAt, tubePair, type Face } from '../furniture';
+import { alongFace, keepOutZones, freeRuns, hitsZone, insideRects, signAt, tubePair, type Face } from '../furniture';
 import { box, kinded, splitScreens, WALL_T, type Box, type GenParams, type InstanceSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
 
 /** テスト用スイッチ: false にすると何もしない（Node ハーネスの before / after 比較。ブラウザでは開発用 `?nodress=1` で無効化 = 構築時間の基準） */
@@ -65,7 +65,7 @@ interface Ctx {
   rng: Rng;
   rects: Rect[];
   faces: FaceR[];
-  /** 扉前 1.8 m・床穴・着地点（furniture.doorZones） */
+  /** 扉前 1.8 m・床穴・着地点・間仕切りの開口（furniture.keepOutZones） */
   zones: AABB[];
   /** 入口 → 各出口の直線帯（半幅 0.6） */
   lanes: Lane[];
@@ -83,7 +83,7 @@ const PANEL_MATS: ReadonlySet<string> = new Set(['lightPanel', 'lightWarm', 'lig
 function makeCtx(L: RoomLayout, p: GenParams, rng: Rng): Ctx {
   const rects = L.footprint;
   return {
-    L, p, rng, rects, faces: facesWithRect(rects), zones: doorZones(L.sockets, null), lanes: lanesOf(L), extraZones: [],
+    L, p, rng, rects, faces: facesWithRect(rects), zones: keepOutZones(L, null), lanes: lanesOf(L), extraZones: [],
     start: L.shellCount ?? 0, h: L.height, note: (s) => dressStats.note.push(s),
   };
 }
@@ -1207,6 +1207,12 @@ function u11(c: Ctx): void {
   // 汎用パターンの家具は PropRepetition（luggage）が後で捨てる（FURNITURE_MATS）ので、先に外して置き場を空ける。
   // ここで足す箱は kind 'dress:carousel' を付ける（PropRepetition.shared.removeInterior はその印の箱を捨てない）ので材質は自由（rubber のベルトなど）
   removeInterior(c, (b) => b.solid && PROP_FURNITURE.has(b.mat));
+  // 汎用パターンの間仕切り（LargeRoom の patternPartitions）も外す。受取所は 1 つの広間で、ターンテーブルと
+  // PropRepetition のコンベアの環が間仕切りの間の帯を横切って塞いでいた（開口の予約 L.passages も一緒に消す）
+  if (removeInterior(c, (b) => b.kind === 'partition') > 0) {
+    delete L.passages;
+    c.zones = keepOutZones(L, null);
+  }
   const w = r.x1 - r.x0, d = r.z1 - r.z0;
   const alongX = w >= d;
   // 柱（7〜8.5 m 格子）の間に収まる大きさ。置き場は中央に近い順の格子探索（動線・柱を避ける）

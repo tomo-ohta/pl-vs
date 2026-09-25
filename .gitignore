@@ -11,3 +11,8 @@ assets/cc0/textures/
 scratch/
 # CC0 の夜景 HDRI（python3 tools/fetch-cc0-extra.py で再取得）
 assets/cc0/hdris/
+# CC0 の足音素材（assets/cc0/audio/src に元の zip。node tools/build-footsteps.mjs で public/audio/steps を再生成）
+assets/cc0/audio/
+public/audio/steps/
+# Adobe Audition の効果音（Adobe のライセンス: 作品への組み込み可・単体配布不可。tools/build-footsteps.mjs が読む）
+assets/adobe/

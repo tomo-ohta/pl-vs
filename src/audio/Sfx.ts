@@ -5,7 +5,7 @@
 import type { MatId } from '../generators/layout';
 import { burst, tone, voice, setPannerPos, type LayerDest, type SharedSources } from './Synth';
 
-export type FloorKind = 'carpet' | 'lino' | 'tile' | 'concrete' | 'wood' | 'water' | 'wet';
+export type FloorKind = 'carpet' | 'lino' | 'tile' | 'concrete' | 'wood' | 'water' | 'wet' | 'metal' | 'grass' | 'snow' | 'gravel' | 'asphalt' | 'ice';
 export type MoveRank = 'walk' | 'dash';
 export type DoorSfxKind = 'open' | 'close' | 'locked' | 'knock';
 export type DoorMat = 'wood' | 'metal' | 'glass';
@@ -20,7 +20,7 @@ export function isSfxKind(s: string): s is SfxKind {
   return SFX_SET.has(s);
 }
 
-/** palette.floor → 足音の床種。wet は Wetness Modifier 等で上書き */
+/** palette.floor / 足元の箱の材質 → 足音の床種。wet は Wetness Modifier 等で上書き */
 export function floorKindOf(mat: MatId | string, wet = false): FloorKind {
   if (wet) return 'wet';
   switch (mat) {
@@ -28,6 +28,7 @@ export function floorKindOf(mat: MatId | string, wet = false): FloorKind {
     case 'floorCarpetGrey':
     case 'carpetPattern':
     case 'upholstery':
+    case 'whiteFabric':
       return 'carpet';
     case 'floorLino':
     case 'rubber':
@@ -36,13 +37,44 @@ export function floorKindOf(mat: MatId | string, wet = false): FloorKind {
     case 'marbleFloor':
     case 'marbleWhite':
     case 'glass':
+    case 'wainscotCream':
       return 'tile';
     case 'floorWood':
     case 'woodPanel':
     case 'bookshelfWood':
+    case 'handrailWood':
+    case 'doorWood':
+    case 'furnitureLight':
+    case 'furnitureDark':
+    case 'boxCardboard':
       return 'wood';
+    case 'metal':
+    case 'metalDark':
+    case 'stainless':
+    case 'shelfMetal':
+    case 'doorMetal':
+    case 'goldTrim':
+    case 'lockerBlue':
+    case 'lockerGreen':
+      return 'metal';
+    case 'grass':
+    case 'plant':
+    case 'plantLeaf':
+    case 'wheat':
+      return 'grass';
+    case 'plantSoil':
+      return 'gravel';
+    case 'snow':
+      return 'snow';
+    case 'ice':
+      return 'ice';
+    case 'floorAsphalt':
+      return 'asphalt';
     case 'water':
+    case 'waterShallow':
       return 'water';
+    case 'puddle':
+      return 'wet';
     default:
       return 'concrete';
   }
@@ -55,12 +87,20 @@ export function doorMatOf(mat: MatId | string): DoorMat {
   return 'wood';
 }
 
+/** 合成の足音しか無い床種（録音素材が無いとき）の置き換え先 */
+const SYNTH_FLOOR: Record<FloorKind, 'carpet' | 'lino' | 'tile' | 'concrete' | 'wood' | 'water' | 'wet'> = {
+  carpet: 'carpet', lino: 'lino', tile: 'tile', concrete: 'concrete', wood: 'wood', water: 'water', wet: 'wet',
+  metal: 'tile', grass: 'carpet', snow: 'carpet', gravel: 'concrete', asphalt: 'concrete', ice: 'tile',
+};
+
 export interface SfxContext {
   ctx: BaseAudioContext;
   sh: SharedSources;
   dest: LayerDest;
   /** 再生開始時の通知（ボイス数の計上用） */
   onVoice?: (durationSec: number) => void;
+  /** 録音素材の変種（AssetManifest.variants。step.<床種>. / move.jump. など）。空なら合成 */
+  samples?: (prefix: string) => AudioBuffer[];
 }
 
 export interface ShotOpts {
@@ -112,17 +152,85 @@ const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
 
 // ---------------------------------------------------------------- 足音 / 着地
 /** 床材ごとの足音。rank で音量・長さ、crouching で音量 -8 dB、wet で水しぶきを混ぜる。持続秒を返す */
+// ---------------------------------------------------------------- 録音素材（第20回。tools/build-footsteps.mjs）
+/** 直前と同じ変種を続けて鳴らさない（同じ一歩の繰り返しは機械的に聞こえる） */
+const lastPick = new Map<string, number>();
+function pickSample(sc: SfxContext, prefix: string): AudioBuffer | null {
+  const list = sc.samples?.(prefix) ?? [];
+  if (!list.length) return null;
+  let i = Math.floor(Math.random() * list.length);
+  if (list.length > 1 && i === lastPick.get(prefix)) i = (i + 1 + Math.floor(Math.random() * (list.length - 1))) % list.length;
+  lastPick.set(prefix, i);
+  return list[i];
+}
+
+/** バッファを t に鳴らす（rate = 再生速度 = 音程、lp = 高域を丸める Hz）。長さ（秒）を返す */
+function playBuf(sc: SfxContext, buf: AudioBuffer, dest: AudioNode, t: number, rate: number, gain: number, lp?: number): number {
+  const { ctx } = sc;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = rate;
+  const g = ctx.createGain();
+  g.gain.value = gain;
+  src.connect(g);
+  let tail: AudioNode = g;
+  if (lp) {
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = lp;
+    f.Q.value = -3.0103; // 山なし（Butterworth）
+    tail.connect(f);
+    tail = f;
+  }
+  tail.connect(dest);
+  src.start(t);
+  const dur = buf.duration / rate;
+  src.onended = () => { src.disconnect(); g.disconnect(); if (tail !== g) tail.disconnect(); };
+  return dur;
+}
+
+/**
+ * 床種ごとの一歩の音量（素材は build-footsteps.mjs で 100 ms 窓の RMS -17 dBFS に揃えてある）。
+ * 第22回の 4 回目（ユーザー指摘「タイル・石・木などが大きい。カーペット程度に一律で」）: 素材の A 特性の大きさは床ごとに ±2 dB 程度だが、
+ * 硬い床は立ち上がりが鋭く、残響への送り（sends）が絨毯の 3〜5 倍で、同じ音量でも大きく聞こえていた。→ 絨毯（1.25・送り 0.15）を基準に、
+ * 送りを下げたうえで、ゲームの出力（環境音を止め、全体の出力を AudioWorklet で記録、一歩の後 400 ms の平均 = 残響込み）で絨毯に揃えた
+ * （硬い床は立ち上がりの分 -1 dB。C02 で測定。以前の設定では硬い床が絨毯より +4 dB・最大値 +6 dB だった）
+ */
+const STEP_GAIN: Record<FloorKind, number> = {
+  carpet: 1.25, grass: 1.6, snow: 1.5,
+  tile: 0.57, lino: 0.73, concrete: 0.54, asphalt: 0.87, wood: 0.67, metal: 0.46, ice: 0.57, gravel: 0.77,
+  water: 0.45, wet: 0.5,
+};
+/** 着地の録音（land.<床種>）を使う床種 */
+const LAND_SAMPLE: Partial<Record<FloorKind, 'concrete' | 'metal' | 'wood'>> = { concrete: 'concrete', tile: 'concrete', lino: 'concrete', asphalt: 'concrete', ice: 'concrete', metal: 'metal', wood: 'wood' };
+/** 素材の無い床種は近い素材で（ice = タイルを少し高く） */
+const STEP_SAMPLE: Partial<Record<FloorKind, FloorKind>> = { ice: 'tile' };
+
+/** 録音素材の一歩。素材が無ければ 0（呼び出し側が合成にする） */
+function sampleStep(sc: SfxContext, floor: FloorKind, rank: MoveRank, crouching: boolean, g: AudioNode, t: number, pitch: number): number {
+  const buf = pickSample(sc, `step.${STEP_SAMPLE[floor] ?? floor}.`);
+  if (!buf) return 0;
+  // 歩き 0.55 / 走り 0.72（少し高く）/ しゃがみ 0.26（丸めて低く = 忍び足）。一歩ごとの揺れは ±0.4 dB だけ（大きく揺らすと鳴ったり鳴らなかったりに聞こえた）
+  const base = crouching ? 0.26 : rank === 'dash' ? 0.72 : 0.55;
+  const rate = pitch * (crouching ? 0.96 : rank === 'dash' ? 1.03 : 1) * (floor === 'ice' ? 1.06 : 1);
+  return playBuf(sc, buf, g, t, rate, base * STEP_GAIN[floor] * rnd(0.955, 1.045), crouching ? 2800 : undefined);
+}
+
 export function playFootstep(sc: SfxContext, floor: FloorKind, rank: MoveRank, crouching: boolean, wet: boolean, o: ShotOpts = {}): number {
   const { ctx, sh } = sc;
   const t = ctx.currentTime;
-  const pitch = (o.pitch ?? 1) * rnd(0.94, 1.06);
+  const pitch = (o.pitch ?? 1) * rnd(0.96, 1.04);
   const vel = rank === 'dash' ? 1 : 0.7;
   const level = (crouching ? 0.4 : 1) * vel;
-  const kind: FloorKind = wet && (floor === 'lino' || floor === 'tile' || floor === 'concrete') ? 'wet' : floor;
-  const sends: Record<FloorKind, number> = { carpet: 0.15, lino: 0.5, tile: 0.8, concrete: 0.7, wood: 0.4, water: 0.6, wet: 0.6 };
+  const kind: FloorKind = wet && (floor === 'lino' || floor === 'tile' || floor === 'concrete' || floor === 'asphalt' || floor === 'metal') ? 'wet' : floor;
+  // 残響への送り（第22回の 4 回目に硬い床を下げた。旧 tile 0.8 / concrete 0.7 / metal 0.8 / ice 0.8 / lino 0.5 / wood 0.4 / water・wet 0.6 / asphalt 0.4）
+  const sends: Record<FloorKind, number> = { carpet: 0.15, lino: 0.35, tile: 0.5, concrete: 0.45, wood: 0.3, water: 0.4, wet: 0.4, metal: 0.5, grass: 0.1, snow: 0.1, gravel: 0.3, asphalt: 0.3, ice: 0.5 };
   let dur = 0.12;
-  const g = chain(sc, { ...o, gain: (o.gain ?? 1) * level }, sends[kind], 0.5);
-  switch (kind) {
+  const g = chain(sc, { ...o, gain: (o.gain ?? 1) * (sc.samples ? 1 : level) }, sends[kind], 0.7);
+  const recorded = sampleStep(sc, kind, rank, crouching, g, t, pitch);
+  if (recorded > 0) return recorded;
+  g.gain.value = (o.gain ?? 1) * level;
+  switch (SYNTH_FLOOR[kind]) {
     case 'carpet':
       burst(ctx, sh, g, t, { kind: 'pink', bp: 500 * pitch, q: 0.8, dur: 0.06, gain: 0.25, attack: 0.008 });
       burst(ctx, sh, g, t + 0.01, { kind: 'brown', lp: 250 * pitch, dur: 0.07, gain: 0.3 });
@@ -151,8 +259,8 @@ export function playFootstep(sc: SfxContext, floor: FloorKind, rank: MoveRank, c
       dur = 0.12;
       break;
     case 'water':
-      burst(ctx, sh, g, t, { lp: 4000, sweepTo: 800, dur: 0.15, gain: 0.35, attack: 0.01 });
-      tone(ctx, g, t + 0.06, { freq: rnd(900, 1600), freqTo: 500, dur: 0.1, gain: 0.05 });
+      burst(ctx, sh, g, t, { lp: 1800, sweepTo: 500, dur: 0.18, gain: 0.35, attack: 0.015 });
+      tone(ctx, g, t + 0.06, { freq: rnd(400, 700), freqTo: 250, dur: 0.1, gain: 0.04 });
       dur = 0.2;
       break;
     case 'wet':
@@ -170,13 +278,61 @@ export function playLand(sc: SfxContext, speed: number, floor: FloorKind, o: Sho
   const t = ctx.currentTime;
   const k = Math.min(1, Math.max(0, (speed - 1.5) / 9));
   if (k <= 0) return 0;
-  const g = chain(sc, { ...o, gain: (o.gain ?? 1) * (0.4 + 0.8 * k) }, floor === 'carpet' ? 0.2 : 0.6, 0.6);
+  const g = chain(sc, { ...o, gain: (o.gain ?? 1) * (0.4 + 0.8 * k) }, floor === 'carpet' || floor === 'grass' || floor === 'snow' ? 0.2 : 0.6, 0.8);
+  // 録音の着地（Adobe: 同じ革靴で各床に飛び降りた音）。硬い床はセメント、無い床は下の一歩の重ね
+  const landKind = LAND_SAMPLE[floor];
+  const landBuf = landKind ? pickSample(sc, `land.${landKind}.`) : null;
+  if (landBuf) {
+    playBuf(sc, landBuf, g, t, rnd(0.97, 1.03), 0.75 * STEP_GAIN[floor]);
+    if (k > 0.5) tone(ctx, g, t, { freq: 60, freqTo: 35, dur: 0.3, gain: 0.22 * k });
+    return 0.6;
+  }
+  // 録音素材: 両足の一歩を低く重ねる（2 本目は 35 ms 遅れ）+ 体重の低い響き
+  const a = pickSample(sc, `step.${STEP_SAMPLE[floor] ?? floor}.`);
+  if (a) {
+    const b = pickSample(sc, `step.${STEP_SAMPLE[floor] ?? floor}.`) ?? a;
+    playBuf(sc, a, g, t, 0.84, 0.5 * STEP_GAIN[floor]);
+    playBuf(sc, b, g, t + 0.035, 0.8, 0.38 * STEP_GAIN[floor]);
+    burst(ctx, sh, g, t, { kind: 'brown', lp: 180, dur: 0.1 + 0.12 * k, gain: 0.35 * k, attack: 0.004 });
+    if (k > 0.5) tone(ctx, g, t, { freq: 60, freqTo: 35, dur: 0.3, gain: 0.25 * k });
+    return 0.5;
+  }
   burst(ctx, sh, g, t, { kind: 'brown', lp: 220, dur: 0.12 + 0.15 * k, gain: 0.6, attack: 0.004 });
   const lp = floor === 'carpet' ? 300 : floor === 'tile' || floor === 'lino' ? 3000 : 1200;
   burst(ctx, sh, g, t, { kind: 'pink', lp, dur: 0.08 + 0.08 * k, gain: 0.35 });
-  if (floor === 'water' || floor === 'wet') burst(ctx, sh, g, t + 0.02, { lp: 4000, sweepTo: 700, dur: 0.3, gain: 0.4, attack: 0.02 });
+  // 水に落ちる: 高い「バシャ」は耳障りだったので低く丸める（第22回の 2 回目）
+  if (floor === 'water' || floor === 'wet') burst(ctx, sh, g, t + 0.02, { lp: floor === 'water' ? 1800 : 4000, sweepTo: floor === 'water' ? 500 : 700, dur: 0.3, gain: 0.4, attack: 0.02 });
   if (k > 0.5) tone(ctx, g, t, { freq: 60, freqTo: 35, dur: 0.3, gain: 0.3 * k });
   return 0.4;
+}
+
+/** ジャンプの踏み切り（第20回）: 衣擦れ + 床を蹴る軽い一歩。素材が無ければ短い息のようなノイズ */
+export function playJump(sc: SfxContext, floor: FloorKind, o: ShotOpts = {}): number {
+  const { ctx, sh } = sc;
+  const t = ctx.currentTime;
+  const g = chain(sc, o, 0.25, 0.6);
+  const cloth = pickSample(sc, 'move.jump.');
+  const step = pickSample(sc, `step.${STEP_SAMPLE[floor] ?? floor}.`);
+  if (cloth || step) {
+    if (step) playBuf(sc, step, g, t, 1.1, 0.2 * STEP_GAIN[floor]);
+    if (cloth) playBuf(sc, cloth, g, t + 0.02, rnd(0.95, 1.08), 0.22);
+    return 0.4;
+  }
+  burst(ctx, sh, g, t, { kind: 'pink', hp: 900, lp: 5000, dur: 0.12, gain: 0.08, attack: 0.02 });
+  return 0.15;
+}
+
+/** 草木を通り抜ける擦れ（第20回。通り抜けられる植え込み・麦の中の一歩ごと）。strength 0〜1 */
+export function playRustle(sc: SfxContext, strength: number, o: ShotOpts = {}, tall = false): number {
+  const { ctx, sh } = sc;
+  const t = ctx.currentTime;
+  const g = chain(sc, o, 0.1, 0.8);
+  // tall: 麦・背の高い草の中（トウモロコシ畑を抜ける録音）。無ければ茂みの擦れ
+  const buf = (tall ? pickSample(sc, 'move.rustleTall.') : null) ?? pickSample(sc, 'move.rustle.');
+  const s = Math.max(0, Math.min(1, strength));
+  if (buf) return playBuf(sc, buf, g, t, rnd(0.94, 1.06), 0.22 + 0.25 * s, 9000);
+  burst(ctx, sh, g, t, { kind: 'pink', hp: 1800, lp: 7000, dur: 0.22, gain: 0.05 + 0.06 * s, attack: 0.03 });
+  return 0.25;
 }
 
 // ---------------------------------------------------------------- 扉 / エレベーター

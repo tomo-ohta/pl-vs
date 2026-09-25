@@ -33,7 +33,9 @@ export function generateVertical(p: GenParams): RoomLayout {
   ];
   const chosen = rng.shuffle(exitCandidates).slice(0, Math.max(1, Math.min(p.exits, 3)));
   if (!chosen.some((s) => s.pos[1] > 0)) chosen[0] = exitCandidates[0];
-  sockets.push(...chosen);
+  // 世界が刈り取った扉（行き先が無く施錠 → removedSockets）は壁に戻す（第22回。以前は穴と枠だけ残り、扉の無い開口から模型の外の暗闇が見えた）。
+  // 抽選の後で除くので、刈り取りの有無で他の出口の選び方は変わらない（他の生成器と同じ）
+  sockets.push(...chosen.filter((s) => !p.removedSockets.includes(s.id)));
   // エレベーター（+X 側の籠）: 別の階の部屋へ
   const elevSocket = socket('elev', 'elevator', [hw + WALL_T, 0, 2.5], 1, 1.2, 2.2);
   sockets.push(elevSocket);

@@ -110,6 +110,8 @@ export function generateCorridor(p: GenParams): RoomLayout {
 
   // バリアント固有
   const vr = rng.fork(`v${p.variant}`);
+  // 迷路の歩廊（layoutHints 'maze'。M14 照明一本の虚空。第22回: 一本道 → 分かれ道・行き止まり・輪のある歩廊の網）
+  if (tid === 'Bridge' && p.def.layoutHints.includes('maze')) return generateBridgeMaze(p, L, snap(Math.min(2.0, Math.max(1.6, width * 0.7))), h, vr);
   const shape = shapes[p.variant % 4];
   const total = snap(lengths[Math.floor(p.variant / 4) % lengths.length] * vr.float(0.9, 1.1));
   const segs = corridorSegments(vr, shape, total, width);
@@ -179,6 +181,117 @@ export function generateCorridor(p: GenParams): RoomLayout {
   else decorate({ L, tid, defId: p.def.id, segs, h, width, sockets: L.sockets, walls, windows, rng: vr.fork('ref'), dim, counter: 0 });
 
   labelAtEntry(L, entry, Math.min(width - 0.4, 2.2), p.label);
+  return L;
+}
+
+/**
+ * 迷路の歩廊（手すりだけ・天井なし）: cols × rows の交点を間隔 S で並べ、入口の交点から乱択 Prim の全域木で通路を張り、
+ * 葉をいくつか刈って外形を崩し、輪を 1〜2 本足す（通路幅 1.6〜2.0 m、交点の間隔 5〜6.5 m、5 × 5〜7 × 6）。交点 = w × w の正方形、通路 = 交点の間の w 幅の矩形（buildShell が接する辺の手すりを抜く）。
+ * 入口は下端中央の交点へ伸びる短い通路の南端。終点の扉は入口から最も遠い行き止まりの外側。照明は迷路の中心に近い交点の上に 1 本だけ
+ */
+function generateBridgeMaze(p: GenParams, L: RoomLayout, w: number, h: number, vr: Rng): RoomLayout {
+  const { palette } = p;
+  const size = [[5, 5], [6, 5], [6, 6], [7, 6]][p.variant % 4];
+  const cols = size[0], rows = size[1];
+  const S = snap(vr.float(5.0, 6.5));
+  const approach = 3.0; // 入口 → 最初の交点までの通路
+  const i0 = Math.floor(cols / 2);
+  const key = (i: number, j: number) => j * cols + i;
+  const cx = (i: number) => (i - i0) * S;
+  const cz = (j: number) => approach + w / 2 + j * S;
+  // 全域木（乱択 Prim: 分かれ道と短い行き止まりが多い。DFS は長い一本の曲がり道になりやすい）
+  const edges = new Set<string>();
+  const ek = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`);
+  const nbrs = (n: number) => {
+    const i = n % cols, j = Math.floor(n / cols), out: number[] = [];
+    if (i > 0) out.push(key(i - 1, j));
+    if (i < cols - 1) out.push(key(i + 1, j));
+    if (j > 0) out.push(key(i, j - 1));
+    if (j < rows - 1) out.push(key(i, j + 1));
+    return out;
+  };
+  const start = key(i0, 0);
+  const seen = new Set<number>([start]);
+  const frontier: [number, number][] = nbrs(start).map((m) => [start, m]);
+  while (frontier.length) {
+    const k = vr.int(0, frontier.length - 1);
+    const [a, b] = frontier[k];
+    frontier[k] = frontier[frontier.length - 1];
+    frontier.pop();
+    if (seen.has(b)) continue;
+    seen.add(b); edges.add(ek(a, b));
+    for (const m of nbrs(b)) if (!seen.has(m)) frontier.push([b, m]);
+  }
+  const degree = (n: number, E: Set<string>) => nbrs(n).filter((m) => E.has(ek(n, m))).length;
+  // 葉を刈る（入口以外。外形を崩して格子に見せない）
+  const alive = new Set<number>(seen);
+  const prune = Math.floor(cols * rows * 0.15);
+  for (let k = 0; k < prune; k++) {
+    const leaves = [...alive].filter((n) => n !== start && degree(n, edges) === 1);
+    if (!leaves.length) break;
+    const leaf = vr.pick(leaves);
+    alive.delete(leaf);
+    for (const m of nbrs(leaf)) edges.delete(ek(leaf, m));
+  }
+  // 輪（生きている隣どうしの未接続の辺を 1〜3 本）
+  const candidates: [number, number][] = [];
+  for (const n of alive) for (const m of nbrs(n)) if (m > n && alive.has(m) && !edges.has(ek(n, m))) candidates.push([n, m]);
+  for (const [a, b] of vr.shuffle(candidates).slice(0, vr.int(1, 2))) edges.add(ek(a, b));
+  // 矩形: 入口の通路 → 交点 → 通路
+  const hw = w / 2;
+  const rects: Rect[] = [rect(-hw, 0, hw, approach)];
+  const nodeRect = (n: number) => { const x = cx(n % cols), z = cz(Math.floor(n / cols)); return rect(x - hw, z - hw, x + hw, z + hw); };
+  for (const n of [...alive].sort((a, b) => a - b)) rects.push(nodeRect(n));
+  for (const e of [...edges].sort()) {
+    const [a, b] = e.split('-').map(Number);
+    const ra = nodeRect(a), rb = nodeRect(b);
+    if (Math.abs(ra.z0 - rb.z0) < 1e-6) rects.push(rect(Math.min(ra.x1, rb.x1), ra.z0, Math.max(ra.x0, rb.x0), ra.z1));
+    else rects.push(rect(ra.x0, Math.min(ra.z1, rb.z1), ra.x1, Math.max(ra.z0, rb.z0)));
+  }
+  L.footprint = rects;
+  L.height = h;
+  L.bounds = footprintAABB(rects, h);
+  const area = rects.reduce((a, r) => a + rectArea(r), 0);
+  // 入口から最も遠い行き止まり（BFS）
+  const dist = new Map<number, number>([[start, 0]]);
+  const queue = [start];
+  while (queue.length) {
+    const n = queue.shift()!;
+    for (const m of nbrs(n)) if (alive.has(m) && edges.has(ek(n, m)) && !dist.has(m)) { dist.set(m, dist.get(n)! + 1); queue.push(m); }
+  }
+  const deadEnds = [...alive].filter((n) => n !== start && degree(n, edges) === 1);
+  const far = (deadEnds.length ? deadEnds : [...alive]).reduce((a, b) => ((dist.get(b) ?? 0) > (dist.get(a) ?? 0) ? b : a));
+  // 終点の扉: 行き止まりの交点の、通路の無い辺（外向き。上 → 左右 → 下の順に探す）
+  const fi = far % cols, fj = Math.floor(far / cols), fr = nodeRect(far);
+  const open = (di: number, dj: number) => {
+    const ni = fi + di, nj = fj + dj;
+    if (ni < 0 || ni >= cols || nj < 0 || nj >= rows) return true;
+    const m = key(ni, nj);
+    return !(alive.has(m) && edges.has(ek(far, m)));
+  };
+  const endType: PortalType = pickEndType(p, vr);
+  const endW = Math.min(endType === 'door' ? DOOR_W : WIDE_W, w - 0.2);
+  const endH = endType === 'door' ? DOOR_H : h - 0.3;
+  const fxc = (fr.x0 + fr.x1) / 2, fzc = (fr.z0 + fr.z1) / 2;
+  let endSocket: Socket;
+  if (open(0, 1)) endSocket = { id: 'end', type: endType, pos: [fxc, 0, fr.z1], dir: 0, width: endW, height: endH };
+  else if (open(1, 0)) endSocket = { id: 'end', type: endType, pos: [fr.x1, 0, fzc], dir: 1, width: endW, height: endH };
+  else if (open(-1, 0)) endSocket = { id: 'end', type: endType, pos: [fr.x0, 0, fzc], dir: 3, width: endW, height: endH };
+  else endSocket = { id: 'end', type: endType, pos: [fxc, 0, fr.z0], dir: 2, width: endW, height: endH };
+  const { entry } = makeEntry(p, rects[0], 0, h);
+  let sockets: Socket[] = [entry, endSocket, ...p.extraSockets];
+  const sideWanted = Math.min(3, Math.max(0, p.exits - 1) + bonusExits(area));
+  sockets.push(...placeExits(rects, sockets, vr, { count: sideWanted, minGap: 3.0 }, 'side'));
+  sockets = sockets.filter((s) => !p.removedSockets.includes(s.id));
+  L.sockets = sockets;
+  dropRemovedHole(L, p);
+  buildShell(L.boxes, rects, 1.05, sockets, { floor: palette.floor, wall: 'metal', ceiling: palette.ceiling, floorHoles: L.holes, noCeiling: true });
+  L.shellCount = L.boxes.length;
+  // 照明一本: 迷路の中心に近い交点の上
+  const mx = (L.bounds.min[0] + L.bounds.max[0]) / 2, mz = (L.bounds.min[2] + L.bounds.max[2]) / 2;
+  const hub = [...alive].reduce((a, b) => (Math.hypot(cx(b % cols) - mx, cz(Math.floor(b / cols)) - mz) < Math.hypot(cx(a % cols) - mx, cz(Math.floor(a / cols)) - mz) ? b : a));
+  L.lights.push({ pos: [cx(hub % cols), 2.2, cz(Math.floor(hub / cols))], color: 0xbfc7d8, intensity: 0.6, distance: 30 });
+  labelAtEntry(L, entry, Math.min(w - 0.4, 2.2), p.label);
   return L;
 }
 

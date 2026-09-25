@@ -65,8 +65,9 @@ export function progressLanes(L: RoomLayout, half = LANE_HALF): Lane[] {
   return out;
 }
 
+/** 扉前 + 通り抜けの予約（L.passages。間仕切りの開口）+ 直線帯 + 床穴 */
 export function clearanceOf(L: RoomLayout, laneHalf = LANE_HALF): Clearance {
-  return { zones: doorwayZones(L), lanes: progressLanes(L, laneHalf), holes: L.holes.slice() };
+  return { zones: [...doorwayZones(L), ...(L.passages ?? [])], lanes: progressLanes(L, laneHalf), holes: L.holes.slice() };
 }
 
 /** 点と線分の 2D 距離 */

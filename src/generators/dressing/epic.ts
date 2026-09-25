@@ -21,7 +21,7 @@ import { addDir, type Dir, type Socket, type Vec3 } from '../../core/types';
 import type { AABB } from '../../core/aabb';
 import { trainSpecFor } from '../../render/TrainGeometry';
 import { along, across, inner, wallSpans, type Rect, type WallSpan } from '../footprint';
-import { alongFace, chair, doorZones, freeRuns, hitsZone, innerFaces, insideRects, lineFace, longTable, signAt, signOnWall, type Face } from '../furniture';
+import { alongFace, chair, keepOutZones, freeRuns, hitsZone, innerFaces, insideRects, lineFace, longTable, signAt, signOnWall, type Face } from '../furniture';
 import { box, DOOR_W, kinded, WALL_T, type Box, type GenParams, type InstanceSpec, type LightSpec, type MatId, type RoomLayout, type SignSpec } from '../layout';
 
 /** 部屋あたりの追加予算（docs/reference-rarities-analysis.md「軽量化の規則」） */
@@ -86,7 +86,7 @@ function makeCtx(L: RoomLayout, p: GenParams, rng: Rng): Ctx {
   return {
     L, p, rng, h: L.height, rects,
     faces: vertical ? [] : innerFaces(L.footprint),
-    zones: doorZones(L.sockets, null, 0.1),
+    zones: keepOutZones(L, null, 0.1),
     margin: vertical ? 0 : WALL_T - 0.001,
     added: 0, lightsAdded: 0, signsAdded: 0,
   };

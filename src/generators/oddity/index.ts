@@ -7,6 +7,9 @@
  *  - Uncommon / Rare は Modifier が主題を持つので主題は確率を下げ、Epic 以上は添え物 1 つだけ。
  *  - 主題は入口から見た正面（Ctx.focus）に置く（視線誘導。入室直後の 1 秒で読めるように）。
  *  - 全部盛りにしない（1 部屋 1 主題）。
+ * 動線: 奇妙さ 1 つ（巨大モニュメント・主題・添え物・空き床のモニュメントそれぞれ）を置いた後、それまで入口から歩いて届いた
+ *  床の高さの扉に届かなくなったら（reachDoors の近似）その奇妙さを取り消す（主題・添え物は次の候補を試す）。
+ *  個々の置き方（canPlace の動線帯）は直線の帯しか守らないので、間仕切りの開口・家具の間の通路をまとめて塞ぐことがあった。
  * 開発用: `?noodd=1` で無効化。結果は (L as OddLayout).oddity に記録（デバッグ HUD / 統計）。
  */
 import type { GenParams, RoomLayout } from '../layout';
@@ -18,6 +21,7 @@ import { TRACE_ODDITIES } from './traces';
 import { SPACE_ODDITIES, isLargeEmpty } from './space';
 import { fillOpenSpace, monument, placeGiantMonument } from './monument';
 import { DISORDER_ODDITIES } from './disorder';
+import { reachDoors } from '../reach';
 
 export interface OddRecord { theme: string | null; accents: string[]; notes: string[] }
 export type OddLayout = RoomLayout & { oddity?: OddRecord };
@@ -46,37 +50,38 @@ export function applyOddity(L: RoomLayout, p: GenParams): void {
   const rec: OddRecord = { theme: null, accents: [], notes: [] };
   (L as OddLayout).oddity = rec;
   const c = ctxOf(L, p, rng);
+  const keep = reachKeeper(L);
   // 広い部屋の中央の巨大モニュメント（Legendary は必ず、他は大部屋で 5 割。正常判定より先 = 「正常な部屋」でも置く）
-  if (placeGiantMonument(c)) rec.notes.push('giant monument');
+  if (guarded(c, keep, 'giant monument', () => placeGiantMonument(c))) rec.notes.push('giant monument');
   // 広くて空の部屋（Legendary / Mythic 以外）は「ただの広い空間」にしない: 正常判定を飛ばし、space の主題を必ず 1 つ入れる
   const exemptWide = p.def.rarity === 'Legendary' || p.def.rarity === 'Mythic';
   const largeEmpty = !exemptWide && isLargeEmpty(c);
-  if (!FORCED && !largeEmpty && rng.chance(budget.normal)) { rec.notes.push('normal room'); fillOpenSpace(c); rec.notes.push(...c.notes); return; }
+  if (!FORCED && !largeEmpty && rng.chance(budget.normal)) { rec.notes.push('normal room'); guarded(c, keep, 'fillOpenSpace', () => fillOpenSpace(c) > 0); rec.notes.push(...c.notes); return; }
   const used = new Set<OddCategory>();
   // 主題
   const forced = FORCED ? ALL_ODDITIES.find((o) => o.id === FORCED) : undefined;
   if (forced) {
-    rec.theme = tryApply(c, [forced], 'strong', used);
+    rec.theme = tryApply(c, keep, [forced], 'strong', used);
   } else if (largeEmpty) {
-    rec.theme = tryApply(c, [...SPACE_ODDITIES, monument], 'strong', used) ?? tryApply(c, ALL_ODDITIES.filter((o) => o.theme), 'strong', used);
+    rec.theme = tryApply(c, keep, [...SPACE_ODDITIES, monument], 'strong', used) ?? tryApply(c, keep, ALL_ODDITIES.filter((o) => o.theme), 'strong', used);
     rec.notes.push('large empty room');
   } else if (rng.chance(budget.theme)) {
-    const themeId = tryApply(c, ALL_ODDITIES.filter((o) => o.theme), 'strong', used);
+    const themeId = tryApply(c, keep, ALL_ODDITIES.filter((o) => o.theme), 'strong', used);
     rec.theme = themeId;
   }
   // 添え物（主題と別カテゴリ）
   const n = rng.int(budget.accents[0], budget.accents[1]);
   for (let i = 0; i < n; i++) {
-    const id = tryApply(c, ALL_ODDITIES.filter((o) => !used.has(o.category)), 'weak', used);
+    const id = tryApply(c, keep, ALL_ODDITIES.filter((o) => !used.has(o.category)), 'weak', used);
     if (id) rec.accents.push(id);
   }
   // 広く空いた床のモニュメント（主題・添え物とは別枠）
-  fillOpenSpace(c);
+  guarded(c, keep, 'fillOpenSpace', () => fillOpenSpace(c) > 0);
   rec.notes.push(...c.notes);
 }
 
 /** 重み付きで候補を試し、最初に apply が true を返した id。カテゴリを used に登録 */
-function tryApply(c: Ctx, candidates: Oddity[], strength: Strength, used: Set<OddCategory>): string | null {
+function tryApply(c: Ctx, keep: ReachKeeper | null, candidates: Oddity[], strength: Strength, used: Set<OddCategory>): string | null {
   const pool = candidates.filter((o) => {
     try { return o.applicable(c); } catch { return false; }
   });
@@ -87,8 +92,73 @@ function tryApply(c: Ctx, candidates: Oddity[], strength: Strength, used: Set<Od
     for (; idx < pool.length - 1; idx++) { r -= pool[idx].weight; if (r <= 0) break; }
     const o = pool.splice(idx, 1)[0];
     let ok = false;
+    const undo = keep ? snapshot(c.L) : null;
     try { ok = o.apply(c, strength); } catch (e) { c.note(`${o.id}: ${String(e)}`); ok = false; }
+    if (ok && keep && undo && !keep.intact()) { undo(); c.note(`${o.id}: undone (blocked a door)`); ok = false; }
     if (ok) { used.add(o.category); return o.id; }
   }
   return null;
+}
+
+/** 奇妙さを置く前に入口から届いた扉が、今も全部届くか */
+interface ReachKeeper { intact(): boolean }
+
+/** 入口から届く扉が 1 つも無い（入口が床に無い・もともと塞がっている）部屋は見張らない（null） */
+function reachKeeper(L: RoomLayout): ReachKeeper | null {
+  const r0 = reachDoors(L);
+  if (!r0) return null;
+  const was = r0.doors.filter((s) => !r0.blocked.includes(s.id)).map((s) => s.id);
+  if (!was.length) return null;
+  return {
+    intact() {
+      const r = reachDoors(L, undefined, was);
+      return !r || r.blocked.length === 0;
+    },
+  };
+}
+
+/** fn（true = 何か置いた）を試し、扉に届かなくなったら取り消して false */
+function guarded(c: Ctx, keep: ReachKeeper | null, label: string, fn: () => boolean): boolean {
+  const undo = keep ? snapshot(c.L) : null;
+  const ok = fn();
+  if (ok && keep && undo && !keep.intact()) { undo(); c.note(`${label}: undone (blocked a door)`); return false; }
+  return ok;
+}
+
+/**
+ * layout の控え（取り消し用）。浅い複製で足りる: 奇妙さは箱・照明などを新しく作って配列に足すか配列ごと差し替え、
+ * 既存の物を書き換えるのは乱れ（disorder）の propGroup / kind の付け替えと instances の transforms の splice だけなので、
+ * その 2 つは別に控える。戻すときは元の配列・オブジェクトの参照に中身を戻す（ctx が L.sockets などの参照を握っているため）。
+ * oddity の記録は控えない。控えの後に足されたフィールドは消す
+ */
+function snapshot(L: RoomLayout): () => void {
+  const T = L as unknown as Record<string, unknown>;
+  const saved: [string, unknown, unknown][] = [];
+  for (const [k, v] of Object.entries(T)) {
+    if (k === 'oddity') continue;
+    saved.push([k, v, Array.isArray(v) ? v.slice() : v && typeof v === 'object' ? { ...v } : v]);
+  }
+  const boxes = L.boxes.slice();
+  const tags = boxes.map((b) => [b.propGroup, b.kind] as const);
+  const transforms = (L.instances ?? []).map((sp) => [sp, sp.transforms.slice()] as const);
+  return () => {
+    for (const k of Object.keys(T)) if (k !== 'oddity' && !saved.some(([sk]) => sk === k)) delete T[k];
+    for (const [k, ref, copy] of saved) {
+      if (Array.isArray(ref)) {
+        ref.length = 0;
+        for (const x of copy as unknown[]) ref.push(x);
+      } else if (ref && typeof ref === 'object') {
+        const o = ref as Record<string, unknown>;
+        for (const kk of Object.keys(o)) delete o[kk];
+        Object.assign(o, copy);
+      }
+      T[k] = Array.isArray(ref) || (ref && typeof ref === 'object') ? ref : copy;
+    }
+    boxes.forEach((b, i) => {
+      const [g, kind] = tags[i];
+      if (g === undefined) delete b.propGroup; else b.propGroup = g;
+      if (kind === undefined) delete b.kind; else b.kind = kind;
+    });
+    for (const [sp, tr] of transforms) { sp.transforms.length = 0; for (const t of tr) sp.transforms.push(t); }
+  };
 }

@@ -3206,7 +3206,7 @@
       "minExits": 1,
       "maxExits": 3,
       "connectionRule": "一定区間ごとに照明/橋を生成・破棄。",
-      "mapShape": "細長直線",
+      "mapShape": "入り組んだ歩廊",
       "dangerTag": 5,
       "effectLabel": "暗闇ストリーミング",
       "modifiers": [
@@ -3226,7 +3226,8 @@
         }
       ],
       "layoutHints": [
-        "voidBelow"
+        "voidBelow",
+        "maze"
       ],
       "recipe": "Bridge + Props[照明一本の虚空] + Modifiers[LightingPhase, FogDepth]",
       "notes": null

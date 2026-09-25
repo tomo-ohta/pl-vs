@@ -217,7 +217,7 @@ function buildPier(rects: Rect[], aprons: Apron[], holes: AABB[], w: number, cur
     const sign = rng.chance(0.5) ? 1 : -1;
     hub = alongX ? [hub[0] + sign * 3.5, hub[1]] : [hub[0], hub[1] + sign * 3.5];
   }
-  const deckRects: Rect[] = [];
+  let deckRects: Rect[] = [];
   const mainIn = inner(main, WALL_T + 0.02);
   const hubRect = rectIntersect(rect(hub[0] - hubHalf, hub[1] - hubHalf, hub[0] + hubHalf, hub[1] + hubHalf), mainIn);
   if (hubRect) deckRects.push(hubRect);
@@ -251,6 +251,21 @@ function buildPier(rects: Rect[], aprons: Apron[], holes: AABB[], w: number, cur
     route(a.point, c, mid2Within(a.home, main, c), perpIsZ);
   }
 
+  // デッキは前庭（と中間段）の奥から始める。脚の矩形は端を半幅だけ延ばして角をつなぐので、そのままだと前庭の上まで
+  // デッキが伸び、狭い前庭（幅 1 m の入口扉）では扉の真ん前が高さ deckTop の段になって縁 → デッキと登れなかった
+  const stepsOf = (): number => { let y = curbH, k = 0; while (deckTop - y > STEP + 0.05 && k < 4) { y = Math.min(deckTop - 0.05, y + STEP); k++; } return k; };
+  const nSteps = stepsOf();
+  for (const a of aprons) {
+    const inward = inwardVec(a.socket.dir);
+    const hw = Math.max(a.socket.width / 2 + APRON_PAD, w / 2) + 0.01;
+    const reach = nSteps * CURB_BACK;
+    const r = a.rect;
+    const cut = a.socket.dir === 0 || a.socket.dir === 2
+      ? rect(a.point[0] - hw, Math.min(r.z0, a.point[1] + inward[1] * reach), a.point[0] + hw, Math.max(r.z1, a.point[1] + inward[1] * reach))
+      : rect(Math.min(r.x0, a.point[0] + inward[0] * reach), a.point[1] - hw, Math.max(r.x1, a.point[0] + inward[0] * reach), a.point[1] + hw);
+    deckRects = subtractRects(deckRects, cut);
+  }
+
   // 箱: デッキ（床から deckTop まで）、前庭の縁から deckTop への中間段、杭
   const boxes: Box[] = [];
   for (const d of deckRects) boxes.push(box([d.x0, 0, d.z0], [d.x1, deckTop, d.z1], 'floorWood'));
@@ -259,7 +274,7 @@ function buildPier(rects: Rect[], aprons: Apron[], holes: AABB[], w: number, cur
     const inward = inwardVec(a.socket.dir);
     let y = curbH;
     let k = 0;
-    while (deckTop - y > STEP + 0.05 && k < 4) {
+    while (k < nSteps) {
       y = Math.min(deckTop - 0.05, y + STEP);
       k++;
       const d0 = (k - 1) * CURB_BACK;
