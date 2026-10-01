@@ -7,6 +7,8 @@ const base = process.env.BASE_PATH ?? '/';
 
 export default defineConfig({
   base,
+  // 素材は v1 / v2 共通の shared/public から配信する（ビルド時は dist へ複写）
+  publicDir: fileURLToPath(new URL('../shared/public/', import.meta.url)),
   plugins: [{
     name: 'local-visual-baselines',
     apply: 'serve',

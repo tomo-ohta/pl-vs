@@ -1,0 +1,21 @@
+{
+  "name": "liminal-shared",
+  "private": true,
+  "version": "0.1.0",
+  "description": "v1 / v2 共通の素材（assets = 原本、public = ゲームが読む変換済み素材）と変換ツール",
+  "type": "module",
+  "scripts": {
+    "build:cc0": "node tools/build-cc0-materials.mjs --max 1024 --aux 512 && npm run build:mobile && npm run build:ktx2",
+    "build:mobile": "node tools/build-mobile-textures.mjs",
+    "build:ktx2": "node tools/build-ktx2.mjs",
+    "build:cc0:models": "node tools/build-cc0-models.mjs",
+    "build:cc0:all": "npm run build:cc0 && npm run build:cc0:models",
+    "build:footsteps": "node tools/build-footsteps.mjs",
+    "build:generated": "node tools/build-generated-textures.mjs",
+    "build:user-materials": "node tools/build-user-materials.mjs",
+    "build:night": "node tools/build-night-views.mjs"
+  },
+  "devDependencies": {
+    "ktx2-encoder": "^0.6.0"
+  }
+}

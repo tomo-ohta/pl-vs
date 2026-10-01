@@ -1,7 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 5173 },
-    { "name": "preview-pages", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "preview", "--base", "/pl-vs/", "--port", "4173", "--strictPort"], "port": 4173 }
+    { "name": "v1-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "-w", "v1"], "port": 5173 },
+    { "name": "v1-preview-pages", "runtimeExecutable": "npm", "runtimeArgs": ["exec", "-w", "v1", "--", "vite", "preview", "--base", "/pl-vs/", "--port", "4173", "--strictPort"], "port": 4173 }
   ]
 }

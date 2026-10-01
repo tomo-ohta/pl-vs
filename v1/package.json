@@ -1,0 +1,26 @@
+{
+  "name": "liminal-v1",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Liminal space exploration web game - v1 (frozen: bug fixes only). TypeScript + Three.js + WebGL2",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "data": "python3 tools/xlsx_to_json.py",
+    "seamstats": "node tools/seam-stats.mjs",
+    "build:pages": "BASE_PATH=/pl-vs/ vite build && touch dist/.nojekyll",
+    "deploy:pages": "npm run build:pages && gh-pages -d dist --dotfiles -m \"deploy: GitHub Pages\""
+  },
+  "dependencies": {
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "gh-pages": "^6.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}
