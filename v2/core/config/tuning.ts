@@ -29,6 +29,10 @@ export const TUNING_SPEC = {
   'secrets.visibilityBudgetMs': num(4, 0, 200, '1 フロアの視線検査に使える時間（ms）。超えたら残りの検査を省く'),
   'secrets.visibilitySamples': num(64, 1, 1024, '本道の上で視線を調べる点の数', true),
 
+  // 隠し方の型の重み（v2-plan.md 4.1。両方を使える仕掛けで引く。相対値）
+  'secrets.mode.present': num(70, 0, 100, '存在型: 扉や穴は最初からあり、見えにくいだけ'),
+  'secrets.mode.appear': num(30, 0, 100, '出現型: 条件を満たして初めて道や扉が現れる'),
+
   // 隠し先の中身の重み（v2-plan.md 4.6。相対値）
   'secrets.dest.passage': num(30, 0, 100, '隠し通路'),
   'secrets.dest.room': num(30, 0, 100, '隠し部屋'),
