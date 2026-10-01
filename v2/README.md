@@ -8,6 +8,26 @@
 - v1 の元: `../v1/`（凍結。タグ `v1-final`）
 - 共通素材: `../shared/public/`（開発時は Vite の publicDir。本番は v1 と同じ /pl-vs/ の素材を読む予定）
 
+## 構成とコマンド
+
+```
+v2/
+├─ core/       純 TypeScript（three.js・DOM 禁止。サーバーとクライアントで共有）
+│   ├─ config/tuning.ts   調整表（生成と仕掛けの数値はすべてここ。URL ?tune=キー=値,… で上書き）
+│   └─ physics/rapier.ts  Rapier（決定論版）の読み込み
+├─ client/     Vite + three.js（いまは起動確認の画面だけ）
+├─ tests/      node --test（*.test.ts を Node がそのまま実行）
+└─ tools/check-boundaries.mjs  core/ が three・client・vite を import していないかの確認
+```
+
+```bash
+npm run dev:v2      # 直下から。http://localhost:5174
+npm run verify:v2   # 型チェック（core は DOM なし / client）+ 境界の確認 + テスト
+```
+
+- import は拡張子 `.ts` まで書く（Vite と Node の両方でそのまま動かすため）。
+- 本番ビルドで `VITE_ASSET_BASE=/pl-vs/` を渡すと、素材を複写せず v1 と同じ素材を読む（`BASE_PATH=/pl-vs/v2/` と一緒に使う）。
+
 ## 決まり（抜粋。詳細は継承計画の 2 章）
 
 - `core/` は three.js / DOM を import しない（サーバーとクライアントで共有）。
