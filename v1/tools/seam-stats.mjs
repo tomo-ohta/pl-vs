@@ -108,9 +108,10 @@ function strayColliders(L, partBounds) {
 }
 
 async function bundle() {
-  const rolldownPath = join(projectRoot, 'node_modules', 'rolldown', 'dist', 'index.mjs');
-  if (!existsSync(rolldownPath)) throw new Error(`rolldown not found at ${rolldownPath}（vite 8 に同梱されているはず）`);
-  const { rolldown } = await import(pathToFileURL(rolldownPath).href);
+  // npm workspaces では依存がリポジトリ直下の node_modules に巻き上げられるので、Node の解決規則で探す
+  let rolldownUrl;
+  try { rolldownUrl = import.meta.resolve('rolldown'); } catch { throw new Error('rolldown not found（vite 8 に同梱されているはず）'); }
+  const { rolldown } = await import(rolldownUrl);
   const b = await rolldown({ input: entryPath, platform: 'node', logLevel: 'silent' });
   await b.write({ file: bundlePath, format: 'esm' });
   await b.close?.();

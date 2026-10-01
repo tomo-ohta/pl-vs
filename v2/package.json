@@ -1,0 +1,8 @@
+{
+  "name": "liminal-v2",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Liminal v2（拡張版: マルチプレイ・体力・新しい部屋生成）。v1 からは継承計画に沿って移植する",
+  "type": "module",
+  "scripts": {}
+}
