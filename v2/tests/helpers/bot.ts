@@ -289,13 +289,13 @@ export function liftsOf(sim: Sim, b: { min: number[]; max: number[] }): { x0: nu
 }
 
 /** 段階 4（移動と身体）: 部品 type の範囲（params.aabb）に足元が入っているか */
-function moveRegion(floor: FloorLayout, type: string, p: readonly number[]): boolean {
+function moveRegion(floor: FloorLayout, type: string, p: readonly number[]): FloorLayout['entities'][number] | null {
   for (const e of floor.entities) {
     if (e.type !== type) continue;
     const a = e.params.aabb as { min: number[]; max: number[] } | undefined;
-    if (a && p[0]! >= a.min[0]! && p[0]! <= a.max[0]! && p[1]! + 0.1 >= a.min[1]! && p[1]! + 0.1 <= a.max[1]! && p[2]! >= a.min[2]! && p[2]! <= a.max[2]!) return true;
+    if (a && p[0]! >= a.min[0]! && p[0]! <= a.max[0]! && p[1]! + 0.1 >= a.min[1]! && p[1]! + 0.1 <= a.max[1]! && p[2]! >= a.min[2]! && p[2]! <= a.max[2]!) return e;
   }
-  return false;
+  return null;
 }
 
 export function cellAtPos(floor: FloorLayout, p: [number, number, number]): CellLayout | null {
@@ -334,7 +334,7 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
   let leg = 0;
   let path: [number, number][] = [];
   // 進み具合は「残りの道のり」（道を引いた所から目標まで）で測る。迷路・帯の回り道で目標から離れても止まったとみなさない
-  let stuck = 0, bestD = Infinity, waitDoor = 0, crouch = 0, planY = player.pos[1], legT = 0, idle = 0;
+  let stuck = 0, bestD = Infinity, waitDoor = 0, crouch = 0, planY = player.pos[1], legT = 0, idle = 0, pushedFor = 0;
   let segFrom: [number, number] = [player.pos[0], player.pos[2]];
   const remaining = (): number => {
     let d = Math.hypot(path[0]![0] - player.pos[0], path[0]![1] - player.pos[2]);
@@ -384,7 +384,11 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
       cmd.moveX = dist > 0.15 ? d[0]! * rr[0]! + d[1]! * rr[1]! : 0;
     }
     // 段階 4（移動と身体）: 前を向くと押し戻される通路（facingPush）では、後ろ向きに歩く（向きを反対にして、後ろへ進む操作）
-    if (moveRegion(floor, 'facingPush', player.pos)) { cmd.yaw += Math.PI; cmd.moveY = -cmd.moveY; cmd.moveX = -cmd.moveX; }
+    // （入る少し手前から。向いている向きで決める: マネキンを見ながら横歩きしている時も同じ）
+    const dl0 = Math.max(1e-6, dist);
+    const push = moveRegion(floor, 'facingPush', player.pos) ?? moveRegion(floor, 'facingPush', [player.pos[0] + (dx / dl0) * 0.6, player.pos[1], player.pos[2] + (dz / dl0) * 0.6]);
+    const pf = push?.params.fwd as number[] | undefined;
+    if (pf && -Math.sin(cmd.yaw) * pf[0]! - Math.cos(cmd.yaw) * pf[2]! > 0) { cmd.yaw += Math.PI; cmd.moveY = -cmd.moveY; cmd.moveX = -cmd.moveX; }
     // 段階 4: 歩くと伸びる廊下（stretchWarp）で進めなくなったら、しばらく立ち止まる（立ち止まると前へ滑る）
     if (idle > 0) { idle -= sim.dt; cmd.moveX = 0; cmd.moveY = 0; }
     // 段階 4: 振り子（pendulum）の払う所へ入る前は、板が通り過ぎて離れていくまで待つ（待つ間は止まったと数えない）
@@ -412,8 +416,10 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     const segD = distToSegment(player.pos[0], player.pos[2], segFrom, tgt);
     if (player.pos[1] < planY - 0.8 || segD > 1.2) { botDebug.trace?.(`replan: y ${player.pos[1].toFixed(2)} planY ${planY.toFixed(2)} segD ${segD.toFixed(2)}`); replan(); continue; }
     const rem = remaining();
-    // 段階 4（移動と身体）: 向かい風・人の流れに押し戻されている間は、止まったと数えない（しゃがむと遅くなって渡れない）
-    const pushedBack = fl > PLAYER.walk * 0.9 && fz[0] * dx + fz[2] * dz < 0;
+    // 段階 4（移動と身体）: 向かい風・人の流れに押し戻されている間は、止まったと数えない（しゃがむと遅くなって渡れない）。
+    // ただし 6 秒続いたら数える（いつまでも逆らえない流れ = 滑り台を上ろうとしている）
+    pushedFor = fl > PLAYER.walk * 0.9 && fz[0] * dx + fz[2] * dz < 0 ? pushedFor + sim.dt : 0;
+    const pushedBack = pushedFor > 0 && pushedFor < 6;
     if (rem < bestD - 0.05 || waitDoor > 0 || pushedBack || waiting) { bestD = Math.min(bestD, rem); stuck = 0; } else stuck++;
     // 進めないとき: しゃがんでみる・跳んでみる → 道を引き直す（段階 4: 伸びる廊下では立ち止まってみる）
     if (stuck * sim.dt > 1.0 && idle <= 0 && moveRegion(floor, 'stretchWarp', player.pos)) { idle = 3.2; stuck = 0; }

@@ -30,6 +30,34 @@ function chasm(ctx: GimmickContext, strips: boolean, hook: string, tell: string)
   return plan;
 }
 
+/**
+ * 矩形 r の縁のうち、部屋の壁（hole の縁）にも、ほかの固い床（solid）にも接していない所に、手すり（高さ 0.95 m の当たる箱）
+ */
+function railAround(ctx: GimmickContext, r: Rect, solid: Rect[], hole: Rect): void {
+  const y = ctx.slot.cell.floorY;
+  const e = 0.02, T = 0.06;
+  const edges: { x0: number; z0: number; x1: number; z1: number }[] = [
+    { x0: r.x0, z0: r.z0, x1: r.x1, z1: r.z0 + T }, { x0: r.x0, z0: r.z1 - T, x1: r.x1, z1: r.z1 },
+    { x0: r.x0, z0: r.z0, x1: r.x0 + T, z1: r.z1 }, { x0: r.x1 - T, z0: r.z0, x1: r.x1, z1: r.z1 },
+  ];
+  const onWall = [Math.abs(r.z0 - hole.z0) < e, Math.abs(r.z1 - hole.z1) < e, Math.abs(r.x0 - hole.x0) < e, Math.abs(r.x1 - hole.x1) < e];
+  edges.forEach((g, i) => {
+    if (onWall[i]) return;
+    // ほかの固い床に接する所は開ける（入口の床から階段へ下りる口）
+    const touching = solid.filter((q) => q.x0 < g.x1 + e && q.x1 > g.x0 - e && q.z0 < g.z1 + e && q.z1 > g.z0 - e);
+    const along = i < 2 ? 'x' : 'z';
+    let segs: [number, number][] = [along === 'x' ? [g.x0, g.x1] : [g.z0, g.z1]];
+    for (const q of touching) {
+      const [a, b] = along === 'x' ? [q.x0 - 0.05, q.x1 + 0.05] : [q.z0 - 0.05, q.z1 + 0.05];
+      segs = segs.flatMap(([p, s]) => (b <= p || a >= s ? [[p, s] as [number, number]] : [[p, Math.max(p, a)], [Math.min(s, b), s]] as [number, number][])).filter(([p, s]) => s - p > 0.1);
+    }
+    for (const [p, s] of segs) {
+      const b = along === 'x' ? box([p, y, g.z0], [s, y + 0.95, g.z1], 'metalDark') : box([g.x0, y, p], [g.x1, y + 0.95, s], 'metalDark');
+      ctx.addBox(b);
+    }
+  });
+}
+
 /** 橋を渡す横の位置: 階段（plan.lane）から離れた所の真ん中。橋の幅 w + 両側の余裕 side が取れなければ null */
 function bridgeU(plan: PitPlan, w: number, side: number): { u: number; lo: number; hi: number } | null {
   const F = plan.frame;
@@ -63,6 +91,8 @@ defineGimmick({
     }
     // 到達判定では床板を床として扱う（ゆっくりなら上を歩ける）
     for (const r of fillRects(plan.hole, plan.solidTop)) ctx.reachAssist(box([r.x0, y - 0.1, r.z0], [r.x1, y, r.z1], s.cell.palette.floor));
+    // 戻る階段の手すり: 床板と接する縁（階段の口へ床板から落ちず、入口の床から下りる）
+    railAround(ctx, plan.lane, plan.solidTop.filter((r) => r !== plan.lane), plan.hole);
     // 「走らないでください」の札（入口の床の脇の壁）
     const e = plan.entry;
     const F = plan.frame;

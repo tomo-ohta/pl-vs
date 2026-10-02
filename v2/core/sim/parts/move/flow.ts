@@ -55,6 +55,26 @@ definePart<FlowState>({
   },
 });
 
+// ---------------------------------------------------------------- 坂（エスカレーター・滑り台の面）
+/**
+ * ramp: 動かない坂の面（SupportSurface）。矩形 rect の、軸 axis（0 = x / 2 = z）の向きに、座標 a0 で高さ y0・a1 で y1。
+ * 描画は visual（escalator: 動く段・slide: 滑り台の板・water: 水の流れる板）
+ */
+definePart({
+  type: 'ramp',
+  init(ctx) {
+    const r = ctx.spec.params.rect as { x0: number; z0: number; x1: number; z1: number };
+    const axis = pNum(ctx.spec, 'axis', 2);
+    const a0 = pNum(ctx.spec, 'a0', 0), a1 = pNum(ctx.spec, 'a1', 1), y0 = pNum(ctx.spec, 'y0', 0), y1 = pNum(ctx.spec, 'y1', 1);
+    const slope = (y1 - y0) / (a1 - a0);
+    const l = Math.hypot(slope, 1);
+    const normal: [number, number, number] = axis === 0 ? [-slope / l, 1 / l, 0] : [0, 1 / l, -slope / l];
+    const origin: [number, number, number] = axis === 0 ? [a0, y0, (r.z0 + r.z1) / 2] : [(r.x0 + r.x1) / 2, y0, a0];
+    ctx.setSurface('top', { id: `${ctx.id}:top`, rect: { ...r }, origin, normal, thickness: pNum(ctx.spec, 'thickness', 0.5) });
+    return {};
+  },
+});
+
 // ---------------------------------------------------------------- プレイヤーの状態
 /** 条件 1 つ（when の要素）。'gravUp:x,y,z' は重力の上の向き、'scaleBelow:0.5' / 'scaleAbove:1.2' は身体の大きさ、'ride:<部品 id の頭>' は乗り物 */
 export function playerCond(p: PlayerState, cond: string): boolean {

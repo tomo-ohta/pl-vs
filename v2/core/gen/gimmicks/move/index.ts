@@ -8,3 +8,4 @@ import './halls.ts';
 import './crawl.ts';
 import './chasm.ts';
 import './rise.ts';
+import './slopes.ts';

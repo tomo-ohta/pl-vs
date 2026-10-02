@@ -25,6 +25,8 @@ export const VIEW_ROOMS: { def: string; w: number; d: number; height?: number; e
   { def: 'swayBridge', w: 6.6, d: 8, entry: 2, exit: 0 },
   { def: 'pendulumHall', w: 6.6, d: 8, height: 4.6, entry: 2, exit: 0 },
   { def: 'riseHall', w: 8.6, d: 12, height: 5.2, kind: 'hall', entry: 2, exit: 0, t: { 'move.rise.w.springs': 0, 'move.rise.w.updraft': 1, 'move.rise.w.ladder': 0 } },
+  { def: 'escalator', w: 5.2, d: 8.2, entry: 2, exit: 0 },
+  { def: 'slideRoom', w: 8.6, d: 15, kind: 'hall', entry: 2, exit: 0, t: { 'move.slide.waterChance': 1 } },
 ];
 
 test('移動と身体の描画: 部品の描画を作って動かしても壊れない', async () => {
@@ -64,6 +66,6 @@ test('移動と身体の描画: 部品の描画を作って動かしても壊れ
     built.dispose();
     sim.physics?.dispose();
   }
-  for (const type of ['flowZone', 'trapTile', 'swayBridge', 'pendulum', 'dustCover', 'sinkTrap']) assert.ok(made.has(type), `${type} の描画がある`);
+  for (const type of ['flowZone', 'trapTile', 'swayBridge', 'pendulum', 'dustCover', 'sinkTrap', 'ramp']) assert.ok(made.has(type), `${type} の描画がある`);
   lib.dispose();
 });

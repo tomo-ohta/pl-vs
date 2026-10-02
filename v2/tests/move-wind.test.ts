@@ -12,6 +12,7 @@ import '../core/sim/parts/index.ts';
 import { Sim } from '../core/sim/sim.ts';
 import { IDLE_COMMAND } from '../core/sim/types.ts';
 import { walkTo } from './helpers/bot.ts';
+import { walkThrough } from './move-helpers.ts';
 import { labRoom } from './helpers/gimmick-lab.ts';
 import { findRooms, regenerate } from './helpers/gimmick-rooms.ts';
 
@@ -120,11 +121,8 @@ test('送風の通路: 生成したフロアに出て、入口から出口の先
   const rooms = findRooms('windTunnel', 3, { maxWorld: 600 });
   assert.ok(rooms.length >= 2, `見つかった部屋 ${rooms.length}`);
   for (const room of rooms) {
-    const sim = new Sim(room.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
-    sim.teleport(0, room.outside, room.yaw);
-    const res = walkTo(sim, room.beyond ?? room.cell.id, undefined, 200);
+    const res = await walkThrough(room, 200);
     assert.ok(res.ok, `${room.floor.id} ${room.id}: ${res.reason}`);
-    sim.physics?.dispose();
     assert.equal(JSON.stringify(regenerate(room)), JSON.stringify(room.floor));
   }
 });

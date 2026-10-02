@@ -85,4 +85,15 @@ export const MOVE_TUNING = {
   'move.rise.ledgeLenM': num(2.0, 1.6, 3, '高い所へ上がる部屋: 棚 1 段の長さ（m）'),
   'move.rise.overshootM': num(0.7, 0.3, 1.5, '弾む床: 次の棚より高く跳ね上がる分（m）'),
   'move.rise.updraftSpeed': num(3.2, 1.5, 6, '上昇気流: 吹き上がる速さ（m/s）'),
+
+  // ---- 逆走エスカレーター [M09]・滑り台 [M14・M12] ----
+  'move.escalator.depthM': num(2.2, 1.6, 3.0, '逆走エスカレーター: 穴の深さ（m。エスカレーターで上る高さ）'),
+  'move.escalator.speed': num(2.3, 1.0, 2.39, '逆走エスカレーター: 下りに動く速さ（m/s）。歩く 3.0 より少し遅く（歩くと少しずつ、走るとゆっくり上れる）'),
+  'move.escalator.landingM': num(0.9, 0.7, 1.6, '逆走エスカレーター: 途中の踊り場の長さ（m）'),
+  'move.escalator.stillSec': num(2.5, 0.5, 8, '逆走エスカレーター（出現型の隠し）: 踊り場で立ち止まる秒数'),
+  'move.slide.depthM': num(2.4, 1.8, 3.0, '滑り台: 穴の深さ（m）'),
+  'move.slide.waterChance': num(0.5, 0, 1, '滑り台: 水の流れる滑り台（ウォータースライダー）になる確率'),
+  'move.slide.slopeDeg': num(38, 25, 45, '滑り台: 傾き（度）'),
+  'move.slide.speed': num(4.5, 2.5, 8, '滑り台: 滑り落ちる流れの速さ（m/s。歩く速さより強く、上へは戻れない）'),
+  'move.slide.chuteSpeed': num(3.0, 2.5, 6, '滑り台（隠し）: 横の溝の流れの速さ（m/s）'),
 } as const satisfies Record<string, Spec>;
