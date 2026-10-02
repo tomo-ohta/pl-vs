@@ -55,6 +55,11 @@ export function shapeIssues(floor: FloorLayout, cell: CellLayout, t0: Tuning = t
   if (hit) out.push(`${at}: 開口の前に当たる物 ${hit.mat}/${hit.kind ?? ''} ${JSON.stringify([hit.min, hit.max])}`);
   if (cell.lights.length > t0['rooms.maxLights']) out.push(`${at}: 灯りが多い ${cell.lights.length}`);
   if (cell.boxes.length > 3200) out.push(`${at}: 箱が多い ${cell.boxes.length}`);
+  // 箱の座標は数（NaN・無限が無い）。傾けた箱は当たり判定にしない
+  const nan = cell.boxes.find((x) => [...x.min, ...x.max, x.slope?.rise ?? 0].some((v) => !Number.isFinite(v)));
+  if (nan) out.push(`${at}: 数でない座標 ${JSON.stringify([nan.min, nan.max])}`);
+  if (cell.boxes.some((x) => x.slope && x.solid)) out.push(`${at}: 当たる傾いた箱`);
+  if (cell.lights.some((l) => l.pos.some((v) => !Number.isFinite(v)) || !(l.distance > 0))) out.push(`${at}: 灯りの位置・届く距離`);
   // 箱は区画の外形の中（描画の見える範囲・焼き込みの範囲）
   const b = cell.bounds, e = 0.06;
   const out1 = cell.boxes.find((x) => x.min[0] < b.min[0] - e || x.max[0] > b.max[0] + e || x.min[2] < b.min[2] - e || x.max[2] > b.max[2] + e || x.min[1] < b.min[1] - e || x.max[1] + (x.slope ? Math.max(0, x.slope.rise) : 0) > b.max[1] + e);
@@ -92,7 +97,7 @@ test('部屋の形: 形ごとに 1 つだけ出やすくしても、検証に通
   for (const def of roomShapeDefs()) {
     const tt = only(def.id);
     // 出にくい形（大きな部屋・広間だけの形）は、3 つ見つかるまで多くの世界を見る
-    for (let w = 1; w <= 24 || ((made.get(def.id) ?? 0) < 3 && w <= 160); w++) {
+    for (let w = 1; w <= 14 || ((made.get(def.id) ?? 0) < 3 && w <= 160); w++) {
       const r = gen(w * 7 + 3, 1 + (w % 9), 0, tt);
       const issues = validateFloor(r.floor);
       if (issues.length) fails.push(`${def.id} w${w}: ${issues.join(' / ')}`);

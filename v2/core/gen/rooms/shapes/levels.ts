@@ -16,6 +16,7 @@ import { themePalette } from '../../../world/palettes.ts';
 import { chair } from '../../dress/furniture.ts';
 import { fillRects, wallFrame, type WallFrame } from '../../gimmicks/util.ts';
 import { defineRoomShape, type RoomShapeContext } from '../types.ts';
+import type { Stair } from '../util.ts';
 import {
   clearCeilingLights, clearOfDoors, cutCeiling, doorZonesOf, footOf, freeWalls, isWallBox, lift, lightGridAt, raiseCeiling, railing, rbox, reachMark, rectD, rectsHit, rectW, reshell, snap,
   stairs, stepCount, subDress, unionRect, useDress,
@@ -283,22 +284,42 @@ defineRoomShape({
         if (a - cur > (best ? best[1] - best[0] : 0)) best = [cur, Math.min(a, F.u1)];
         cur = Math.max(cur, b);
       }
-      if (!best || best[1] - best[0] < 2 * run + 1.8) continue;
+      if (!best || best[1] - best[0] < 2 * sw + 1.6) continue;
       const [a0, a1] = best;
+      // 段の置き方: 長い壁なら足場の前の縁沿い（両端の方へ上る）、短ければ足場の両端から部屋の奥へ直角に（壁の方へ上る）
+      const along = a1 - a0 >= 2 * run + 1.8;
+      if (!along && F.depth < dd + run + 1.0 + 1.2) continue;
+      // 直角の段とその足元が開口の前に掛からない
+      if (!along && (!clearOfDoors(ctx, F.rect(a0, dd, a0 + sw, dd + run + 0.95), 1.6, 0.45) || !clearOfDoors(ctx, F.rect(a1 - sw, dd, a1, dd + run + 0.95), 1.6, 0.45))) continue;
       if (ctx.h < 4.3 && !raiseCeiling(ctx, snap(ctx.rng.float(4.6, 5.2)))) return false;
       const H = ctx.cell.height;
       const deckR = F.rect(a0, 0, a1, dd);
       deck(ctx, deckR, fy + L1, 'woodPanel', 0.05);
-      // 段: 足場の前の縁沿い、両端の方へ上る（上の段から横へ足場に出る）
-      const s1u = a0 + 0.2 + run, s2u = a1 - 0.2 - run;
-      const st1 = stairs(ctx, { x: F.point(s1u, dd + sw / 2)[0], z: F.point(s1u, dd + sw / 2)[1], dir: uDir(d, -1), width: sw, y0: fy, y1: fy + L1, riseMax: 0.22, tread: 0.26, mat: 'shelfMetal', rails: 'both', railMat: 'metal' });
-      const st2 = stairs(ctx, { x: F.point(s2u, dd + sw / 2)[0], z: F.point(s2u, dd + sw / 2)[1], dir: uDir(d, 1), width: sw, y0: fy, y1: fy + L1, riseMax: 0.22, tread: 0.26, mat: 'shelfMetal', rails: 'both', railMat: 'metal' });
-      // 段の足元（足場の下の壁際から行ける）の目印
-      reachMark(ctx, d, s1u + 0.45);
-      reachMark(ctx, d, s2u - 0.45);
-      // 足場の前の縁の手すり（段の上の 1.2 m は開ける）・開いた両端の手すり
+      const mkStair = (u: number, v: number, dir: Dir): Stair => stairs(ctx, { x: F.point(u, v)[0], z: F.point(u, v)[1], dir, width: sw, y0: fy, y1: fy + L1, riseMax: 0.22, tread: 0.26, mat: 'shelfMetal', rails: 'both', railMat: 'metal' });
+      let st1: Stair, st2: Stair, s1u: number, s2u: number;
+      const gaps: [number, number][] = [];
+      if (along) {
+        // 足場の前の縁沿い、両端の方へ上る（上の段から横へ足場に出る）。足元は足場の下の壁際から行ける
+        s1u = a0 + 0.2 + run; s2u = a1 - 0.2 - run;
+        st1 = mkStair(s1u, dd + sw / 2, uDir(d, -1));
+        st2 = mkStair(s2u, dd + sw / 2, uDir(d, 1));
+        reachMark(ctx, d, s1u + 0.45);
+        reachMark(ctx, d, s2u - 0.45);
+        gaps.push([a0 + 0.2, a0 + 1.4], [a1 - 1.4, a1 - 0.2]);
+      } else {
+        // 両端から直角に: 部屋の奥（足元）から壁の方（足場の前の縁）へ上る
+        s1u = a0 + sw / 2; s2u = a1 - sw / 2;
+        st1 = mkStair(s1u, dd + run, d);
+        st2 = mkStair(s2u, dd + run, d);
+        const ends: [number, Dir][] = [[a0, uDir(d, -1)], [a1, uDir(d, 1)]];
+        for (const [e, side] of ends) if (Math.abs(e - F.u0) < 0.05 || Math.abs(e - F.u1) < 0.05) reachMark(ctx, side, F.point(0, dd + run + 0.45)[d === 0 || d === 2 ? 1 : 0]);
+        gaps.push([a0, a0 + sw + 0.05], [a1 - sw - 0.05, a1]);
+      }
+      // 足場の前の縁の手すり（段の上る所は開ける）・開いた両端の手すり
       const rail = (p: number, q: number): void => { if (q - p > 0.15) { const [x0, z0] = F.point(p, dd), [x1, z1] = F.point(q, dd); railing(ctx, x0, z0, x1, z1, fy + L1, { mat: 'shelfMetal', posts: 1.8 }); } };
-      rail(a0 + 0.2 + 1.2, a1 - 0.2 - 1.2);
+      rail(gaps[0]![1], gaps[1]![0]);
+      if (gaps[0]![0] - a0 > 0.15) rail(a0, gaps[0]![0]);
+      if (a1 - gaps[1]![1] > 0.15) rail(gaps[1]![1], a1);
       for (const e of [a0, a1]) if (Math.abs(e - F.u0) > 0.05 && Math.abs(e - F.u1) > 0.05) { const [x0, z0] = F.point(e, 0), [x1, z1] = F.point(e, dd); railing(ctx, x0, z0, x1, z1, fy + L1, { mat: 'shelfMetal' }); }
       // 鉄骨: 前と奥の柱（1.8 m ごと）・横の管・筋交い・巾木。作業灯 2 つ
       const nPost = Math.max(2, Math.round((a1 - a0) / 1.8));
@@ -323,7 +344,7 @@ defineRoomShape({
         ctx.addBox(box([x - 0.12, fy + L1 + 0.8, z - 0.06], [x + 0.12, fy + L1 + 0.98, z + 0.06], 'lightYellow', false));
         ctx.addLight({ pos: [x, fy + L1 + 0.6, z], color: 0xffd28a, intensity: 0.55, distance: 5 });
       }
-      const all = unionRect([deckR, st1.rect, st2.rect, F.rect(s1u, dd, s1u + 0.9, dd + sw), F.rect(s2u - 0.9, dd, s2u, dd + sw)]);
+      const all = along ? unionRect([deckR, st1.rect, st2.rect, F.rect(s1u, dd, s1u + 0.9, dd + sw), F.rect(s2u - 0.9, dd, s2u, dd + sw)]) : unionRect([deckR, st1.rect, st2.rect, F.rect(a0, dd + run, a1, dd + run + 0.9)]);
       ctx.keepOut({ min: [all.x0 - 0.3, fy, all.z0 - 0.3], max: [all.x1 + 0.3, fy + H, all.z1 + 0.3] });
       return true;
     }
