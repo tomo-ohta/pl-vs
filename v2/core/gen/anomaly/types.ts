@@ -15,7 +15,7 @@ import type { Rng } from '../../math/rng.ts';
 import type { Rect } from '../../world/footprint.ts';
 import type { Box, CellLayout, EntitySpec, WallOpening, Zone } from '../../world/layout.ts';
 import type { DressKind } from '../dress/types.ts';
-import type { GeoCell } from '../floor/geometry.ts';
+import type { FloorGeometry, GeoCell } from '../floor/geometry.ts';
 import type { Rarity } from '../floor/profile.ts';
 
 export interface AnomalyFloor { id: string; seed: number; depth: number; rarity: Rarity; family: string }
@@ -54,6 +54,10 @@ export interface AnomalyContext {
    * 立ったまま通れること（底が 1.8 m より低い宙の箱は、床まである壁として見る）も確かめる。少しずつ置く異変が途中で確かめる
    */
   reachOk(): boolean;
+  /** フロアの形（ほかの区画・開口。読むだけ）。前の部屋の物を写す・部屋の上の空きを確かめる異変が使う（段階 4 で足した） */
+  readonly world: FloorGeometry;
+  /** この部屋の前に通る部屋（本道なら本道の前の部屋。脇道なら入ってくる開口の向こうのいちばん近い部屋）。無ければ null */
+  readonly prev: GeoCell | null;
 }
 
 export interface AnomalyDef {

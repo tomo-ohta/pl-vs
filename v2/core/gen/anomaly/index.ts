@@ -172,7 +172,8 @@ function doorsClear(g: GeoCell, s: Snapshot): boolean {
   const zones = doorFronts(g.cell, g.openings, 1.2, 0.3);
   const before = new Map(s.boxes.map((b, i) => [b, s.data[i]!]));
   for (const b of g.cell.boxes) {
-    if (!b.solid) continue;
+    // 床の高さより上に出ない箱（切り分けた床板・床の穴の底と側面）は通り道を塞がない
+    if (!b.solid || b.max[1] <= g.cell.floorY + 1e-3) continue;
     const o = before.get(b);
     const moved = !o || !o.solid || o.min.some((v, k) => Math.abs(v - b.min[k]!) > 1e-6) || o.max.some((v, k) => Math.abs(v - b.max[k]!) > 1e-6);
     if (moved && hitsAny(zones, b)) return false;
@@ -194,6 +195,27 @@ interface Active {
   stop: TourStop;
   /** pre の前の写し（post で取り消すときに pre の分も戻す） */
   pre: Snapshot | null;
+  /** この部屋の前に通る部屋（AnomalyContext.prev） */
+  prev?: GeoCell | null;
+}
+
+/** 脇道の部屋の前の部屋: 入ってくる開口の向こうから開口をたどって、いちばん近い部屋・広間（この部屋は除く） */
+function roomBehind(geo: FloorGeometry, g: GeoCell, entrance: WallOpening): GeoCell | null {
+  const first = portalAt(geo, g.cell.id, entrance);
+  if (!first) return null;
+  const start = first.cells[0] === g.cell.id ? first.cells[1] : first.cells[0];
+  const seen = new Set([g.cell.id, start]);
+  const q = [start];
+  for (let h = 0; h < q.length && h < 64; h++) {
+    const c = geo.cells.find((x) => x.cell.id === q[h]);
+    if (c && ROOM_KINDS.has(c.kind)) return c;
+    for (const p of geo.portals) {
+      if (!p.cells.includes(q[h]!)) continue;
+      const o = p.cells[0] === q[h] ? p.cells[1] : p.cells[0];
+      if (!seen.has(o)) { seen.add(o); q.push(o); }
+    }
+  }
+  return null;
 }
 
 interface Env {
@@ -228,6 +250,8 @@ function runStage(stage: 'pre' | 'post', a: Active, env: Env, furniture: Box[]):
     skipDress() { if (stage === 'pre') skip = true; },
     keepOut(x) { if (stage === 'pre') keep.push(x); },
     reachOk: () => reachNotWorse(a.g, base),
+    world: geo,
+    prev: a.prev ?? null,
   };
   const ok = fn(ctx) !== false && reachNotWorse(a.g, base) && doorsClear(a.g, snap);
   if (!ok) {
@@ -309,7 +333,9 @@ export function planAnomalies(p: FloorProfile, geo: FloorGeometry, gimmicks: Gim
     const inf = info.get(g.cell.id)!;
     const id = `a:${def.id}:${g.cell.id}`;
     const placed: PlacedAnomaly = { id, def: def.id, name: def.name, cell: g.cell.id };
-    return { def, g, id, entrance: inf.entrance, main: inf.main, rng: rng.fork(def.id), memo: {}, placed, stop: { label: `異変: ${def.name}`, cell: g.cell.id, ...standAt(inf.entrance) }, pre: def.pre ? snapshot(g.cell) : null };
+    const prevId = inf.main ? prevRoom(g.cell.id) : null;
+    const prev = prevId ? geo.cells.find((x) => x.cell.id === prevId) ?? null : roomBehind(geo, g, inf.entrance);
+    return { def, g, id, entrance: inf.entrance, main: inf.main, rng: rng.fork(def.id), memo: {}, placed, stop: { label: `異変: ${def.name}`, cell: g.cell.id, ...standAt(inf.entrance) }, pre: def.pre ? snapshot(g.cell) : null, prev };
   };
   const start = (def: AnomalyDef, g: GeoCell, rng: Rng): Active | null => {
     const a = create(def, g, rng);

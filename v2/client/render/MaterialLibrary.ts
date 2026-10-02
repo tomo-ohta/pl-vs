@@ -253,6 +253,8 @@ export const SURFACES: Record<MatId, Surface> = {
   ice: { texture: 'tile', color: 0xcfe6f2, meters: 6, roughness: 1, bump: .002, metalness: 0, gloss: { clearcoat: .9, roughness: .04 }, procedural: 'ice' },
   snow: { texture: 'carpet', color: 0xf4f6f8, meters: 1, roughness: .98, bump: .006 },
   grass: { texture: 'foliage', color: 0x7f9a4e, meters: 1, roughness: .8, bump: .009 },
+  /** 砂（段階 4・部屋まるごとの異変の砂の部屋・室内の海の浜）: 細かい粒の布地の柄を砂の色で */
+  sand: { texture: 'carpet', color: 0xd8c49c, meters: .8, roughness: .97, bump: .007 },
 };
 
 /** 部屋別バリアントの上書き。値だけ違うものは量子化してキーを共有する */

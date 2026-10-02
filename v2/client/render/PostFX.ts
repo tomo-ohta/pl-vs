@@ -32,6 +32,7 @@ import { CopyShader } from 'three/addons/shaders/CopyShader.js';
 import { LensPass } from './LensPass.ts';
 import { VideoPass } from './VideoPass.ts';
 import type { FilmPreset } from './FilmPreset.ts';
+import { GradePass, RoomGradeState, type RoomGrade } from './RoomGrade.ts';
 
 export type ToneMappingId = 'aces' | 'agx';
 export const TONE_MAPPINGS: Record<ToneMappingId, THREE.ToneMapping> = {
@@ -247,8 +248,8 @@ export class PostFX {
     this.timer = new FrameTimer(renderer);
   }
 
-  /** composer を使っているか（false なら直接描画） */
-  get active(): boolean { return this.composer !== null; }
+  /** composer を使っているか（false なら直接描画。部屋の画面効果のためだけの composer は数えない） */
+  get active(): boolean { return this.composer !== null && !this.gradeOnly; }
 
   /** 構成を適用する。pass 構成か MSAA が変わるときだけ composer を作り直す */
   configure(cfg: PostFXConfig): void {
@@ -354,6 +355,7 @@ export class PostFX {
       this.videoPass.setStillness(this.stillness);
       this.videoPass.update(dt, this.frame);
     }
+    this.updateGrade(dt);
     if (this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
   }
@@ -380,8 +382,60 @@ export class PostFX {
   /** 入室直後: オートフォーカスの迷い */
   notifyRoomEnter(): void { this.lensPass?.notifyRoomEnter(); }
 
+  // ------------------------------------------------------------ 部屋の画面効果（段階 4・oddity。client/render/RoomGrade.ts）
+  private readonly grade = new RoomGradeState();
+  private gradePass: GradePass | null = null;
+  /** 部屋の画面効果のためだけに作った composer（RenderPass → GradePass → OutputPass）か */
+  private gradeOnly = false;
+
+  /**
+   * 部屋の画面効果を頼む（部品の描画が、その部屋にいる間だけ毎フレーム呼ぶ）。呼ばれなくなった効果はゆっくり戻る。
+   * null ですぐ取り下げる（戻るのはゆっくり）
+   */
+  setRoomGrade(key: string, g: RoomGrade | null): void { this.grade.set(key, g, this.frame); }
+
+  /** 今の画面効果の値（確認用） */
+  get roomGrade(): Readonly<RoomGradeState['current']> { return this.grade.current; }
+
+  /** 画面効果の pass が描画に入っているか（確認用） */
+  get gradeActive(): boolean { return !!this.gradePass && !!this.composer?.passes.includes(this.gradePass); }
+
+  private updateGrade(dt: number): void {
+    const live = this.grade.update(this.frame, dt);
+    const pass = this.gradePass;
+    if (!live) {
+      // 効果が消えたら pass を外す（効果のためだけに作った composer は捨てて直接描画に戻す）
+      if (pass && this.composer?.passes.includes(pass)) {
+        if (this.gradeOnly) this.disposeComposer();
+        else this.composer.removePass(pass);
+      }
+      return;
+    }
+    const gp = this.gradePass ?? (this.gradePass = new GradePass());
+    if (!this.composer) {
+      // 直接描画の設定（off / low の clean）でも画面効果は掛ける: 効果の間だけ最小の composer を作る
+      const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 0, depthBuffer: true, stencilBuffer: false });
+      rt.texture.name = 'PostFX.grade';
+      const composer = new EffectComposer(this.renderer, rt);
+      this.renderPass = new RenderPass(this.scene, this.camera);
+      composer.addPass(this.renderPass);
+      composer.addPass(gp);
+      this.outputPass = new OutputPass();
+      composer.addPass(this.outputPass);
+      this.composer = composer;
+      this.gradeOnly = true;
+      this.applySize();
+    } else if (!this.composer.passes.includes(gp)) {
+      const at = this.outputPass ? this.composer.passes.indexOf(this.outputPass) : -1;
+      this.composer.insertPass(gp, at >= 0 ? at : this.composer.passes.length);
+      this.applySize();
+    }
+    gp.apply(this.grade.current, dt);
+  }
+
   /** デバッグ HUD 用の 1 行 */
   describe(): string {
+    if (this.gradeOnly) return 'direct+grade';
     if (!this.composer) return 'direct';
     const c = this.config;
     return [c.gtao ? `gtao×${c.gtaoScale}` : null, c.bloom ? 'bloom' : null, c.msaa ? `msaa${c.msaa}` : null, c.film !== 'off' ? `film:${c.film}` : null].filter(Boolean).join('+') || 'composer';
@@ -402,10 +456,13 @@ export class PostFX {
     this.outputPass = null;
     this.renderPass = null;
     this.composer = null;
+    this.gradeOnly = false;
   }
 
   dispose(): void {
     this.disposeComposer();
+    this.gradePass?.dispose();
+    this.gradePass = null;
     this.timer.dispose();
   }
 }

@@ -13,7 +13,8 @@ import { IDLE_COMMAND } from '../core/sim/types.ts';
 import type { FloorLayout } from '../core/world/layout.ts';
 
 const t = defaultTuning();
-const shape = (f: FloorLayout): string => f.cells.filter((c) => c.role !== 'secret').map((c) => `${c.id}:${c.bounds.min.join(',')}:${c.bounds.max.join(',')}`).join('|');
+/** 形 = 区画の足跡と床の高さ（天井の高さは部屋まるごとの異変 vast が上げることがあるので見ない） */
+const shape = (f: FloorLayout): string => f.cells.filter((c) => c.role !== 'secret').map((c) => `${c.id}:${c.bounds.min.join(',')}:${c.bounds.max[0]},${c.bounds.max[2]}`).join('|');
 
 test('裏のフロア: 表と同じ形・中身と調子は裏の seed で決まる（決定的）', () => {
   const tones = new Set<string>();

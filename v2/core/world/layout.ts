@@ -28,7 +28,8 @@ export type MatId =
   | 'ice' | 'snow' | 'grass'
   | 'sidingWood' | 'sidingMetal'
   | 'screenArcade' | 'screenPc' | 'canLabel'
-  | 'wheat';
+  | 'wheat'
+  | 'sand';
 
 /** 箱（描画と当たり判定の基本単位） */
 export interface Box {
@@ -157,6 +158,11 @@ export interface CellLayout {
    * 床・壁の素材の柄と色合いを揃える（区画の境目で色が切り替わらないように）
    */
   materialKey?: string;
+  /**
+   * 地図に出す「見かけの足跡」（無ければ footprint）。地図と中の広さが合わない部屋（W18。中は大広間なのに地図では小部屋）が使う。
+   * 地図の描画は、これがあればこちらを描く（段階 4 で足した。部屋まるごとの異変 vast）
+   */
+  mapFootprint?: Rect[];
 }
 
 /** 区画どうしの開口（cell and portal の描画で、ここを通して隣の区画が見える） */
