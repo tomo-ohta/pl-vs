@@ -133,7 +133,8 @@ test('崩れる床: 乗り続けると揺れて落ち、穴の底へ落ちる。
     // 床板の真ん中に立ち続ける（ほかの床板にも掛かるので、まわりの床板も落ちる）
     for (let i = 0; i < 60 * 3; i++) sim.step([{ ...IDLE_COMMAND }]);
     assert.ok(sim.outputOf(tile.id, 'fallen') > 0.5, `${room.cell.id}: 床板が落ちた`);
-    assert.ok(Math.abs(sim.players[0]!.pos[1] - bottomOf(room)) < 0.1, `${room.cell.id}: 穴の底へ落ちた（y=${sim.players[0]!.pos[1].toFixed(2)}）`);
+    // 穴の底か、底へ下りる階段の低い段（床板が階段の脇なら段に落ちる。担当 sense が「底ちょうど」から緩めた。仕掛けが増えて選ばれる部屋が変わった）
+    assert.ok(Math.abs(sim.players[0]!.pos[1] - bottomOf(room)) < 0.1 || (sim.players[0]!.onGround && sim.players[0]!.pos[1] < room.cell.floorY - 1.0), `${room.cell.id}: 穴の底へ落ちた（y=${sim.players[0]!.pos[1].toFixed(2)}）`);
     // 入口の床へ戻って待つ → 戻る
     sim.teleport(0, room.inside, room.yaw);
     for (let i = 0; i < 60 * (t['gimmick.crumble.respawnSec'] + 1); i++) sim.step([{ ...IDLE_COMMAND }]);

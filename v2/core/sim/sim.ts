@@ -159,6 +159,7 @@ export class Sim implements PlayerWorld {
       p.interactedId = c.interact ? this.pickInteractable(p, c.interact.yaw, c.interact.pitch) : null;
       p.flashlight = !!c.flashlight;
       p.dropPressed = !!c.drop;
+      p.voice = c.voice ?? -1;
       if (c.interact && p.interactedId) this.events.push({ type: 'interact', tick: this.tick, player: p.id, entity: p.interactedId });
     }
 

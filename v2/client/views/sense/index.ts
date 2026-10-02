@@ -9,3 +9,4 @@ import './sight.ts';
 import './watch.ts';
 import './camera.ts';
 import './curtains.ts';
+import './sound.ts';

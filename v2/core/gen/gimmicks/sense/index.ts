@@ -9,3 +9,5 @@ import './sight.ts';
 import './curtains.ts';
 import './watch.ts';
 import './camera.ts';
+import './sound.ts';
+import './echo.ts';

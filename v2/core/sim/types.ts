@@ -21,6 +21,8 @@ export interface InputCommand {
   drop?: boolean;
   /** 懐中電灯が点いているか（R キーで切り替える状態。照らした所だけ現れる物などが読む） */
   flashlight?: boolean;
+  /** マイクの音量（0..1。マイクを使っていなければ無し。担当 sense: 声で開く扉） */
+  voice?: number;
 }
 
 export const IDLE_COMMAND: Readonly<InputCommand> = { moveX: 0, moveY: 0, yaw: 0, pitch: 0, jump: false, dash: false, crouch: false, interact: null, drop: false, flashlight: false };
@@ -65,6 +67,8 @@ export interface PlayerState {
   interactedId: string | null;
   /** 懐中電灯が点いているか（コマンドの flashlight。目の位置・視線の向きで照らす） */
   flashlight: boolean;
+  /** マイクの音量（コマンドの voice。マイクを使っていなければ -1。担当 sense） */
+  voice?: number;
   /** その tick に「置く」操作をしたか（持ち物の部品が読む） */
   dropPressed: boolean;
   /** 持っている物（持ち物の部品の id）。無ければ null */

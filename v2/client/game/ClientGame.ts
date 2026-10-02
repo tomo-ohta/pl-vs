@@ -327,7 +327,7 @@ export class ClientGame {
   }
 
   private command(input: InputState): InputCommand {
-    return { moveX: input.moveX, moveY: input.moveY, yaw: this.yaw, pitch: this.pitch, jump: this.pendingJump, dash: input.dash, crouch: input.crouch, interact: this.pendingInteract, drop: this.pendingDrop, flashlight: this.flashlightOn };
+    return { moveX: input.moveX, moveY: input.moveY, yaw: this.yaw, pitch: this.pitch, jump: this.pendingJump, dash: input.dash, crouch: input.crouch, interact: this.pendingInteract, drop: this.pendingDrop, flashlight: this.flashlightOn, ...(this.audio.loudness.micAvailable ? { voice: this.audio.loudness.level() } : {}) };
   }
 
   /** タップした画面の位置（NDC）を、視線の向きにする */

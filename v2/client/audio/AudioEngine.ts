@@ -742,6 +742,45 @@ export class AudioEngine {
     return this.loudness.level();
   }
 
+  /**
+   * 鳴り続ける音（担当 sense: 音の高さの部屋）。正弦波と少しの倍音を、高さ・音量を変えながら鳴らす。pos があれば定位。
+   * ctx 未生成なら何もしない handle
+   */
+  drone(freq: number, gain: number, pos?: Vec3): { setFreq(hz: number, sec?: number): void; setGain(g: number, sec?: number): void; stop(): void } {
+    const ctx = this.ctx;
+    if (!ctx || !this.ambientBus) return { setFreq() {}, setGain() {}, stop() {} };
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    let tail: AudioNode = out;
+    if (pos) {
+      const p = ctx.createPanner();
+      p.panningModel = 'equalpower';
+      p.distanceModel = 'inverse';
+      p.refDistance = 2;
+      p.positionX.value = pos[0]; p.positionY.value = pos[1]; p.positionZ.value = pos[2];
+      out.connect(p);
+      tail = p;
+    }
+    tail.connect(this.ambientBus);
+    const oscs = [[1, 1], [2, 0.18], [3.01, 0.06]].map(([r, a]) => {
+      const o = ctx.createOscillator();
+      o.frequency.value = freq * r!;
+      const g = ctx.createGain();
+      g.gain.value = a!;
+      o.connect(g).connect(out);
+      o.start();
+      return { o, r: r! };
+    });
+    const t0 = ctx.currentTime;
+    out.gain.setValueAtTime(0, t0);
+    out.gain.linearRampToValueAtTime(gain, t0 + 0.6);
+    return {
+      setFreq: (hz, sec = 0.15) => { const t = ctx.currentTime; for (const { o, r } of oscs) { o.frequency.cancelScheduledValues(t); o.frequency.setValueAtTime(o.frequency.value, t); o.frequency.linearRampToValueAtTime(hz * r, t + sec); } },
+      setGain: (g, sec = 0.3) => { const t = ctx.currentTime; out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(out.gain.value, t); out.gain.linearRampToValueAtTime(g, t + sec); },
+      stop: () => { const t = ctx.currentTime; out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(out.gain.value, t); out.gain.linearRampToValueAtTime(0, t + 0.4); for (const { o } of oscs) o.stop(t + 0.5); setTimeout(() => { out.disconnect(); tail.disconnect(); }, 700); },
+    };
+  }
+
   // ---------------------------------------------------------------- 部屋の音の効果（担当 sense）
   /** 全体の音量を絞る（key ごと。gain 1 で外す）。無音の部屋・目を閉じる など */
   setDuck(key: string, gain: number, fadeSec = 0.4): void {

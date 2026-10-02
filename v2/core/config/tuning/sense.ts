@@ -65,4 +65,19 @@ export const SENSE_TUNING = {
   'sense.gaze.sec': num(1.6, 0.5, 5, 'マネキンの視線の先・鏡の扉など: 見つめ続ける秒数'),
   'sense.lookBack.sec': num(1.0, 0.3, 4, '出口の前で振り返る: 来た道を見ている秒数'),
   'sense.cctv.watchSec': num(2.0, 0.5, 6, '監視カメラ: モニターを見つめる秒数（自分のいない所の扉が開いているのを見る）'),
+
+  // ---- 音（gimmicks/sense/sound.ts）----
+  'sense.chime.intervalSec': num(0.7, 0.3, 2, '音をつなぐ扉: 旋律の音と音の間（秒）'),
+  'sense.chime.periodSec': num(11, 5, 40, '音をつなぐ扉: 旋律をくり返す間隔（秒）'),
+  'sense.gate.loudLevel': num(0.55, 0.2, 0.95, 'マイクで開く扉: 開く音量（0..1。走る 0.7・跳んで着地 1.0・歩く 0.35）'),
+  'sense.gate.quietLevel': num(0.08, 0.01, 0.3, '静かにすると開く: これより静かな間を数える（0..1）'),
+  'sense.gate.quietSec': num(3, 1, 10, '静かにすると開く: 静かにしている秒数'),
+  'sense.steps.sneakSec': num(3, 1, 10, '足音が増える（BA02）: しゃがんで歩き続ける秒数'),
+  'sense.pa.periodSec': num(6, 3, 20, '遠くの館内放送: 放送をくり返す間隔（秒）'),
+  'sense.living.leanSec': num(4, 1.5, 12, '壁の向こうの生活音（BA04）: 壁にもたれて止まる秒数'),
+  'sense.silent.sec': num(3, 1, 10, '無音の隅（BA01）: 無音の隅で止まる秒数'),
+  'sense.maze.cellM': num(1.8, 1.6, 2.4, '音で形を知る迷路: 迷路の 1 マス（m）'),
+  'sense.maze.dripSec': num(2.2, 0.8, 6, '反響で形が分かる: 出口の前の水の音の間隔（秒）'),
+  'sense.pitch.fogNear': num(0.4, 0, 2, '音の高さの部屋: 霧の掛かり始め（m）'),
+  'sense.pitch.fogFar': num(2.8, 1.5, 8, '音の高さの部屋: 何も見えなくなる距離（m）'),
 } as const satisfies Record<string, Spec>;

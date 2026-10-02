@@ -273,6 +273,16 @@ function watchClock(sim: Sim, e: EntitySpec, leg: V2): InputCommand | null {
   return still(sim, { yaw: yaw + Math.PI, pitch: -1.35 });
 }
 
+/** 音で開く扉: 扉の前（区画 zone）で、loud なら跳んで着地の音を立て、quiet なら止まって静かにする。開くまで */
+function noiseGate(sim: Sim, e: EntitySpec): InputCommand | null {
+  if (sim.outputOf(e.id, 'open') > 0.5) return null;
+  const z = e.params.zone as { min: number[]; max: number[] };
+  const pl = sim.players[0]!;
+  if (pl.pos[0] < z.min[0]! || pl.pos[0] > z.max[0]! || pl.pos[2] < z.min[2]! || pl.pos[2] > z.max[2]!) return null;
+  if (e.params.mode === 'quiet') return still(sim);
+  return still(sim, { jump: pl.onGround && sim.tick % 40 === 0 });
+}
+
 export function senseDrive(sim: Sim, leg: readonly number[]): InputCommand | null {
   const pl = sim.players[0]!;
   const cell = cellOf(sim.floor, pl.pos);
@@ -296,6 +306,10 @@ export function senseDrive(sim: Sim, leg: readonly number[]): InputCommand | nul
   }
   for (const e of partsIn(sim.floor, cell.id, 'watchClock')) {
     const c = watchClock(sim, e, leg2);
+    if (c) return c;
+  }
+  for (const e of partsIn(sim.floor, cell.id, 'noiseGate')) {
+    const c = noiseGate(sim, e);
     if (c) return c;
   }
   return null;
