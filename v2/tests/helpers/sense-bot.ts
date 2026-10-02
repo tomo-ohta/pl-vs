@@ -185,17 +185,24 @@ function flood(sim: Sim, e: EntitySpec, leg3: readonly number[], cell: CellLayou
   const near = fwd ? a : b, far = fwd ? b : a;
   const me: V2 = [pl.pos[0], pl.pos[2]];
   const ln = onLine(me, near, far), lt = onLine(leg, near, far);
-  // 区間の目標が向こう岸（列の向こうの端より先）のときだけ
-  if (lt.t < 0.9 || leg3[1]! < y - 0.5) return null;
+  if (leg3[1]! < y - 0.5) return null;
+  // 区間の目標が向こう岸（列の向こうの端より先）か、列の途中の横（浮く箱の前の壁の口）のとき
+  const across = lt.t >= 0.9;
+  if (!across && (lt.t < 0.1 || lt.off > 2.6)) return null;
+  const stop = across ? 1 : lt.t;
+  const P: V2 = lerp(near, far, stop);
   if (pl.pos[1] < y - 0.4) return goVia(sim, cell, near);
   if (ln.t > 1.0) return null;
+  const r = floodLevel(sim.tick * sim.dt, floodParams({ spec: e }));
   if (ln.t < 0.15) {
     const d = Math.hypot(me[0] - near[0], me[1] - near[1]);
-    const r = floodLevel(sim.tick * sim.dt, floodParams({ spec: e }));
-    if (d < 0.9 && r.stage === 'high' && r.left > ln.len / 3.0 + 0.8) return toward(sim, far);
+    if (d < 0.9 && r.stage === 'high' && r.left > (ln.len * stop) / 3.0 + (across ? 0.8 : 2.0)) return toward(sim, across ? far : P);
     return d > 0.35 ? goVia(sim, cell, near) : still(sim);
   }
-  return toward(sim, far);
+  if (across) return toward(sim, far);
+  // 列の途中で横へ（浮く箱に乗り、壁の口へ）。口の扉の前まで来たら、扉を開けるのは bot.ts に任せる
+  if (Math.hypot(leg[0] - me[0], leg[1] - me[1]) < 1.0) return null;
+  return ln.t < stop - 0.04 && ln.off < 0.6 ? toward(sim, P) : toward(sim, leg);
 }
 
 /**
@@ -345,6 +352,9 @@ function search(sim: Sim, e: EntitySpec, leg: V2): InputCommand | null {
     return { i, d0: Math.min(ts[0]!, ts[1]!) - 0.55, d1: Math.max(ts[0]!, ts[1]!) + 0.55 };
   }).sort((p, q) => p.d0 - q.d0);
   const d = mp.t * mp.len;
+  // 今の所と区間の目標の間に帯が無ければ（同じ側の隅の扉など）手を出さない
+  const dl = lp.t * lp.len;
+  if (!spans.some((s) => Math.min(d, dl) < s.d1 && Math.max(d, dl) > s.d0)) return null;
   const inside = spans.find((s) => d > s.d0 && d < s.d1);
   if (inside) return toward(sim, [a[0] + dirv[0] * (inside.d1 + 0.2), a[1] + dirv[1] * (inside.d1 + 0.2)], { dash: true });
   // 渡る道から外れている（隅へ戻された）: 今の安全な床の上で、道へ戻る

@@ -11,6 +11,7 @@ import { dressCell } from '../core/gen/dress/index.ts';
 import { showcaseFloor } from '../core/gen/floor/showcase.ts';
 import { walkTo } from './helpers/bot.ts';
 import { regenerate } from './helpers/gimmick-rooms.ts';
+import type { Sim } from '../core/sim/sim.ts';
 import { findSenseRooms, simOf, T } from './sense-util.ts';
 
 const IDS = [...new Set((CATALOG_BY_WS.sense ?? []).filter((e) => e.status === 'done').flatMap((e) => e.impl.filter((m) => m.kind === 'gimmick' || m.kind === 'anomaly').map((m) => m.id)))];
@@ -55,4 +56,33 @@ test('担当 sense の仕掛け・異変: 見本のフロア（?try=）に置け
     assert.equal(JSON.stringify(again.entities.filter((e) => e.cell === room.cell.id)), JSON.stringify(room.floor.entities.filter((e) => e.cell === room.cell.id)), `${def}: 同じ部品`);
   }
   void ANOMALIES;
+});
+
+/** 隠しの壁を全部消す（出現型は、裏の振る舞いの出力で現れることを仕掛けごとの試験で確かめる。ここでは現れた後に歩けるか） */
+function revealAll(sim: Sim): void {
+  for (const e of sim.floor.entities) if (e.type === 'reveal') (sim as unknown as { revealGroup(g: string, b: string): void }).revealGroup(String(e.params.group), 'test');
+}
+
+test('担当 sense の隠し: 仕掛けの部屋から隠しの奥まで歩いて行ける（存在型・出現型は現れた後）', async () => {
+  const found = findSenseRooms(GIMMICKS, 8, 1200);
+  const seen = new Map<string, number>();
+  const fails: string[] = [];
+  let n = 0;
+  for (const def of GIMMICKS) for (const room of found.get(def) ?? []) {
+    for (const sec of room.r.gimmicks?.secrets.filter((x) => x.host === room.cell.id) ?? []) {
+      const key = `${sec.hook}|${sec.mode}`;
+      if ((seen.get(key) ?? 0) >= 2) continue;
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+      n++;
+      const sim = await simOf(room.floor);
+      revealAll(sim);
+      sim.teleport(0, [room.inside[0], room.inside[1] + 0.02, room.inside[2]], room.yaw);
+      const res = walkTo(sim, sec.cells[sec.cells.length - 1]!, undefined, 150);
+      if (!res.ok) fails.push(`${def} ${sec.hook}(${sec.mode}) ${room.floor.id}@w${room.key.world} ${room.cell.id}: ${res.reason}`);
+      sim.physics?.dispose();
+    }
+  }
+  console.log(`  隠し ${n}: ${[...seen.keys()].join('・')}`);
+  assert.ok(n >= 10, `隠し ${n}`);
+  assert.deepEqual(fails, []);
 });
