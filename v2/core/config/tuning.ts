@@ -75,6 +75,8 @@ export const TUNING_SPEC = {
   'gimmick.sameAxisMul': num(0.3, 0, 1, '本道で直前の仕掛けと作用の軸が同じときの重みの倍率'),
   'gimmick.intenseRunMul': num(0.4, 0, 1, '本道で強い仕掛け（強さ 2 以上）が続くときの重みの倍率'),
   'gimmick.secretBoost': num(3, 1, 20, '隠しの数に空きがある間、隠しを差し出す仕掛けの重みに掛ける倍率'),
+  'gimmick.repeatMul': num(0.35, 0, 1, '同じフロアに同じ仕掛けがすでにあるとき、1 つごとに重みに掛ける倍率（同じものが続かないように）'),
+  'gimmick.tilt.slideAt': num(0.55, 0.1, 1, '傾く床: 物が滑り出す傾き（最大の傾きに対する割合。摩擦をこの傾きに合わせる）'),
 
   // ---- 物理（v2-plan.md 6.1）----
   'physics.tickHz': num(60, 30, 120, 'シミュレーションの固定 tick', true),

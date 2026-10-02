@@ -1,12 +1,18 @@
 /**
- * v2 の起動。いまは段階 1 の実験場（core/lab/lab.ts）を読み込む。
- * - URL: `?seed=` 世界の seed / `?tune=キー=値,…` 調整表の上書き / `?nolock=1` Pointer Lock を使わない（自動テスト向け）
+ * v2 の起動: 世界の seed と深さからフロアを作って遊ぶ（core/gen/floor）。
+ * - URL: `?seed=` 世界の seed / `?depth=` 始める深さ / `?variant=1` 裏のフロアから始める / `?tune=キー=値,…` 調整表の上書き /
+ *   `?nolock=1` Pointer Lock を使わない（自動テスト向け）
+ * - `?lab=1` 段階 1 の実験場（core/lab/lab.ts）
+ * - `?showcase=1` / `?showcase=2` 見本のフロア: 仕掛けを全種 1 つずつ・隠しを全部付けたフロア（2 は隠しの型が逆）。
+ *   G で次の仕掛けの入口へ移る（Shift+G で前へ）。`?dev=1` なら、ふつうのフロアでも G が使える
  * - 開発用: window.game（ClientGame）。ペインが隠れて rAF が止まるときは game.stepOnce() で 1 tick ずつ進める
  */
 import './ui/style.css';
 import { makeTuning, parseTuneParam, tuningVersion } from '../core/config/tuning.ts';
 import { labFloor } from '../core/lab/lab.ts';
-import { generateFloorReport } from '../core/gen/floor/index.ts';
+import { generateFloorReport, type GenReport } from '../core/gen/floor/index.ts';
+import type { TourStop } from '../core/gen/floor/gimmicks.ts';
+import { showcaseFloor } from '../core/gen/floor/showcase.ts';
 import type { FloorLayout } from '../core/world/layout.ts';
 import { ClientGame } from './game/ClientGame.ts';
 import { mountUi } from './ui/dom.ts';
@@ -18,6 +24,8 @@ const { tuning, errors } = makeTuning(parseTuneParam(params.get('tune')));
 if (errors.length) console.warn('[tune]', errors.join(' / '));
 const seed = Number(params.get('seed') ?? 1) >>> 0 || 1;
 const useLab = params.has('lab');
+const showcase = Math.max(0, Number(params.get('showcase') ?? 0) | 0);
+const devTour = showcase > 0 || params.has('dev');
 let depth = Math.max(0, Number(params.get('depth') ?? 0) | 0);
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -30,7 +38,12 @@ const syncRec = (): void => rec.setVisible(game.settings.data.recOverlay && !gam
 syncRec();
 game.settings.onChange(syncRec);
 
-ui.pause.title.textContent = useLab ? 'LIMINAL v2 — 実験場' : 'LIMINAL v2';
+ui.pause.title.textContent = useLab ? 'LIMINAL v2 — 実験場' : showcase ? 'LIMINAL v2 — 見本のフロア' : 'LIMINAL v2';
+if (devTour) {
+  const p = document.createElement('p');
+  p.innerHTML = '<b class="mono">G</b>次の仕掛けの入口へ移る（Shift+G で前へ）';
+  ui.pause.help.append(p);
+}
 ui.pause.resumeLabel.textContent = '始める';
 ui.setPauseVisible(true);
 ui.pause.resume.addEventListener('click', () => {
@@ -39,13 +52,45 @@ ui.pause.resume.addEventListener('click', () => {
   void game.resume();
 });
 
-/** 深さ depth（・版 variant）のフロアを作る（seed は世界の seed） */
-let variant = 0;
+/** 深さ depth（・版 variant）のフロアを作る（seed は世界の seed。見本は最初のフロアだけ） */
+let variant = Math.max(0, Number(params.get('variant') ?? 0) | 0);
+let tour: { stop: TourStop; text: string }[] = [];
+let tourAt = -1;
 function makeFloor(d: number, v = 0): FloorLayout {
   if (useLab) return labFloor(seed, tuningVersion(tuning));
-  const r = generateFloorReport({ world: seed, depth: d, variant: v }, tuning);
-  console.info(`[gen] ${r.floor.id} ${r.profile.rarity} ${r.profile.family.name}/${r.profile.pattern} ${r.profile.cols}×${r.profile.rows} 区画 ${r.floor.cells.length} 作り直し ${r.attempts - 1} ${r.ms} ms`, r.issues);
+  const r = showcase && d === 0 && v === 0 && !moved ? showcaseFloor(tuning, { flip: showcase === 2 }) : generateFloorReport({ world: seed, depth: d, variant: v }, tuning);
+  console.info(`[gen] ${r.floor.id} ${r.profile.rarity} ${r.profile.family.name}/${r.profile.pattern} ${r.profile.cols}×${r.profile.rows} 区画 ${r.floor.cells.length}${r.tone ? ` 裏の調子 ${r.tone}` : ''} 作り直し ${r.attempts - 1} ${r.ms} ms`, r.issues);
+  tour = tourOf(r);
+  tourAt = -1;
+  if (devTour) console.table(tour.map((x) => ({ 場所: x.text, 区画: x.stop.cell })));
   return r.floor;
+}
+
+const MODE_JA = { present: '存在型（最初からある）', appear: '出現型（条件で現れる）' } as const;
+const DEST_JA: Record<string, string> = { passage: '抜け道', room: '小部屋', privateRoom: '私室', rareRoom: '珍しい部屋', floorLink: '下のフロアへの穴', bFloor: '裏のフロアへの穴', clue: '手がかり' };
+/** 見て回る順と、その場所の隠し（型と行き先） */
+function tourOf(r: GenReport): { stop: TourStop; text: string }[] {
+  const g = r.gimmicks;
+  if (!g) return [];
+  return g.tour.map((stop, i) => {
+    const sec = g.secrets.filter((s) => s.host === stop.cell);
+    const tail = sec.length ? ` — 隠し: ${sec.map((s) => `${MODE_JA[s.mode]}・${DEST_JA[s.dest] ?? s.dest}`).join(' / ')}` : '';
+    return { stop, text: `${i + 1}/${g.tour.length} ${stop.label}${tail}` };
+  });
+}
+
+// 見本のフロアのワープ（G / Shift+G）。案内は 6 秒で消す
+let hintTimer = 0;
+if (devTour) {
+  addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyG' || e.repeat || game.paused || !tour.length) return;
+    tourAt = (tourAt + (e.shiftKey ? -1 : 1) + tour.length) % tour.length;
+    const { stop, text } = tour[tourAt]!;
+    game.teleport(stop.pos, stop.yaw);
+    ui.setHint(text);
+    clearTimeout(hintTimer);
+    hintTimer = window.setTimeout(() => ui.setHint(''), 6000);
+  });
 }
 
 // 暗転（フロアの移動）
@@ -54,6 +99,7 @@ fade.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;pointer-e
 document.body.appendChild(fade);
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 let moving = false;
+let moved = false;
 game.onFloorExit = (_exit, _kind, to): void => {
   if (moving || useLab) return;
   moving = true;
@@ -63,6 +109,7 @@ game.onFloorExit = (_exit, _kind, to): void => {
     // 行き先: 隠しの穴は 'depth.variant'（別のフロア・裏のフロア）、ふつうの出口は 1 つ下の表のフロア
     const m = to ? /^(\d+)\.(\d+)$/.exec(to) : null;
     if (m) { depth = Number(m[1]); variant = Number(m[2]); } else { depth++; variant = 0; }
+    moved = true;
     const t0 = performance.now();
     await game.loadFloor(makeFloor(depth, variant));
     console.info(`[floor] B${depth + 1}F${variant ? `（裏 ${variant}）` : ''} 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
@@ -72,7 +119,7 @@ game.onFloorExit = (_exit, _kind, to): void => {
 };
 
 const t0 = performance.now();
-await game.loadFloor(makeFloor(depth));
+await game.loadFloor(makeFloor(depth, variant));
 console.info(`[floor] 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
 game.start();
 // REC の時刻（一時停止中は止める）

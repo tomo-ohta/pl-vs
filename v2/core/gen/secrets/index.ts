@@ -47,7 +47,8 @@ function free(world: SecretWorld, r: Rect, y0: number, y1: number, ignore: strin
   return true;
 }
 
-export function attachSecret(world: SecretWorld, host: GeoCell, offer: SecretOffer, mode: SecretMode, rng: Rng, t: Tuning, index: number): PlacedSecret | null {
+/** forceDest: 行き先を決めて付ける（見本のフロア用。既定は調整表 secrets.dest.* の重みで引く） */
+export function attachSecret(world: SecretWorld, host: GeoCell, offer: SecretOffer, mode: SecretMode, rng: Rng, t: Tuning, index: number, forceDest?: SecretDest): PlacedSecret | null {
   const d = offer.doorway;
   const hr = host.cell.footprint.reduce((a, r) => ((r.x1 - r.x0) * (r.z1 - r.z0) > (a.x1 - a.x0) * (a.z1 - a.z0) ? r : a));
   const edge = d.dir === 0 ? hr.z1 : d.dir === 2 ? hr.z0 : d.dir === 1 ? hr.x1 : hr.x0;
@@ -66,7 +67,7 @@ export function attachSecret(world: SecretWorld, host: GeoCell, offer: SecretOff
   }
   if (!rect) return null;
   const id = `secret${index}`;
-  const dest = rng.weighted(DESTS, (k) => t[`secrets.dest.${k}` as const]);
+  const dest = forceDest ?? rng.weighted(DESTS, (k) => t[`secrets.dest.${k}` as const]);
   const back = ((d.dir + 2) % 4) as Dir;
   const doorPos: [number, number, number] = d.dir === 0 || d.dir === 2 ? [d.at, d.y, edge] : [edge, d.y, d.at];
   const ops: WallOpening[] = [opening(`${id}:in`, doorPos, back, d.width, d.height)];
@@ -96,6 +97,16 @@ export function attachSecret(world: SecretWorld, host: GeoCell, offer: SecretOff
   // 入口から隠し部屋の床への段差（入口の y と床の y が違うとき）
   if (y < d.y - 0.01) cell.boxes.push(d.dir === 0 || d.dir === 2 ? box([d.at - d.width / 2, y, Math.min(edge, edge + sgn * 0.6)], [d.at + d.width / 2, d.y, Math.max(edge, edge + sgn * 0.6)], palette.floor) : box([Math.min(edge, edge + sgn * 0.6), y, d.at - d.width / 2], [Math.max(edge, edge + sgn * 0.6), d.y, d.at + d.width / 2], palette.floor));
   furnishSecret(world, cell, rect, y, dest, rng, id);
+  // 入るまで暗い（入口の奥が明るくて目立たないように）。入ると灯り、そのまま点いている。目印の光（穴の縁など）は点いたまま
+  const lamp = `${id}.lamp`;
+  for (const b of cell.boxes) if (b.mat === cell.palette.light && !b.solid && b.max[1] - b.min[1] < 0.06) b.kind = `lamp:${lamp}`;
+  for (const l of cell.lights) l.lampId = lamp;
+  const cx = (rect.x0 + rect.x1) / 2, cz = (rect.z0 + rect.z1) / 2;
+  world.entities.push(
+    { id: `${id}.enter`, type: 'zoneSensor', cell: id, params: { aabb: { min: [rect.x0 + 0.2, y - 0.1, rect.z0 + 0.2], max: [rect.x1 - 0.2, y + 2.4, rect.z1 - 0.2] } } },
+    { id: `${id}.seen`, type: 'latch', cell: id, params: {}, inputs: { set: `${id}.enter.in` } },
+    { id: lamp, type: 'lamp', cell: id, params: { on: false, rate: 2.5, pos: [cx, y + 2.2, cz] }, inputs: { on: `${id}.seen.out` } },
+  );
   world.cells.push({ cell, kind: 'secret', openings: ops, node: -1 });
   return { id, host: host.cell.id, hook: offer.hook, mode, dest, cell: id };
 }
@@ -125,8 +136,9 @@ function furnishSecret(world: SecretWorld, cell: CellLayout, r: Rect, y: number,
     case 'privateRoom': {
       // 特殊個室 [QR]: 白一色の部屋に、大きすぎる椅子が 1 脚
       const s = rng.float(2.2, 3.0);
-      cell.boxes.push(box([cx - 0.25 * s, y, cz - 0.25 * s], [cx + 0.25 * s, y + 0.45 * s, cz + 0.25 * s], 'paintWhite'));
-      cell.boxes.push(box([cx - 0.25 * s, y + 0.45 * s, cz + 0.2 * s], [cx + 0.25 * s, y + 0.95 * s, cz + 0.25 * s], 'paintWhite'));
+      // 布張り（白い壁と床から浮くように、壁とは別の白）
+      cell.boxes.push(box([cx - 0.25 * s, y, cz - 0.25 * s], [cx + 0.25 * s, y + 0.45 * s, cz + 0.25 * s], 'whiteFabric'));
+      cell.boxes.push(box([cx - 0.25 * s, y + 0.45 * s, cz + 0.2 * s], [cx + 0.25 * s, y + 0.95 * s, cz + 0.25 * s], 'whiteFabric'));
       break;
     }
     case 'floorLink':

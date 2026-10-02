@@ -11,14 +11,18 @@ import type { AABB } from '../../math/aabb.ts';
 import { hashAll, Rng } from '../../math/rng.ts';
 import type { Box, EntitySpec, WallOpening, Zone } from '../../world/layout.ts';
 import { reachOpenings } from '../reach.ts';
-import { attachSecret, type PlacedSecret } from '../secrets/index.ts';
+import { attachSecret, type PlacedSecret, type SecretDest } from '../secrets/index.ts';
 import '../gimmicks/index.ts';
 import { gimmickDefs, type GimmickContext, type GimmickDef, type GimmickSlot, type SecretMode, type SecretOffer } from '../gimmicks/types.ts';
-import { frontOf } from '../gimmicks/util.ts';
+import { frontOf, inward } from '../gimmicks/util.ts';
+import type { Vec3 } from '../../math/vec.ts';
 import type { FloorGeometry, GeoCell } from './geometry.ts';
 import { rarityRank, type FloorProfile } from './profile.ts';
 
 export interface PlacedGimmick { id: string; def: string; cell: string; main: boolean }
+
+/** 見て回る順（確認用のワープ）: 区画の入口のすぐ外に、中を向いて立つ */
+export interface TourStop { label: string; cell: string; pos: Vec3; yaw: number }
 
 export interface GimmickResult {
   gimmicks: PlacedGimmick[];
@@ -28,6 +32,15 @@ export interface GimmickResult {
   attachFailures: number;
   /** 区画ごとの中身を置かない範囲 */
   keepOut: Map<string, AABB[]>;
+  /** 仕掛けと、仕掛けとは別の隠し（暗がり）を見て回る順 */
+  tour: TourStop[];
+}
+
+/** 開口 o のすぐ外（0.6 m）に、区画の中を向いて立つ位置 */
+function standAt(o: WallOpening): { pos: Vec3; yaw: number } {
+  const [ix, iz] = inward(o);
+  const p = frontOf(o, -0.6);
+  return { pos: [p[0], p[1] + 0.02, p[2]], yaw: Math.atan2(-ix, -iz) };
 }
 
 const SLOT_KINDS = new Set(['room', 'hall', 'corridor']);
@@ -52,12 +65,20 @@ function openingTo(geo: FloorGeometry, g: GeoCell, other: string): WallOpening |
   return g.openings.slice().sort((a, b) => Math.hypot(a.pos[0] - c[0], a.pos[2] - c[1]) - Math.hypot(b.pos[0] - c[0], b.pos[2] - c[1]))[0] ?? null;
 }
 
-export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, depth: number): GimmickResult {
+/**
+ * 見本のフロア（確認用）: 仕掛けを決めた順に 1 つずつ置き、差し出された隠しを全部付ける。
+ * 型を選べる隠しは存在 / 出現を交互に（flip で逆から）。仕掛けとは別の隠し（暗がり）は 1 つだけ
+ */
+export interface ShowcaseOptions { gimmicks: string[]; flip?: boolean }
+/** 見本のフロアの隠しの行き先（付けた順。行き先ごとの見た目・つながりを全部見られるように） */
+const SHOWCASE_DESTS: SecretDest[] = ['bFloor', 'privateRoom', 'floorLink', 'room', 'passage', 'rareRoom', 'clue'];
+
+export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, depth: number, showcase?: ShowcaseOptions): GimmickResult {
   const rng = new Rng(hashAll(p.seed, 'gimmicks'));
   const main = mainCells(geo);
   const mainSet = new Set(main);
   const keepOut = new Map<string, AABB[]>();
-  const result: GimmickResult = { gimmicks: [], secrets: [], keepOut, budget: 0, attachFailures: 0 };
+  const result: GimmickResult = { gimmicks: [], secrets: [], keepOut, budget: 0, attachFailures: 0, tour: [] };
   const offers: { offer: SecretOffer; host: GeoCell; gimmick: string }[] = [];
   const defs = gimmickDefs();
   let physicsUsed = 0;
@@ -65,13 +86,15 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   // 隠しの数（フロア全体）を先に決める。隠しが無いと成り立たない仕掛けは、この数に空きがあるときだけ置く
   const sr = new Rng(hashAll(p.seed, 'secrets'));
   const mean = t['secrets.perFloorMean'] + t['secrets.depthGain'] * depth + (rarityRank(p.rarity) >= rarityRank('Legendary') ? t['secrets.rarityBonusLegendary'] : 0);
-  let budget = Math.min(t['secrets.perFloorMax'], sr.poisson(mean));
+  let budget = showcase ? 999 : Math.min(t['secrets.perFloorMax'], sr.poisson(mean));
   result.budget = budget;
+  let alternate = showcase?.flip ? 1 : 0;
   const world = { cells: geo.cells, portals: geo.portals, entities: geo.entities, exits: geo.exits, depth };
   let index = 0;
   const modeOf = (o: SecretOffer): SecretMode => {
     const modes = o.modes;
     if (modes.length === 1) return modes[0]!;
+    if (showcase) return modes[alternate++ % modes.length]!;
     return sr.weighted(modes, (m) => (m === 'present' ? t['secrets.mode.present'] : t['secrets.mode.appear']));
   };
 
@@ -79,11 +102,13 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   const slots = geo.cells.filter((g) => SLOT_KINDS.has(g.kind) && g.cell.role !== 'entry' && g.cell.role !== 'exit' && g.openings.length > 0);
   slots.sort((a, b) => (mainSet.has(a.cell.id) ? main.indexOf(a.cell.id) : 1e6) - (mainSet.has(b.cell.id) ? main.indexOf(b.cell.id) : 1e6));
 
+  const todo = showcase ? showcase.gimmicks.slice() : null;
   for (const g of slots) {
     const onMain = mainSet.has(g.cell.id);
     const chance = g.kind === 'hall' ? t['gimmick.chance.hall'] : g.kind === 'corridor' ? t['gimmick.chance.corridor'] : onMain ? t['gimmick.chance.main'] : t['gimmick.chance.side'];
     const r = rng.fork(`slot:${g.cell.id}`);
-    if (!r.chance(chance)) continue;
+    if (todo && !todo.length) break;
+    if (!todo && !r.chance(chance)) continue;
     const idx = main.indexOf(g.cell.id);
     const entrance = onMain && idx > 0 ? openingTo(geo, g, main[idx - 1]!) : g.openings[0] ?? null;
     const exit = onMain && idx >= 0 && idx < main.length - 1 ? openingTo(geo, g, main[idx + 1]!) : g.openings.find((o) => o !== entrance) ?? null;
@@ -98,11 +123,14 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
       (def.onMainPath !== false || !onMain) &&
       (!def.physics || physicsUsed < t['gimmick.physicsMax']) &&
       (!def.requiresSecret || budget > 0) &&
-      (!def.fits || def.fits(slot)));
+      (!def.fits || def.fits(slot)) &&
+      (!todo || todo.includes(def.id)));
     if (!fit.length) continue;
-    const def = r.weighted(fit, (x) => {
+    // 見本: 残りの一覧の先頭から、この区画に置けるもの
+    const def = todo ? fit.sort((a, b) => todo.indexOf(a.id) - todo.indexOf(b.id))[0]! : r.weighted(fit, (x) => {
       let wt = x.weight;
       if (x.offersSecret && budget > offers.length) wt *= t['gimmick.secretBoost'];
+      wt *= t['gimmick.repeatMul'] ** result.gimmicks.filter((y) => y.def === x.id).length;
       if (onMain && prevMain) {
         if (x.axes.some((a) => prevMain!.axes.includes(a))) wt *= t['gimmick.sameAxisMul'];
         if (x.intensity >= 2 && prevMain.intensity >= 2) wt *= t['gimmick.intenseRunMul'];
@@ -117,7 +145,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
     if (def.requiresSecret && !required.length) { built.restore(); continue; }
     let ok = true;
     for (const o of required) {
-      const sec = attachSecret(world, g, o, modeOf(o), sr.fork(`req${index}`), t, index);
+      const sec = attachSecret(world, g, o, modeOf(o), sr.fork(`req${index}`), t, index, showcase ? SHOWCASE_DESTS[index % SHOWCASE_DESTS.length] : undefined);
       if (!sec) { ok = false; result.attachFailures++; break; }
       result.secrets.push(sec);
       index++;
@@ -129,7 +157,10 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
     const placed = built.id;
     if (def.physics) physicsUsed++;
     if (onMain) prevMain = def;
+    if (todo) todo.splice(todo.indexOf(def.id), 1);
     result.gimmicks.push({ id: placed, def: def.id, cell: g.cell.id, main: onMain });
+    const door = entrance ?? g.openings[0];
+    if (door) result.tour.push({ label: def.name, cell: g.cell.id, ...standAt(door) });
   }
 
   // ⑤ 隠し（残りの数だけ、差し出された元から重みで選ぶ）
@@ -137,21 +168,23 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   while (budget > 0 && pool.length) {
     const pick = sr.weighted(pool, (x) => x.offer.weight);
     pool.splice(pool.indexOf(pick), 1);
-    const s = attachSecret(world, pick.host, pick.offer, modeOf(pick.offer), sr.fork(`s${index}`), t, index);
+    const s = attachSecret(world, pick.host, pick.offer, modeOf(pick.offer), sr.fork(`s${index}`), t, index, showcase ? SHOWCASE_DESTS[index % SHOWCASE_DESTS.length] : undefined);
     if (s) { result.secrets.push(s); index++; budget--; } else result.attachFailures++;
   }
   // 足りなければ、仕掛けとは別の元: 脇道・寄り道の部屋の暗がりの入口（存在型。近くの照明を外して暗くする）
+  if (showcase) budget = Math.min(budget, 1);
   if (budget > 0) {
     const hosts = sr.shuffle(geo.cells.filter((g) => g.kind === 'room' && (g.cell.role === 'side' || g.cell.role === 'rest') && !result.gimmicks.some((x) => x.cell === g.cell.id)));
     for (const g of hosts) {
       if (budget <= 0) break;
       const offer = darkCornerOffer(g, sr);
       if (!offer) continue;
-      const s = attachSecret(world, g, offer, 'present', sr.fork(`d${index}`), t, index);
+      const s = attachSecret(world, g, offer, 'present', sr.fork(`d${index}`), t, index, showcase ? SHOWCASE_DESTS[index % SHOWCASE_DESTS.length] : undefined);
       if (!s) { result.attachFailures++; continue; }
       result.secrets.push(s);
       index++;
       budget--;
+      if (g.openings[0]) result.tour.push({ label: '暗がりの隠し', cell: g.cell.id, ...standAt(g.openings[0]) });
       // 入口の近くの照明を外す（暗がり）
       const c = offer.doorway;
       const near = (x: number, z: number): boolean => (c.dir === 0 || c.dir === 2 ? Math.abs(x - c.at) < 2.2 : Math.abs(z - c.at) < 2.2);

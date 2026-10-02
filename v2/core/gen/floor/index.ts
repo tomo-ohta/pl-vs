@@ -4,6 +4,9 @@
  *   ① 性質（希少度・系統・骨組みの型・大きさ）→ ② 骨組み → ③ 形（部屋・廊下・階段・扉）→ ④ 仕掛け → ⑤ 隠し →
  *   ⑥ 中身（家具。仕掛けの場所は空ける）→ ⑦ 検証
  * 検証に通らなければ、別の候補（profile の salt を変える）で作り直す。候補の並びも seed で決まるので、同じ key なら同じフロア。
+ *
+ * 裏のフロア（variant ≥ 1）: 表のフロア（同じ深さの variant 0）と同じ形を作る（表が合格した性質と形の作り直しの回数を使う）。
+ * 仕掛け・隠し・中身は裏の seed で置き、だめなら置き直す（形は変えない）。見た目は bside.ts の調子で変える
  */
 import { tuningVersion, type Tuning } from '../../config/tuning.ts';
 import { aabbUnion, type AABB } from '../../math/aabb.ts';
@@ -12,9 +15,11 @@ import { rectsOverlap } from '../../world/footprint.ts';
 import type { FloorLayout } from '../../world/layout.ts';
 import type { DressRoom } from '../dress/types.ts';
 import { reachOpenings } from '../reach.ts';
+import { applyBSide } from './bside.ts';
 import { buildGeometry, GenError, type FloorGeometry } from './geometry.ts';
-import { placeGimmicks, type GimmickResult } from './gimmicks.ts';
-import { floorId, rollProfile, type FloorKey, type FloorProfile } from './profile.ts';
+import { placeGimmicks, type GimmickResult, type ShowcaseOptions } from './gimmicks.ts';
+import { floorId, floorSeed, rollProfile, type FloorKey, type FloorProfile } from './profile.ts';
+import { familyById } from './themes.ts';
 import { buildSkeleton } from './skeleton.ts';
 
 export const GEN_VERSION = 'gen-1';
@@ -24,6 +29,8 @@ export interface GenOptions {
   dress?: (r: DressRoom) => void;
   /** 仕掛けと隠しを置かない（段階 2 の確認用） */
   noGimmicks?: boolean;
+  /** 見本のフロア（確認用）: 仕掛けを 1 つずつ置き、隠しを全部付ける。系統・型・大きさも見本用に決める */
+  showcase?: ShowcaseOptions;
 }
 
 export interface GenReport {
@@ -31,6 +38,10 @@ export interface GenReport {
   profile: FloorProfile;
   gimmicks: GimmickResult | null;
   attempts: number;
+  /** 合格した形の作り直しの回数（同じ性質のまま。裏のフロアが表と同じ形を作るのに使う） */
+  geoTry: number;
+  /** 裏のフロアの調子（bside.ts の BSIDE_TONES の id） */
+  tone?: string;
   issues: string[];
   ms: number;
 }
@@ -42,39 +53,51 @@ export function generateFloor(key: FloorKey, t: Tuning, opts: GenOptions = {}): 
 export function generateFloorReport(key: FloorKey, t: Tuning, opts: GenOptions = {}): GenReport {
   const t0 = Date.now();
   const tries = t['floor.genRetries'];
-  let last: { floor: FloorLayout; profile: FloorProfile; issues: string[]; gimmicks: GimmickResult | null } | null = null;
+  // 裏のフロア: 表のフロアが合格した性質と形を使う（表を一度作って確かめる。裏へ入るときだけなので軽い）
+  const front = key.variant > 0 && !opts.showcase ? generateFloorReport({ ...key, variant: 0 }, t, { dress: opts.dress, noGimmicks: opts.noGimmicks }) : null;
+  let last: Omit<GenReport, 'attempts' | 'issues' | 'ms'> | null = null;
   const errors: string[] = [];
   for (let attempt = 0; attempt < tries; attempt++) {
-    const profile = rollProfile(key, t, attempt);
+    const profile = front ? { ...rollProfile({ ...key, variant: 0 }, t, front.attempts - 1), key, id: floorId(key) } : rollProfile(key, t, attempt);
+    if (opts.showcase) {
+      // 見本: 天井の高い系統（弾む床が置けるように）・格子・広め
+      Object.assign(profile, { family: { ...familyById('library'), hallChance: 0.3, levelChance: 0, doorChance: 0.4 }, pattern: 'grid', cols: 5, rows: 5, spacing: 15, rarity: 'Rare' });
+    }
     const rng = new Rng(profile.seed);
     // 形がうまく行かない（階段が収まらない・区画が近すぎる）ときは、性質と骨組みはそのままで形だけ作り直す（系統の出方を偏らせない）
     let geo: FloorGeometry | null = null;
+    let geoTry = front ? front.geoTry : 0;
     const sk = buildSkeleton(profile, rng.fork('skeleton'), t);
-    for (let g = 0; g < 4 && !geo; g++) {
+    for (; geoTry < 4 && !geo; geoTry++) {
       try {
-        geo = buildGeometry(profile, sk, rng.fork(g === 0 ? 'geometry' : `geometry${g}`), t);
+        geo = buildGeometry(profile, sk, rng.fork(geoTry === 0 ? 'geometry' : `geometry${geoTry}`), t);
       } catch (e) {
-        if (e instanceof GenError) { errors.push(`#${attempt}.${g}: ${e.message}`); continue; }
+        if (e instanceof GenError) { errors.push(`#${attempt}.${geoTry}: ${e.message}`); continue; }
         throw e;
       }
     }
     if (!geo) continue;
-    const gimmicks = opts.noGimmicks ? null : placeGimmicks(profile, geo, t, key.depth);
+    geoTry--;
+    // 中身の seed: 表は性質の seed、裏は裏の seed（置き直すたびに変える）
+    const content: FloorProfile = front ? { ...profile, seed: hashAll(floorSeed(key), 'content', attempt) } : profile;
+    const gimmicks = opts.noGimmicks ? null : placeGimmicks(content, geo, t, key.depth, opts.showcase);
     if (opts.dress) {
       for (const g of geo.cells) {
-        opts.dress({ cell: g.cell, kind: g.kind, openings: g.openings, keepOut: gimmicks?.keepOut.get(g.cell.id) ?? [], rng: new Rng(hashAll(profile.seed, 'dress', g.cell.id)), density: 0.5 });
+        opts.dress({ cell: g.cell, kind: g.kind, openings: g.openings, keepOut: gimmicks?.keepOut.get(g.cell.id) ?? [], rng: new Rng(hashAll(content.seed, 'dress', g.cell.id)), density: 0.5 });
       }
     }
-    const floor = assemble(key, profile, geo, t);
+    const floor = assemble(key, content, geo, t);
+    const tone = front ? applyBSide(floor, new Rng(hashAll(floorSeed(key), 'tone'))).id : undefined;
     // 仕掛けを置いた区画は置くときに到達を確かめている（部品が作る床を含めて）ので、ここでは見ない
     const checked = new Set(gimmicks?.gimmicks.map((g) => g.cell) ?? []);
     const issues = validateFloor(floor, geo, checked);
-    if (!issues.length) return { floor, profile, gimmicks, attempts: attempt + 1, issues: errors, ms: Date.now() - t0 };
+    const res = { floor, profile: content, gimmicks, geoTry, ...(tone ? { tone } : {}) };
+    if (!issues.length) return { ...res, attempts: attempt + 1, issues: errors, ms: Date.now() - t0 };
     errors.push(...issues.map((s) => `#${attempt}: ${s}`));
-    last = { floor, profile, issues, gimmicks };
+    last = res;
   }
   if (!last) throw new Error(`フロアを作れませんでした（${floorId(key)}）: ${errors.join(' / ')}`);
-  return { floor: last.floor, profile: last.profile, gimmicks: last.gimmicks, attempts: tries, issues: errors, ms: Date.now() - t0 };
+  return { ...last, attempts: tries, issues: errors, ms: Date.now() - t0 };
 }
 
 function assemble(key: FloorKey, profile: FloorProfile, geo: FloorGeometry, t: Tuning): FloorLayout {

@@ -12,6 +12,7 @@ import type { Rapier } from './rapier.ts';
 
 type World = InstanceType<Rapier['World']>;
 type Body = ReturnType<World['createRigidBody']>;
+type Collider = ReturnType<World['createCollider']>;
 
 export interface BodyOptions {
   density?: number;
@@ -31,6 +32,8 @@ export class PhysicsWorld {
   readonly world: World;
   private player: Body | null = null;
   private readonly bodies = new Map<number, Body>();
+  /** 部品が動かす箱の当たり判定（setKinematicPose で接触を作り直させる） */
+  private readonly kinematicColliders = new Map<number, Collider>();
 
   constructor(R: Rapier, dt: number) {
     this.R = R;
@@ -66,7 +69,7 @@ export class PhysicsWorld {
   addKinematicBox(center: Vec3, half: Vec3, friction = 0.8): number {
     const R = this.R;
     const body = this.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(center[0], center[1], center[2]));
-    this.world.createCollider(R.ColliderDesc.cuboid(half[0], half[1], half[2]).setFriction(friction), body);
+    this.kinematicColliders.set(body.handle, this.world.createCollider(R.ColliderDesc.cuboid(half[0], half[1], half[2]).setFriction(friction), body));
     this.bodies.set(body.handle, body);
     return body.handle;
   }
@@ -76,6 +79,9 @@ export class PhysicsWorld {
     if (!b) return;
     b.setNextKinematicTranslation({ x: pos[0], y: pos[1], z: pos[2] });
     b.setNextKinematicRotation({ x: rot[0], y: rot[1], z: rot[2], w: rot[3] });
+    // Rapier は、上に載った物が箱と一緒に動いて相対位置が変わらないと、接触の向きを作り直さない
+    // （ゆっくり傾く床の上の物が、平らだったときの向きのまま止まって滑らない）。当たり判定の位置を「変わった」ことにして毎 tick 作り直させる
+    this.kinematicColliders.get(handle)?.setTranslationWrtParent({ x: 0, y: 0, z: 0 });
   }
 
   /** 剛体の位置と向き */
@@ -118,6 +124,7 @@ export class PhysicsWorld {
   dispose(): void {
     this.world.free();
     this.bodies.clear();
+    this.kinematicColliders.clear();
     this.player = null;
   }
 }

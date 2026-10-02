@@ -220,6 +220,14 @@ export class ClientGame {
     this.input.exitLock();
   }
 
+  /** 開発用: プレイヤーを pos へ移す（見本のフロアのワープ）。視点もすぐ合わせる */
+  teleport(pos: readonly [number, number, number], yaw: number): void {
+    if (!this.sim) return;
+    this.sim.teleport(0, [pos[0], pos[1], pos[2]], yaw);
+    this.acc = 0;
+    this.handleEvents(this.sim.drainEvents());
+  }
+
   /** テスト用: 1 tick 進める（ペインが隠れて rAF が止まるときの確認用） */
   stepOnce(cmd: Partial<InputCommand> = {}): void {
     if (!this.sim) return;

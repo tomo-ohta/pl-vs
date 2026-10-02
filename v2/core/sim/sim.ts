@@ -312,6 +312,12 @@ export class Sim implements PlayerWorld {
     this.events.push({ type: 'reveal', tick: this.tick, entity: by, data: { group } });
   }
 
+  /** 開発用: プレイヤーを pos へ移す（向き yaw）。イベントは player.respawn（cause 'teleport'） */
+  teleport(index: number, pos: Vec3, yaw: number): void {
+    const p = this.players[index];
+    if (p) this.respawnPlayer(p, { pos, yaw }, 'teleport');
+  }
+
   private respawnPlayer(p: PlayerState, at: { pos: Vec3; yaw: number } | null, cause: string): void {
     const to = at ?? p.respawn;
     p.pos = [...to.pos];

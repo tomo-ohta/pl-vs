@@ -5,6 +5,7 @@
  * 動く物には焼き込み陰影が無いので、置かれた区画の陰影をその位置で測って頂点の明るさ（bakedLight）に写す（浮いて見えないように）。
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { aabbCenter, type AABB } from '../../core/math/aabb.ts';
 import type { PartState } from '../../core/sim/part.ts';
 import type { Sim } from '../../core/sim/sim.ts';
@@ -49,6 +50,23 @@ function boxGeometry(size: [number, number, number], mat: MatId): THREE.BufferGe
   const g = surfaceBox({ min: [-size[0] / 2, -size[1] / 2, -size[2] / 2], max: [size[0] / 2, size[1] / 2, size[2] / 2], mat, solid: false });
   if (!g.getAttribute('bakedLight')) g.setAttribute('bakedLight', new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count * 3), 3));
   return g;
+}
+
+/** 単位の大きさの棚（-0.5..0.5）: 幅の向きの両端の側板・天板・底板・棚板 2 枚。前後は開いている。wideX: 幅が x の向き */
+function shelfGeometry(mat: MatId, wideX: boolean): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const add = (c: [number, number, number], size: [number, number, number]): void => {
+    const g = boxGeometry(size, mat);
+    g.translate(c[0], c[1], c[2]);
+    parts.push(g);
+  };
+  const t = 0.06;
+  if (wideX) { add([-0.5 + t / 2, 0, 0], [t, 1, 1]); add([0.5 - t / 2, 0, 0], [t, 1, 1]); }
+  else { add([0, 0, -0.5 + t / 2], [1, 1, t]); add([0, 0, 0.5 - t / 2], [1, 1, t]); }
+  for (const y of [-0.5 + 0.02, -0.18, 0.15, 0.5 - 0.02]) add([0, y, 0], wideX ? [1 - 2 * t, 0.04, 0.96] : [0.96, 0.04, 1 - 2 * t]);
+  const merged = mergeGeometries(parts, false);
+  for (const g of parts) g.dispose();
+  return merged ?? boxGeometry([1, 1, 1], mat);
 }
 
 /** ジオメトリの bakedLight を一色に（区画の陰影をその位置で測った値） */
@@ -172,9 +190,11 @@ defineView('propPile', (_spec, ctx) => {
   const make = (s: Readonly<PartState>): void => {
     const mats = s.mats as string[];
     const kinds = s.kinds as string[];
+    const half = s.half as number[];
     const order = new Map<string, number[]>();
     mats.forEach((m, i) => {
-      const key = `${m}|${kinds[i] === 'ball' ? 'ball' : 'box'}`;
+      const shape = kinds[i] === 'ball' ? 'ball' : kinds[i] === 'shelf' ? (half[i * 3]! >= half[i * 3 + 2]! ? 'shelfX' : 'shelfZ') : 'box';
+      const key = `${m}|${shape}`;
       const list = order.get(key) ?? [];
       list.push(i);
       order.set(key, list);
@@ -183,11 +203,13 @@ defineView('propPile', (_spec, ctx) => {
       const [mat, shape] = key.split('|') as [MatId, string];
       let geo: THREE.BufferGeometry;
       if (shape === 'ball') geo = sphere;
+      else if (shape === 'shelfX' || shape === 'shelfZ') geo = shelfGeometry(mat, shape === 'shelfX');
       else {
         geo = unitBox.get(mat) ?? boxGeometry([1, 1, 1], mat);
         unitBox.set(mat, geo);
       }
       const g = geo.clone();
+      if (shape === 'shelfX' || shape === 'shelfZ') geo.dispose();
       g.deleteAttribute('bakedLight');
       g.setAttribute('bakedLight', new THREE.InstancedBufferAttribute(new Float32Array(index.length * 3).fill(0.2), 3));
       const mesh = new THREE.InstancedMesh(g, ctx.materials.get(mat), index.length);

@@ -44,10 +44,12 @@ defineGimmick({
     const side = (d: Dir): number => (s.openings.some((o) => o.dir === d) ? 1.35 : 0.05);
     const hole: Rect = { x0: snap(r0.x0 + side(3)), x1: snap(r0.x1 - side(1)), z0: snap(r0.z0 + side(2)), z1: snap(r0.z1 - side(0)) };
     if (rectW(hole) < 4 || rectD(hole) < 4) return;
-    // 隠しの壁: 開口の無い壁のうち、穴が壁まで届いている側
+    // 隠しの壁: 開口の無い壁のうち、穴が壁まで届いている側。入口と直角の壁を選ぶ（入口から出口へまっすぐ歩くだけでは物がどかない。
+    // 反対側の壁際へ行って立ち続けると、床がそちらへ傾いて物が滑る）
     const walls = ([0, 1, 2, 3] as const).filter((d) => side(d) < 0.1);
     if (!walls.length) return;
-    const wd = ctx.rng.pick(walls);
+    const across = walls.filter((d) => !s.entrance || d % 2 !== s.entrance.dir % 2);
+    const wd = ctx.rng.pick(across.length ? across : walls);
     const span = freeWallSpan(s, wd, 2.6, 0.5);
     if (!span) return;
     cutFloorSlab(s, hole);
@@ -61,20 +63,28 @@ defineGimmick({
     // 浅い傾きでも物が滑るよう、物と板の摩擦は小さく
     const halfMax = Math.max(rectW(walk), rectD(walk)) / 2;
     const maxDeg = Math.min(11, (Math.atan(0.33 / halfMax) * 180) / Math.PI);
-    ctx.addEntity('plate', { type: 'tiltFloor', params: { rect: { ...plate }, walkRect: { ...walk }, y, thickness: 0.2, maxDeg, rateDeg: 4, returnDeg: 2, mat: ctx.rng.pick(['floorWood', 'floorLino', 'floorTile'] as const), friction: 0.03 } });
+    // 物が滑り出す傾き: 最大の slideAt 倍（少し寄っただけでは滑らず、端に立ち続けると滑る）。摩擦は板と物で同じ値（Rapier は平均を使う）
+    const mu = Math.tan((ctx.tuning['gimmick.tilt.slideAt'] * maxDeg * Math.PI) / 180);
+    ctx.addEntity('plate', { type: 'tiltFloor', params: { rect: { ...plate }, walkRect: { ...walk }, y, thickness: 0.2, maxDeg, rateDeg: 4, returnDeg: 2, mat: ctx.rng.pick(['floorWood', 'floorLino', 'floorTile'] as const), friction: mu } });
     // 万一、板の下に落ちたら入口の前へ
     const back = s.entrance ? frontOf(s.entrance, 0.8) : [(hole.x0 + hole.x1) / 2, y, hole.z0 - 0.8];
     ctx.addEntity('pitBack', { type: 'respawnZone', params: { aabb: aabbJson({ min: [hole.x0, y - 1.25, hole.z0], max: [hole.x1, y - 0.7, hole.z1] }), to: [back[0]!, y + 0.05, back[2]!], toYaw: 0 } });
-    // 物の山: 隠しの壁の前（幅 2.4 m・奥行き 1.6 m）
+    // 物の山: 隠しの壁の前（幅 2.4 m・奥行き 1.6 m）。壁際には背の高い棚を 2 つ（入口の上まで隠す。傾けると滑ってどく）
     const at = Math.min(Math.max(span.at, span.a0 + 1.3), span.a1 - 1.3);
     const wall = wd === 0 ? plate.z1 : wd === 2 ? plate.z0 : wd === 1 ? plate.x1 : plate.x0;
     const sg = wd === 0 || wd === 1 ? -1 : 1;
-    const p0 = Math.min(wall, wall + sg * 1.6), p1 = Math.max(wall, wall + sg * 1.6);
-    const pileR = wd === 0 || wd === 2 ? { min: [at - 1.2, y + 0.05, p0], max: [at + 1.2, y + 1.3, p1] } : { min: [p0, y + 0.05, at - 1.2], max: [p1, y + 1.3, at + 1.2] };
-    const pile = ctx.addEntity('pile', { type: 'propPile', params: { region: { min: pileR.min, max: pileR.max }, count: ctx.rng.int(18, 26), size: [0.32, 0.55], mats: ['boxCardboard', 'furnitureLight', 'plasticBlue', 'boxCardboard'], density: 200, friction: 0.04, ballRatio: 0.3, layers: 2 } });
+    const along = (a0: number, a1: number, n0: number, n1: number, y0: number, y1: number): { min: number[]; max: number[] } => {
+      const w0 = Math.min(wall + sg * n0, wall + sg * n1), w1 = Math.max(wall + sg * n0, wall + sg * n1);
+      return wd === 0 || wd === 2 ? { min: [a0, y0, w0], max: [a1, y1, w1] } : { min: [w0, y0, a0], max: [w1, y1, a1] };
+    };
+    const shelfMat = ctx.rng.pick(['furnitureDark', 'shelfMetal', 'woodPanel'] as const);
+    ctx.addEntity('screen', { type: 'propPile', params: { items: [{ ...along(at - 1.08, at - 0.04, 0.06, 0.56, y + 0.02, y + 2.12), mat: shelfMat, kind: 'shelf' }, { ...along(at + 0.04, at + 1.08, 0.06, 0.56, y + 0.02, y + 2.12), mat: shelfMat, kind: 'shelf' }], density: 160, friction: mu } });
+    const pileR = along(at - 1.2, at + 1.2, 0.62, 1.7, y + 0.05, y + 1.3);
+    const pile = ctx.addEntity('pile', { type: 'propPile', params: { region: { min: pileR.min, max: pileR.max }, count: ctx.rng.int(14, 20), size: [0.32, 0.55], mats: ['boxCardboard', 'furnitureLight', 'plasticBlue', 'boxCardboard'], density: 200, friction: mu, ballRatio: 0.3, layers: 2 } });
     // ほかの所にも少し（転がして遊べる）
-    ctx.addEntity('scatter', { type: 'propPile', params: { region: aabbJson({ min: [plate.x0 + 0.5, y + 0.05, plate.z0 + 0.5], max: [plate.x1 - 0.5, y + 0.6, plate.z1 - 0.5] }), count: ctx.rng.int(5, 9), size: [0.25, 0.4], mats: ['boxCardboard', 'plasticRed'], density: 200, friction: 0.04, ballRatio: 0.5, layers: 1 } });
-    const count = ctx.addEntity('count', { type: 'countSensor', params: { aabb: { min: [pileR.min[0]!, y - 0.6, pileR.min[2]!], max: [pileR.max[0]!, y + 2.5, pileR.max[2]!] }, of: pile, belowRatio: 0.3 } });
+    ctx.addEntity('scatter', { type: 'propPile', params: { region: aabbJson({ min: [plate.x0 + 0.5, y + 0.05, plate.z0 + 0.5], max: [plate.x1 - 0.5, y + 0.6, plate.z1 - 0.5] }), count: ctx.rng.int(5, 9), size: [0.25, 0.4], mats: ['boxCardboard', 'plasticRed'], density: 200, friction: mu, ballRatio: 0.5, layers: 1 } });
+    const near = along(at - 1.2, at + 1.2, 0, 1.7, y - 0.6, y + 2.5);
+    const count = ctx.addEntity('count', { type: 'countSensor', params: { aabb: near, of: pile, belowRatio: 0.3 } });
     ctx.offerSecret({ hook: 'tilt.clearProps', modes: ['present', 'appear'], weight: 1.2, revealOutput: `${count}.below`, doorway: { dir: wd, at, y, width: 1.0, height: 2.0 }, floorY: y - 0.3, tell: '物の隙間から漏れる光' });
     ctx.keepOut({ min: [hole.x0, y - 1.2, hole.z0], max: [hole.x1, y + 3, hole.z1] });
   },
