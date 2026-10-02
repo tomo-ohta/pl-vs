@@ -127,7 +127,9 @@ defineAnomaly({
       const bb = bbOf(g.boxes);
       const r = rectOf(ctx, (bb.min[0] + bb.max[0]) / 2, (bb.min[2] + bb.max[2]) / 2);
       const ax = anchorOf(bb.min[0], bb.max[0], r.x0, r.x1), az = anchorOf(bb.min[2], bb.max[2], r.z0, r.z1);
-      for (const b of g.boxes) scaleBox(b, s, ax, fy, az);
+      // 背の高い家具（2.6 m の棚など）も膝より低く（0.3 倍でも 0.78 m になるので、高さ 0.72 m に収まる倍率まで下げる）
+      const sg = Math.min(s, 0.72 / Math.max(0.01, bb.max[1] - fy));
+      for (const b of g.boxes) scaleBox(b, sg, ax, fy, az);
     }
     // 壁の根元の小さな扉（開口の前後と家具の陰を避ける）
     const solids = interiorSolids(cell);
