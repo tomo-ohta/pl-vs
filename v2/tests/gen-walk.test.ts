@@ -39,6 +39,8 @@ test('開口と扉は、ジャンプせずに両向きに通れる（見えな�
     prepare(sim, floor);
     for (const p of floor.portals) {
       if (p.cells.some((c) => skip.has(c))) continue;
+      // 段階 4（フロアの形）: 窓（見えるだけ）と天井の点検口（上下の穴）は、歩いて横切る開口ではない
+      if (p.kind === 'window' || p.kind === 'hole') continue;
       const axis = p.dir % 2 === 0 ? 2 : 0;
       const c = [(p.aabb.min[0] + p.aabb.max[0]) / 2, p.aabb.min[1], (p.aabb.min[2] + p.aabb.max[2]) / 2];
       for (const s of [1, -1]) {

@@ -80,8 +80,9 @@ test('一つだけ違う: 生成したフロアに出て、出現型は違う家
       if (before.ok) fails.push(`${room.floor.id} ${sec.id}: 触れる前に隠しへ行けた`);
       // 違う家具の前（1.2〜1.8 m）に立って、見て調べる
       let touched = false;
-      for (const dist of [1.3, 1.7, 1.0]) for (let k = 0; k < 8 && !touched; k++) {
-        const a = (k / 8) * Math.PI * 2;
+      // 狭いブース（2 m 四方）では、ブースの口の側にしか立てないことがある。角度を細かく・距離を広めに探す
+      for (const dist of [1.3, 1.7, 1.0, 2.0, 0.8]) for (let k = 0; k < 16 && !touched; k++) {
+        const a = (k / 16) * Math.PI * 2;
         const x = c[0]! + Math.cos(a) * dist, z = c[2]! + Math.sin(a) * dist;
         if (sim.colliders.query(x - 0.4, room.cell.floorY + 0.05, z - 0.4, x + 0.4, room.cell.floorY + 1.8, z + 0.4).length) continue;
         if (x < room.cell.bounds.min[0] + 0.4 || x > room.cell.bounds.max[0] - 0.4 || z < room.cell.bounds.min[2] + 0.4 || z > room.cell.bounds.max[2] - 0.4) continue;

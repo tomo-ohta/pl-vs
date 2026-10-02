@@ -104,8 +104,14 @@ defineGimmick({
     cell.render = { ...cell.render, fog: { color, near: t['map.fogTower.fogNearM'], far: t['map.fogTower.fogFarM'] } };
     cell.palette = { ...cell.palette, fog: color };
     if (secret && doorOpening) {
-      const away = ctx.addEntity('away', { type: 'distanceSensor', params: { target: [...top], dist: t['map.fogTower.awayM'], mode: 'far', sec: t['map.fogTower.awaySec'], aabb: aabbJson({ min: [r.x0, y - 0.5, r.z0], max: [r.x1, y + 2.5, r.z1] }) } });
-      ctx.offerSecret({ hook: 'landmark.away', modes: ['present', 'appear'], weight: 1.1, revealOutput: `${away}.done`, doorway: { dir: secret.dir, at: secret.at, y, width: 1.0, height: 2.0 }, tell: '霧のいちばん奥、塔の灯りが届かない所' });
+      // 離れる距離: 隠しの壁の前（壁から内側 0.9 m 余り）で届く距離まで縮める（小さな部屋では awayM 離れられる所が無い）。塔の灯りとの 3 次元の距離
+      const fx = secret.front[0], fz = secret.front[1];
+      const reach = Math.hypot(fx - top[0], (y + 1.0) - top[1], fz - top[2]) - 1.2;
+      const dist = Math.min(t['map.fogTower.awayM'], reach);
+      // 4 m も離れられない部屋では、現れる隠しにしない（壁と同じ色の扉だけ）
+      const modes: ('present' | 'appear')[] = dist >= 4 ? ['present', 'appear'] : ['present'];
+      const away = ctx.addEntity('away', { type: 'distanceSensor', params: { target: [...top], dist, mode: 'far', sec: t['map.fogTower.awaySec'], aabb: aabbJson({ min: [r.x0, y - 0.5, r.z0], max: [r.x1, y + 2.5, r.z1] }) } });
+      ctx.offerSecret({ hook: 'landmark.away', modes, weight: 1.1, revealOutput: `${away}.done`, doorway: { dir: secret.dir, at: secret.at, y, width: 1.0, height: 2.0 }, tell: '霧のいちばん奥、塔の灯りが届かない所' });
     }
     // 家具は置かない（霧と仕切りだけの部屋）
     ctx.keepOut({ min: [r.x0, y - 0.1, r.z0], max: [r.x1, y + cell.height, r.z1] });

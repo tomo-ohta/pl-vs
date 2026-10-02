@@ -128,6 +128,7 @@ interface Snap {
   exits: number;
   keep: number;
   noDress: boolean;
+  bounds: AABB;
 }
 
 function snapshot(g: GeoCell, geo: FloorGeometry, gim: GimmickResult, an: AnomalyPlan): Snap {
@@ -135,7 +136,33 @@ function snapshot(g: GeoCell, geo: FloorGeometry, gim: GimmickResult, an: Anomal
     cell: JSON.stringify(g.cell), keys: Object.keys(g.cell), boxes: new Set(g.cell.boxes), openings: g.openings.length,
     cells: geo.cells.length, portals: geo.portals.length, entities: geo.entities.length, exits: geo.exits.length,
     keep: gim.keepOut.get(g.cell.id)?.length ?? 0, noDress: an.noDress.has(g.cell.id),
+    bounds: { min: [...g.cell.bounds.min], max: [...g.cell.bounds.max] },
   };
+}
+
+/** 2 つの外形の重なりの体積（どれかの軸の重なりが 0.3 m 以下なら 0。壁の厚みで接しているだけの隣は数えない） */
+function overlapVolume(a: AABB, b: AABB): number {
+  let v = 1;
+  for (let i = 0; i < 3; i++) {
+    const d = Math.min(a.max[i]!, b.max[i]!) - Math.max(a.min[i]!, b.min[i]!);
+    if (d <= 0.3) return 0;
+    v *= d;
+  }
+  return v;
+}
+
+/**
+ * 形で大きくなった外形（天井を上げる・床を掘る・区画を足す）が、ほかの区画に入り込まないか（段階 4 の統合: フロアの形の担当の
+ * 上下に重なる型（螺旋・ビル・中二階 …）で、高い天井や穴が上下の階の区画に入り込んだ）
+ */
+function clearOfOthers(g: GeoCell, geo: FloorGeometry, s: Snap): boolean {
+  const added = geo.cells.slice(s.cells).map((x) => x.cell);
+  for (const o of geo.cells.slice(0, s.cells)) {
+    if (o.cell === g.cell) continue;
+    if (overlapVolume(g.cell.bounds, o.cell.bounds) > overlapVolume(s.bounds, o.cell.bounds) + 0.05) return false;
+    for (const c of added) if (overlapVolume(c.bounds, o.cell.bounds) > 0.05) return false;
+  }
+  return true;
 }
 
 function restore(g: GeoCell, geo: FloorGeometry, gim: GimmickResult, an: AnomalyPlan, s: Snap): void {
@@ -209,7 +236,8 @@ export function shapeRooms(p: FloorProfile, geo: FloorGeometry, gimmicks: Gimmic
     return !shape || !!roomShapeDef(shape)?.anomalies?.includes(defId);
   };
 
-  const cands = geo.cells.filter((g) => ROOM_KINDS.has(g.kind) && !NOT_ROLES.has(g.cell.role) && g.openings.length > 0 && !gimCells.has(g.cell.id) && !hosts.has(g.cell.id) && !anomalies.noDress.has(g.cell.id));
+  // フロアの形が作った区画（geo.reserved: 鏡写しの組など）には掛けない
+  const cands = geo.cells.filter((g) => ROOM_KINDS.has(g.kind) && !NOT_ROLES.has(g.cell.role) && g.openings.length > 0 && !gimCells.has(g.cell.id) && !hosts.has(g.cell.id) && !anomalies.noDress.has(g.cell.id) && !geo.reserved?.has(g.cell.id));
   cands.sort((a, b) => (mainIdx.get(a.cell.id) ?? 1e6) - (mainIdx.get(b.cell.id) ?? 1e6));
 
   const entranceOf = (g: GeoCell): WallOpening => {
@@ -272,7 +300,7 @@ export function shapeRooms(p: FloorProfile, geo: FloorGeometry, gimmicks: Gimmic
       },
       reachOk: () => reachNotWorse(g, base, !!an),
     };
-    const why = def.build(ctx) === false ? 'build' : !reachNotWorse(g, base, !!an) ? 'reach' : !doorsClear(g, snap) ? 'doors' : !doorFloorsOk(g, geo) ? 'floor'
+    const why = def.build(ctx) === false ? 'build' : !clearOfOthers(g, geo, snap) ? 'overlap' : !reachNotWorse(g, base, !!an) ? 'reach' : !doorsClear(g, snap) ? 'doors' : !doorFloorsOk(g, geo) ? 'floor'
       : cell.boxes.length - snap.boxes.size > t['rooms.maxBoxes'] ? 'boxes' : cell.lights.length > Math.max(lights0, t['rooms.maxLights']) ? 'lights' : '';
     if (why) { roomsDebug.fail?.(def.id, cell.id, why); restore(g, geo, gimmicks, anomalies, snap); return false; }
     cell.shape = def.id;

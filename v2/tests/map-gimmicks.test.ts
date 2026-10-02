@@ -169,7 +169,7 @@ test('地図の空白: 出現型は空白の壁の前で立ち止まる・壁を
 });
 
 test('地図の空白: 製図台があっても入口から出口の向こうまで歩ける・決定的', () => {
-  const rooms = findRooms('mapBlank', 4, { maxWorld: 200 });
+  const rooms = findRooms('mapBlank', 4, { maxWorld: 500 });
   assert.ok(rooms.length >= 3, `地図の空白の部屋 ${rooms.length}`);
   for (const room of rooms) {
     assert.ok(room.cell.boxes.some((b) => b.propGroup?.endsWith('mapBlank-table')), '製図台の地図');

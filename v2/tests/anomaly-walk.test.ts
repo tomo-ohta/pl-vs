@@ -61,6 +61,8 @@ test('異変の部屋の開口は、ジャンプせずに両向きに通れる�
     const sim = new Sim(floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
     for (const p of floor.portals) {
       if (!p.cells.some((c) => cells.has(c))) continue;
+      // 段階 4（フロアの形）: 窓と天井の点検口は、歩いて横切る開口ではない
+      if (p.kind === 'window' || p.kind === 'hole') continue;
       const axis = p.dir % 2 === 0 ? 2 : 0;
       const c = [(p.aabb.min[0] + p.aabb.max[0]) / 2, p.aabb.min[1], (p.aabb.min[2] + p.aabb.max[2]) / 2];
       for (const s of [1, -1]) {
@@ -103,7 +105,19 @@ test('浸水は遅く、軽い部屋は高く跳べる（ゾーンが効く）',
       const cell = r.floor.cells.find((c) => c.id === a.cell)!;
       const z = cell.zones.find((x) => x.kind === (a.def === 'flood' ? 'water' : 'gravity'))!;
       const sim = new Sim(r.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
-      const p0: [number, number, number] = [(z.aabb.min[0] + z.aabb.max[0]) / 2, cell.floorY + 0.02, (z.aabb.min[2] + z.aabb.max[2]) / 2];
+      // 頭の上が 2.6 m 空いている所（真ん中に家具・宙の足場があると跳べない）。真ん中から外へ探す
+      const cx = (z.aabb.min[0] + z.aabb.max[0]) / 2, cz = (z.aabb.min[2] + z.aabb.max[2]) / 2;
+      // 宙に浮かせた家具（軽い部屋）の下でも跳べないので、体の幅 ±0.45 m の上が天井まで空いている所を区画の箱から探す
+      const top0 = Math.min(cell.floorY + cell.height, cell.floorY + 3.2);
+      const clear = (x: number, zz: number): boolean => !cell.boxes.some((b) => b.solid !== false && b.max[1] > cell.floorY + 0.05 && b.min[1] < top0 - 0.01 && b.min[0] < x + 0.45 && b.max[0] > x - 0.45 && b.min[2] < zz + 0.45 && b.max[2] > zz - 0.45);
+      let spot: [number, number] | null = null;
+      search: for (let rr = 0; rr <= 4; rr += 0.25) for (let k = 0; k < 16; k++) {
+        const x = cx + Math.cos((k / 16) * Math.PI * 2) * rr, zz = cz + Math.sin((k / 16) * Math.PI * 2) * rr;
+        if (x > z.aabb.min[0] + 0.5 && x < z.aabb.max[0] - 0.5 && zz > z.aabb.min[2] + 0.5 && zz < z.aabb.max[2] - 0.5 && clear(x, zz)) { spot = [x, zz]; break search; }
+      }
+      if (!spot && a.def === 'lowGravity') { sim.physics?.dispose(); continue; }
+      spot ??= [cx, cz];
+      const p0: [number, number, number] = [spot[0], cell.floorY + 0.02, spot[1]];
       sim.teleport(0, p0, 0);
       for (let i = 0; i < 20; i++) sim.step([{ ...IDLE_COMMAND }]);
       const pl = sim.players[0]!;

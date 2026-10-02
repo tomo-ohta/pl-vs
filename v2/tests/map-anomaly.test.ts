@@ -44,7 +44,8 @@ test('見本のフロア（?try=mapErase,mapRotate,unmapped）: 3 つとも置�
 
 test('ふつうのフロアにも出る・同じ key なら同じ', () => {
   const by: Record<string, number> = {};
-  for (let w = 1; w <= 150; w++) {
+  // 150 フロア。異変の種類が増えて揃わなければ、どれも 3 回出るまで（400 フロアまで）
+  for (let w = 1; w <= 150 || (w <= 400 && IDS.some((id) => (by[id] ?? 0) < 3)); w++) {
     const r = generateFloorReport({ world: w, depth: 1 + (w % 9), variant: 0 }, t);
     for (const a of r.anomalies) if (IDS.includes(a.def)) by[a.def] = (by[a.def] ?? 0) + 1;
   }

@@ -222,6 +222,19 @@ function wallOnEdge(out: Box[], e: Edge, a0: number, a1: number, y: number, h: n
   };
   const cuts: [number, number][] = ops.map((op) => [Math.max(a0, op.at - op.width / 2), Math.min(a1, op.at + op.width / 2)]);
   for (const [s0, s1] of subtract(a0, a1, cuts)) put(s0, s1, y, y + h);
+  // 段階 4（フロアの形の担当が足した）: 横に重なる開口（階段室の上下の階の扉など、同じ所の高さの違う開口）は、
+  // 区間ごとに、重なる開口の高さの範囲をまとめて抜く（1 つずつ上下の壁を立てると、上の開口が下の開口のまぐさで塞がる）
+  if (ops.some((_p, i) => ops.some((_q, j) => j > i && cuts[i]![0] < cuts[j]![1] - EPS && cuts[j]![0] < cuts[i]![1] - EPS))) {
+    const xs = [...new Set(cuts.flat())].sort((p, q) => p - q);
+    for (let i = 0; i + 1 < xs.length; i++) {
+      const p = xs[i]!, q = xs[i + 1]!;
+      if (q - p < 0.005) continue;
+      const gaps = ops.filter((_, k) => cuts[k]![0] <= p + 1e-6 && cuts[k]![1] >= q - 1e-6).map((op) => [Math.max(0, op.sill ?? 0), Math.max(0, op.sill ?? 0) + op.height] as [number, number]);
+      if (!gaps.length) continue;
+      for (const [v0, v1] of subtract(0, h, gaps)) put(p, q, y + v0, y + v1);
+    }
+    return;
+  }
   for (const op of ops) {
     const s0 = Math.max(a0, op.at - op.width / 2);
     const s1 = Math.min(a1, op.at + op.width / 2);

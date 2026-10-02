@@ -122,6 +122,8 @@ test('細い道: 落ちた先の隠し部屋まで歩いて行ける（存在型
     if (!sec) continue;
     n++;
     const sim = new Sim(r.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
+    // ほかの隠し（出現型）の壁は消しておく（歩く人の道順は隠し通路も通る。gen-walk の prepare と同じ）
+    for (const e of r.floor.entities) if (e.type === 'reveal') (sim as unknown as { revealGroup(g: string, b: string): void }).revealGroup(String(e.params.group), 'test');
     // 段階 4（carry）: スイッチで開く扉は開いたままにする（歩く人はスイッチを探さない。gen-walk の prepare と同じ）
     const wired = r.floor.entities.filter((e) => e.type === 'door' && e.inputs?.open).map((e) => e.id);
     const step = sim.step.bind(sim);

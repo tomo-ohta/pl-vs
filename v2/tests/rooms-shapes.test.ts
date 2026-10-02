@@ -54,7 +54,13 @@ const CHECKS: Record<string, (c: CellLayout, fl: FloorLayout) => string | null> 
   slantWalls: (c) => (boxesOf(c, (b) => !!b.slope && !b.solid && b.mat === c.palette.wall).length >= 1 ? null : '傾いた壁の板'),
   windows: (c) => (boxesOf(c, (b) => b.mat === 'windowLit' || b.mat === 'windowDark').length >= 5 ? null : '窓 5 枚以上'),
   hut: (c) => (boxesOf(c, (b) => ['glass', 'sidingMetal', 'sidingWood', 'neonRed'].includes(b.mat)).length >= 1 ? null : '小屋'),
-  eelBed: (c) => (Math.min(...c.footprint.map((r) => Math.min(r.x1 - r.x0, r.z1 - r.z0))) <= 1.6 && Math.max(...c.footprint.map((r) => Math.max(r.x1 - r.x0, r.z1 - r.z0))) >= 9 ? null : '細長い帯'),
+  // 細い矩形（幅 1.6 m 以下）をまとめた長さで見る（ほかの開口への枝が帯を区切るので、矩形 1 つの長さでは短く見える）
+  eelBed: (c) => {
+    const thin = c.footprint.filter((r) => Math.min(r.x1 - r.x0, r.z1 - r.z0) <= 1.6);
+    if (!thin.length) return '細長い帯';
+    const len = Math.max(Math.max(...thin.map((r) => r.x1)) - Math.min(...thin.map((r) => r.x0)), Math.max(...thin.map((r) => r.z1)) - Math.min(...thin.map((r) => r.z0)));
+    return len >= 9 ? null : `細長い帯 ${len.toFixed(1)}`;
+  },
   endless: (c) => (c.render?.fog && c.render.fog.far < 14 ? null : '霧'),
   roundRoom: (c, fl) => (locked(fl, c) >= 4 ? null : `開かない扉 ${locked(fl, c)}`),
   centerHole: (c) => (c.bounds.min[1] <= fyOf(c) - 2.0 ? null : '深い穴'),

@@ -20,7 +20,7 @@ import { applyBSide } from './bside.ts';
 import { buildGeometry, GenError, type FloorGeometry } from './geometry.ts';
 import { placeGimmicks, type GimmickResult, type ShowcaseOptions } from './gimmicks.ts';
 import { floorId, floorSeed, rollProfile, type FloorKey, type FloorProfile } from './profile.ts';
-import { familyById } from './themes.ts';
+import { familyById, type PatternId } from './themes.ts';
 import { buildSkeleton } from './skeleton.ts';
 import { placeMapSigns } from '../gimmicks/map/signs.ts';
 import { shapeRooms } from '../rooms/index.ts';
@@ -34,6 +34,8 @@ export interface GenOptions {
   noGimmicks?: boolean;
   /** 見本のフロア（確認用）: 仕掛けを 1 つずつ置き、隠しを全部付ける。系統・型・大きさも見本用に決める */
   showcase?: ShowcaseOptions & Partial<AnomalyShowcase>;
+  /** フロアの形の型を決めて作る（確認用。クライアントの ?shape=。段階 4 のフロアの形の担当） */
+  shape?: PatternId;
 }
 
 export interface GenReport {
@@ -59,11 +61,11 @@ export function generateFloorReport(key: FloorKey, t: Tuning, opts: GenOptions =
   const t0 = Date.now();
   const tries = t['floor.genRetries'];
   // 裏のフロア: 表のフロアが合格した性質と形を使う（表を一度作って確かめる。裏へ入るときだけなので軽い）
-  const front = key.variant > 0 && !opts.showcase ? generateFloorReport({ ...key, variant: 0 }, t, { dress: opts.dress, noGimmicks: opts.noGimmicks }) : null;
+  const front = key.variant > 0 && !opts.showcase ? generateFloorReport({ ...key, variant: 0 }, t, { dress: opts.dress, noGimmicks: opts.noGimmicks, ...(opts.shape ? { shape: opts.shape } : {}) }) : null;
   let last: Omit<GenReport, 'attempts' | 'issues' | 'ms'> | null = null;
   const errors: string[] = [];
   for (let attempt = 0; attempt < tries; attempt++) {
-    const profile = front ? { ...rollProfile({ ...key, variant: 0 }, t, front.attempts - 1), key, id: floorId(key) } : rollProfile(key, t, attempt);
+    const profile = front ? { ...rollProfile({ ...key, variant: 0 }, t, front.attempts - 1, opts.shape), key, id: floorId(key) } : rollProfile(key, t, attempt, opts.shape);
     if (opts.showcase) {
       // 見本: 天井の高い系統（弾む床が置けるように）・格子・広め
       // 仕掛け 13 種 + 異変の部屋が入るように 6×6
@@ -100,11 +102,13 @@ export function generateFloorReport(key: FloorKey, t: Tuning, opts: GenOptions =
       for (const g of geo.cells) {
         if (fixed.has(g.cell.id) || anomalies?.noDress.has(g.cell.id)) continue;
         dressedFrom.set(g.cell.id, g.cell.boxes.length);
-        opts.dress({ cell: g.cell, kind: g.kind, openings: g.openings, keepOut: gimmicks?.keepOut.get(g.cell.id) ?? [], rng: new Rng(hashAll(content.seed, 'dress', g.cell.id)), density: 0.5 });
+        opts.dress({ cell: g.cell, kind: g.kind, openings: g.openings, keepOut: [...(gimmicks?.keepOut.get(g.cell.id) ?? []), ...(geo.keepOut?.get(g.cell.id) ?? [])], rng: new Rng(hashAll(content.seed, 'dress', g.cell.id)), density: 0.5 });
       }
     }
     // 異変の中身を置いた後の変化（post: 家具の変形）
     anomalies?.post(dressedFrom);
+    // フロアの形の仕上げ（鏡写しの家具など。仕掛け・異変・隠しのある区画は触らない）
+    geo.afterDress?.({ ...(opts.dress ? { dress: opts.dress } : {}), dressedFrom, busy: new Set([...(gimmicks?.gimmicks.map((x) => x.cell) ?? []), ...(anomalies?.placed.map((x) => x.cell) ?? []), ...(gimmicks?.secrets.flatMap((x) => [x.host, ...x.cells, ...(x.to ? [x.to] : [])]) ?? [])]) });
     // 地図の看板（入口の案内図・現在地の看板）と落ちている誰かの地図（段階 4・地図の担当。家具の後に空いている壁と床へ）
     if (gimmicks) placeMapSigns(content, geo, gimmicks, anomalies?.placed ?? [], t);
     const floor = assemble(key, content, geo, t);

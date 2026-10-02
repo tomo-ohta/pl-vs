@@ -362,9 +362,13 @@ export function sampleCellLight(cell: BuiltCell, at: [number, number, number], l
 /** 点を含む区画（無ければ null） */
 export function cellAt(built: BuiltFloor, at: readonly [number, number, number]): BuiltCell | null {
   let best: BuiltCell | null = null;
+  // 段階 4（フロアの形）: 上下に重なる区画（階・天井裏・立体交差）では、点がその区画の床から天井の間にある区画を先に（床の高い方）
+  const stand = (c: BuiltCell): boolean => at[1] >= c.layout.floorY - 1.0 && at[1] <= c.layout.floorY + c.layout.height;
   for (const c of built.cells.values()) {
     const b = c.bounds;
     if (at[0] < b.min[0] || at[0] > b.max[0] || at[2] < b.min[2] || at[2] > b.max[2] || at[1] < b.min[1] - 2 || at[1] > b.max[1] + 0.5) continue;
+    if (best && stand(best) !== stand(c)) { if (stand(c)) best = c; continue; }
+    if (best && stand(c) && Math.abs(c.layout.floorY - best.layout.floorY) > 0.5) { if (c.layout.floorY > best.layout.floorY) best = c; continue; }
     // 重なるときは小さい区画（中に入っている方）
     if (!best || (b.max[0] - b.min[0]) * (b.max[2] - b.min[2]) < (best.bounds.max[0] - best.bounds.min[0]) * (best.bounds.max[2] - best.bounds.min[2])) best = c;
   }

@@ -97,7 +97,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   result.budget = budget;
   let alternate = showcase?.flip ? 1 : 0;
   // 通り抜けの出口にしない区画: 仕掛けのある区画（置くたびに足す）
-  const avoid = new Set<string>();
+  const avoid = new Set<string>(geo.reserved ?? []);
   const world = { cells: geo.cells, portals: geo.portals, entities: geo.entities, exits: geo.exits, depth, avoid };
   // 行き止まりでない隠し（通り抜け・穴）の数。隠しが 2 つ以上になるフロアでは secrets.throughMin 以上にする
   let through = 0;
@@ -133,7 +133,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   };
 
   // 置く順: 本道の上（入口から）→ ほか
-  const slots = geo.cells.filter((g) => SLOT_KINDS.has(g.kind) && g.cell.role !== 'entry' && g.cell.role !== 'exit' && g.openings.length > 0);
+  const slots = geo.cells.filter((g) => SLOT_KINDS.has(g.kind) && g.cell.role !== 'entry' && g.cell.role !== 'exit' && g.openings.length > 0 && !geo.reserved?.has(g.cell.id));
   slots.sort((a, b) => (mainSet.has(a.cell.id) ? main.indexOf(a.cell.id) : 1e6) - (mainSet.has(b.cell.id) ? main.indexOf(b.cell.id) : 1e6));
 
   const todo = showcase ? showcase.gimmicks.slice() : null;
@@ -221,7 +221,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   // 足りなければ、仕掛けとは別の元: 脇道・寄り道の部屋の暗がりの入口（存在型。近くの照明を外して暗くする）
   if (showcase) budget = Math.min(budget, 1);
   if (budget > 0) {
-    const hosts = sr.shuffle(geo.cells.filter((g) => g.kind === 'room' && (g.cell.role === 'side' || g.cell.role === 'rest') && !result.gimmicks.some((x) => x.cell === g.cell.id)));
+    const hosts = sr.shuffle(geo.cells.filter((g) => g.kind === 'room' && (g.cell.role === 'side' || g.cell.role === 'rest') && !result.gimmicks.some((x) => x.cell === g.cell.id) && !geo.reserved?.has(g.cell.id)));
     for (const g of hosts) {
       if (budget <= 0) break;
       const offer = darkCornerOffer(g, sr);
@@ -342,6 +342,9 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
     for (const x of touched.values()) x.g.cell.boxes = x.boxes;
   };
   if (!added) { restore(); return null; }
+  // 段階 4（フロアの形）: 下に別の階の区画がある区画では、床の下に掘れる深さより深く掘る仕掛け（穴・溝）は置かない
+  const free = geo.belowFree?.get(g.cell.id);
+  if (free !== undefined && g.cell.boxes.some((b) => b.min[1] < g.cell.floorY - Math.max(0.2, free - 0.05))) { restore(); return null; }
   // 閉じ込めない: 開口どうしが歩いてつながる（部品が作る床は reachAssist で足す）
   if (g.openings.length >= 2) {
     const reach = reachOpenings({ footprint: g.cell.footprint, floorY: g.cell.floorY, boxes: assist.length ? [...g.cell.boxes, ...assist] : g.cell.boxes }, g.openings, 0.1);

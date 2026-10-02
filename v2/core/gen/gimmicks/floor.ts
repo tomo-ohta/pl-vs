@@ -73,6 +73,8 @@ defineGimmick({
     const gi = t['gimmick.crumble.gapM'] / 2;
     pieces.forEach((r, i) => {
       const b = { min: [r.x0 + gi, y - 0.12, r.z0 + gi], max: [r.x1 - gi, y, r.z1 - gi] };
+      // 段階 4（フロアの形の担当が直した）: 固い床の縁の細い切れ端（0.3 m 未満）は崩れない（乗っても揺れて見えるだけの細い板にしない）
+      if (Math.min(r.x1 - r.x0, r.z1 - r.z0) < 0.3) { ctx.addBox(box(b.min as [number, number, number], b.max as [number, number, number], floorMat)); return; }
       if (safe.has(i)) { ctx.addBox(box(b.min as [number, number, number], b.max as [number, number, number], floorMat)); return; }
       ctx.addEntity(`t${i}`, { type: 'crumbleTile', params: { box: b, mat, standSec: t['gimmick.crumble.standSec'] * ctx.rng.float(0.85, 1.25), shakeSec: t['gimmick.crumble.shakeSec'] * ctx.rng.float(0.8, 1.3), respawnSec: t['gimmick.crumble.respawnSec'] } });
     });

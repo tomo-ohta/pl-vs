@@ -19,12 +19,15 @@ defineAnomaly({
     const fixed = interiorSolids(cell);
     const made: Box[] = [];
     const want = ctx.rng.int(2, 4);
+    // 段階 4（フロアの形の担当が直した）: 足場の底は立った頭より上（1.85 m）。低い足場は、後で置く家具と合わせて立ったままの道を塞ぐことがあった
+    const lo = 1.97;
+    if (h - 1.85 < lo) return;
     for (let i = 0; i < 30 && made.length < want; i++) {
       const r = ctx.rng.pick(ctx.rects);
       const s = ctx.rng.float(0.9, 1.4);
       if (r.x1 - r.x0 < s + 1 || r.z1 - r.z0 < s + 1) continue;
       const x = ctx.rng.float(r.x0 + s / 2 + 0.4, r.x1 - s / 2 - 0.4), z = ctx.rng.float(r.z0 + s / 2 + 0.4, r.z1 - s / 2 - 0.4);
-      const top = fy + ctx.rng.float(1.15, Math.max(1.2, h - 1.85));
+      const top = fy + ctx.rng.float(lo, Math.max(lo, h - 1.85));
       const b = box([x - s / 2, top - 0.12, z - s / 2], [x + s / 2, top, z + s / 2], ctx.rng.pick(['furnitureLight', 'woodPanel', 'metal'] as const), true);
       if (hitsAny(doors, b) || fixed.some((f) => overlaps(f, b, 0.2)) || made.some((m) => overlaps(m, b, 0.5))) continue;
       b.kind = 'floatingPlatform';

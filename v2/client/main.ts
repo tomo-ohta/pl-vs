@@ -7,6 +7,8 @@
  *   G で次の仕掛けの入口へ移る（Shift+G で前へ）。`?dev=1` なら、ふつうのフロアでも G が使える
  * - `?try=id,id` 指定した仕掛け・異変だけを置いた見本のフロア / `?group=<担当>` 担当（core/gen/catalog）の仕掛け・異変を全部置いた見本
  * - 地図と図鑑（client/map/MapController）: M キー / 地図ボタンでメニューの地図のタブ。フロアを読むたびに setFloor
+ * - `?shape=<型>` フロアの形の型を決めて作る（どのフロアも。core/gen/floor/themes.ts の PatternId。例: spiral・tower・station）
+ * - 駅の車両（F35）で次のフロアへ着いたときは、次のフロアの車両の中（trainRide の params.arrive）に出る
  * - 開発用: window.game（ClientGame）。ペインが隠れて rAF が止まるときは game.stepOnce() で 1 tick ずつ進める
  */
 import './ui/style.css';
@@ -16,6 +18,7 @@ import { dressCell } from '../core/gen/dress/index.ts';
 import { generateFloorReport, type GenReport } from '../core/gen/floor/index.ts';
 import type { TourStop } from '../core/gen/floor/gimmicks.ts';
 import { showcaseFloor } from '../core/gen/floor/showcase.ts';
+import type { PatternId } from '../core/gen/floor/themes.ts';
 import { RARE_DEFS } from '../core/gen/secrets/index.ts';
 import { CATALOG_BY_WS } from '../core/gen/catalog/index.ts';
 import type { FloorLayout } from '../core/world/layout.ts';
@@ -31,6 +34,8 @@ const { tuning, errors } = makeTuning(parseTuneParam(params.get('tune')));
 if (errors.length) console.warn('[tune]', errors.join(' / '));
 const seed = Number(params.get('seed') ?? 1) >>> 0 || 1;
 const useLab = params.has('lab');
+// フロアの形の型（段階 4 のフロアの形の担当が足した）
+const shapeParam = (params.get('shape') || undefined) as PatternId | undefined;
 const showcase = Math.max(0, Number(params.get('showcase') ?? 0) | 0);
 // 見本に置く仕掛け・異変を選ぶ（?try= / ?group=）
 const tryIds = [...new Set([
@@ -82,7 +87,7 @@ function makeFloor(d: number, v = 0): FloorLayout {
   const dress = params.has('nodress') ? undefined : dressCell;
   const first = d === 0 && v === 0 && !moved;
   const r = tryIds.length && first ? showcaseFloor(tuning, { ids: tryIds, flip: showcase === 2, dress })
-    : showcase && first ? showcaseFloor(tuning, { flip: showcase === 2, dress }) : generateFloorReport({ world: seed, depth: d, variant: v }, tuning, { dress });
+    : showcase && first ? showcaseFloor(tuning, { flip: showcase === 2, dress }) : generateFloorReport({ world: seed, depth: d, variant: v }, tuning, { dress, ...(shapeParam ? { shape: shapeParam } : {}) });
   console.info(`[gen] ${r.floor.id} ${r.profile.rarity} ${r.profile.family.name}/${r.profile.pattern} ${r.profile.cols}×${r.profile.rows} 区画 ${r.floor.cells.length} 箱 ${r.floor.cells.reduce((a, c) => a + c.boxes.length, 0)}${r.tone ? ` 裏の調子 ${r.tone}` : ''} 作り直し ${r.attempts - 1} ${r.ms} ms`, r.issues);
   lastReport = r;
   tour = tourOf(r);
@@ -137,8 +142,14 @@ game.onFloorExit = (_exit, _kind, to): void => {
     if (m) { depth = Number(m[1]); variant = Number(m[2]); } else { depth++; variant = 0; }
     moved = true;
     const t0 = performance.now();
-    await game.loadFloor(makeFloor(depth, variant));
+    const next = makeFloor(depth, variant);
+    await game.loadFloor(next);
     if (game.sim) maps.setFloor(game.sim.floor, lastReport, { world: seed, depth, variant });
+    // 駅の車両で着いた: 次のフロアにも車両があれば、その中に出る（扉が閉まった車両の中から、着いて扉が開く）
+    if (_exit === 'train') {
+      const arrive = next.entities.find((e) => e.type === 'trainRide')?.params.arrive as { pos?: number[]; yaw?: number } | undefined;
+      if (arrive?.pos) game.teleport([arrive.pos[0]!, arrive.pos[1]!, arrive.pos[2]!], arrive.yaw ?? 0);
+    }
     console.info(`[floor] B${depth + 1}F${variant ? `（裏 ${variant}）` : ''} 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
     fade.style.opacity = '0';
     moving = false;
