@@ -13,9 +13,18 @@
  */
 import type { Vec3 } from '../../../math/vec.ts';
 import type { Json } from '../../../world/layout.ts';
-import { definePart, pAabb, pNum, playerIn } from '../../part.ts';
+import type { AABB } from '../../../math/aabb.ts';
+import type { PlayerState } from '../../types.ts';
+import { definePart, pAabb, pNum, playerIn, type PartContext } from '../../part.ts';
 
 const ON = 0.5;
+
+/** 部屋にいるか: aabb の中で、params.rects（床の矩形）があればそのどれかの上（L 字の部屋の外形の欠けた隅は部屋の外） */
+function inRoom(ctx: PartContext, a: AABB, p: PlayerState): boolean {
+  if (!playerIn(p, a)) return false;
+  const rs = ctx.spec.params.rects as { x0: number; z0: number; x1: number; z1: number }[] | undefined;
+  return !rs || rs.some((r) => p.pos[0] >= r.x0 - 0.05 && p.pos[0] <= r.x1 + 0.05 && p.pos[2] >= r.z0 - 0.05 && p.pos[2] <= r.z1 + 0.05);
+}
 
 definePart<{ inside: number; sec: number; total: number }>({
   type: 'oddRoom',
@@ -23,7 +32,7 @@ definePart<{ inside: number; sec: number; total: number }>({
   init: () => ({ inside: 0, sec: 0, total: 0 }),
   step(s, ctx) {
     const a = pAabb(ctx.spec, 'aabb');
-    const inside = ctx.players.some((p) => playerIn(p, a)) ? 1 : 0;
+    const inside = ctx.players.some((p) => inRoom(ctx, a, p)) ? 1 : 0;
     ctx.output('entered', inside && !s.inside ? 1 : 0);
     s.sec = inside ? s.sec + ctx.dt : 0;
     if (inside) s.total += ctx.dt;
@@ -52,7 +61,7 @@ definePart<{ t: number; inside: number }>({
   step(s, ctx) {
     const a = pAabb(ctx.spec, 'aabb');
     const day = Math.max(1, pNum(ctx.spec, 'daySec', 90));
-    const inside = ctx.players.some((p) => playerIn(p, a)) ? 1 : 0;
+    const inside = ctx.players.some((p) => inRoom(ctx, a, p)) ? 1 : 0;
     if (inside) s.t += ctx.dt;
     if (inside !== s.inside) ctx.cue(inside ? 'odd.clock.enter' : 'odd.clock.leave');
     s.inside = inside;
@@ -88,7 +97,7 @@ definePart<TrailState>({
     const a = pAabb(ctx.spec, 'aabb');
     const stride = pNum(ctx.spec, 'stride', 0.62);
     const max = Math.max(4, Math.round(pNum(ctx.spec, 'max', 160)));
-    const p = ctx.players.find((q) => playerIn(q, a) && q.onGround && !q.surfaceId);
+    const p = ctx.players.find((q) => inRoom(ctx, a, q) && q.onGround && !q.surfaceId);
     if (!p) { s.last = []; ctx.output('count', s.prints.length / 4); return; }
     if (s.last.length === 2) s.acc += Math.hypot(p.pos[0] - s.last[0]!, p.pos[2] - s.last[1]!);
     s.last = [p.pos[0], p.pos[2]];

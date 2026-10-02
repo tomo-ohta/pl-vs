@@ -11,6 +11,7 @@ import type { PartState } from '../../../core/sim/part.ts';
 import type { Box, EntitySpec, Json } from '../../../core/world/layout.ts';
 import type { RoomGrade } from '../../render/RoomGrade.ts';
 import type { ViewContext } from '../views.ts';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { aabbOf, boxesGroup, cloudTexture, eyeOf, glowMaterial, inside, num, prng, str } from './util.ts';
 
 export interface Fx {
@@ -28,7 +29,47 @@ export interface FxArgs {
   seed: number;
   /** 画面効果の頼みの鍵（効果ごとに一意） */
   key: string;
+  /** 部屋の床の矩形（壁の内側。L 字の部屋で、外形の欠けた隅に粒・煙を出さないように） */
+  rects: Rect[];
 }
+
+export interface Rect { x0: number; z0: number; x1: number; z1: number }
+
+/** 矩形の中の点を面積の重みで選ぶ（u, v は 0..1 の乱数） */
+function inRects(rects: readonly Rect[], u: number, v: number, w: number): [number, number] {
+  const total = rects.reduce((a, r) => a + (r.x1 - r.x0) * (r.z1 - r.z0), 0);
+  let k = w * total;
+  for (const r of rects) {
+    const ar = (r.x1 - r.x0) * (r.z1 - r.z0);
+    if (k <= ar) return [r.x0 + u * (r.x1 - r.x0), r.z0 + v * (r.z1 - r.z0)];
+    k -= ar;
+  }
+  const r = rects[rects.length - 1]!;
+  return [r.x0 + u * (r.x1 - r.x0), r.z0 + v * (r.z1 - r.z0)];
+}
+
+/** 床の矩形ごとの水平の板をまとめたジオメトリ（フロア座標の xz。y = 0。UV は矩形ごとに meters m で 1 回） */
+function plateGeo(rects: readonly Rect[], meters: number): THREE.BufferGeometry {
+  const parts = rects.map((r) => {
+    const g = new THREE.PlaneGeometry(r.x1 - r.x0, r.z1 - r.z0);
+    g.rotateX(-Math.PI / 2);
+    g.translate((r.x0 + r.x1) / 2, 0, (r.z0 + r.z1) / 2);
+    const uv = g.getAttribute('uv') as THREE.BufferAttribute;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (r.x1 - r.x0) / meters + r.x0 / meters, uv.getY(i) * (r.z1 - r.z0) / meters + r.z0 / meters);
+    return g;
+  });
+  const merged = parts.length === 1 ? parts[0]! : mergeGeometries(parts, false) ?? parts[0]!;
+  if (merged !== parts[0]) for (const g of parts) g.dispose();
+  return merged;
+}
+
+/** 目が部屋の中か（高さは部屋の範囲、水平は床の矩形のどれか。L 字の外形の欠けた隅は部屋の外） */
+function inRoom(rects: readonly Rect[], room: { min: number[]; max: number[] }, e: THREE.Vector3 | null): boolean {
+  return !!e && e.y >= room.min[1]! - 0.05 && e.y <= room.max[1]! + 0.05 && rects.some((r) => e.x >= r.x0 - 0.05 && e.x <= r.x1 + 0.05 && e.z >= r.z0 - 0.05 && e.z <= r.z1 + 0.05);
+}
+
+/** いちばん大きい矩形 */
+const largest = (rects: readonly Rect[]): Rect => rects.reduce((a, r) => ((r.x1 - r.x0) * (r.z1 - r.z0) > (a.x1 - a.x0) * (a.z1 - a.z0) ? r : a));
 
 type FxFactory = (a: FxArgs) => Fx | null;
 const FX = new Map<string, FxFactory>();
@@ -65,8 +106,9 @@ function cameraYaw(ctx: ViewContext): number {
 }
 
 // ---------------------------------------------------------------- 雨（E03 雨漏り）
-defineFx('rain', ({ p, ctx, room, seed }) => {
+defineFx('rain', ({ p, ctx, room, seed, rects }) => {
   const a = p.aabb ? aabbOf(p.aabb) : room;
+  const R = p.aabb ? [{ x0: a.min[0], z0: a.min[2], x1: a.max[0], z1: a.max[2] }] : rects;
   const n = Math.round(num(p.count, 300));
   const len = num(p.len, 0.45), speed = num(p.speed, 7.5);
   const geo = new THREE.PlaneGeometry(0.012, len);
@@ -74,7 +116,7 @@ defineFx('rain', ({ p, ctx, room, seed }) => {
   const mesh = particles(ctx, geo, mat, n);
   const r = prng(seed);
   const H = a.max[1] - a.min[1];
-  const drops = Array.from({ length: n }, () => ({ x: a.min[0] + r() * (a.max[0] - a.min[0]), z: a.min[2] + r() * (a.max[2] - a.min[2]), ph: r() * H, v: speed * (0.8 + r() * 0.4) }));
+  const drops = Array.from({ length: n }, () => { const [x, z] = inRects(R, r(), r(), r()); return { x, z, ph: r() * H, v: speed * (0.8 + r() * 0.4) }; });
   // 床の波紋（輪が広がって消える）
   const ringGeo = new THREE.RingGeometry(0.03, 0.045, 16);
   ringGeo.rotateX(-Math.PI / 2);
@@ -98,7 +140,7 @@ defineFx('rain', ({ p, ctx, room, seed }) => {
       mesh.instanceMatrix.needsUpdate = true;
       ripples.forEach((w, i) => {
         w.t += dt / w.life;
-        if (w.t >= 1) { w.t = 0; w.x = a.min[0] + r() * (a.max[0] - a.min[0]); w.z = a.min[2] + r() * (a.max[2] - a.min[2]); }
+        if (w.t >= 1) { w.t = 0; [w.x, w.z] = inRects(R, r(), r(), r()); }
         const s = 0.6 + w.t * 3.2;
         pos.set(w.x, floorY + 0.006, w.z);
         scl.set(s, 1, s);
@@ -112,15 +154,16 @@ defineFx('rain', ({ p, ctx, room, seed }) => {
 });
 
 // ---------------------------------------------------------------- 雪（E04 雪の室内）
-defineFx('snowfall', ({ p, ctx, room, seed }) => {
+defineFx('snowfall', ({ p, ctx, room, seed, rects }) => {
   const a = p.aabb ? aabbOf(p.aabb) : room;
+  const R = p.aabb ? [{ x0: a.min[0], z0: a.min[2], x1: a.max[0], z1: a.max[2] }] : rects;
   const n = Math.round(num(p.count, 260));
   const geo = new THREE.CircleGeometry(0.018, 6);
   const mat = glowMaterial(0xffffff, 0.85);
   const mesh = particles(ctx, geo, mat, n);
   const r = prng(seed);
   const H = a.max[1] - a.min[1];
-  const flakes = Array.from({ length: n }, () => ({ x: r(), z: r(), ph: r() * H, v: 0.35 + r() * 0.35, w: r() * 6.28, s: 0.6 + r() * 0.8 }));
+  const flakes = Array.from({ length: n }, () => { const [x, z] = inRects(R, r(), r(), r()); return { x, z, ph: r() * H, v: 0.35 + r() * 0.35, w: r() * 6.28, s: 0.6 + r() * 0.8 }; });
   let t = 0;
   return {
     update(dt) {
@@ -128,8 +171,8 @@ defineFx('snowfall', ({ p, ctx, room, seed }) => {
       if (ctx.camera) q.copy(ctx.camera.quaternion);
       flakes.forEach((f, i) => {
         const y = a.max[1] - ((f.ph + t * f.v) % H);
-        const x = a.min[0] + f.x * (a.max[0] - a.min[0]) + Math.sin(t * 0.9 + f.w) * 0.12;
-        const z = a.min[2] + f.z * (a.max[2] - a.min[2]) + Math.cos(t * 0.7 + f.w) * 0.12;
+        const x = f.x + Math.sin(t * 0.9 + f.w) * 0.12;
+        const z = f.z + Math.cos(t * 0.7 + f.w) * 0.12;
         pos.set(x, y, z);
         scl.set(f.s, f.s, f.s);
         m4.compose(pos, q, scl);
@@ -142,12 +185,13 @@ defineFx('snowfall', ({ p, ctx, room, seed }) => {
 });
 
 // ---------------------------------------------------------------- 埃（T08 古くなる・T02 日の筋）
-defineFx('dust', ({ p, ctx, room, seed }) => {
+defineFx('dust', ({ p, ctx, room, seed, rects }) => {
   const a = p.aabb ? aabbOf(p.aabb) : room;
+  const R = p.aabb ? [{ x0: a.min[0], z0: a.min[2], x1: a.max[0], z1: a.max[2] }] : rects;
   const n = Math.round(num(p.count, 200));
   const r = prng(seed);
   const base = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { base[i * 3] = a.min[0] + r() * (a.max[0] - a.min[0]); base[i * 3 + 1] = a.min[1] + r() * (a.max[1] - a.min[1]); base[i * 3 + 2] = a.min[2] + r() * (a.max[2] - a.min[2]); }
+  for (let i = 0; i < n; i++) { const [x, z] = inRects(R, r(), r(), r()); base[i * 3] = x; base[i * 3 + 1] = a.min[1] + r() * (a.max[1] - a.min[1]); base[i * 3 + 2] = z; }
   const geo = new THREE.BufferGeometry();
   const attr = new THREE.BufferAttribute(base.slice(), 3);
   geo.setAttribute('position', attr);
@@ -172,8 +216,11 @@ defineFx('dust', ({ p, ctx, room, seed }) => {
 });
 
 // ---------------------------------------------------------------- 風で流れる紙・葉（E08 風の向き）
-defineFx('drift', ({ p, ctx, room, seed }) => {
-  const a = p.aabb ? aabbOf(p.aabb) : room;
+defineFx('drift', ({ p, ctx, room, seed, rects }) => {
+  const box0 = p.aabb ? aabbOf(p.aabb) : room;
+  // 流れるのはいちばん大きい矩形の中（L 字の外形の欠けた隅へ出ない）
+  const L = largest(rects);
+  const a = p.aabb ? box0 : { min: [L.x0, box0.min[1], L.z0] as [number, number, number], max: [L.x1, box0.max[1], L.z1] as [number, number, number] };
   const n = Math.round(num(p.count, 60));
   const dir = (p.dir as number[] | undefined) ?? [0, 1];
   const dl = Math.hypot(dir[0]!, dir[1]!) || 1;
@@ -273,25 +320,22 @@ defineFx('streams', ({ p, ctx }) => {
  * 天井から y0 までの煙の層。外から見ると部屋の上半分が灰色に埋まっている。目（カメラ）が y0 より上にあると霧が濃くなり前が見えない。
  * しゃがむ（目 0.75 m）と煙の下が見える
  */
-defineFx('smoke', ({ p, ctx, room, seed, key }) => {
+defineFx('smoke', ({ p, ctx, room, seed, key, rects }) => {
   const y0 = num(p.y0, room.min[1] + 1.25), y1 = num(p.y1, room.max[1]);
   const color = num(p.color, 0x6a6764);
   const layers = Math.max(3, Math.round(num(p.layers, 7)));
-  const w = room.max[0] - room.min[0], d = room.max[2] - room.min[2];
-  const cx = (room.min[0] + room.max[0]) / 2, cz = (room.min[2] + room.max[2]) / 2;
-  const geo = new THREE.PlaneGeometry(w, d);
-  geo.rotateX(-Math.PI / 2);
+  // 煙の板は床の矩形ごと（L 字の部屋の外形の欠けた隅に出さない）。柄は 3 m で 1 回
+  const geo = plateGeo(rects, 3);
   const r = prng(seed);
   const meshes: { m: THREE.Mesh; mat: THREE.MeshBasicMaterial; tex: THREE.Texture; v: [number, number] }[] = [];
   for (let i = 0; i < layers; i++) {
     const k = i / (layers - 1);
     const tex = cloudTexture().clone();
     tex.needsUpdate = true;
-    tex.repeat.set(w / 3, d / 3);
     // いちばん下の層は濃く（煙の底の面が見える）
     const mat = glowMaterial(color, i === 0 ? 0.55 : 0.32, { map: tex });
     const m = new THREE.Mesh(geo, mat);
-    m.position.set(cx, y0 + (y1 - y0) * k * 0.92 + 0.02, cz);
+    m.position.set(0, y0 + (y1 - y0) * k * 0.92 + 0.02, 0);
     ctx.root.add(m);
     meshes.push({ m, mat, tex, v: [(r() - 0.5) * 0.05, (r() - 0.5) * 0.05] });
   }
@@ -306,7 +350,7 @@ defineFx('smoke', ({ p, ctx, room, seed, key }) => {
         x.m.position.y += Math.sin(t * 0.5 + x.v[0] * 40) * 0.0008;
       }
       const eye = eyeOf(ctx);
-      if (!eye || !inside({ min: [room.min[0], room.min[1] - 1, room.min[2]], max: [room.max[0], room.max[1] + 1, room.max[2]] }, eye)) return;
+      if (!eye || !inRoom(rects, { min: [room.min[0], room.min[1] - 1, room.min[2]], max: [room.max[0], room.max[1] + 1, room.max[2]] }, eye)) return;
       const k = smooth(y0 - 0.05, y0 + 0.3, eye.y);
       const fog = ctx.scene?.fog as THREE.Fog | undefined;
       if (fog && k > 0) {
@@ -323,12 +367,12 @@ defineFx('smoke', ({ p, ctx, room, seed, key }) => {
 
 // ---------------------------------------------------------------- 画面の色（部屋にいる間だけ）
 /** 部屋（aabb があればその範囲）に目がある間だけ、画面の色 grade を掛ける */
-defineFx('grade', ({ p, ctx, room, key }) => {
+defineFx('grade', ({ p, ctx, room, key, rects }) => {
   const g = p.grade as unknown as RoomGrade;
   if (!g) return null;
-  const zone = p.aabb ? aabbOf(p.aabb) : room;
+  const zone = p.aabb ? aabbOf(p.aabb) : null;
   return {
-    update() { if (inside(zone, eyeOf(ctx), 0.05)) ctx.postfx?.setRoomGrade(key, g); },
+    update() { if (zone ? inside(zone, eyeOf(ctx), 0.05) : inRoom(rects, room, eyeOf(ctx))) ctx.postfx?.setRoomGrade(key, g); },
     dispose() { ctx.postfx?.setRoomGrade(key, null); },
   };
 });
@@ -355,17 +399,14 @@ function rippleTexture(): THREE.DataTexture {
   return t;
 }
 
-defineFx('ripples', ({ p, ctx, room }) => {
-  const w = room.max[0] - room.min[0], d = room.max[2] - room.min[2];
-  const geo = new THREE.PlaneGeometry(w, d);
-  geo.rotateX(-Math.PI / 2);
+defineFx('ripples', ({ p, ctx, room, rects }) => {
+  const geo = plateGeo(rects, 1.6);
   const tex = rippleTexture().clone();
   tex.needsUpdate = true;
-  tex.repeat.set(w / 1.6, d / 1.6);
   // 縞は影の色の半透明（明るい砂の上に暗い筋）
   const mat = glowMaterial(num(p.color, 0x9c8458), num(p.opacity, 0.35), { map: tex });
   const m = new THREE.Mesh(geo, mat);
-  m.position.set((room.min[0] + room.max[0]) / 2, num(p.y, room.min[1] + 0.12), (room.min[2] + room.max[2]) / 2);
+  m.position.set(0, num(p.y, room.min[1] + 0.12), 0);
   ctx.root.add(m);
   const speed = num(p.speed, 0.025);
   let t = 0;
@@ -382,7 +423,7 @@ defineFx('ripples', ({ p, ctx, room }) => {
 
 // ---------------------------------------------------------------- 温度（E07）
 /** 冷たい側（cold）から暖かい側（warm）へ: 冷たい所では画面の縁が凍って青く、白い息が出る。暖かい所では赤みが差す */
-defineFx('thermal', ({ p, ctx, room, seed, key }) => {
+defineFx('thermal', ({ p, ctx, room, seed, key, rects }) => {
   const cold = (p.cold as number[] | undefined) ?? [room.min[0], room.min[2]];
   const warm = (p.warm as number[] | undefined) ?? [room.max[0], room.max[2]];
   const ex = warm[0]! - cold[0]!, ez = warm[1]! - cold[1]!;
@@ -399,7 +440,7 @@ defineFx('thermal', ({ p, ctx, room, seed, key }) => {
   return {
     update(dt) {
       const eye = eyeOf(ctx);
-      if (!eye || !inside(room, eye, 0.05)) { mat.opacity = 0; return; }
+      if (!eye || !inRoom(rects, room, eye)) { mat.opacity = 0; return; }
       const t = Math.max(0, Math.min(1, ((eye.x - cold[0]!) * ex + (eye.z - cold[1]!) * ez) / l2));
       const c = 1 - t;
       ctx.postfx?.setRoomGrade(key, {
@@ -429,7 +470,7 @@ defineFx('thermal', ({ p, ctx, room, seed, key }) => {
  * 鏡の面（axis の座標 at）の向こう側に、カメラを鏡写しにした位置で人影を描く。鏡の中の部屋（同じ形の半分）に入れるが、
  * 向こうへ入ると、人影はこちら側に現れる。しゃがむと人影も低くなる
  */
-defineFx('figure', ({ p, ctx, room }) => {
+defineFx('figure', ({ p, ctx, room, rects }) => {
   const axis = str(p.axis, 'x');
   const at = num(p.at, 0);
   const mat = new THREE.MeshLambertMaterial({ color: num(p.color, 0x2a2c30) });
@@ -448,7 +489,7 @@ defineFx('figure', ({ p, ctx, room }) => {
   return {
     update() {
       const eye = eyeOf(ctx);
-      if (!eye || !ctx.camera || !inside(room, eye, 0.1)) { group.visible = false; return; }
+      if (!eye || !ctx.camera || !inRoom(rects, room, eye)) { group.visible = false; return; }
       const mx = axis === 'x' ? 2 * at - eye.x : eye.x, mz = axis === 'z' ? 2 * at - eye.z : eye.z;
       if (mx < room.min[0] + 0.2 || mx > room.max[0] - 0.2 || mz < room.min[2] + 0.2 || mz > room.max[2] - 0.2 || Math.abs((axis === 'x' ? eye.x : eye.z) - at) < 0.25) { group.visible = false; return; }
       const f = new THREE.Vector3(0, 0, -1).applyQuaternion(ctx.camera.quaternion);
@@ -487,7 +528,7 @@ defineFx('grow', ({ p, ctx }) => {
 
 // ---------------------------------------------------------------- 場所で変わる画面の色（T08 古くなる）
 /** 点 from（入口）から to（奥）へ進むほど、画面の色を a から b へ変える（部屋にいる間だけ） */
-defineFx('gradient', ({ p, ctx, room, key }) => {
+defineFx('gradient', ({ p, ctx, room, key, rects }) => {
   const f = (p.from as number[] | undefined) ?? [room.min[0], room.min[2]];
   const t2 = (p.to as number[] | undefined) ?? [room.max[0], room.max[2]];
   const a = (p.a ?? {}) as unknown as RoomGrade, b = (p.b ?? {}) as unknown as RoomGrade;
@@ -496,7 +537,7 @@ defineFx('gradient', ({ p, ctx, room, key }) => {
   return {
     update() {
       const eye = eyeOf(ctx);
-      if (!eye || !inside(room, eye, 0.05)) return;
+      if (!eye || !inRoom(rects, room, eye)) return;
       const k = Math.max(0, Math.min(1, ((eye.x - f[0]!) * ex + (eye.z - f[1]!) * ez) / l2));
       const ta = a.tint ?? [1, 1, 1], tb = b.tint ?? [1, 1, 1];
       ctx.postfx?.setRoomGrade(key, {

@@ -59,7 +59,7 @@ defineAnomaly({
       F.push(box([cx - w / 2 - 0.08, top - 0.03, cz - d / 2], [cx - w / 2, top - 0.005, cz + d / 2], 'trim', false), box([cx + w / 2, top - 0.03, cz - d / 2], [cx + w / 2 + 0.08, top - 0.005, cz + d / 2], 'trim', false));
     }
     addGroup(ctx, F, 'windows');
-    const clock = ctx.addEntity('clock', { type: 'oddClock', params: { aabb: aabbJ(roomBox(ctx)), daySec: t['anomaly.dayCycle.daySec'], startPhase: 0.02, panes: panes.map((p) => ({ min: p.min, max: p.max, dir: p.dir })) } });
+    const clock = ctx.addEntity('clock', { type: 'oddClock', params: { aabb: aabbJ(roomBox(ctx)), rects: ctx.rects.map((r) => ({ ...r })), daySec: t['anomaly.dayCycle.daySec'], startPhase: 0.02, panes: panes.map((p) => ({ min: p.min, max: p.max, dir: p.dir })) } });
     const night = ctx.addEntity('night', { type: 'oddLevel', params: {}, inputs: { in: `${clock}.night` } });
     // 夜の灯り: 天井の照明と点光源（夜に点く）。日の光: 窓の前の点光源（昼に明るい）
     for (const b of cell.boxes) if (isCeilingPanel(cell, b)) b.kind = `lamp:${night}`;

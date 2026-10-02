@@ -197,7 +197,7 @@ defineAnomaly({
     }
     for (const r of ctx.rects) ctx.addZone({ kind: 'water', aabb: { min: [r.x0, fy - 0.1, r.z0], max: [r.x1, fy + 0.6, r.z1] }, params: { slow: t['anomaly.sand.slow'], dry: true } });
     const room = roomBox(ctx);
-    ctx.addEntity('trail', { type: 'oddTrail', params: { aabb: aabbJ({ min: room.min, max: [room.max[0], fy + 0.8, room.max[2]] }), y: fy + depth, max: t['anomaly.snow.prints'], color: 0x9a8262, opacity: 0.45 } });
+    ctx.addEntity('trail', { type: 'oddTrail', params: { aabb: aabbJ({ min: room.min, max: [room.max[0], fy + 0.8, room.max[2]] }), rects: ctx.rects.map((r) => ({ ...r })), y: fy + depth, max: t['anomaly.snow.prints'], color: 0x9a8262, opacity: 0.45 } });
     roomFx(ctx,
       { kind: 'ripples', y: fy + depth + 0.002, color: 0xb89c6c, speed: t['anomaly.sand.shift'] },
       { kind: 'dust', count: Math.min(260, Math.round(areaOf(ctx) * 4)), color: 0xe6d2a4, opacity: 0.5 },

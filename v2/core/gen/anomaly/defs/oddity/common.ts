@@ -32,7 +32,8 @@ export function roomFx(ctx: AnomalyContext, ...fx: { [k: string]: Json }[]): str
   const id = `${ctx.id}.room`;
   const e = ctx.world.entities.find((x) => x.id === id);
   if (e) { (e.params.fx as Json[]).push(...fx); return id; }
-  return ctx.addEntity('room', { type: 'oddRoom', params: { aabb: aabbJ(roomBox(ctx)), fx } });
+  // rects: 床の矩形（壁の内側）。描画は粒・煙をこの中にだけ出す（L 字の部屋の外形の欠けた隅に出さない）
+  return ctx.addEntity('room', { type: 'oddRoom', params: { aabb: aabbJ(roomBox(ctx)), rects: ctx.rects.map((r) => ({ ...r })), fx } });
 }
 
 /** 壁の室内面（足跡の外周） */

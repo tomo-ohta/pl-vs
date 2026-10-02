@@ -17,9 +17,10 @@ import { aabbOf, cloudTexture, eyeOf, glowMaterial, inside, num } from './util.t
 defineView('oddRoom', (spec, ctx) => {
   const room = aabbOf(spec.params.aabb);
   const list = (spec.params.fx as { [k: string]: Json }[] | undefined) ?? [];
+  const rects = (spec.params.rects as { x0: number; z0: number; x1: number; z1: number }[] | undefined) ?? [{ x0: room.min[0], z0: room.min[2], x1: room.max[0], z1: room.max[2] }];
   const fx: Fx[] = [];
   list.forEach((p, i) => {
-    const f = createFx(String(p.kind), { p, ctx, room, spec, seed: hashAll(spec.id, i), key: `${spec.id}#${i}` });
+    const f = createFx(String(p.kind), { p, ctx, room, spec, seed: hashAll(spec.id, i), key: `${spec.id}#${i}`, rects });
     if (f) fx.push(f);
   });
   if (!fx.length) return null;
@@ -142,6 +143,7 @@ defineView('oddClock', (spec, ctx) => {
     beams.push({ m: b, c, dir: pn.dir, h });
   }
   const key = `${spec.id}#sky`;
+  const clockRects = spec.params.rects as { x0: number; z0: number; x1: number; z1: number }[] | undefined;
   const col = new THREE.Color();
   return {
     update(s) {
@@ -161,7 +163,8 @@ defineView('oddClock', (spec, ctx) => {
         }
         b.m.visible = sun > 0.02;
       }
-      if (inside(room, eyeOf(ctx), 0.05)) {
+      const e = eyeOf(ctx);
+      if (inside(room, e, 0.05) && (!clockRects || clockRects.some((q) => e!.x >= q.x0 - 0.05 && e!.x <= q.x1 + 0.05 && e!.z >= q.z0 - 0.05 && e!.z <= q.z1 + 0.05))) {
         // 画面: 夕方は橙、夜は青く暗く
         const dusk = Math.max(0, 1 - Math.abs(phase - 0.5) / 0.09);
         const night = phase > 0.6 && phase < 0.9 ? Math.min(1, (phase - 0.6) / 0.06, (0.9 - phase) / 0.06) : 0;

@@ -44,7 +44,7 @@ defineAnomaly({
     const y0 = fy + ctx.rng.float(t['anomaly.smoke.bottomMin'], Math.max(t['anomaly.smoke.bottomMin'], t['anomaly.smoke.bottomMax']));
     cell.lights = cell.lights.map((l) => ({ ...l, color: mixColor(l.color, 0xff8a40, 0.55), intensity: l.intensity * 0.75 }));
     cell.palette = { ...cell.palette, lightColor: mixColor(cell.palette.lightColor, 0xff9a50, 0.45), ambient: mixColor(cell.palette.ambient, 0x3a2a20, 0.6), lightIntensity: cell.palette.lightIntensity * 0.8 };
-    const fx: { [k: string]: Json }[] = [{ kind: 'smoke', y0, y1: fy + h, color: 0x6c6862, far: t['anomaly.smoke.far'], layers: 7 }];
+    const fx: { [k: string]: Json }[] = [{ kind: 'smoke', y0, y1: fy + h, color: 0x6c6862, far: t['anomaly.smoke.far'], layers: 5 }];
     // くすぶるごみ箱（奥）: 箱 + 燠火の光 + 立ちのぼる煙の筋
     const spot = farSpots(ctx, 0.3)[0];
     if (spot) {
@@ -185,7 +185,7 @@ defineAnomaly({
     cell.render = { ...cell.render, fog: { color: 0xdfe6ee, near: 3, far: t['anomaly.snow.fogFar'] } };
     cell.palette.fog = 0xdfe6ee;
     const room = roomBox(ctx);
-    ctx.addEntity('trail', { type: 'oddTrail', params: { aabb: aabbJ({ min: room.min, max: [room.max[0], fy + 1, room.max[2]] }), y: fy + depth, max: t['anomaly.snow.prints'], color: 0x9aa6b8, opacity: 0.55 } });
+    ctx.addEntity('trail', { type: 'oddTrail', params: { aabb: aabbJ({ min: room.min, max: [room.max[0], fy + 1, room.max[2]] }), rects: ctx.rects.map((r) => ({ ...r })), y: fy + depth, max: t['anomaly.snow.prints'], color: 0x9aa6b8, opacity: 0.55 } });
     roomFx(ctx,
       { kind: 'snowfall', count: Math.min(t['anomaly.snow.flakesMax'], Math.round(areaOf(ctx) * 7)) },
       { kind: 'grade', grade: { tint: [0.95, 1, 1.07], frost: 0.2, saturation: 0.9 } },
