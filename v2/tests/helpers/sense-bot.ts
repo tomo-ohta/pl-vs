@@ -11,6 +11,7 @@ import { patternAt, searchSpot } from '../../core/sim/parts/sense/light.ts';
 import type { Sim } from '../../core/sim/sim.ts';
 import { IDLE_COMMAND, type InputCommand } from '../../core/sim/types.ts';
 import type { CellLayout, EntitySpec, FloorLayout } from '../../core/world/layout.ts';
+import { pathInCell } from './bot.ts';
 
 type V2 = [number, number];
 
@@ -75,6 +76,96 @@ function project(pts: V2[], p: V2): { d: number; off: number } {
     acc += r.len;
   }
   return best;
+}
+
+/** 区画の中の点 to へ、区画の道探し（bot.ts の pathInCell）で歩く。道は目標が変わるか 4 秒ごとに引き直す */
+let route: { key: string; pts: V2[]; at: number } | null = null;
+function goVia(sim: Sim, cell: CellLayout, to: V2, o: Partial<InputCommand> = {}): InputCommand {
+  const pl = sim.players[0]!;
+  const key = `${cell.id}|${to[0].toFixed(2)},${to[1].toFixed(2)}`;
+  if (!route || route.key !== key || sim.tick - route.at > 240) {
+    const pts = pathInCell(sim, cell, [pl.pos[0], pl.pos[1], pl.pos[2]], [to[0], cell.floorY, to[1]]) ?? [];
+    route = { key, pts: [...pts.map((q) => [q[0], q[1]] as V2), to], at: sim.tick };
+  }
+  while (route.pts.length > 1 && Math.hypot(route.pts[0]![0] - pl.pos[0], route.pts[0]![1] - pl.pos[2]) < 0.3) route.pts.shift();
+  return toward(sim, route.pts[0]!, o);
+}
+
+/** 点 c（高さ cy）を見て調べる（0.6 秒に 1 回。押した直後の状態の変わりを待つ） */
+function poke(sim: Sim, c: V2, cy: number): InputCommand {
+  const pl = sim.players[0]!;
+  const ex = c[0] - pl.pos[0], ez = c[1] - pl.pos[2], ey = cy - (pl.pos[1] + pl.eye);
+  const yaw = Math.atan2(-ex, -ez), pitch = Math.atan2(ey, Math.hypot(ex, ez));
+  return still(sim, { yaw, pitch, ...(sim.tick % 36 === 0 ? { interact: { yaw, pitch } } : {}) });
+}
+
+/** 区間の目標 leg が扉 door の前か（その扉へ向かうときだけ手を出す） */
+function headingTo(sim: Sim, door: unknown, leg: V2, r = 2.4): boolean {
+  const d = sim.floor.entities.find((x) => x.id === door);
+  const pn = d?.params.panel as { min: number[]; max: number[] } | undefined;
+  return !!pn && Math.hypot((pn.min[0]! + pn.max[0]!) / 2 - leg[0], (pn.min[2]! + pn.max[2]!) / 2 - leg[1]) < r;
+}
+
+/** 鏡で光を導く: 出口の扉へ向かうとき、解と違う向きの鏡へ歩いて回す（解は部品の params.solution） */
+function beam(sim: Sim, e: EntitySpec, leg: V2, cell: CellLayout): InputCommand | null {
+  if (sim.outputOf(e.id, 'lit') > 0.5 || sim.outputOf(e.id.replace(/\.beam$/, '.solved'), 'out') > 0.5) return null;
+  if (!headingTo(sim, e.params.door, leg)) return null;
+  const ids = e.params.mirrorIds as string[], sol = e.params.solution as number[], ms = e.params.mirrors as number[][];
+  const i = ids.findIndex((id, k) => (sim.outputOf(id, 'state') > 0.5 ? 1 : 0) !== sol[k]);
+  if (i < 0) return null;
+  const m: V2 = [ms[i]![0]!, ms[i]![1]!];
+  const pl = sim.players[0]!;
+  const dx = pl.pos[0] - m[0], dz = pl.pos[2] - m[1];
+  const d = Math.hypot(dx, dz);
+  if (d > 1.5) return goVia(sim, cell, [m[0] + (dx / Math.max(d, 1e-6)) * 1.1, m[1] + (dz / Math.max(d, 1e-6)) * 1.1]);
+  return poke(sim, m, Number(e.params.y ?? 1));
+}
+
+/** 非常電源: 出口の扉へ向かうとき、電源が切れていればレバーへ歩いて引く（入っていれば手を出さない。走るのは senseAdjust） */
+function lever(sim: Sim, e: EntitySpec, leg: V2, cell: CellLayout): InputCommand | null {
+  if (!e.params.power || sim.outputOf(e.id, 'on') > 0.5) return null;
+  if (sim.outputOf(String(e.params.door), 'open') > 0.5 || !headingTo(sim, e.params.door, leg)) return null;
+  const p = e.params.pos as number[];
+  const pl = sim.players[0]!;
+  const d = Math.hypot(pl.pos[0] - p[0]!, pl.pos[2] - p[2]!);
+  if (d > 1.3) {
+    const dir = Number(e.params.dir);
+    const n: V2 = ([[0, -1], [-1, 0], [0, 1], [1, 0]] as const)[dir] as V2;
+    return goVia(sim, cell, [p[0]! + n[0] * 0.9, p[2]! + n[1] * 0.9]);
+  }
+  return poke(sim, [p[0]!, p[2]!], p[1]!);
+}
+
+/** ボタンで開く扉（段階 3 の switchDoor: 扉の open ← latch ← ボタンの pressed）。ボタン id → 扉 id */
+const BUTTON_DOORS = new WeakMap<FloorLayout, Map<string, string>>();
+function buttonDoors(floor: FloorLayout): Map<string, string> {
+  let m = BUTTON_DOORS.get(floor);
+  if (m) return m;
+  m = new Map();
+  const byId = new Map(floor.entities.map((e) => [e.id, e]));
+  for (const d of floor.entities) {
+    if (d.type !== 'door' || !d.inputs?.open) continue;
+    const src = byId.get(d.inputs.open.slice(0, d.inputs.open.lastIndexOf('.')));
+    const set = src?.type === 'latch' ? src.inputs?.set : undefined;
+    if (set?.endsWith('.pressed')) m.set(set.slice(0, -'.pressed'.length), d.id);
+  }
+  BUTTON_DOORS.set(floor, m);
+  return m;
+}
+
+/** ボタンで開く扉へ向かうとき、扉が閉じていればボタンへ歩いて押す（担当の外の仕掛けだが、歩く人の道を塞ぐので手助けする） */
+function button(sim: Sim, e: EntitySpec, leg: V2, cell: CellLayout): InputCommand | null {
+  const door = buttonDoors(sim.floor).get(e.id);
+  if (!door || sim.outputOf(door, 'open') > 0.5 || !headingTo(sim, door, leg)) return null;
+  const b = e.params.box as { min: number[]; max: number[] };
+  const c: V2 = [(b.min[0]! + b.max[0]!) / 2, (b.min[2]! + b.max[2]!) / 2];
+  const cy = (b.min[1]! + b.max[1]!) / 2;
+  const bb = cell.bounds;
+  const thinX = b.max[0]! - b.min[0]! < b.max[2]! - b.min[2]!;
+  const n: V2 = thinX ? [Math.sign((bb.min[0] + bb.max[0]) / 2 - c[0]), 0] : [0, Math.sign((bb.min[2] + bb.max[2]) / 2 - c[1])];
+  const pl = sim.players[0]!;
+  if (Math.hypot(pl.pos[0] - c[0], pl.pos[2] - c[1]) > 1.3) return goVia(sim, cell, [c[0] + n[0] * 0.9, c[1] + n[1] * 0.9]);
+  return poke(sim, c, cy);
 }
 
 /**
@@ -312,10 +403,26 @@ export function senseDrive(sim: Sim, leg: readonly number[]): InputCommand | nul
     const c = noiseGate(sim, e);
     if (c) return c;
   }
+  for (const e of partsIn(sim.floor, cell.id, 'beam')) {
+    const c = beam(sim, e, leg2, cell);
+    if (c) return c;
+  }
+  for (const e of partsIn(sim.floor, cell.id, 'lever')) {
+    const c = lever(sim, e, leg2, cell);
+    if (c) return c;
+  }
+  for (const e of partsIn(sim.floor, cell.id, 'button')) {
+    const c = button(sim, e, leg2, cell);
+    if (c) return c;
+  }
   return null;
 }
 
-export function senseAdjust(_sim: Sim, cmd: InputCommand): void {
+export function senseAdjust(sim: Sim, cmd: InputCommand): void {
   // 懐中電灯は点けたまま（遊び始めは点いている）
   cmd.flashlight = senseBotOptions.flashlight;
+  const cell = cellOf(sim.floor, sim.players[0]!.pos);
+  if (!cell) return;
+  // 非常電源が入っている間は走る（電源が切れる前に出口へ）
+  if (partsIn(sim.floor, cell.id, 'lever').some((e) => e.params.power && sim.outputOf(e.id, 'on') > 0.5)) cmd.dash = true;
 }

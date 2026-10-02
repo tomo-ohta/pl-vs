@@ -11,3 +11,6 @@ import './watch.ts';
 import './camera.ts';
 import './sound.ts';
 import './echo.ts';
+import './beam.ts';
+import './power.ts';
+import './beacons.ts';
