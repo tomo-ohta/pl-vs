@@ -11,6 +11,7 @@ import type { PartState } from '../../core/sim/part.ts';
 import type { SimEvent } from '../../core/sim/types.ts';
 import type { AudioEngine } from '../audio/AudioEngine.ts';
 import type { PostFX } from '../render/PostFX.ts';
+import type { QualityTier } from '../render/quality.ts';
 import type { Sim } from '../../core/sim/sim.ts';
 import type { EntitySpec, Json, MatId } from '../../core/world/layout.ts';
 import type { MaterialLibrary } from '../render/MaterialLibrary.ts';
@@ -34,6 +35,8 @@ export interface ViewContext {
   scene?: THREE.Scene;
   /** シミュレーションのイベントを受け取る（足音・扉・Cue など）。戻り値で受け取りをやめる */
   onEvent?(f: (e: SimEvent) => void): () => void;
+  /** 今の画質の段（重い描画 = 映り込み・監視映像を軽くする）。テストでは無いことがある（担当 sense が足した） */
+  quality?(): QualityTier;
 }
 
 export interface EntityView {

@@ -6,3 +6,6 @@ import './fx.ts';
 import './floor.ts';
 import './light.ts';
 import './sight.ts';
+import './watch.ts';
+import './camera.ts';
+import './curtains.ts';

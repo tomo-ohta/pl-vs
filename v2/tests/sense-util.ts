@@ -9,7 +9,14 @@ import '../core/sim/parts/index.ts';
 import { partDef } from '../core/sim/part.ts';
 import { Sim } from '../core/sim/sim.ts';
 import { IDLE_COMMAND, type InputCommand } from '../core/sim/types.ts';
-import type { EntitySpec, FloorLayout, PortalSpec } from '../core/world/layout.ts';
+import type { EntitySpec, FloorLayout, PortalSpec, WallOpening } from '../core/world/layout.ts';
+import type { AABB } from '../core/math/aabb.ts';
+import { Rng } from '../core/math/rng.ts';
+import { doorPanel, makeCell, opening } from '../core/world/build.ts';
+import { themePalette } from '../core/world/palettes.ts';
+import '../core/gen/gimmicks/index.ts';
+import { gimmickDef, type GimmickContext, type GimmickSlot, type SecretOffer } from '../core/gen/gimmicks/types.ts';
+import { frontOf } from '../core/gen/gimmicks/util.ts';
 import { dressCell } from '../core/gen/dress/index.ts';
 import { generateFloorReport, type GenReport } from '../core/gen/floor/index.ts';
 import { labRoom, type LabRoom } from './helpers/gimmick-lab.ts';
@@ -25,6 +32,65 @@ export async function simOf(floor: FloorLayout, t: Tuning = T): Promise<Sim> {
 /** 実験室の部屋（入口の向き entry・出口の向き exit）に仕掛けを組み、入口の内側に立つ Sim を作る */
 export async function labSim(def: string, o: { w: number; d: number; height?: number; entry: Dir; exit: Dir | null; entryAt?: number; exitAt?: number; seed?: number; kind?: 'room' | 'hall'; t?: Tuning }): Promise<{ room: LabRoom; sim: Sim } | null> {
   const room = labRoom(def, { seed: 1, ...o });
+  if (!room) return null;
+  const sim = await simOf(room.floor, o.t);
+  sim.teleport(0, [room.inside[0], room.cell.floorY + 0.02, room.inside[2]], yawTo(room.inside, room.exitInside ?? room.cell.bounds.max));
+  return { room, sim };
+}
+
+/**
+ * 扉のある実験室の部屋（helpers/gimmick-lab.ts の labRoom と同じ組み方に、開口ごとの扉の部品を足したもの）。
+ * 出口の扉に鍵を掛ける仕掛け（時計・音で開く扉）を試す
+ */
+export function labRoomDoors(defId: string, o: { w: number; d: number; height?: number; entry: Dir; exit: Dir | null; entryAt?: number; exitAt?: number; seed?: number; kind?: 'room' | 'hall'; t?: Tuning }): LabRoom | null {
+  const t = o.t ?? T;
+  const seed = o.seed ?? 1;
+  const at = (dir: Dir, f: number): Vec3 => { const x = 0.6 + (o.w - 1.2) * f, z = 0.6 + (o.d - 1.2) * f; return dir === 0 ? [x, 0, o.d] : dir === 2 ? [x, 0, 0] : dir === 1 ? [o.w, 0, z] : [0, 0, z]; };
+  const openings: WallOpening[] = [opening('room:in', at(o.entry, o.entryAt ?? 0.5), o.entry, 1.0)];
+  if (o.exit !== null) openings.push(opening('room:out', at(o.exit, o.exitAt ?? 0.5), o.exit, 1.0));
+  const rect = { x0: 0, z0: 0, x1: o.w, z1: o.d };
+  const cell = makeCell({ id: 'room', role: 'gimmick', rects: [rect], height: o.height ?? 2.8, palette: themePalette('GenericRoom'), openings });
+  const slot: GimmickSlot = { cell, kind: o.kind ?? 'room', openings, main: true, entrance: openings[0]!, exit: openings[1] ?? null, rect };
+  const def = gimmickDef(defId);
+  if (!def) throw new Error(`仕掛けがありません: ${defId}`);
+  const entities: EntitySpec[] = openings.map((op, i) => {
+    const axis = op.dir === 0 || op.dir === 2 ? 'z' : 'x';
+    const coord = axis === 'z' ? op.pos[2] : op.pos[0];
+    const along = axis === 'z' ? op.pos[0] : op.pos[2];
+    const pn = doorPanel(axis, coord, along, 1.0, 0, 2.1);
+    return { id: `door${i}`, type: 'door', cell: 'room', params: { panel: { min: [...pn.min], max: [...pn.max] }, axis, mat: 'doorWood', hinge: 1, swing: 1 } };
+  });
+  const offers: SecretOffer[] = [];
+  const keepOut: AABB[] = [];
+  let added = 0;
+  const ctx: GimmickContext = {
+    slot, rng: new Rng(seed), tuning: t, id: `g:${defId}:room`,
+    floor: { id: 'lab', seed, depth: 1, rarity: 'Common', family: 'lab' },
+    addBox(b) { cell.boxes.push(b); added++; return b; },
+    addEntity(name, e) { const id = `g:${defId}:room.${name}`; entities.push({ ...e, id, cell: e.cell ?? 'room' } as EntitySpec); added++; return id; },
+    addZone(z) { cell.zones.push(z); },
+    keepOut(a) { keepOut.push(a); },
+    frontOf: (op, dd = 1.0) => frontOf(op, dd),
+    offerSecret(of) { offers.push(of); },
+    doorAt: (op) => entities[openings.indexOf(op)] ?? null,
+    removeBoxes(pred) { cell.boxes = cell.boxes.filter((b) => !pred(b)); },
+    reachAssist() {},
+  };
+  if (def.fits && !def.fits(slot)) return null;
+  def.build(ctx);
+  if (!added) return null;
+  const floor: FloorLayout = {
+    id: 'lab', seed, genVersion: 'lab', tuningVersion: 'lab',
+    bounds: { min: [cell.bounds.min[0] - 2, cell.bounds.min[1] - 6, cell.bounds.min[2] - 2], max: [cell.bounds.max[0] + 2, cell.bounds.max[1], cell.bounds.max[2] + 2] },
+    cells: [cell], portals: [], entities, surfaces: [], spawn: { pos: frontOf(openings[0]!, 1.0), yaw: 0, cell: 'room' }, exits: [],
+  };
+  const inside = frontOf(openings[0]!, 1.0);
+  return { floor, cell, slot, offers, keepOut, inside: [inside[0], 0, inside[2]], exitInside: openings[1] ? (() => { const p = frontOf(openings[1]!, 1.0); return [p[0], 0, p[2]] as Vec3; })() : null };
+}
+
+/** 扉のある実験室で Sim を作る（入口の内側に立つ） */
+export async function labSimDoors(def: string, o: Parameters<typeof labRoomDoors>[1]): Promise<{ room: LabRoom; sim: Sim } | null> {
+  const room = labRoomDoors(def, o);
   if (!room) return null;
   const sim = await simOf(room.floor, o.t);
   sim.teleport(0, [room.inside[0], room.cell.floorY + 0.02, room.inside[2]], yawTo(room.inside, room.exitInside ?? room.cell.bounds.max));

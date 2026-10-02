@@ -10,7 +10,7 @@ import type { Rect } from '../../../world/footprint.ts';
 import { box, type Box, type MatId } from '../../../world/layout.ts';
 import type { GimmickContext, GimmickSlot } from '../types.ts';
 import { buildPit, planPit, type PitPlan } from '../pit.ts';
-import { fillRects, frontOf, innerRect, rectGap } from '../util.ts';
+import { fillRects, freeWallSpan, frontOf, innerRect, rectGap } from '../util.ts';
 
 /** 部屋の照明を 1 つの lamp 部品につなぐ（on: 最初に点いているか）。戻り値は lamp の id */
 export function darkenRoom(ctx: GimmickContext, name = 'dark', on = false, inputs?: { [k: string]: string }, rate = 6): string {
@@ -111,6 +111,38 @@ export function roomRegion(s: GimmickSlot, y0 = -0.5, y1 = 3): { min: number[]; 
   const r = innerRect(s);
   const y = s.cell.floorY;
   return { min: [r.x0, y + y0, r.z0], max: [r.x1, y + y1, r.z1] };
+}
+
+/** 開口の無い壁のうち、長さ need の空いた区間があるもの（区間の真ん中 at）。prefer の順に並べる（無ければ入口から遠い順） */
+export function freeWalls(ctx: GimmickContext, need: number, prefer?: (d: Dir) => number): { d: Dir; at: number; a0: number; a1: number }[] {
+  const s = ctx.slot;
+  const out: { d: Dir; at: number; a0: number; a1: number }[] = [];
+  for (const d of [0, 1, 2, 3] as const) {
+    if (s.openings.some((o) => o.dir === d)) continue;
+    const span = freeWallSpan(s, d, need, 0.8);
+    if (span) out.push({ d, ...span });
+  }
+  const e = s.entrance?.pos;
+  const score = prefer ?? ((d: Dir): number => { if (!e) return 0; const { wall } = wallCoord(ctx, d); return -(d === 0 || d === 2 ? Math.abs(wall - e[2]) : Math.abs(wall - e[0])); });
+  return out.sort((p, q) => score(p.d) - score(q.d));
+}
+
+/** 7 つの線の数字（0..9）。中心 (x, y, z)・高さ h。壁 d の室内面に貼る（壁から 0.01 m） */
+const SEG: Record<number, string> = { 0: 'abcdef', 1: 'bc', 2: 'abged', 3: 'abgcd', 4: 'fgbc', 5: 'afgcd', 6: 'afgedc', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
+export function digitBoxes(ctx: GimmickContext, d: Dir, at: number, yc: number, h: number, digit: number, mat: MatId): Box[] {
+  const w = h * 0.55, t = h * 0.12;
+  const out: Box[] = [];
+  const seg = (u0: number, v0: number, u1: number, v1: number): void => { out.push(wallBox(ctx, d, at + (u0 + u1) / 2, Math.abs(u1 - u0) / 2, yc + v0, yc + v1, 0.004, 0.012, mat)); };
+  for (const c of SEG[digit] ?? '') {
+    if (c === 'a') seg(-w / 2, h / 2 - t, w / 2, h / 2);
+    if (c === 'g') seg(-w / 2, -t / 2, w / 2, t / 2);
+    if (c === 'd') seg(-w / 2, -h / 2, w / 2, -h / 2 + t);
+    if (c === 'f') seg(-w / 2, 0, -w / 2 + t, h / 2);
+    if (c === 'b') seg(w / 2 - t, 0, w / 2, h / 2);
+    if (c === 'e') seg(-w / 2, -h / 2, -w / 2 + t, 0);
+    if (c === 'c') seg(w / 2 - t, -h / 2, w / 2, 0);
+  }
+  return out;
 }
 
 /** 床板の列を、到達判定のときだけ床として扱う（穴を渡れることにする） */

@@ -8,7 +8,8 @@
 import { hashAll, Rng } from '../../../math/rng.ts';
 import type { Vec3 } from '../../../math/vec.ts';
 import type { Json } from '../../../world/layout.ts';
-import { definePart, pAabb, pNum, playerIn, type PartContext } from '../../part.ts';
+import { definePart, pAabb, pBool, pNum, playerIn, type PartContext } from '../../part.ts';
+import { blockedIn, inCone, onScreen } from './common.ts';
 
 interface DarumaState { phase: number; t: number; dur: number; cycle: number; caught: number; corner: number; anchor: { [id: string]: Json }; [k: string]: Json | undefined }
 
@@ -76,3 +77,82 @@ const pOf = (ctx: PartContext): Vec3 => {
   const p = ctx.spec.params.pos as number[];
   return [p[0]!, p[1]! + 1.4, p[2]!];
 };
+
+// ---------------------------------------------------------------- 見ていない間だけ進む時計
+interface ClockState { hand: number; seen: number; unseen: number; [k: string]: Json | undefined }
+
+/**
+ * watchClock: 壁の時計（中心 pos）は、見られていない間だけ進む（12 時間で cycleSec 秒）。見ている = 時計が画面に映っている。
+ * 出力: twelve（針が 12 時の前後 window 時間の中）・seen・hand（時。0..12）・unseen（見られずに続いた秒数。隠しの元）
+ */
+definePart<ClockState>({
+  type: 'watchClock',
+  outputs: ['twelve', 'seen', 'hand', 'unseen'],
+  init: (ctx) => ({ hand: pNum(ctx.spec, 'start', 4), seen: 0, unseen: 0 }),
+  step(s, ctx) {
+    const c = ctx.spec.params.pos as number[];
+    const pos: Vec3 = [c[0]!, c[1]!, c[2]!];
+    const region = pAabb(ctx.spec, 'region');
+    const inside = ctx.players.filter((p) => playerIn(p, region));
+    // 見ている = 部屋の中の人の画面に映っている（時計は壁の高い所にあり、前は家具を置かないので、遮りは見ない）
+    const seen = inside.some((p) => onScreen(p, pos, 48, 32, 16));
+    if (!seen) s.hand = (s.hand + (12 / pNum(ctx.spec, 'cycleSec', 30)) * ctx.dt) % 12;
+    s.seen = seen ? 1 : 0;
+    s.unseen = inside.length && !seen ? s.unseen + ctx.dt : 0;
+    const w = pNum(ctx.spec, 'window', 0.3);
+    ctx.output('twelve', s.hand < w || s.hand > 12 - w ? 1 : 0);
+    ctx.output('seen', s.seen);
+    ctx.output('hand', s.hand);
+    ctx.output('unseen', s.unseen);
+  },
+});
+
+// ---------------------------------------------------------------- 見つめる
+/**
+ * gazeSensor: 区画 region の中の人が、点 target を見つめている（視線から deg 度以内・maxDist 以内・遮られない）時間が sec に達したら done（入ったまま）。
+ * still なら、動かず視線も止めている間だけ数える（立ち止まって見つめる = 撮像のズーム）。
+ * mode 'down': 下を見て（pitch が downPitch より下）動かずにいる = 目を閉じる（target は見ない）。出力 done・progress・gazing
+ */
+definePart<{ t: number; done: number }>({
+  type: 'gazeSensor',
+  outputs: ['done', 'progress', 'gazing'],
+  init: () => ({ t: 0, done: 0 }),
+  step(s, ctx) {
+    const region = pAabb(ctx.spec, 'region');
+    const still = pBool(ctx.spec, 'still', true);
+    const down = ctx.spec.params.mode === 'down';
+    const t = ctx.spec.params.target as number[] | undefined;
+    const target: Vec3 = t ? [t[0]!, t[1]!, t[2]!] : [0, 0, 0];
+    const deg = pNum(ctx.spec, 'deg', 6), maxDist = pNum(ctx.spec, 'maxDist', 30);
+    const gazing = ctx.players.some((p) => {
+      if (!playerIn(p, region)) return false;
+      if (still && (p.moveRank !== 'still' || p.stillSec < pNum(ctx.spec, 'stillSec', 0.4))) return false;
+      if (down) return p.pitch < pNum(ctx.spec, 'downPitch', -1.0);
+      return inCone(p, target, deg, maxDist) && !blockedIn(ctx.floor, ctx.spec.cell ?? '', [p.pos[0], p.pos[1] + p.eye, p.pos[2]], target, 0.15);
+    });
+    s.t = gazing ? s.t + ctx.dt : 0;
+    if (s.t >= pNum(ctx.spec, 'sec', 1.5)) s.done = 1;
+    ctx.output('done', s.done);
+    ctx.output('progress', Math.min(1, s.t / pNum(ctx.spec, 'sec', 1.5)));
+    ctx.output('gazing', gazing ? 1 : 0);
+  },
+});
+
+// ---------------------------------------------------------------- 記念撮影の機械
+/** photoCam: 調べる（E / タップ）と写真を撮る（三脚のカメラ box）。出力 taken（一度でも撮った）・shots（撮った回数）。cue 'photo.shot' */
+definePart<{ shots: number }>({
+  type: 'photoCam',
+  outputs: ['taken', 'shots'],
+  init(ctx) {
+    ctx.setInteractable(pAabb(ctx.spec, 'box'), 2.4);
+    return { shots: 0 };
+  },
+  step(s, ctx) {
+    if (ctx.interactedBy()) {
+      s.shots++;
+      ctx.cue('photo.shot', ctx.spec.params.eye ? (ctx.spec.params.eye as number[]).slice(0, 3) as Vec3 : undefined, { n: s.shots });
+    }
+    ctx.output('taken', s.shots > 0 ? 1 : 0);
+    ctx.output('shots', s.shots);
+  },
+});

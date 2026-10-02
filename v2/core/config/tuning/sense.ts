@@ -17,7 +17,7 @@ export const SENSE_TUNING = {
   'sense.spotRide.tileM': num(0.5, 0.3, 1, '動く光の中だけ床: 床板の大きさ（m）'),
   'sense.lightBands.widthM': num(0.75, 0.5, 1.4, '光の帯の橋: 帯の幅（m）'),
   'sense.lightBands.gapM': num(0.45, 0.2, 1.2, '光の帯の橋: 帯の間（m。隣の帯へ乗り移れる）'),
-  'sense.lightBands.onSec': num(4.5, 2, 12, '光の帯の橋: 帯が点いている秒数'),
+  'sense.lightBands.onSec': num(4.5, 2, 12, '光の帯の橋: 帯が点いている秒数（長い穴では、歩いて渡り切れる長さまで延ばす）'),
   'sense.lightBands.offSec': num(2.5, 0.5, 8, '光の帯の橋: 帯が消えている秒数'),
   'sense.lightBands.warnSec': num(1.0, 0, 3, '光の帯の橋: 消える前に瞬く秒数'),
   'sense.lookBridge.widthM': num(1.0, 0.6, 1.6, '見ている間だけある橋: 橋の幅（m）'),
@@ -35,6 +35,8 @@ export const SENSE_TUNING = {
   'sense.lightWave.windowM': num(3.2, 2, 6, '明滅の位相: 点いている帯の長さ（m）'),
   'sense.lightWave.restSec': num(3, 0, 10, '明滅の位相: 波と波の間の、全部消えている秒数'),
   'sense.lightWave.graceSec': num(1.0, 0.4, 4, '明滅の位相: 暗闇にこれだけいると闇に捕まる（秒）'),
+  'sense.lightWave.doorPoolM': num(1.3, 0.8, 2, '明滅の位相: 開口の前の消えない灯りの半径（m）'),
+
   // ---- サーチライト（gimmicks/sense/search.ts）----
   'sense.search.stripM': num(1.6, 1.2, 3, 'サーチライト: 入口・出口の壁沿いの安全な床の奥行き（m）'),
   'sense.search.laneM': num(1.8, 1.2, 3, 'サーチライト: 光の円が往復する帯の幅（m）'),
@@ -43,7 +45,9 @@ export const SENSE_TUNING = {
   'sense.search.speedMin': num(1.6, 0.5, 5, 'サーチライト: 光の円の速さの下限（m/s）'),
   'sense.search.speedMax': num(2.6, 0.5, 6, 'サーチライト: 光の円の速さの上限（m/s）'),
   'sense.search.catchesToCorner': num(2, 1, 10, 'サーチライト: これだけ見つかると、戻される先が隅（隠しの扉の前）になる', true),
-  'sense.lightWave.doorPoolM': num(1.3, 0.8, 2, '明滅の位相: 開口の前の消えない灯りの半径（m）'),
+
+  // ---- 幕の部屋（gimmicks/sense/curtains.ts）----
+  'sense.curtains.spacingM': num(1.5, 1.2, 2.5, '幕の部屋: 幕の口の間隔（m）'),
 
   // ---- 視線と観測（gimmicks/sense/sight.ts）----
   'sense.daruma.chantMin': num(2.4, 1, 8, 'だるまさん: 数え歌の長さの下限（秒）'),
@@ -52,4 +56,13 @@ export const SENSE_TUNING = {
   'sense.daruma.watchMax': num(3.2, 0.5, 8, 'だるまさん: 振り返って見ている長さの上限（秒）'),
   'sense.daruma.tolM': num(0.15, 0.05, 0.6, 'だるまさん: 見られている間に動いてよい距離（m。止まりきれない分）'),
   'sense.daruma.catchesToCorner': num(3, 1, 10, 'だるまさん: これだけ捕まると、入口ではなく隅（隠しの扉の前）へ連れて行かれる', true),
+  'sense.clock.cycleSec': num(30, 10, 120, '見ていない間だけ進む時計: 見ていない間に針が 12 時間回る秒数'),
+  'sense.clock.windowH': num(0.35, 0.1, 1.5, '見ていない間だけ進む時計: 12 時の前後この時間（時）の間に見ると、扉の鍵が開く'),
+  'sense.clock.openSec': num(6, 2, 20, '見ていない間だけ進む時計: 鍵が開いている秒数'),
+  'sense.clock.goneSec': num(45, 10, 180, '見ていない間だけ進む時計（BO03）: 一度も見ないまま部屋にこれだけいると、時計が消えて跡が扉になる'),
+  'sense.zoom.sec': num(1.5, 0.5, 5, 'ズームで注視: 立ち止まって看板を見つめ続ける秒数（撮像がズームして小さな文字が読める）'),
+  'sense.zoom.deg': num(4, 1.5, 10, 'ズームで注視: 看板を見つめている判定の角度（度）'),
+  'sense.gaze.sec': num(1.6, 0.5, 5, 'マネキンの視線の先・鏡の扉など: 見つめ続ける秒数'),
+  'sense.lookBack.sec': num(1.0, 0.3, 4, '出口の前で振り返る: 来た道を見ている秒数'),
+  'sense.cctv.watchSec': num(2.0, 0.5, 6, '監視カメラ: モニターを見つめる秒数（自分のいない所の扉が開いているのを見る）'),
 } as const satisfies Record<string, Spec>;

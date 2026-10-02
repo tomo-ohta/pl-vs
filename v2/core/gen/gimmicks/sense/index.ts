@@ -6,3 +6,6 @@ import './lightfloor.ts';
 import './dark.ts';
 import './search.ts';
 import './sight.ts';
+import './curtains.ts';
+import './watch.ts';
+import './camera.ts';

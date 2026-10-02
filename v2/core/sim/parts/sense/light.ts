@@ -39,6 +39,22 @@ definePart({
   },
 });
 
+/** flashlightSensor: 区画 region の中の人の懐中電灯が mode（'off' = 消している / 'on' = 点けている）の間 sec 秒続いたら done（入ったまま） */
+definePart<{ t: number; done: number }>({
+  type: 'flashlightSensor',
+  outputs: ['done', 'ok'],
+  init: () => ({ t: 0, done: 0 }),
+  step(s, ctx) {
+    const region = pAabb(ctx.spec, 'region');
+    const want = ctx.spec.params.mode !== 'on';
+    const ok = ctx.players.some((p) => playerIn(p, region) && p.flashlight !== want);
+    s.t = ok ? s.t + ctx.dt : 0;
+    if (s.t >= pNum(ctx.spec, 'sec', 1)) s.done = 1;
+    ctx.output('done', s.done);
+    ctx.output('ok', ok ? 1 : 0);
+  },
+});
+
 // ---------------------------------------------------------------- 闇に捕まる
 /** 点 (x, z) が明るいか（pools の照明の明るさは lamp 部品の状態 level） */
 export function litAt(pools: readonly number[][], x: number, z: number, levelOf: (lamp: string) => number, lampIds: readonly (string | null)[]): boolean {

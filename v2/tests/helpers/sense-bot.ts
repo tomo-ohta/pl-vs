@@ -248,6 +248,31 @@ function daruma(sim: Sim, e: EntitySpec): InputCommand | null {
   return st.phase !== 0 || st.dur - st.t < 0.55 ? still(sim) : null;
 }
 
+/**
+ * 見ていない間だけ進む時計: 出口の扉の鍵が掛かっている間、時計から目をそらして待ち（針が進む）、12 時の少し前で時計を見つめて止め、
+ * 鍵が開いたら（ふつうの歩き方で）扉へ。出口の扉へ向かうときだけ
+ */
+function watchClock(sim: Sim, e: EntitySpec, leg: V2): InputCommand | null {
+  const unlock = String(e.params.unlock);
+  if (sim.outputOf(unlock, 'out') > 0.5) return null;
+  const door = sim.floor.entities.find((x) => x.id === e.params.door);
+  const pn = door?.params.panel as { min: number[]; max: number[] } | undefined;
+  if (!pn || Math.hypot((pn.min[0]! + pn.max[0]!) / 2 - leg[0], (pn.min[2]! + pn.max[2]!) / 2 - leg[1]) > 2.2) return null;
+  const st = sim.stateOf(e.id) as { hand: number } | null;
+  if (!st) return null;
+  const pl = sim.players[0]!;
+  // 部屋の中に入ってから（時計は部屋の中の人の目にだけ止まる）
+  const rg = e.params.region as { min: number[]; max: number[] };
+  if (pl.pos[0] < rg.min[0]! + 0.3 || pl.pos[0] > rg.max[0]! - 0.3 || pl.pos[2] < rg.min[2]! + 0.3 || pl.pos[2] > rg.max[2]! - 0.3) return null;
+  const c = e.params.pos as number[];
+  const ex = c[0]! - pl.pos[0], ey = c[1]! - (pl.pos[1] + pl.eye), ez = c[2]! - pl.pos[2];
+  const yaw = Math.atan2(-ex, -ez), pitch = Math.atan2(ey, Math.hypot(ex, ez));
+  const w = Number(e.params.window ?? 0.3);
+  // 12 時の少し前〜少し後なら見つめる（見ると止まり、鍵が開く）。それ以外は真下を見て待つ
+  if (st.hand > 12 - w * 0.6 || st.hand < w * 0.3) return still(sim, { yaw, pitch });
+  return still(sim, { yaw: yaw + Math.PI, pitch: -1.35 });
+}
+
 export function senseDrive(sim: Sim, leg: readonly number[]): InputCommand | null {
   const pl = sim.players[0]!;
   const cell = cellOf(sim.floor, pl.pos);
@@ -267,6 +292,10 @@ export function senseDrive(sim: Sim, leg: readonly number[]): InputCommand | nul
   }
   for (const e of partsIn(sim.floor, cell.id, 'daruma')) {
     const c = daruma(sim, e);
+    if (c) return c;
+  }
+  for (const e of partsIn(sim.floor, cell.id, 'watchClock')) {
+    const c = watchClock(sim, e, leg2);
     if (c) return c;
   }
   return null;

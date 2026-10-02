@@ -192,6 +192,7 @@ export class ClientGame {
         root, materials: this.materials, built: this.built, sim: this.sim, levelOf: this.lampLevel,
         audio: this.audio, postfx: this.postfx, camera: this.camera, scene: this.scene,
         onEvent: (f) => { this.eventListeners.add(f); return () => this.eventListeners.delete(f); },
+        quality: () => this.tier,
       });
       if (!v) { root.removeFromParent(); continue; }
       this.views.set(e.id, v);

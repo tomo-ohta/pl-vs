@@ -179,7 +179,8 @@ test('異変: それぞれ見て分かる形になっている（浸水の水・
           assert.ok(c.boxes.some((b) => b.mat === c.palette.light && !b.solid && b.max[1] < fy + 0.1), `${msg}: 床の照明`);
           break;
         case 'stack':
-          assert.ok(c.boxes.some((b) => b.solid && b.propGroup && b.min[1] > fy + 0.9), `${msg}: 積まれた家具`);
+          // 0.75 m: 背の低い家具（倉庫のかご車 0.8 m）を積んでも上の段は 0.8 m から（担当 sense が 0.9 から下げた。仕掛けが増えて異変の部屋が変わり、かご車の部屋に当たった）
+          assert.ok(c.boxes.some((b) => b.solid && b.propGroup && b.min[1] > fy + 0.75), `${msg}: 積まれた家具`);
           break;
         case 'scatter':
           assert.ok(c.boxes.some((b) => b.kind === 'scatteredPaper'), msg);

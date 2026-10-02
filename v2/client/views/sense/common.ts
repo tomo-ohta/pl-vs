@@ -41,6 +41,17 @@ export class LitParts {
     return m;
   }
 
+  /** 円柱（半径 r・高さ h。軸は y）。時計の文字盤など */
+  cylinder(r: number, h: number, at: [number, number, number], mat: MatId, segments = 32): THREE.Mesh {
+    const g = new THREE.CylinderGeometry(r, r, h, segments);
+    g.setAttribute('bakedLight', new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count * 3).fill(0.3), 3));
+    this.geos.push(g);
+    const m = new THREE.Mesh(g, this.ctx.materials.get(mat));
+    m.position.set(...at);
+    this.group.add(m);
+    return m;
+  }
+
   /** フロア座標の点 at の陰影で、全部の頂点の明るさを塗る */
   relight(at: [number, number, number]): void {
     const cell = cellAt(this.ctx.built, at);
@@ -77,6 +88,10 @@ export function doorNear(ctx: ViewContext, x: number, z: number, r = 0.7): boole
 export function onCue(ctx: ViewContext, id: string, f: (name: string, e: { pos?: number[]; data?: { [k: string]: unknown } }) => void): () => void {
   return ctx.onEvent?.((e) => { if (e.type === 'cue' && e.entity === id) f(String(e.data?.name ?? ''), e); }) ?? (() => {});
 }
+
+/** 描く層: 画面の幕（画面のカメラだけ）・写した像にだけ写る物（写真・監視カメラ・鏡のカメラだけ） */
+export const LAYER_SCREEN = 5;
+export const LAYER_IMAGE = 3;
 
 /** 光る物の材質（加算合成。照明に依らず光って見える。暗い部屋で光の床・光の筋に使う） */
 export function glowMaterial(color: number, opacity = 1): THREE.MeshBasicMaterial {
@@ -155,6 +170,9 @@ export class ScreenVeil {
     this.mesh.renderOrder = 9999;
     this.mesh.frustumCulled = false;
     this.mesh.visible = false;
+    // 幕は画面のカメラだけが描く（写真・監視カメラ・鏡のカメラには写らない）
+    this.mesh.layers.set(LAYER_SCREEN);
+    ctx.camera?.layers.enable(LAYER_SCREEN);
     (ctx.camera ?? ctx.root).add(this.mesh);
   }
   set(opacity: number, color?: number): void {

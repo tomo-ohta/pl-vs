@@ -11,6 +11,7 @@ import { dressCell } from '../core/gen/dress/index.ts';
 import type { SimEvent } from '../core/sim/types.ts';
 import { IDLE_COMMAND } from '../core/sim/types.ts';
 import { simOf, T } from './sense-util.ts';
+import { QUALITY_TIERS } from '../client/render/quality.ts';
 
 test('担当 sense の描画: 見本のフロアの全部の部品で、描画を作って更新できる', async () => {
   const { MaterialLibrary } = await import('../client/render/MaterialLibrary.ts');
@@ -35,7 +36,8 @@ test('担当 sense の描画: 見本のフロアの全部の部品で、描画�
     for (const e of floor.entities) {
       const root = new THREE.Group();
       built.root.add(root);
-      const v = createView(e, { root, materials, built, sim, levelOf: (id) => sim.outputOf(id, 'level'), camera, scene, onEvent: (f) => { listeners.add(f); return () => listeners.delete(f); } });
+      const tier = QUALITY_TIERS[(['high', 'low', 'mid'] as const)[chunks.indexOf(chunk) % 3]!];
+      const v = createView(e, { root, materials, built, sim, levelOf: (id) => sim.outputOf(id, 'level'), camera, scene, onEvent: (f) => { listeners.add(f); return () => listeners.delete(f); }, quality: () => tier });
       if (v) { views.push({ v, id: e.id }); seen.add(e.type); }
     }
     for (let f = 0; f < 40; f++) {
@@ -48,5 +50,5 @@ test('担当 sense の描画: 見本のフロアの全部の部品で、描画�
     built.dispose();
     sim.physics?.dispose();
   }
-  assert.ok(seen.has('lightFloor'), [...seen].join(','));
+  for (const type of ['lightFloor', 'darkHazard', 'searchlight', 'daruma', 'watchClock', 'senseFx']) assert.ok(seen.has(type), `${type}: ${[...seen].join(',')}`);
 });
