@@ -15,7 +15,7 @@ import type { StyleEnv } from './styles.ts';
 /** かごの寸法（内側 + 壁） */
 const CAR_W = 2.0, CAR_D = 2.2, CAR_H = 2.45, CAR_DOOR = 0.95;
 
-interface Shaft { id: string; x: number; stops: { y: number; cell: string; door: string; button: string; aabb: EntitySpec['params'][string] }[] }
+interface Shaft { id: string; x: number; stops: { y: number; cell: string; hall: string; door: string; button: string; aabb: EntitySpec['params'][string]; zIn: number; zOut: number }[] }
 
 /** フロアのエレベーター（かごの列ごと。階をまたいで集めてから部品を作る） */
 const SHAFTS = new WeakMap<GeoBuild, Map<number, Shaft>>();
@@ -63,9 +63,9 @@ export function addLift(g: GeoBuild, pl: Placed, _sk: Skeleton, _placed: Map<num
     // 階の表示（扉の上の帯。色だけ。階ごとに違う色）
     const tint = (['neonBlue', 'lightGreen', 'neonRed', 'lightYellow'] as const)[pl.node.story % 4]!;
     g.addBox(id, box([x - 0.3, pl.y + DOOR_H + 0.08, car.z1 - WALL_T - 0.02], [x + 0.3, pl.y + DOOR_H + 0.18, car.z1 - WALL_T], tint, false));
-    g.addBox(pl.cellId, box([x - 0.3, pl.y + DOOR_H + 0.08, car.z1], [x + 0.3, pl.y + DOOR_H + 0.18, car.z1 + 0.02], tint, false));
+    g.addBox(pl.cellId, box([x - 0.3, pl.y + DOOR_H + 0.08, car.z1 + WALL_T], [x + 0.3, pl.y + DOOR_H + 0.18, car.z1 + WALL_T + 0.02], tint, false));
     const sh = shafts.get(k) ?? { id: liftId, x, stops: [] };
-    sh.stops.push({ y: pl.y, cell: id, door: doorId, button: buttonId, aabb: aabbJson({ min: [car.x0 + WALL_T, pl.y - 0.1, car.z0 + WALL_T], max: [car.x1 - WALL_T, pl.y + CAR_H - 0.1, car.z1 - WALL_T] }) });
+    sh.stops.push({ y: pl.y, cell: id, hall: pl.cellId, zIn: car.z1 - WALL_T - 0.035, zOut: car.z1 + WALL_T + 0.035, door: doorId, button: buttonId, aabb: aabbJson({ min: [car.x0 + WALL_T, pl.y - 0.1, car.z0 + WALL_T], max: [car.x1 - WALL_T, pl.y + CAR_H - 0.1, car.z1 - WALL_T] }) });
     shafts.set(k, sh);
   }
 }
@@ -80,6 +80,13 @@ function finishLifts(g: GeoBuild, shafts: Map<number, Shaft>): void {
     sh.stops.forEach((s, i) => { const d = g.out.entities.find((e) => e.id === s.door); if (d) d.inputs = { open: `${liftId}.open${i}` }; });
     const inputs: NonNullable<EntitySpec['inputs']> = {};
     sh.stops.forEach((s, i) => { inputs[`call${i}`] = `${s.button}.pressed`; });
+    // 階の表示（扉の上の色の帯の前に、上から 1・2・3 … の数字。かごの中と、ホールの側）
+    const sy = (y: number): number => y + DOOR_H + 0.13;
+    sh.stops.forEach((s, i) => {
+      const label = `${i + 1}`;
+      g.out.entities.push({ id: `${s.cell}:signIn`, type: 'liftSign', cell: s.cell, params: { label, pos: [sh.x, sy(s.y), s.zIn], facing: -1 } });
+      g.out.entities.push({ id: `${s.cell}:signOut`, type: 'liftSign', cell: s.hall, params: { label, pos: [sh.x, sy(s.y), s.zOut], facing: 1 } });
+    });
     g.out.entities.push({
       id: liftId, type: 'shaftLift', cell: sh.stops[0]!.cell,
       params: { stops: sh.stops.map((s) => ({ y: s.y, aabb: s.aabb })), closeSec: g.t['structure.elevator.closeSec'], rideSec: g.t['structure.elevator.rideSec'] },

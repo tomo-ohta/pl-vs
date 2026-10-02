@@ -86,7 +86,7 @@ defineGimmick({
     const door = ctx.addEntity('door', { type: 'securityDoor', params: { panel: aabbJson({ min: [pr.x0, y, pr.z0], max: [pr.x1, y + 2.12, pr.z1] }), out: out as Json, slide: (dw.d % 2 === 0 ? [1, 0, 0] : [0, 0, 1]) as Json }, inputs: { open: `${alarm}.on` } });
     const front = wallPoint(dw, dw.at, 0.9, 0, y);
     ctx.addEntity('hint', { type: 'constant', params: { value: 0, bot: botHint([{ at: btn.stand, look: btn.center, wait: 0.4 }, { at: front, until: `${door}.open` }], { only: 'secret' }) } });
-    ctx.offerSecret({ hook: 'alarm.door', modes: ['present'], weight: 1, required: true, doorway: { dir: dw.d, at: doorAt(dw), y, width: 1.0, height: 2.0 }, tell: '警報の鳴っている間だけ開く鋼鉄の扉' });
+    ctx.offerSecret({ hook: 'alarm.door', modes: ['present'], weight: 1, required: true, ownDoor: door, doorway: { dir: dw.d, at: doorAt(dw), y, width: 1.0, height: 2.0 }, tell: '警報の鳴っている間だけ開く鋼鉄の扉' });
     for (const w of [bw, dw]) { const k = w.F.rect(w.at - 1.0, 0, w.at + 1.0, 1.4); ctx.keepOut({ min: [k.x0, y, k.z0], max: [k.x1, y + 2.6, k.z1] }); }
   },
 });

@@ -492,7 +492,10 @@ export function attachSecret(world: SecretWorld, host: GeoCell, offer: SecretOff
     const pn = doorPanel(l.n, l.coord, l.at, DOOR_W, ly, DOOR_H);
     const panel = { min: [...pn.min], max: [...pn.max] };
     let doorId: string | undefined;
-    if (isEntry) {
+    if (isEntry && offer.ownDoor) {
+      // 入口の扉は仕掛けが置いている（隠しの扉は足さず、開口の扉はその部品）
+      doorId = offer.ownDoor;
+    } else if (isEntry) {
       // 存在型は壁と同じ色の扉（見えにくい）。出現型は壁が消えると現れるふつうの扉
       doorId = `${id}.door`;
       world.entities.push({ id: doorId, type: 'door', cell: host.cell.id, params: { panel, axis: l.n, mat: mode === 'present' ? host.cell.palette.wall : host.cell.palette.door, hinge: rng.chance(0.5) ? 1 : -1, swing, autoCloseSec: 6 } });

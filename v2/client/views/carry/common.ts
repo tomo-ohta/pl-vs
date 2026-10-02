@@ -66,15 +66,17 @@ export class Parts {
 // ---------------------------------------------------------------- 音（WebAudio の合成。鐘・鍵盤の高さのある音）
 /**
  * 高さのある音（鐘・鍵盤・正解の音）。AudioEngine の一発音には高さを変えられる鐘が無いので、ここで小さく合成する。
- * 音量は設定の効果音の音量を通らない（全体の音量 0.25 に合わせて控えめ）
+ * 出口は AudioEngine の効果音の入口（全体・効果音の音量と、部屋の効果を通る）
  */
 export function playTone(ctx: ViewContext, freq: number, o: { pos?: readonly number[]; dur?: number; gain?: number; type?: OscillatorType; bell?: boolean } = {}): void {
   const ac = ctx.audio?.context;
-  if (!ac || ac.state !== 'running') return;
+  const bus = ctx.audio?.sfxInput;
+  if (!ac || !bus || ac.state !== 'running') return;
   const t = ac.currentTime;
   const dur = o.dur ?? 1.4;
   const out = ac.createGain();
-  out.gain.value = (o.gain ?? 0.5) * 0.12;
+  // 効果音のバスの後で全体の音量（既定 0.25 の 2 乗 = 0.0625）が掛かる。既定の音量で、前（出力へ直接 0.12 倍）と同じくらいの大きさに
+  out.gain.value = (o.gain ?? 0.5) * 1.9;
   let node: AudioNode = out;
   if (o.pos) {
     const pan = ac.createPanner();
@@ -85,7 +87,7 @@ export function playTone(ctx: ViewContext, freq: number, o: { pos?: readonly num
     out.connect(pan);
     node = pan;
   }
-  node.connect(ac.destination);
+  node.connect(bus);
   const partials: [number, number][] = o.bell ? [[1, 1], [2.76, 0.35], [5.4, 0.12], [8.9, 0.05]] : [[1, 1], [2, 0.25], [3, 0.1]];
   for (const [k, a] of partials) {
     const osc = ac.createOscillator();

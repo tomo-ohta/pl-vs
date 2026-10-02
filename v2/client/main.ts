@@ -81,14 +81,14 @@ let tour: { stop: TourStop; text: string }[] = [];
 let tourAt = -1;
 /** 最後に作ったフロアの生成の報告（地図と図鑑が仕掛け・異変・隠しの場所を知るのに使う。実験場は null） */
 let lastReport: GenReport | null = null;
-function makeFloor(d: number, v = 0): FloorLayout {
+function makeFloor(d: number, v = 0, arrival?: 'lift'): FloorLayout {
   lastReport = null;
   if (useLab) return labFloor(seed, tuningVersion(tuning));
   // 中身（家具）: ?nodress=1 で置かない（確認用）
   const dress = params.has('nodress') ? undefined : dressCell;
   const first = d === 0 && v === 0 && !moved;
   const r = tryIds.length && first ? showcaseFloor(tuning, { ids: tryIds, flip: showcase === 2, dress })
-    : showcase && first ? showcaseFloor(tuning, { flip: showcase === 2, dress }) : generateFloorReport({ world: seed, depth: d, variant: v }, tuning, { dress, ...(shapeParam ? { shape: shapeParam } : {}) });
+    : showcase && first ? showcaseFloor(tuning, { flip: showcase === 2, dress }) : generateFloorReport({ world: seed, depth: d, variant: v }, tuning, { dress, ...(shapeParam ? { shape: shapeParam } : {}), ...(arrival ? { arrival } : {}) });
   console.info(`[gen] ${r.floor.id} ${r.profile.rarity} ${r.profile.family.name}/${r.profile.pattern} ${r.profile.cols}×${r.profile.rows} 区画 ${r.floor.cells.length} 箱 ${r.floor.cells.reduce((a, c) => a + c.boxes.length, 0)}${r.tone ? ` 裏の調子 ${r.tone}` : ''} 作り直し ${r.attempts - 1} ${r.ms} ms`, r.issues);
   lastReport = r;
   tour = tourOf(r);
@@ -132,6 +132,8 @@ document.body.appendChild(fade);
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 let moving = false;
 let moved = false;
+/** 置いた物が残る（I09）の保存の鍵: 世界の seed・フロアの id・調整表の版。見本・実験場のフロアは残さない（同じ id でも中身が違う） */
+const saveKeyOf = (f: FloorLayout): string | undefined => useLab || ((showcase || tryIds.length) && !moved) ? undefined : `${seed}:${f.id}:${tuningVersion(tuning)}`;
 /** 前の階に戻る輪を通った階（同じ階からは 1 回だけ） */
 const loopedFrom = new Set<number>();
 game.onFloorExit = (_exit, _kind, to): void => {
@@ -149,15 +151,18 @@ game.onFloorExit = (_exit, _kind, to): void => {
     if (m) { depth = Number(m[1]); variant = Number(m[2]); } else if (back !== null) { depth = back; variant = 0; } else { depth++; variant = 0; }
     moved = true;
     const t0 = performance.now();
-    const next = makeFloor(depth, variant);
+    // エレベーター（liftCabin）で移った: 次のフロアの入口をかごにして、かごの中から始める
+    const byLift = _kind === 'elevator';
+    const next = makeFloor(depth, variant, byLift ? 'lift' : undefined);
     if (back !== null) next.spawn = loopSpawn(next, seed);
-    await game.loadFloor(next);
+    await game.loadFloor(next, { saveKey: saveKeyOf(next) });
     if (game.sim) maps.setFloor(game.sim.floor, lastReport, { world: seed, depth, variant });
     // 駅の車両で着いた: 次のフロアにも車両があれば、その中に出る（扉が閉まった車両の中から、着いて扉が開く）
     if (_exit === 'train') {
       const arrive = next.entities.find((e) => e.type === 'trainRide')?.params.arrive as { pos?: number[]; yaw?: number } | undefined;
       if (arrive?.pos) game.teleport([arrive.pos[0]!, arrive.pos[1]!, arrive.pos[2]!], arrive.yaw ?? 0);
     }
+    if (byLift) game.audio.elevator('bell');
     console.info(`[floor] B${depth + 1}F${variant ? `（裏 ${variant}）` : ''} 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
     fade.style.opacity = '0';
     moving = false;
@@ -165,7 +170,7 @@ game.onFloorExit = (_exit, _kind, to): void => {
 };
 
 const t0 = performance.now();
-await game.loadFloor(makeFloor(depth, variant));
+{ const first = makeFloor(depth, variant); await game.loadFloor(first, { saveKey: saveKeyOf(first) }); }
 if (game.sim) maps.setFloor(game.sim.floor, lastReport, { world: seed, depth, variant });
 console.info(`[floor] 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
 game.start();

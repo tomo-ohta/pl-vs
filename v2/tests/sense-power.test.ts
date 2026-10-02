@@ -49,6 +49,7 @@ test('鏡で光を導く: はじめは受光器に当たらず扉は開かない
     const r = await labSimDoors('mirrorBeam', { ...size(dir, 6, 8), entry: dir, exit: opp(dir), seed: seed * 7 + dir });
     assert.ok(r, `向き ${dir} seed ${seed}: 組める`);
     const { room, sim } = r;
+    const away = (): void => { sim.teleport(0, [room.inside[0], room.cell.floorY + 0.02, room.inside[2]], 0); stand(sim, 0.1); };
     const beam = entitiesOf(room.floor, 'beam')[0]!;
     const door = room.floor.entities.find((e) => e.id === 'door1')!;
     stand(sim, 0.2);
@@ -71,13 +72,27 @@ test('鏡で光を導く: はじめは受光器に当たらず扉は開かない
       }
       assert.ok(key, '印に当たる並びがある');
       ids.forEach((id, i) => { if ((sim.outputOf(id, 'state') > 0.5 ? 1 : 0) !== key![i]) poke(sim, id); });
+      // 鏡の前（筋の上）に立っていると、人が筋を遮る。入口へ下がって見る
+      away();
       assert.equal(sim.outputOf(beam.id, 'target'), 1, '印に当たる');
       stand(sim, T['sense.mirror.targetSec'] + 0.2);
       assert.equal(out(sim, offer.revealOutput!), 1, '当て続けると開く');
       targets++;
     }
     ids.forEach((id, i) => { if ((sim.outputOf(id, 'state') > 0.5 ? 1 : 0) !== sol[i]) poke(sim, id); });
+    away();
     assert.equal(sim.outputOf(beam.id, 'lit'), 1, `向き ${dir} seed ${seed}: 解の向きで当たる`);
+    // 筋の上に立つと遮られて当たらない・離れるとまた当たる
+    {
+      const path = (sim.stateOf(beam.id)?.full ?? []) as number[][];
+      const [a0, a1] = [path[path.length - 2]!, path[path.length - 1]!];
+      const mid = [(a0[0]! + a1[0]!) / 2, (a0[1]! + a1[1]!) / 2];
+      sim.teleport(0, [mid[0]!, room.cell.floorY + 0.02, mid[1]!], 0);
+      stand(sim, 0.1);
+      assert.equal(sim.outputOf(beam.id, 'lit'), 0, `向き ${dir} seed ${seed}: 人が筋を遮る`);
+      away();
+      assert.equal(sim.outputOf(beam.id, 'lit'), 1, `向き ${dir} seed ${seed}: 離れるとまた当たる`);
+    }
     stand(sim, 0.1);
     assert.equal(out(sim, lock), 0, '鍵が開く');
     // 鏡を回しても開いたまま

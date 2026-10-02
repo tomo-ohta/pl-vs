@@ -265,6 +265,14 @@ test('F23 縦に積んだビル・F24 エレベーターホール: 階が 2〜3 
         const lifts = f.entities.filter((e) => e.type === 'shaftLift');
         assert.equal(lifts.length, 2, 'エレベーター 2 基');
         for (const l of lifts) assert.equal((l.params.stops as unknown[]).length, r.profile.stories, '各階に止まる');
+        // 階の表示（数字の板）は、かごの中とホールの側の両方にあり、壁に埋まっていない
+        const signs = f.entities.filter((e) => e.type === 'liftSign');
+        assert.equal(signs.length, lifts.length * r.profile.stories * 2, '階の表示');
+        for (const s of signs) {
+          const q = s.params.pos as number[];
+          const buried = f.cells.flatMap((c) => c.boxes).some((b) => b.solid !== false && q.every((v, i) => v > b.min[i]! + 0.005 && v < b.max[i]! - 0.005));
+          assert.ok(!buried, `${f.id} ${s.id}: 壁に埋まっていない`);
+        }
       }
     }
   }

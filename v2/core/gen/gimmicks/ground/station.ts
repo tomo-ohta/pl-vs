@@ -181,7 +181,7 @@ defineGimmick({
         const pre = sideOf(F, a, v) === (vs < v ? 0 : 1) ? [] : [{ at: ((): [number, number, number] => { const q = F.point(reliable.u, sideOf(F, a, v) === 0 ? v - 1.0 : v + 1.0); return [q[0], y, q[1]]; })(), until: `${reliable.id}.open` }, { at: ((): [number, number, number] => { const q = F.point(reliable.u, sideOf(F, a, v) === 0 ? v + 1.0 : v - 1.0); return [q[0], y, q[1]]; })() }];
         hints.push(botHint([...pre, { at: [st[0], y, st[1]], crouch: true, wait: 0.3, until: `${broken}.done` }], { enterAt: enterAt(a), only: 'secret' }));
       }
-      ctx.offerSecret({ hook: 'auto.crouch', modes: ['appear'], weight: 1, revealOutput: `${broken}.done`, doorway: { dir: spot.d, at: spot.at, y, width: 1.0, height: 2.0 }, tell: '「故障中」の札の自動扉' });
+      ctx.offerSecret({ hook: 'auto.crouch', modes: ['appear'], weight: 1, revealOutput: `${broken}.done`, ownDoor: broken, doorway: { dir: spot.d, at: spot.at, y, width: 1.0, height: 2.0 }, tell: '「故障中」の札の自動扉' });
       ctx.keepOut({ min: [Math.min(z.x0, z.x1), y, Math.min(z.z0, z.z1)], max: [Math.max(z.x0, z.x1), y + 2.5, Math.max(z.z0, z.z1)] });
     }
     ctx.addEntity('hint', { type: 'constant', params: { value: 0, bot: hints } });

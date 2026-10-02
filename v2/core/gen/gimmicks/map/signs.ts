@@ -212,8 +212,21 @@ export function placeMapSigns(p: FloorProfile, geo: FloorGeometry, gimmicks: Gim
     const s = spots[0];
     if (s) {
       const board = hangBoard(spawn, s, 1.3, 1.05, 2.0, 'mapGuide');
-      const shown = geo.cells.filter((c) => (c.kind !== 'room' && c.kind !== 'secret') || c.cell.id === spawn.cell.id || c.cell.role === 'exit').map((c) => c.cell.id);
-      const corridors = geo.cells.filter((c) => (c.kind === 'corridor' || c.kind === 'junction') && c.cell.id !== spawn.cell.id);
+      // 描くのは入口から開口を map.guide.hops 回たどるまでの廊下・広間（フロア全部の廊下を描くと、探す楽しみが減る）と、出口の印
+      const hops = new Map<string, number>([[spawn.cell.id, 0]]);
+      const q = [spawn.cell.id];
+      for (let h = 0; h < q.length; h++) {
+        const d = hops.get(q[h]!)!;
+        if (d >= t['map.guide.hops']) continue;
+        for (const pt of geo.portals) {
+          if (!pt.cells.includes(q[h]!) || pt.kind === 'window') continue;
+          const o = pt.cells[0] === q[h] ? pt.cells[1] : pt.cells[0];
+          if (!hops.has(o) && !secretCells.has(o)) { hops.set(o, d + 1); q.push(o); }
+        }
+      }
+      const near = geo.cells.filter((c) => hops.has(c.cell.id));
+      const shown = near.filter((c) => (c.kind !== 'room' && c.kind !== 'secret') || c.cell.id === spawn.cell.id).map((c) => c.cell.id);
+      const corridors = near.filter((c) => (c.kind === 'corridor' || c.kind === 'junction') && c.cell.id !== spawn.cell.id);
       const kinds = ['secret', 'exit', 'phantom', 'missing'] as const;
       const w = (k: (typeof kinds)[number]): number => (k === 'secret' && !gimmicks.secrets.length) || ((k === 'missing' || k === 'phantom') && !corridors.length) ? 0 : t[`map.guide.lie.${k}` as const];
       let lie: { [k: string]: Json } = {};

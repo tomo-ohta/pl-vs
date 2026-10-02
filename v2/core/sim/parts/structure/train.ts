@@ -9,7 +9,7 @@
  * 出力: open（扉を開けるか）, riding（走っている間 1）, progress（走った割合 0..1）
  */
 import type { Json } from '../../../world/layout.ts';
-import { definePart, pAabb, pNum, pVec, playerIn } from '../../part.ts';
+import { definePart, pAabb, pBool, pNum, pVec, playerIn } from '../../part.ts';
 
 interface TrainState { phase: string; t: number; [k: string]: Json | undefined }
 
@@ -22,11 +22,14 @@ definePart<TrainState>({
     const inside = ctx.players.some((p) => playerIn(p, a));
     const dwell = pNum(ctx.spec, 'dwellSec', 4), close = pNum(ctx.spec, 'closeSec', 1.2), ride = pNum(ctx.spec, 'rideSec', 9), arrive = pNum(ctx.spec, 'arriveSec', 2.5);
     s.t += ctx.dt;
-    switch (s.phase) {
+    // 線の終わりの駅: 着いたら扉を開けたまま止まる（走らない）
+    if (pBool(ctx.spec, 'terminal', false) && s.phase !== 'arrive') s.phase = 'wait';
+    else switch (s.phase) {
       case 'arrive':
         if (s.t >= arrive) { s.phase = 'wait'; s.t = 0; ctx.cue('train.open', undefined); }
         break;
       case 'wait':
+        if (pBool(ctx.spec, 'terminal', false)) break;
         if (!inside) s.t = 0;
         else if (s.t >= dwell) { s.phase = 'closing'; s.t = 0; ctx.cue('train.close', undefined); }
         break;

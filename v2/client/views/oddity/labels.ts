@@ -9,16 +9,17 @@
  */
 import * as THREE from 'three';
 import type { Json } from '../../../core/world/layout.ts';
+import { cleanName, Settings } from '../../settings/Settings.ts';
 import { defineFx } from './fx.ts';
 import { num, str } from './util.ts';
 
-/** 遊ぶ人の名前（?name= か、保存された名前 liminal2.playerName。無ければ既定の呼び名） */
+/** 遊ぶ人の名前（?name= か、設定の名前。無ければ既定の呼び名） */
 export function playerName(): string {
   try {
     const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('name') : null;
-    if (q && q.trim()) return q.trim().slice(0, 12);
-    const s = typeof localStorage !== 'undefined' ? localStorage.getItem('liminal2.playerName') : null;
-    if (s && s.trim()) return s.trim().slice(0, 12);
+    if (q && cleanName(q)) return cleanName(q);
+    const s = typeof localStorage !== 'undefined' ? Settings.load().data.playerName : '';
+    if (s) return s;
   } catch { /* 保存先が無い */ }
   return 'あなた';
 }

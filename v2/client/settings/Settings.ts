@@ -52,6 +52,8 @@ export interface SettingsData {
   vhsStrength: number;
   /** トーンマップ */
   toneMapping: ToneMappingId;
+  /** 遊ぶ人の名前（12 文字まで。部屋の異変「自分の名前」の掲示・名札に出る。空なら既定の呼び名） */
+  playerName: string;
 }
 
 /** 保存名（liminal2.settings.v1）。項目の意味を変えたら版を上げる */
@@ -70,6 +72,7 @@ export const DEFAULT_SETTINGS: Readonly<SettingsData> = {
   vhsStrength: 2.0,
   frameHold: 'off',
   toneMapping: 'agx',
+  playerName: '',
 };
 
 /** 保存先（localStorage の一部。テストでは差し替える） */
@@ -178,5 +181,12 @@ export function sanitize(d: SettingsData): SettingsData {
     frameHold,
     vhsStrength: typeof d.vhsStrength === 'number' && Number.isFinite(d.vhsStrength) ? Math.min(2, Math.max(0, d.vhsStrength)) : DEFAULT_SETTINGS.vhsStrength,
     toneMapping,
+    playerName: cleanName(d.playerName),
   };
+}
+
+/** 名前: 文字列で、制御文字を除き、前後の空白を落として 12 文字まで */
+export function cleanName(v: unknown): string {
+  if (typeof v !== 'string') return '';
+  return [...v.replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, 12).join('');
 }

@@ -62,10 +62,15 @@ export function textPlate(text: string, w: number, h: number, o: { fg?: string; 
     g.fillStyle = o.bg ?? '#1a1c20';
     g.fillRect(0, 0, cv.width, cv.height);
     g.fillStyle = o.fg ?? '#f2f0e6';
-    g.font = o.font ?? `bold ${Math.round(px * 0.62)}px sans-serif`;
+    // 文字が板の幅に収まらなければ、文字を小さくする（指定の書体は横に縮めて収める）
+    const room = cv.width * 0.92;
+    let size = Math.round(px * 0.62);
+    g.font = o.font ?? `bold ${size}px sans-serif`;
+    const wide = g.measureText(text).width;
+    if (!o.font && wide > room) { size = Math.max(8, Math.floor((size * room) / wide)); g.font = `bold ${size}px sans-serif`; }
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(text, cv.width / 2, cv.height / 2 + px * 0.04);
+    g.fillText(text, cv.width / 2, cv.height / 2 + px * 0.04, room);
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
     mat = new THREE.MeshBasicMaterial({ map: tex, fog: true });
@@ -89,8 +94,8 @@ export function disposeMesh(m: THREE.Object3D): void {
 function sfxOut(audio: AudioEngine): { ctx: AudioContext; dest: AudioNode } | null {
   const ctx = audio.context;
   if (!ctx || ctx.state === 'closed') return null;
-  const bus = (audio as unknown as { sfxBus?: GainNode | null }).sfxBus;
-  return { ctx, dest: bus ?? ctx.destination };
+  const bus = audio.sfxInput;
+  return bus ? { ctx, dest: bus } : null;
 }
 
 function panned(ctx: AudioContext, dest: AudioNode, pos?: readonly number[]): AudioNode {

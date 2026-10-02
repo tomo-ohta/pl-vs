@@ -44,7 +44,7 @@ export const CARRY_CATALOG: CatalogEntry[] = [
   },
   {
     idea: 'I09', name: '置いた物が残る', status: 'done',
-    impl: [{ kind: 'part', id: 'carryItem' }, { kind: 'part', id: 'carryBody' }, { kind: 'client', id: 'client/views/carry/persist.ts' }],
+    impl: [{ kind: 'part', id: 'carryItem' }, { kind: 'part', id: 'carryBody' }, { kind: 'client', id: 'client/game/carryStore.ts' }],
     note: '動かして置いた物の位置をフロアの id ごとに保存（localStorage。core/sim/parts/carry/persist.ts の carrySave / carryRestore）。次に同じフロアを作ったら、生成の後に部品の状態へ戻す（core は決定的なまま）。保存は {部品 id: [x, 底の y, z, yaw]} だけで小さい。フロアの id・生成器と調整表の版が違えば戻さない',
   },
   {

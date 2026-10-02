@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { defineView } from '../views.ts';
 import type { SoundHandle } from '../../audio/AudioEngine.ts';
+import { disposeMesh, textPlate } from '../ground/util.ts';
 
 defineView('trainRide', (spec, ctx) => {
   const w = spec.params.windows as { x0: number; x1: number; z: number; y0: number; y1: number } | undefined;
@@ -26,6 +27,10 @@ defineView('trainRide', (spec, ctx) => {
   const m4 = new THREE.Matrix4();
   let shift = 0;
   let rumble: SoundHandle | null = null;
+  // 線の終わりの駅: 車両の扉の上に「終点」（この車両は走らない）
+  const signAt = spec.params.sign as number[] | undefined;
+  const sign = signAt ? textPlate('終点 ・ この電車は回送になります', 1.6, 0.2, { fg: '#ffb060', bg: '#121212', px: 128 }) : null;
+  if (sign && signAt) { sign.position.set(signAt[0]!, signAt[1]!, signAt[2]!); ctx.root.add(sign); }
   const off = ctx.onEvent?.((e) => {
     if (e.type !== 'cue' || e.entity !== spec.id) return;
     const name = e.data?.name;
@@ -58,6 +63,6 @@ defineView('trainRide', (spec, ctx) => {
       });
       mesh.instanceMatrix.needsUpdate = true;
     },
-    dispose() { off?.(); rumble?.stop(0.2); mesh.removeFromParent(); geo.dispose(); mat.dispose(); },
+    dispose() { off?.(); rumble?.stop(0.2); mesh.removeFromParent(); geo.dispose(); mat.dispose(); if (sign) disposeMesh(sign); },
   };
 });

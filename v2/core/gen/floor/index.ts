@@ -24,6 +24,7 @@ import { familyById, type PatternId } from './themes.ts';
 import { buildSkeleton } from './skeleton.ts';
 import { placeMapSigns } from '../gimmicks/map/signs.ts';
 import { shapeRooms } from '../rooms/index.ts';
+import { liftArrival } from './arrival.ts';
 
 export const GEN_VERSION = 'gen-1';
 
@@ -36,6 +37,8 @@ export interface GenOptions {
   showcase?: ShowcaseOptions & Partial<AnomalyShowcase>;
   /** フロアの形の型を決めて作る（確認用。クライアントの ?shape=。段階 4 のフロアの形の担当） */
   shape?: PatternId;
+  /** 着き方（'lift': エレベーターで着いた。入口の階段の手前をかごにして、かごの中から始める。arrival.ts） */
+  arrival?: 'lift';
 }
 
 export interface GenReport {
@@ -58,6 +61,12 @@ export function generateFloor(key: FloorKey, t: Tuning, opts: GenOptions = {}): 
 }
 
 export function generateFloorReport(key: FloorKey, t: Tuning, opts: GenOptions = {}): GenReport {
+  const r = generateFloorReportInner(key, t, opts);
+  if (opts.arrival === 'lift') liftArrival(r.floor);
+  return r;
+}
+
+function generateFloorReportInner(key: FloorKey, t: Tuning, opts: GenOptions): GenReport {
   const t0 = Date.now();
   const tries = t['floor.genRetries'];
   // 裏のフロア: 表のフロアが合格した性質と形を使う（表を一度作って確かめる。裏へ入るときだけなので軽い）

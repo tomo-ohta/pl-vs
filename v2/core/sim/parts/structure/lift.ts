@@ -21,6 +21,9 @@ function stopsOf(ctx: PartContext): Stop[] {
   return (raw as { y: number; aabb: { min: number[]; max: number[] } }[]).map((s) => ({ y: s.y, aabb: { min: [s.aabb.min[0]!, s.aabb.min[1]!, s.aabb.min[2]!], max: [s.aabb.max[0]!, s.aabb.max[1]!, s.aabb.max[2]!] } }));
 }
 
+/** liftSign: エレベーターの階の表示（描画だけ。params: label・pos・facing（+1 で +z を向く）） */
+definePart({ type: 'liftSign', outputs: [], init: () => ({}) });
+
 definePart<LiftState>({
   type: 'shaftLift',
   outputs: ['riding', 'at', 'open0', 'open1', 'open2', 'open3', 'open4'],

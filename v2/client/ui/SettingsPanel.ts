@@ -42,7 +42,10 @@ interface SelectDef {
 /** 見出し（v1 第21回: メニューの「設定」タブで 音 / 操作 / 映像 / 開発 に分ける） */
 interface HeadDef { kind: 'head'; label: string }
 
-type RowDef = SliderDef | SelectDef | HeadDef;
+/** 文字の欄（名前） */
+interface TextDef { kind: 'text'; key: 'playerName'; label: string; placeholder: string; max: number; note?: string }
+
+type RowDef = SliderDef | SelectDef | HeadDef | TextDef;
 
 const ON_OFF = [{ value: 'on', label: 'オン' }, { value: 'off', label: 'オフ' }];
 const pct = (v: number): string => `${Math.round(v * 100)}%`;
@@ -55,6 +58,7 @@ const ROWS: RowDef[] = [
   { kind: 'slider', key: 'sfxVolume', label: '効果音', min: 0, max: 1, step: 0.01, format: pct },
   { kind: 'head', label: '操作' },
   { kind: 'slider', key: 'lookSensitivity', label: '視点感度', min: 0.3, max: 3, step: 0.05, format: (v) => `×${v.toFixed(2)}` },
+  { kind: 'text', key: 'playerName', label: '名前', placeholder: 'あなた', max: 12, note: '掲示に出る' },
   { kind: 'head', label: '映像' },
   // v1 では設定タブの右列「映像の品質」にあった #quality（選択肢と表記は同じ）
   {
@@ -104,6 +108,7 @@ export class SettingsPanel {
   private readonly settings: Settings;
   private readonly inputs = new Map<string, { range: HTMLInputElement; value: HTMLElement; def: SliderDef }>();
   private readonly selects = new Map<string, { select: HTMLSelectElement; def: SelectDef }>();
+  private readonly texts = new Map<string, { input: HTMLInputElement; def: TextDef }>();
   private readonly unsubscribe: () => void;
 
   /** slot: 入れる先（省略時は #settings-slot。無ければ el を作るだけで、どこにも入れない） */
@@ -113,7 +118,7 @@ export class SettingsPanel {
     this.el.id = 'settings-panel';
     for (const def of ROWS) {
       if (def.kind === 'head') { const h = document.createElement('h3'); h.className = 'set-h'; h.textContent = def.label; this.el.appendChild(h); continue; }
-      this.el.appendChild(def.kind === 'slider' ? this.makeRow(def) : this.makeSelectRow(def));
+      this.el.appendChild(def.kind === 'slider' ? this.makeRow(def) : def.kind === 'text' ? this.makeTextRow(def) : this.makeSelectRow(def));
     }
 
     const reset = document.createElement('button');
@@ -177,9 +182,33 @@ export class SettingsPanel {
     return row;
   }
 
+  private makeTextRow(def: TextDef): HTMLElement {
+    const row = document.createElement('label');
+    row.className = 'settings-row';
+    const name = document.createElement('span');
+    name.className = 'settings-label';
+    name.textContent = def.label;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = def.max;
+    input.placeholder = def.placeholder;
+    input.autocomplete = 'off';
+    input.setAttribute('aria-label', def.label);
+    input.addEventListener('change', () => this.settings.set({ [def.key]: input.value } as Partial<SettingsData>));
+    // 文字を打つ間はゲームの操作（移動・タブの切り替え）に入力を渡さない
+    for (const ev of ['pointerdown', 'touchstart', 'touchmove', 'keydown', 'keyup'] as const) input.addEventListener(ev, (e) => e.stopPropagation());
+    const note = document.createElement('span');
+    note.className = 'settings-value mono';
+    note.textContent = def.note ?? '';
+    row.append(name, input, note);
+    this.texts.set(def.key, { input, def });
+    return row;
+  }
+
   /** settings の値を表示に合わせる */
   refresh(): void {
     const d = this.settings.data;
+    for (const { input, def } of this.texts.values()) if (document.activeElement !== input && input.value !== d[def.key]) input.value = d[def.key];
     for (const { range, value, def } of this.inputs.values()) {
       const v = d[def.key];
       if (parseFloat(range.value) !== v) range.value = String(v);

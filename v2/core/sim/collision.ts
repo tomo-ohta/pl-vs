@@ -39,6 +39,11 @@ export class ColliderIndex {
     else this.dynamic.delete(key);
   }
 
+  /** 動く箱（key と箱。読むだけ）。光の筋を遮る物を探すのに使う */
+  dynamicEntries(): IterableIterator<[string, AABB]> {
+    return this.dynamic.entries();
+  }
+
   get counts(): { static: number; dynamic: number } {
     return { static: this.staticCount, dynamic: this.dynamic.size };
   }

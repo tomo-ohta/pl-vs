@@ -175,6 +175,12 @@ export class AudioEngine {
   /** 部屋の音の効果（担当 sense）: 全体の音量の絞り（無音の部屋）と、こもり（水の中・壁の向こう）。キーごとに重ね、いちばん強いものが効く */
   private duckNode: GainNode | null = null;
   private muffleNode: BiquadFilterNode | null = null;
+  /**
+   * 画面の操作の音（メニュー・タブ）の出口: 部屋の効果（無音の部屋の絞り・水の中のこもり）を通らずに音割れ防止へ。
+   * uiBus は効果音の音量、uiOut は全体の音量（master と同じ値）
+   */
+  private uiBus: GainNode | null = null;
+  private uiOut: GainNode | null = null;
   private readonly ducks = new Map<string, number>();
   private readonly muffles = new Map<string, number>();
   /** 足音を遅らせる秒数（足音が遅れて聞こえる部屋）と、足音の高さの倍率（遅い部屋） */
@@ -253,6 +259,9 @@ export class AudioEngine {
     this.muffleNode.frequency.value = 20000;
     this.muffleNode.Q.value = 0.5;
     this.master.connect(this.duckNode).connect(this.muffleNode).connect(this.limiter).connect(ctx.destination);
+    this.uiBus = ctx.createGain();
+    this.uiOut = ctx.createGain();
+    this.uiBus.connect(this.uiOut).connect(this.limiter);
     this.applyRoomFx(0);
     this.ambientProbe = ctx.createAnalyser();
     this.ambientProbe.fftSize = 2048;
@@ -352,6 +361,15 @@ export class AudioEngine {
     // 環境音は -3 dB（第20回の 2 回目。足音に対して大きすぎ、空調の部屋で足音が埋もれていた）
     ramp(this.ambientBus, this.hidden ? 0 : this.volumes.ambientVolume ** 2 * AMBIENT_TRIM);
     ramp(this.sfxBus, this.volumes.sfxVolume ** 2);
+    if (this.uiBus && this.uiOut) { ramp(this.uiOut, this.volumes.masterVolume ** 2); ramp(this.uiBus, this.volumes.sfxVolume ** 2); }
+  }
+
+  /**
+   * 効果音の入口（部品の描画が自分で合成する音をつなぐ所）。全体・効果音の音量と部屋の効果（無音の部屋・こもり）を通る。
+   * 鳴らせないとき（音が始まっていない）は null
+   */
+  get sfxInput(): AudioNode | null {
+    return this.ctx && this.ctx.state !== 'closed' ? this.sfxBus : null;
   }
 
   /** 品質 Tier の変更（ボイス予算・リバーブ実装の切替） */
@@ -635,8 +653,9 @@ export class AudioEngine {
 
   ui(kind: UiSfxKind): void {
     const sc = this.sfx();
-    if (!sc) return;
-    playUi(sc, kind);
+    if (!sc || !this.uiBus) return;
+    // 画面の操作の音は部屋の効果を通さない（無音の部屋でもメニューの音は聞こえる）
+    playUi({ ...sc, dest: { dry: this.uiBus, reverb: this.uiBus } }, kind);
   }
 
   /**

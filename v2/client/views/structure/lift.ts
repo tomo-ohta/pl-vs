@@ -5,6 +5,17 @@
 import * as THREE from 'three';
 import { defineView } from '../views.ts';
 import type { SoundHandle } from '../../audio/AudioEngine.ts';
+import { disposeMesh, textPlate } from '../ground/util.ts';
+
+/** エレベーターの階の表示（扉の上の数字。光る板） */
+defineView('liftSign', (spec, ctx) => {
+  const pos = (spec.params.pos as number[] | undefined) ?? [0, 0, 0];
+  const plate = textPlate(String(spec.params.label ?? ''), 0.3, 0.16, { fg: '#ffd27a', bg: '#141210', px: 96 });
+  plate.position.set(pos[0]!, pos[1]!, pos[2]!);
+  if (Number(spec.params.facing ?? 1) < 0) plate.rotation.y = Math.PI;
+  ctx.root.add(plate);
+  return { update() {}, dispose() { disposeMesh(plate); } };
+});
 
 defineView('shaftLift', (spec, ctx) => {
   let hum: SoundHandle | null = null;

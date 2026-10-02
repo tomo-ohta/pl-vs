@@ -65,7 +65,7 @@ interface AutoState { k: number; refused: number; inside: number; crouch: number
 
 definePart<AutoState>({
   type: 'autoDoor',
-  outputs: ['open', 'refused', 'done'],
+  outputs: ['open', 'refused', 'done', 'angle'],
   init(ctx) {
     ctx.setCollider('panel', pAabb(ctx.spec, 'panel'));
     return { k: 0, refused: 0, inside: 0, crouch: 0, done: 0, idle: 0 };
@@ -98,6 +98,8 @@ definePart<AutoState>({
     s.k = approach(s.k, target, ctx.dt / 0.7);
     ctx.setCollider('panel', s.k < 0.5 ? panel : null);
     ctx.output('open', s.k >= 0.9 ? 1 : 0);
+    // 開き具合（扉 door と同じ名前。区画と開口の見え方が、閉じている間は向こうを描かない）
+    ctx.output('angle', s.k);
     ctx.output('refused', s.refused);
     ctx.output('done', s.done);
   },

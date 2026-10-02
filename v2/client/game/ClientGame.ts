@@ -35,6 +35,7 @@ import { createView, type EntityView } from '../views/index.ts';
 import { PortalRenderer } from '../world/Portals.ts';
 import { applyLampLevels, cellAt, FloorBuilder, type BuiltFloor } from '../world/FloorBuilder.ts';
 import { LightManager } from '../world/LightManager.ts';
+import { restoreCarry, watchCarry } from './carryStore.ts';
 import { Visibility } from '../world/Visibility.ts';
 
 const TONE_MAPPINGS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping } as const;
@@ -90,6 +91,8 @@ export class ClientGame {
   flashlightOn = true;
   /** 部品の描画が受け取るシミュレーションのイベント（views の ctx.onEvent） */
   private eventListeners = new Set<(e: SimEvent) => void>();
+  /** 置いた物の保存をやめて書く（フロアを離れるとき） */
+  private carryWatch: (() => void) | null = null;
   private pendingInteract: { yaw: number; pitch: number } | null = null;
   private prevPos: [number, number, number] = [0, 0, 0];
   private currentCell: string | null = null;
@@ -181,11 +184,16 @@ export class ClientGame {
   }
 
   // ---------------------------------------------------------------- フロア
-  async loadFloor(floor: FloorLayout): Promise<void> {
+  /**
+   * フロアを読む。saveKey: 置いた物が残る（I09）の保存の鍵（世界の seed・フロア・調整表の版。見本・実験場では渡さない）
+   */
+  async loadFloor(floor: FloorLayout, opts: { saveKey?: string } = {}): Promise<void> {
     this.unloadFloor();
     const needsPhysics = floor.entities.some((e) => partDef(e.type)?.physics);
     const physics = needsPhysics ? new PhysicsWorld(await loadRapier(), 1 / this.tuning['physics.tickHz']) : null;
     this.sim = new Sim(floor, { tuning: this.tuning, physics });
+    // 置いた物の保存を、最初の tick の前に戻す
+    if (opts.saveKey) restoreCarry(this.sim, opts.saveKey);
     this.built = new FloorBuilder(this.materials, { tier: this.tier.id }).build(floor);
     this.scene.add(this.built.root);
     this.visibility = new Visibility(floor);
@@ -206,6 +214,7 @@ export class ClientGame {
       const portal = e.type === 'door' ? floor.portals.find((p) => p.doorId === e.id) : undefined;
       this.viewRoots.set(e.id, { root, cells: portal ? [...portal.cells] : e.cell ? [e.cell] : [] });
     }
+    if (opts.saveKey) this.carryWatch = watchCarry(this.sim, opts.saveKey, (f) => { this.eventListeners.add(f); return () => this.eventListeners.delete(f); });
     this.warmUp();
     const p = this.sim.players[0]!;
     this.yaw = p.yaw;
@@ -248,6 +257,9 @@ export class ClientGame {
   }
 
   unloadFloor(): void {
+    // 置いた物を保存してから捨てる
+    this.carryWatch?.();
+    this.carryWatch = null;
     for (const v of this.views.values()) v.dispose();
     this.views.clear();
     this.viewRoots.clear();

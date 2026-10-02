@@ -13,6 +13,7 @@ import { box, WALL_T, type Box } from '../../../world/layout.ts';
 import type { Skeleton } from '../skeleton.ts';
 import { aabbJson, snap, type GeoBuild, type Placed } from '../geometry.ts';
 import { carveInner, holeJoin, holeWindow, type StyleEnv } from './styles.ts';
+import { isStation, stationContinues } from '../profile.ts';
 
 const CAR_DEPTH = 3.2, CAR_H = 2.35, TRENCH = 1.1;
 
@@ -42,16 +43,21 @@ export function addTrain(g: GeoBuild, pl: Placed, _sk: Skeleton, _e: StyleEnv, r
   // 部品: 乗って dwellSec で扉が閉まり、rideSec で次の駅へ
   const interior = { min: [car.x0 + WALL_T, y - 0.1, car.z0 + WALL_T], max: [car.x1 - WALL_T, y + CAR_H - 0.1, car.z1 - WALL_T] };
   const exitAt: [number, number, number] = [cx, y - 3.0, (car.z0 + car.z1) / 2];
+  // 線の終わりの駅（次の深さは駅でない）: 車両は終点で止まったまま（扉は開いたまま・走らない）。乗っても次の駅へ行かない
+  // （次のフロアのふつうの入口に出てしまうので）。見本の ?shape=station（線の外の駅）は走る
+  const key = g.p.key;
+  const terminal = isStation(key.world, key.depth, t) && !stationContinues(key.world, key.depth, t);
   g.out.entities.push({
     id: rideId, type: 'trainRide', cell: inner.cellId,
     params: {
       aabb: aabbJson(interior as { min: [number, number, number]; max: [number, number, number] }), dwellSec: t['structure.station.dwellSec'], rideSec: t['structure.station.rideSec'], closeSec: 1.2, arriveSec: 2.5,
       exit: [...exitAt], arrive: { pos: [cx, y + 0.02, (car.z0 + car.z1) / 2 + 0.3], yaw: Math.PI },
       windows: { x0: car.x0, x1: car.x1, z: car.z0 - 0.6, y0: y + 0.9, y1: y + 1.9 },
+      ...(terminal ? { terminal: true, sign: [cx, y + CAR_H - 0.25, car.z1 + WALL_T + 0.03] } : {}),
     },
   });
   for (const d of doors) { const e = g.out.entities.find((x) => x.id === d); if (e) e.inputs = { open: `${rideId}.open` }; }
-  g.out.exits.push({ id: 'train', kind: 'door', aabb: { min: [exitAt[0] - 0.8, exitAt[1] - 1.5, exitAt[2] - 0.8], max: [exitAt[0] + 0.8, exitAt[1] + 0.6, exitAt[2] + 0.8] }, to: { floor: `${g.p.key.depth + 1}.0`, exitId: 'train' } });
+  if (!terminal) g.out.exits.push({ id: 'train', kind: 'door', aabb: { min: [exitAt[0] - 0.8, exitAt[1] - 1.5, exitAt[2] - 0.8], max: [exitAt[0] + 0.8, exitAt[1] + 0.6, exitAt[2] + 0.8] }, to: { floor: `${g.p.key.depth + 1}.0`, exitId: 'train' } });
   // 車両の中: 奥の壁沿いの座席・つり革の棒・奥の窓（外は暗いトンネル）
   (inner.post ??= []).push((cell) => {
     const z0 = car.z0 + WALL_T;

@@ -11,7 +11,6 @@ import type { PartState } from '../../../core/sim/part.ts';
 import type { EntitySpec, Json, MatId } from '../../../core/world/layout.ts';
 import { defineView, type ViewContext } from '../views.ts';
 import { lightAt, onCue, Parts, withBaked } from './common.ts';
-import { persistFor } from './persist.ts';
 import { receiverGlow } from './puzzle.ts';
 import { tileTop } from './picture.ts';
 
@@ -183,7 +182,6 @@ function handPlace(group: THREE.Group, half: V3): void {
 }
 
 function itemView(spec: EntitySpec, ctx: ViewContext): ReturnType<Parameters<typeof defineView>[1]> {
-  const off = persistFor(ctx);
   const half = (spec.params.half as V3 | undefined) ?? [0.15, 0.15, 0.15];
   const kind = String(spec.params.kind ?? 'box');
   const mat = (spec.params.mat as MatId | undefined) ?? 'boxCardboard';
@@ -246,7 +244,7 @@ function itemView(spec: EntitySpec, ctx: ViewContext): ReturnType<Parameters<typ
         P.relight(lightAt(ctx, [wp.x, wp.y, wp.z]));
       }
     },
-    dispose() { offCue(); off(); P.dispose(); },
+    dispose() { offCue(); P.dispose(); },
   };
 }
 

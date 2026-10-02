@@ -3,6 +3,7 @@
  * autoDoor（左右に開くガラスの扉と枠・上の灯り（緑 = 開く / 赤 = 開かない）・故障中の札）・shutter（上下する板と、動く音）。
  */
 import * as THREE from 'three';
+import type { MatId } from '../../../core/world/layout.ts';
 import { defineView } from '../views.ts';
 import { aabbOf, boxGeo, disposeMesh, drone, glowMaterial, lightAt, noise, onCue, setBaked, textPlate, tone, type Drone } from './util.ts';
 
@@ -96,13 +97,15 @@ defineView('autoDoor', (spec, ctx) => {
   const c: [number, number, number] = [(p.min[0] + p.max[0]) / 2, (p.min[1] + p.max[1]) / 2, (p.min[2] + p.max[2]) / 2];
   const group = new THREE.Group();
   ctx.root.add(group);
-  const glassGeo = boxGeo(alongX ? [len / 2, h - 0.05, th] : [th, h - 0.05, len / 2], 'glass');
+  // 戸の材質（既定はガラス。エレベーターのかごの引き戸はステンレス: core/gen/floor/arrival.ts）
+  const leafMat = (spec.params.mat as MatId | undefined) ?? 'glass';
+  const glassGeo = boxGeo(alongX ? [len / 2, h - 0.05, th] : [th, h - 0.05, len / 2], leafMat);
   const frameGeo = boxGeo(alongX ? [len / 2, 0.05, th + 0.02] : [th + 0.02, 0.05, len / 2], 'metalDark');
   const l = lightAt(ctx, [c[0], c[1], c[2]]);
   setBaked(glassGeo, l); setBaked(frameGeo, l);
   const leaves = [-1, 1].map((sd) => {
     const g = new THREE.Group();
-    const glass = new THREE.Mesh(glassGeo, ctx.materials.get('glass'));
+    const glass = new THREE.Mesh(glassGeo, ctx.materials.get(leafMat));
     const bottom = new THREE.Mesh(frameGeo, ctx.materials.get('metalDark'));
     bottom.position.y = -(h - 0.05) / 2;
     const top = new THREE.Mesh(frameGeo, ctx.materials.get('metalDark'));

@@ -35,7 +35,7 @@ definePart<{ left: number; [k: string]: Json | undefined }>({
 
 definePart<{ k: number; [k: string]: Json | undefined }>({
   type: 'securityDoor',
-  outputs: ['open'],
+  outputs: ['open', 'angle'],
   inputs: ['open'],
   init(ctx) {
     ctx.setCollider('panel', pAabb(ctx.spec, 'panel'));
@@ -58,6 +58,8 @@ definePart<{ k: number; [k: string]: Json | undefined }>({
     if (prev > 0 && s.k === 0) ctx.cue('steel.close', c);
     ctx.setCollider('panel', s.k < 0.6 ? panel : null);
     ctx.output('open', s.k >= 0.95 ? 1 : 0);
+    // 開き具合（扉 door と同じ名前。区画と開口の見え方が、閉じている間は向こうを描かない）
+    ctx.output('angle', s.k);
   },
 });
 
