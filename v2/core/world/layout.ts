@@ -28,7 +28,8 @@ export type MatId =
   | 'ice' | 'snow' | 'grass'
   | 'sidingWood' | 'sidingMetal'
   | 'screenArcade' | 'screenPc' | 'canLabel'
-  | 'wheat';
+  | 'wheat'
+  | 'sand';
 
 /** 箱（描画と当たり判定の基本単位） */
 export interface Box {

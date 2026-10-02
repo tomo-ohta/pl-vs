@@ -51,7 +51,8 @@ test('異変の部屋の開口は、ジャンプせずに両向きに通れる�
   const fails: string[] = [];
   const kinds = new Set<string>();
   let n = 0;
-  for (let w = 1; w <= 60; w++) {
+  // 60 フロア。異変の種類が多くて揃わなければ、揃うまで（160 フロアまで）続ける（段階 4 で種類が増えた）
+  for (let w = 1; w <= 60 || (w <= 160 && kinds.size < anomalyDefs().length - 2); w++) {
     const r = generateFloorReport({ world: w, depth: 1 + (w % 8), variant: w % 5 === 0 ? 1 : 0 }, t, { dress: dressCell });
     if (!r.anomalies.length) continue;
     const floor = r.floor;

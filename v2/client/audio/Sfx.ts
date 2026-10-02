@@ -64,6 +64,7 @@ export function floorKindOf(mat: MatId | string, wet = false): FloorKind {
     case 'wheat':
       return 'grass';
     case 'plantSoil':
+    case 'sand':
       return 'gravel';
     case 'snow':
       return 'snow';

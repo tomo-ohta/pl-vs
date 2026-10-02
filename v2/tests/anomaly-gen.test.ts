@@ -198,16 +198,24 @@ test('異変: それぞれ見て分かる形になっている（浸水の水・
 });
 
 test('異変: 見本のフロアは頼んだ異変を 1 つずつ置き、見て回る順に入る', () => {
-  // 仕掛けを置かない見本（部屋が足りる）: 全種
-  const r = generateFloorReport({ world: 1, depth: 0, variant: 0 }, t, { showcase: { gimmicks: [], anomalies: ALL }, dress: dressCell });
-  assert.deepEqual(new Set(r.anomalies.map((a) => a.def)), new Set(ALL));
-  assert.equal(r.anomalies.length, ALL.length);
-  const stops = r.gimmicks!.tour.filter((s) => s.label.startsWith('異変: '));
-  assert.equal(stops.length, r.anomalies.length);
-  for (const a of r.anomalies) assert.ok(stops.some((s) => s.cell === a.cell && s.label === `異変: ${a.name}`), a.id);
-  // 仕掛けを全種置いた見本: 半分ずつ頼めば全部入る
+  // 段階 4 で異変の種類が増えたので、1 つのフロアに入る数ずつに分けて頼む（仕掛けなしは 14 種ずつ・仕掛けを全種置いたら 7 種ずつ）
+  const chunk = (n: number): string[][] => Array.from({ length: Math.ceil(ALL.length / n) }, (_v, i) => ALL.slice(i * n, (i + 1) * n));
+  // 仕掛けを置かない見本（部屋が足りる）
+  for (const part of chunk(14)) {
+    let r: GenReport | null = null;
+    for (let w = 1; w <= 6 && (!r || new Set(r.anomalies.map((a) => a.def)).size < part.length); w++) {
+      const s = generateFloorReport({ world: w, depth: 0, variant: 0 }, t, { showcase: { gimmicks: [], anomalies: part }, dress: dressCell });
+      if (!r || new Set(s.anomalies.map((a) => a.def)).size > new Set(r.anomalies.map((a) => a.def)).size) r = s;
+    }
+    assert.deepEqual(new Set(r!.anomalies.map((a) => a.def)), new Set(part));
+    assert.equal(r!.anomalies.length, part.length);
+    const stops = r!.gimmicks!.tour.filter((s) => s.label.startsWith('異変: '));
+    assert.equal(stops.length, r!.anomalies.length);
+    for (const a of r!.anomalies) assert.ok(stops.some((s) => s.cell === a.cell && s.label === `異変: ${a.name}`), a.id);
+  }
+  // 仕掛けを全種置いた見本: 分けて頼めば全部入る
   const gim = gimmickDefs().map((d) => d.id);
-  for (const half of [ALL.slice(0, 7), ALL.slice(7)]) {
+  for (const half of chunk(7)) {
     let best = 0;
     for (let w = 1; w <= 6 && best < half.length; w++) {
       const s = generateFloorReport({ world: w, depth: 0, variant: 0 }, t, { showcase: { gimmicks: gim, anomalies: half }, dress: dressCell });
