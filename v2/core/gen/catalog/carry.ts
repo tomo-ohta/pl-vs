@@ -28,7 +28,7 @@ export const CARRY_CATALOG: CatalogEntry[] = [
   },
   {
     idea: 'I05', name: '鍵ではない鍵', status: 'done', impl: [{ kind: 'gimmick', id: 'keycardGate' }, { kind: 'part', id: 'carrySensor' }],
-    note: '壁際に改札（機械 2 台・赤い読み取り口）。同じフロアの別の部屋（clueCells）に社員証か切符が落ちている。持って改札の間に立つと読み取り口が緑になり、扉の板が消えて壁が開く（出現型・必ず付ける）。行き先が通り抜けなら近道になる。廊下にも置ける',
+    note: '壁際に改札（機械 2 台・赤い読み取り口）。同じフロアの別の部屋（clueCells）に社員証か切符が落ちている。持って改札の間に立つと読み取り口が緑になり、扉の板が消えて壁が開く（出現型・必ず付ける）。行き先が通り抜けなら近道になる。部屋と広間に置く（廊下は数が多くて出すぎたので外した）',
   },
   {
     idea: 'I06', name: '落とし物を届ける', status: 'done', impl: [{ kind: 'gimmick', id: 'lostItem' }],
