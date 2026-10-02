@@ -14,13 +14,13 @@
  */
 import { aabbExpand, rayAabb, type AABB } from '../math/aabb.ts';
 import { hashAll, Rng } from '../math/rng.ts';
-import { lookDir, type Vec3 } from '../math/vec.ts';
+import type { Vec3 } from '../math/vec.ts';
 import type { Tuning } from '../config/tuning.ts';
 import type { PhysicsWorld } from '../physics/world.ts';
 import { PASSABLE_VEGETATION, type EntitySpec, type FloorLayout, type InputWire, type SupportSurface, type Zone } from '../world/layout.ts';
 import { ColliderIndex } from './collision.ts';
 import { partDef, type PartContext, type PartDef, type PartState } from './part.ts';
-import { createPlayer, PLAYER, playerHeight, stepPlayer, type PlayerWorld } from './player.ts';
+import { createPlayer, PLAYER, playerEye, playerHeight, playerLook, stepPlayer, type PlayerWorld } from './player.ts';
 import type { InputCommand, PlayerState, SimEvent } from './types.ts';
 import { IDLE_COMMAND } from './types.ts';
 
@@ -355,8 +355,9 @@ export class Sim implements PlayerWorld {
 
   /** 視線の先の、いちばん近い調べられる部品。手前に壁があれば当たらない */
   private pickInteractable(p: PlayerState, yaw: number, pitch: number): string | null {
-    const eye: Vec3 = [p.pos[0], p.pos[1] + p.eye, p.pos[2]];
-    const dir = lookDir(yaw, pitch);
+    // 目と視線は重力の向き（壁・天井を歩いている）と身体の大きさを含む（段階 4・移動と身体）
+    const eye: Vec3 = playerEye(p);
+    const dir = playerLook(p, yaw, pitch);
     let best: { id: string; t: number } | null = null;
     for (const rt of this.order) {
       if (!rt.interact) continue;

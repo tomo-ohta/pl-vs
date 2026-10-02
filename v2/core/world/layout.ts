@@ -103,7 +103,15 @@ export interface RenderOverrides {
  * hazard: 体力（v2 の後半。今は効果なし）/ marker: 効果なし（地図・部品の目印）
  */
 /** gravity: 重さの倍率（params.scale。0.4 なら軽い部屋）。ほかは v1 と同じ */
-export type ZoneKind = 'water' | 'friction' | 'force' | 'crawl' | 'hazard' | 'marker' | 'gravity';
+/**
+ * 段階 4（移動と身体）で足した種類:
+ * climb: はしご（vector = はしごへ向かう水平の向き。そちらへ押すと上る・離れる向きで下りる）/
+ * swim: 深い水（params.surface = 水面の高さ。無ければ aabb の上端。深ければ浮いて泳ぐ・しゃがむで潜る・跳ぶで浮く・縁へ押すと這い上がる）/
+ * magnet: 磁力の面（vector = 面の外向き = その面に立ったときの上。aabb は面から 1 m の厚み。向かって歩くと乗り移る）。
+ * water / force のほかの params: sink（足が沈む深さ m）・drag（落ちる速さの上限 m/s）・air（force: 宙にいる間の倍率）。
+ * force の vector の上向きの成分は、上昇気流（上へ向かう速さ）として効く。gravity の scale は 1 より大きくてもよい（重い部屋）
+ */
+export type ZoneKind = 'water' | 'friction' | 'force' | 'crawl' | 'hazard' | 'marker' | 'gravity' | 'climb' | 'swim' | 'magnet';
 export interface Zone {
   id?: string;
   kind: ZoneKind;
