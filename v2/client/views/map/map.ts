@@ -32,8 +32,11 @@ function brightness(ctx: ViewContext, at: [number, number, number]): number {
   return Math.max(0.18, Math.min(1, (l[0] + l[1] + l[2]) / 3 * 1.4));
 }
 
-/** 地図の絵を描いた板（面の大きさ w × h、画素 px） */
-function boardMesh(info: MapInfo, r: MapReadable, w: number, h: number, style: DrawStyle): { mesh: THREE.Mesh; dispose(): void } | null {
+/**
+ * 地図の絵を描いた板（面の大きさ w × h）。rotation は地図の回転（壁の板は、板を見る人の前が上になるように回す。
+ * 本物の「現在地」の看板と同じ。床・机の上の地図は回さない = 北が奥で、世界の向きとそのまま重なる）
+ */
+function boardMesh(info: MapInfo, r: MapReadable, w: number, h: number, style: DrawStyle, rotation = 0): { mesh: THREE.Mesh; dispose(): void } | null {
   if (typeof document === 'undefined') return null;
   const px = 512;
   const canvas = document.createElement('canvas');
@@ -44,7 +47,7 @@ function boardMesh(info: MapInfo, r: MapReadable, w: number, h: number, style: D
   const scene = sceneOfReadable(info, r);
   const c = readableContent(info, r);
   const label = style === 'paper' ? `${c.author ?? '誰か'} ${c.date ?? ''}`.trim() : c.title;
-  drawMap(g, scene, { width: canvas.width, height: canvas.height, center: null, pxPerM: 40, style, label, pad: 26, dpr: 2 });
+  drawMap(g, scene, { width: canvas.width, height: canvas.height, center: null, pxPerM: 40, style, label, pad: 26, dpr: 2, rotation });
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
@@ -68,7 +71,8 @@ function readable(type: 'mapBoard' | 'mapNote'): void {
     const sx = max[0] - min[0], sy = max[1] - min[1], sz = max[2] - min[2];
     const w = flat ? (type === 'mapNote' ? 0.28 : sx) : n![0] !== 0 ? sz : sx;
     const h = flat ? (type === 'mapNote' ? 0.2 : sz) : sy;
-    const made = boardMesh(info, r, w, h, type === 'mapNote' ? 'paper' : 'sign');
+    // 壁の板: 板を見る人の向き（-normal）が地図の上
+    const made = boardMesh(info, r, w, h, type === 'mapNote' ? 'paper' : 'sign', flat ? 0 : Math.atan2(n![0]!, n![1]!));
     if (!made) return null;
     const { mesh } = made;
     if (flat) {
