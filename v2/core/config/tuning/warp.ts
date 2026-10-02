@@ -59,4 +59,9 @@ export const WARP_TUNING = {
   'warp.twoDoors.weight': num(0.5, 0, 10, '2 つの扉が同じ部屋へ: 出やすさ（相対）'),
   'warp.twoDoors.spacingM': num(2.6, 2.2, 4, '2 つの扉が同じ部屋へ: 並んだ扉の真ん中どうしの間隔（m）'),
   'warp.twoDoors.depthM': num(4.8, 3.6, 7, '2 つの扉が同じ部屋へ: 居間の奥行き（扉 A から扉 B まで。m）'),
+  // ---- 時間で入れ替わる扉（timedDoors: T04・F27）
+  'warp.timedDoors.weight': num(0.45, 0, 10, '時間で入れ替わる扉: 出やすさ（相対）'),
+  'warp.timedDoors.spacingM': num(2.0, 1.8, 4, '時間で入れ替わる扉: 並んだ扉の真ん中どうしの間隔（m）'),
+  'warp.timedDoors.periodSec': num(30, 8, 300, '時間で入れ替わる扉: 2 枚の扉の行き先が入れ替わる間隔（秒）'),
+  'warp.timedDoors.secretWeight': num(1.4, 0, 5, '時間で入れ替わる扉: 隠しの元（琥珀の部屋の壁）の重み'),
 } as const satisfies Record<string, Spec>;

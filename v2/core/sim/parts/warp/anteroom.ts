@@ -24,7 +24,8 @@
  *   entries … [pod j の行き先の copies の番号 …]（無ければ [0]）・phase … { sec, entries: [[…], …] }（時間で入れ替える）
  *   managed … この部品が開け閉めする扉の id（d<i> の並び）
  *   auto   … { 扉の id: 自動で閉まる秒 }（0 は閉まらない）
- * outputs: d0, d1, …・ready（R の扉が全部閉じている）・entered（pod から入った回数）・free（いつも 0）・phase（今の組の番号）
+ * outputs: d0, d1, …・ready（R の扉が全部閉じている）・entered（pod から入った回数）・free（いつも 0）・phase（今の組の番号）・
+ *          multi（同じ扉で 2 つの別の双子の部屋へ行ったことがある = 時間で入れ替わったことに気づいた）
  */
 import { aabbCenter } from '../../../math/aabb.ts';
 import { distXZ, type Vec3 } from '../../../math/vec.ts';
@@ -36,7 +37,7 @@ interface Copy { doors: string[]; pods: string[]; xform: Xform; end: boolean }
 
 const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
-type S = { target: Record<string, number>; idle: Record<string, number>; centers: Record<string, number[]>; entered: number; pending: Record<string, string> };
+type S = { target: Record<string, number>; idle: Record<string, number>; centers: Record<string, number[]>; entered: number; pending: Record<string, string>; via: number[]; multi: number };
 
 /** 今の pod ごとの行き先（時間で入れ替えるなら今の組） */
 export function anteEntries(ctx: { spec: PartContext['spec']; time: number }): { entries: number[]; phase: number } {
@@ -62,7 +63,7 @@ definePart<S>({
     }
     const target: Record<string, number> = {};
     for (const id of managed) target[id] = 0;
-    return { target, idle: {}, centers, entered: 0, pending: {} };
+    return { target, idle: {}, centers, entered: 0, pending: {}, via: [], multi: 0 };
   },
   step(s, ctx) {
     const P = ctx.spec.params;
@@ -79,6 +80,10 @@ definePart<S>({
     const room = readAabb(P.room);
     const auto = (P.auto ?? {}) as Record<string, number>;
     s.pending ??= {};
+    s.via ??= [];
+    s.multi ??= 0;
+    /** 扉 k で双子の部屋 c へ行った（同じ扉で 2 つの部屋へ行ったら multi） */
+    const went = (k: number, c: number): void => { s.via[k] = (s.via[k] ?? 0) | (1 << c); if ((s.via[k]! & (s.via[k]! - 1)) !== 0) s.multi = 1; };
     const angle = (id: string): number => Number(ctx.stateOf(id)?.angle ?? 0);
     // 閉じている: 板が閉じきっていて、開ける途中でもない（R の扉はふつうの扉の状態 target、足した扉はこの部品の target）
     const closed = (id: string): boolean => angle(id) < 0.02 && !(managed.includes(id) ? s.target[id] : Number(ctx.stateOf(id)?.target ?? 0));
@@ -113,6 +118,7 @@ definePart<S>({
           s.target[there] = 1;
           s.idle[there] = 0;
           s.entered++;
+          went(j, entries[j] ?? 0);
         } else locked(hit, p);
         continue;
       }
@@ -147,6 +153,7 @@ definePart<S>({
         s.target[there] = 1;
         s.idle[there] = 0;
         s.entered++;
+        went(k, entries[k] ?? 0);
         continue;
       }
       s.target[hit] = s.target[hit] ? 0 : 1;
@@ -167,6 +174,7 @@ definePart<S>({
     ctx.output('entered', s.entered);
     ctx.output('free', 0);
     ctx.output('phase', phase);
+    ctx.output('multi', s.multi);
   },
 });
 
@@ -179,5 +187,22 @@ definePart<{ on: number }>({
   step(s, ctx) {
     s.on = !ctx.wired('on') || ctx.input('on') > 0.5 ? 1 : 0;
     ctx.output('on', s.on);
+  },
+});
+
+/**
+ * 行き先の色の灯り（時間で入れ替わる扉: 扉の上の細い灯り）。入力 phase（控え室の出力 phase）の組の色 colors[phase] を状態 idx にする。
+ * 組が変わったときに合図 'phase.flip'（描画は小さなチャイム）
+ */
+definePart<{ idx: number }>({
+  type: 'warpPhaseLamp',
+  inputs: ['phase'],
+  outputs: ['idx'],
+  init: () => ({ idx: 0 }),
+  step(s, ctx) {
+    const n = Math.max(1, ((ctx.spec.params.colors as number[] | undefined) ?? [0]).length);
+    const k = Math.max(0, Math.round(ctx.input('phase'))) % n;
+    if (k !== s.idx) { s.idx = k; ctx.cue('phase.flip', ctx.spec.params.pos as Vec3 | undefined, { idx: k }); }
+    ctx.output('idx', s.idx);
   },
 });

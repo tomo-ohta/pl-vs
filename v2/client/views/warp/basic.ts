@@ -62,3 +62,24 @@ defineView('warpTreadmill', (spec, ctx) => {
   });
   return { update() {}, dispose() { off?.(); } };
 });
+
+// ---------------------------------------------------------------- 行き先の色の灯り（時間で入れ替わる扉）
+defineView('warpPhaseLamp', (spec, ctx) => {
+  const p = (spec.params.pos as number[] | undefined) ?? [0, 0, 0];
+  const dir = typeof spec.params.dir === 'number' ? spec.params.dir : 0;
+  const list = (spec.params.colors as number[] | undefined) ?? [0xffffff];
+  const colors = list.map((c) => new THREE.Color(c));
+  const alongX = dir === 0 || dir === 2;
+  const g = glowBox(alongX ? [0.9, 0.04, 0.02] : [0.02, 0.04, 0.9], list[0] ?? 0xffffff);
+  g.mesh.position.set(p[0]!, p[1]!, p[2]!);
+  ctx.root.add(g.mesh);
+  const m = g.mesh.material as THREE.MeshBasicMaterial;
+  const off = ctx.onEvent?.((e) => {
+    if (e.type !== 'cue' || e.entity !== spec.id || e.data?.name !== 'phase.flip') return;
+    ctx.audio?.play('chime', { pos: e.pos, gain: 0.25 });
+  });
+  return {
+    update(s) { m.color.copy(colors[Number(s.idx ?? 0)] ?? colors[0]!); },
+    dispose() { off?.(); g.dispose(); },
+  };
+});

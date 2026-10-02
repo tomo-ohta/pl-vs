@@ -12,12 +12,13 @@
  */
 import { WARP_TUNING } from '../../../config/tuning/warp.ts';
 import { defineGimmick } from '../types.ts';
-import { buildAnteroom, planAnteroom } from './anteroom.ts';
+import { buildAnteroom, anteroomFits, planAnteroom } from './anteroom.ts';
 import { buildStraightHall } from './hall.ts';
 import { axisOf } from './pocket.ts';
 
 defineGimmick({
   id: 'loopHall', name: '閉じた輪の廊下', axes: ['move', 'sight'], kinds: ['room'], minSize: [3.8, 3.8], weight: WARP_TUNING['warp.loopHall.weight'].default, intensity: 1,
+  fits: (s) => anteroomFits(s),
   offersSecret: true, onMainPath: true,
   build(ctx) {
     const t = ctx.tuning;

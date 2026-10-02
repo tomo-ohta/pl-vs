@@ -11,12 +11,13 @@
 import { WARP_TUNING } from '../../../config/tuning/warp.ts';
 import { DOOR_H, DOOR_W, type Json } from '../../../world/layout.ts';
 import { defineGimmick } from '../types.ts';
-import { attachToPod, buildAnteroom, planAnteroom } from './anteroom.ts';
+import { attachToPod, buildAnteroom, anteroomFits, planAnteroom } from './anteroom.ts';
 import { frontPoint, joinCells, makeFrame } from './pocket.ts';
 import { buildThroughRoom } from './throughRoom.ts';
 
 defineGimmick({
   id: 'twoDoors', name: '2 つの扉が同じ部屋へ', axes: ['move', 'sight'], kinds: ['room'], minSize: [4.2, 5.2], weight: WARP_TUNING['warp.twoDoors.weight'].default, intensity: 1,
+  fits: (s) => anteroomFits(s, { count: 2, spacing: WARP_TUNING['warp.twoDoors.spacingM'].default }),
   onMainPath: true,
   build(ctx) {
     const t = ctx.tuning;

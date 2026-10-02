@@ -11,3 +11,4 @@ import './fourRights.ts';
 import './cornerSwap.ts';
 import './turnRoom.ts';
 import './twoDoors.ts';
+import './timedDoors.ts';

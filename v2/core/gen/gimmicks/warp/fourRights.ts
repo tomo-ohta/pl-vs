@@ -18,7 +18,7 @@ import { ceilingLight, makeFrame } from './pocket.ts';
 const sb = (min: number[], max: number[], mat: string, solid = true): SwapBox => ({ min, max, mat, solid });
 
 defineGimmick({
-  id: 'fourRights', name: '4 回曲がっても戻らない', axes: ['sight', 'move'], kinds: ['room', 'hall'], minSize: [5.0, 5.0], weight: WARP_TUNING['warp.fourRights.weight'].default, intensity: 1,
+  id: 'fourRights', name: '4 回曲がっても戻らない', axes: ['sight', 'move'], kinds: ['room'], minSize: [5.0, 5.0], weight: WARP_TUNING['warp.fourRights.weight'].default, intensity: 1,
   offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && s.openings.length >= 2 && s.cell.footprint.length === 1,
   build(ctx) {

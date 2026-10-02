@@ -12,11 +12,12 @@
 import { WARP_TUNING } from '../../../config/tuning/warp.ts';
 import { WALL_T, type Json } from '../../../world/layout.ts';
 import { defineGimmick } from '../types.ts';
-import { buildAnteroom, planAnteroom } from './anteroom.ts';
+import { buildAnteroom, anteroomFits, planAnteroom } from './anteroom.ts';
 import { buildStraightHall } from './hall.ts';
 
 defineGimmick({
   id: 'recedingHall', name: '遠ざかる廊下', axes: ['move', 'sight'], kinds: ['room'], minSize: [3.8, 3.8], weight: WARP_TUNING['warp.recede.weight'].default, intensity: 1,
+  fits: (s) => anteroomFits(s),
   onMainPath: true,
   build(ctx) {
     const t = ctx.tuning;

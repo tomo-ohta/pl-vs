@@ -16,13 +16,14 @@ import { box, DOOR_W, WALL_T, type Box, type MatId, type Palette, type WallOpeni
 import { themePalette } from '../../../world/palettes.ts';
 import { familyById } from '../../floor/themes.ts';
 import { defineGimmick } from '../types.ts';
-import { attachToPod, buildAnteroom, planAnteroom } from './anteroom.ts';
+import { attachToPod, buildAnteroom, anteroomFits, planAnteroom } from './anteroom.ts';
 import { addPocketCell, axisOf, carveDoorway, doorSpec, makeFrame, pocketCell, safePalette, splitAt } from './pocket.ts';
 
 const STEPS = 9, TREAD = 0.28, LD = 1.6, LM = 1.6, LANE = 1.3, SEP = 0.15, SLAB = 0.2, STEP_T = 0.45;
 
 defineGimmick({
   id: 'endlessStairs', name: '階段の数', axes: ['move', 'sight'], kinds: ['room'], minSize: [3.8, 3.8], weight: WARP_TUNING['warp.stairs.weight'].default, intensity: 1,
+  fits: (s) => anteroomFits(s),
   onMainPath: true,
   build(ctx) {
     const t = ctx.tuning;

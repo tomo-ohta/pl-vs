@@ -15,7 +15,7 @@ import { box, DOOR_H, DOOR_W, WALL_T, type Box, type CellLayout, type EntitySpec
 import { plant, sofa } from '../../dress/props.ts';
 import { reachOpenings } from '../../reach.ts';
 import { xBox, xJson, xPoint, xVec, type Xform } from '../../../sim/parts/warp/util.ts';
-import type { GimmickContext } from '../types.ts';
+import type { GimmickContext, GimmickSlot } from '../types.ts';
 import { doorZone, freeWallSpan, innerRect } from '../util.ts';
 import { addPocketCell, axisOf, canPocket, carveDoorway, copyCell, doorSpec, frontPoint, isBSide, joinCells, nextPocketRise, signOf, xOpening } from './pocket.ts';
 
@@ -43,6 +43,22 @@ export interface AnteroomOptions {
   count?: number;
   /** 並べる扉の真ん中どうしの間隔（m） */
   spacing?: number;
+}
+
+/** 区画の形だけで分かる、控え室を組めるかの見込み（GimmickDef.fits 用。扉の有無と別の空間の置き場所は組むときに見る） */
+export function anteroomFits(s: GimmickSlot, o: AnteroomOptions = {}): boolean {
+  if (s.kind !== 'room' || !s.entrance || s.cell.footprint.length !== 1 || s.openings.length > 4) return false;
+  const count = Math.max(1, o.count ?? 1), extra = (count - 1) * (o.spacing ?? 2.4);
+  const dirs: Dir[] = o.dir !== undefined ? [o.dir] : [0, 1, 2, 3];
+  return dirs.some((d) => {
+    const span = freeWallSpan(s, d, DOOR_W + 1.2 + extra, 0.9);
+    if (!span) return false;
+    const lo = span.a0 + DOOR_W / 2 + 0.6, hi = span.a1 - DOOR_W / 2 - 0.6 - extra;
+    if (hi < lo) return false;
+    if (!o.snap) return true;
+    const off = o.snapOffset ?? 0;
+    return Math.floor((hi - off) / o.snap) >= Math.ceil((lo - off) / o.snap);
+  });
 }
 
 /** 扉が付いていない開口があれば null（R の中が外から見えると、双子の部屋と見分けがつく） */

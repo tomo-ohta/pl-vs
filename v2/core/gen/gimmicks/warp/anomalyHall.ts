@@ -23,7 +23,7 @@ import { themePalette } from '../../../world/palettes.ts';
 import type { SwapBox } from '../../../sim/parts/warp/swap.ts';
 import { xJson } from '../../../sim/parts/warp/util.ts';
 import { defineGimmick } from '../types.ts';
-import { attachToPod, buildAnteroom, planAnteroom } from './anteroom.ts';
+import { attachToPod, buildAnteroom, anteroomFits, planAnteroom } from './anteroom.ts';
 import { addPocketCell, axisOf, ceilingLight, joinCells, makeFrame, openingPair, pocketCell, splitAlong, type Frame } from './pocket.ts';
 
 const W = 2.4, S = 3.6, L = 15.6, LC1 = 5, H = 2.7;
@@ -39,6 +39,7 @@ function hallPalette(): Palette {
 
 defineGimmick({
   id: 'anomalyHall', name: '異変の廊下', axes: ['sight', 'puzzle'], kinds: ['room'], minSize: [3.8, 3.8], weight: WARP_TUNING['warp.lapHall.weight'].default, intensity: 2,
+  fits: (s) => anteroomFits(s, { snap: 3 }),
   offersSecret: true, onMainPath: true,
   build(ctx) {
     const t = ctx.tuning;
