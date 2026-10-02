@@ -66,6 +66,16 @@ export const TUNING_SPEC = {
   'rarity.depth.legendary': num(10, 0, 100, 'Legendary が出る最小の深さ', true),
   'rarity.depth.mythic': num(18, 0, 100, 'Mythic が出る最小の深さ', true),
 
+  // ---- 仕掛けの置き方（gimmicks-and-structures.md 4.2・4.5）----
+  'gimmick.chance.main': num(0.5, 0, 1, '本道の上の部屋に仕掛けを置く確率'),
+  'gimmick.chance.side': num(0.65, 0, 1, '脇道の部屋（行き止まり・寄り道）に置く確率'),
+  'gimmick.chance.hall': num(0.85, 0, 1, '広間に置く確率'),
+  'gimmick.chance.corridor': num(0.3, 0, 1, '廊下に置く確率'),
+  'gimmick.physicsMax': num(2, 0, 10, '1 フロアの物理を使う仕掛けの上限（重さ）', true),
+  'gimmick.sameAxisMul': num(0.3, 0, 1, '本道で直前の仕掛けと作用の軸が同じときの重みの倍率'),
+  'gimmick.intenseRunMul': num(0.4, 0, 1, '本道で強い仕掛け（強さ 2 以上）が続くときの重みの倍率'),
+  'gimmick.secretBoost': num(3, 1, 20, '隠しの数に空きがある間、隠しを差し出す仕掛けの重みに掛ける倍率'),
+
   // ---- 物理（v2-plan.md 6.1）----
   'physics.tickHz': num(60, 30, 120, 'シミュレーションの固定 tick', true),
   'physics.maxBodiesDesktop': num(400, 0, 4000, '同時に動かす剛体の上限（PC）', true),

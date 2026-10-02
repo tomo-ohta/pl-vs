@@ -230,3 +230,103 @@ defineView('propPile', (_spec, ctx) => {
     },
   };
 });
+
+// ---------------------------------------------------------------- 崩れる床
+defineView('crumbleTile', (spec, ctx) => {
+  const b = aabbOf(spec.params.box);
+  const mat = (spec.params.mat as MatId | undefined) ?? 'floorTile';
+  const size: [number, number, number] = [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]];
+  const g = boxGeometry(size, mat);
+  const mesh = new THREE.Mesh(g, ctx.materials.get(mat));
+  const c = aabbCenter(b);
+  mesh.position.set(...c);
+  ctx.root.add(mesh);
+  setBaked(g, lightAt(ctx, [c[0], c[1] + 0.3, c[2]]));
+  let t = 0;
+  return {
+    update(s, dt) {
+      t += dt;
+      const phase = s.phase as number;
+      if (phase === 1) {
+        // 揺れ（だんだん強く）
+        const k = Math.min(1, (s.t as number) / 0.9);
+        mesh.position.set(c[0] + Math.sin(t * 61) * 0.012 * k, c[1] + Math.sin(t * 47) * 0.008 * k, c[2] + Math.cos(t * 53) * 0.012 * k);
+        mesh.visible = true;
+      } else if (phase === 2) {
+        const d = s.drop as number;
+        mesh.position.set(c[0], c[1] - d * d * 0.5, c[2]);
+        mesh.rotation.set(d * 0.4, 0, d * 0.25);
+        mesh.visible = d < 4;
+      } else {
+        mesh.position.set(...c);
+        mesh.rotation.set(0, 0, 0);
+        mesh.visible = true;
+      }
+    },
+    dispose() { mesh.removeFromParent(); g.dispose(); },
+  };
+});
+
+// ---------------------------------------------------------------- 視線のマネキン
+defineView('mannequin', (_spec, ctx) => {
+  const mat = ctx.materials.get('marbleWhite');
+  const group = new THREE.Group();
+  const parts: THREE.BufferGeometry[] = [];
+  const add = (size: [number, number, number], at: [number, number, number]): void => {
+    const g = boxGeometry(size, 'marbleWhite');
+    parts.push(g);
+    const m = new THREE.Mesh(g, mat);
+    m.position.set(...at);
+    group.add(m);
+  };
+  // 胴・腰・脚・腕（箱）と頭（球）。高さ 1.75 m
+  add([0.38, 0.55, 0.22], [0, 1.22, 0]);
+  add([0.34, 0.2, 0.2], [0, 0.88, 0]);
+  add([0.13, 0.78, 0.14], [-0.09, 0.39, 0]);
+  add([0.13, 0.78, 0.14], [0.09, 0.39, 0]);
+  add([0.1, 0.62, 0.1], [-0.26, 1.18, 0]);
+  add([0.1, 0.62, 0.1], [0.26, 1.18, 0]);
+  add([0.08, 0.12, 0.08], [0, 1.54, 0]);
+  const head = new THREE.SphereGeometry(0.12, 18, 14);
+  head.setAttribute('bakedLight', new THREE.BufferAttribute(new Float32Array(head.getAttribute('position').count * 3), 3));
+  parts.push(head);
+  const hm = new THREE.Mesh(head, mat);
+  hm.position.set(0, 1.68, 0);
+  group.add(hm);
+  ctx.root.add(group);
+  let relight = 0;
+  return {
+    update(s, dt) {
+      const p = s.pos as number[];
+      group.position.set(p[0]!, p[1]!, p[2]!);
+      group.rotation.y = s.yaw as number;
+      relight -= dt;
+      if (relight <= 0) {
+        relight = 0.3;
+        const c = lightAt(ctx, [p[0]!, p[1]! + 1.2, p[2]!]);
+        for (const g of parts) setBaked(g, c);
+      }
+    },
+    dispose() { group.removeFromParent(); for (const g of parts) g.dispose(); },
+  };
+});
+
+// ---------------------------------------------------------------- 導く光（光る球 + 点光源）
+defineView('guideLight', (spec, ctx) => {
+  const color = typeof spec.params.color === 'number' ? spec.params.color : 0xfff1d0;
+  const geo = new THREE.SphereGeometry(0.1, 16, 12);
+  const orb = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, fog: true }));
+  const light = new THREE.PointLight(color, 2.2, 7, 2);
+  orb.add(light);
+  ctx.root.add(orb);
+  let t = 0;
+  return {
+    update(s, dt) {
+      t += dt;
+      const p = s.pos as number[];
+      orb.position.set(p[0]!, p[1]! + Math.sin(t * 2.1) * 0.05, p[2]!);
+      light.intensity = 2.0 + Math.sin(t * 7.3) * 0.15;
+    },
+    dispose() { orb.removeFromParent(); geo.dispose(); (orb.material as THREE.Material).dispose(); },
+  };
+});

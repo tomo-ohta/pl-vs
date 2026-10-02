@@ -62,7 +62,7 @@ export class ClientGame {
   tier: QualityTier;
   paused = true;
   /** フロアの出口に入った（main がつぎのフロアを読む） */
-  onFloorExit: ((exitId: string, kind: string) => void) | null = null;
+  onFloorExit: ((exitId: string, kind: string, to: string | null) => void) | null = null;
 
   private readonly hemi = new THREE.HemisphereLight(0xe5e4d5, 0x6c665a, 0.1);
   private lightsPool: LightManager;
@@ -306,10 +306,17 @@ export class ClientGame {
           if (name === 'door.open' || name === 'door.close' || name === 'door.locked') {
             this.audio.door(name.slice(5) as 'open' | 'close' | 'locked', String(e.data?.mat ?? 'doorWood') as MatId, e.pos);
           } else if (name === 'button.press') this.audio.ui('confirm');
+          else if (name === 'beacon') this.audio.play(String(e.data?.kind ?? 'chime'), { pos: e.pos, gain: Number(e.data?.gain ?? 0.8) });
+          else if (name === 'bounce') this.audio.play('thud', { pos: e.pos, gain: 0.6 });
+          else if (name === 'crumble.shake') this.audio.play('clank', { pos: e.pos, gain: 0.35 });
+          else if (name === 'crumble.fall') this.audio.play('thud', { pos: e.pos, gain: 0.8 });
+          else if (name === 'mannequin.caught') { this.audio.play('shutter', { gain: 0.9 }); this.postfx.videoPass?.forceJitter?.(); }
+          else if (name === 'guide.arrive') this.audio.play('chime', { pos: e.pos, gain: 0.4 });
+          else if (name === 'lamp.on') this.audio.play('clank', { pos: e.pos, gain: 0.15 });
           break;
         }
         case 'reveal': this.onReveal(String(e.data?.group ?? ''), String(e.data?.style ?? 'fadeIn')); break;
-        case 'floor.exit': this.onFloorExit?.(String(e.data?.exit ?? ''), String(e.data?.kind ?? '')); break;
+        case 'floor.exit': this.onFloorExit?.(String(e.data?.exit ?? ''), String(e.data?.kind ?? ''), sim.floor.exits.find((x) => x.id === e.data?.exit)?.to?.floor ?? null); break;
         default: break;
       }
     }

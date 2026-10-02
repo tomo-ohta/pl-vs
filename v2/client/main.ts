@@ -39,10 +39,11 @@ ui.pause.resume.addEventListener('click', () => {
   void game.resume();
 });
 
-/** 深さ depth のフロアを作る（seed は世界の seed） */
-function makeFloor(d: number): FloorLayout {
+/** 深さ depth（・版 variant）のフロアを作る（seed は世界の seed） */
+let variant = 0;
+function makeFloor(d: number, v = 0): FloorLayout {
   if (useLab) return labFloor(seed, tuningVersion(tuning));
-  const r = generateFloorReport({ world: seed, depth: d, variant: 0 }, tuning);
+  const r = generateFloorReport({ world: seed, depth: d, variant: v }, tuning);
   console.info(`[gen] ${r.floor.id} ${r.profile.rarity} ${r.profile.family.name}/${r.profile.pattern} ${r.profile.cols}×${r.profile.rows} 区画 ${r.floor.cells.length} 作り直し ${r.attempts - 1} ${r.ms} ms`, r.issues);
   return r.floor;
 }
@@ -53,16 +54,18 @@ fade.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;pointer-e
 document.body.appendChild(fade);
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 let moving = false;
-game.onFloorExit = (): void => {
+game.onFloorExit = (_exit, _kind, to): void => {
   if (moving || useLab) return;
   moving = true;
   void (async () => {
     fade.style.opacity = '1';
     await sleep(550);
-    depth++;
+    // 行き先: 隠しの穴は 'depth.variant'（別のフロア・裏のフロア）、ふつうの出口は 1 つ下の表のフロア
+    const m = to ? /^(\d+)\.(\d+)$/.exec(to) : null;
+    if (m) { depth = Number(m[1]); variant = Number(m[2]); } else { depth++; variant = 0; }
     const t0 = performance.now();
-    await game.loadFloor(makeFloor(depth));
-    console.info(`[floor] B${depth + 1}F 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
+    await game.loadFloor(makeFloor(depth, variant));
+    console.info(`[floor] B${depth + 1}F${variant ? `（裏 ${variant}）` : ''} 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
     fade.style.opacity = '0';
     moving = false;
   })();

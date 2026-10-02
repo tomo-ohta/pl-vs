@@ -1,0 +1,231 @@
+/**
+ * 仕掛けと隠しをフロアに置く（v2-plan.md 5 章の ④⑤）。
+ *
+ * ④ 仕掛け: 区画（部屋・広間・廊下）ごとに確率で置く。本道の上では、直前の仕掛けと作用の軸が同じなら重みを下げ、
+ *    強い仕掛け（強さ 2 以上）が続くなら下げる（緩急）。置いたら区画の開口どうしが歩いてつながるかを調べ、だめなら取り消す。
+ * ⑤ 隠し: フロアの隠しの数をポアソン分布（調整表 secrets.*）で引き、差し出された元から重みで選んで付ける。
+ *    必ず付ける元（謎のパズル）は数の外で付け、付けられなければその仕掛けを取り消す。
+ */
+import type { Tuning } from '../../config/tuning.ts';
+import type { AABB } from '../../math/aabb.ts';
+import { hashAll, Rng } from '../../math/rng.ts';
+import type { Box, EntitySpec, WallOpening, Zone } from '../../world/layout.ts';
+import { reachOpenings } from '../reach.ts';
+import { attachSecret, type PlacedSecret } from '../secrets/index.ts';
+import '../gimmicks/index.ts';
+import { gimmickDefs, type GimmickContext, type GimmickDef, type GimmickSlot, type SecretMode, type SecretOffer } from '../gimmicks/types.ts';
+import { frontOf } from '../gimmicks/util.ts';
+import type { FloorGeometry, GeoCell } from './geometry.ts';
+import { rarityRank, type FloorProfile } from './profile.ts';
+
+export interface PlacedGimmick { id: string; def: string; cell: string; main: boolean }
+
+export interface GimmickResult {
+  gimmicks: PlacedGimmick[];
+  secrets: PlacedSecret[];
+  /** 隠しの数（引いた値）と、置けなかった回数（調整用） */
+  budget: number;
+  attachFailures: number;
+  /** 区画ごとの中身を置かない範囲 */
+  keepOut: Map<string, AABB[]>;
+}
+
+const SLOT_KINDS = new Set(['room', 'hall', 'corridor']);
+
+/** 入口から出口の階段までの区画の並び（開口のつながりで） */
+function mainCells(geo: FloorGeometry): string[] {
+  const by = new Map<string, string[]>();
+  for (const p of geo.portals) { by.set(p.cells[0], [...(by.get(p.cells[0]) ?? []), p.cells[1]]); by.set(p.cells[1], [...(by.get(p.cells[1]) ?? []), p.cells[0]]); }
+  const prev = new Map<string, string | null>([[geo.spawn.cell, null]]);
+  const q = [geo.spawn.cell];
+  for (let h = 0; h < q.length && !prev.has('exitStairs'); h++) for (const m of by.get(q[h]!) ?? []) if (!prev.has(m)) { prev.set(m, q[h]!); q.push(m); }
+  const out: string[] = [];
+  for (let c: string | null | undefined = 'exitStairs'; c; c = prev.get(c)) out.unshift(c);
+  return out;
+}
+
+/** 区画の開口のうち、隣の区画 other との間のもの */
+function openingTo(geo: FloorGeometry, g: GeoCell, other: string): WallOpening | null {
+  const p = geo.portals.find((x) => x.cells.includes(g.cell.id) && x.cells.includes(other));
+  if (!p) return null;
+  const c: [number, number] = [(p.aabb.min[0] + p.aabb.max[0]) / 2, (p.aabb.min[2] + p.aabb.max[2]) / 2];
+  return g.openings.slice().sort((a, b) => Math.hypot(a.pos[0] - c[0], a.pos[2] - c[1]) - Math.hypot(b.pos[0] - c[0], b.pos[2] - c[1]))[0] ?? null;
+}
+
+export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, depth: number): GimmickResult {
+  const rng = new Rng(hashAll(p.seed, 'gimmicks'));
+  const main = mainCells(geo);
+  const mainSet = new Set(main);
+  const keepOut = new Map<string, AABB[]>();
+  const result: GimmickResult = { gimmicks: [], secrets: [], keepOut, budget: 0, attachFailures: 0 };
+  const offers: { offer: SecretOffer; host: GeoCell; gimmick: string }[] = [];
+  const defs = gimmickDefs();
+  let physicsUsed = 0;
+  let prevMain: GimmickDef | null = null;
+  // 隠しの数（フロア全体）を先に決める。隠しが無いと成り立たない仕掛けは、この数に空きがあるときだけ置く
+  const sr = new Rng(hashAll(p.seed, 'secrets'));
+  const mean = t['secrets.perFloorMean'] + t['secrets.depthGain'] * depth + (rarityRank(p.rarity) >= rarityRank('Legendary') ? t['secrets.rarityBonusLegendary'] : 0);
+  let budget = Math.min(t['secrets.perFloorMax'], sr.poisson(mean));
+  result.budget = budget;
+  const world = { cells: geo.cells, portals: geo.portals, entities: geo.entities, exits: geo.exits, depth };
+  let index = 0;
+  const modeOf = (o: SecretOffer): SecretMode => {
+    const modes = o.modes;
+    if (modes.length === 1) return modes[0]!;
+    return sr.weighted(modes, (m) => (m === 'present' ? t['secrets.mode.present'] : t['secrets.mode.appear']));
+  };
+
+  // 置く順: 本道の上（入口から）→ ほか
+  const slots = geo.cells.filter((g) => SLOT_KINDS.has(g.kind) && g.cell.role !== 'entry' && g.cell.role !== 'exit' && g.openings.length > 0);
+  slots.sort((a, b) => (mainSet.has(a.cell.id) ? main.indexOf(a.cell.id) : 1e6) - (mainSet.has(b.cell.id) ? main.indexOf(b.cell.id) : 1e6));
+
+  for (const g of slots) {
+    const onMain = mainSet.has(g.cell.id);
+    const chance = g.kind === 'hall' ? t['gimmick.chance.hall'] : g.kind === 'corridor' ? t['gimmick.chance.corridor'] : onMain ? t['gimmick.chance.main'] : t['gimmick.chance.side'];
+    const r = rng.fork(`slot:${g.cell.id}`);
+    if (!r.chance(chance)) continue;
+    const idx = main.indexOf(g.cell.id);
+    const entrance = onMain && idx > 0 ? openingTo(geo, g, main[idx - 1]!) : g.openings[0] ?? null;
+    const exit = onMain && idx >= 0 && idx < main.length - 1 ? openingTo(geo, g, main[idx + 1]!) : g.openings.find((o) => o !== entrance) ?? null;
+    const rect = g.cell.footprint.reduce((a, x) => ((x.x1 - x.x0) * (x.z1 - x.z0) > (a.x1 - a.x0) * (a.z1 - a.z0) ? x : a));
+    const slot: GimmickSlot = { cell: g.cell, kind: g.kind, openings: g.openings, main: onMain, entrance, exit, rect };
+    const w = rect.x1 - rect.x0, d = rect.z1 - rect.z0;
+    const fit = defs.filter((def) =>
+      def.kinds.includes(g.kind) &&
+      (!def.minSize || (Math.min(w, d) >= def.minSize[0] && Math.max(w, d) >= def.minSize[1])) &&
+      (!def.minHeight || g.cell.height >= def.minHeight) &&
+      (!def.minRarity || rarityRank(p.rarity) >= rarityRank(def.minRarity)) &&
+      (def.onMainPath !== false || !onMain) &&
+      (!def.physics || physicsUsed < t['gimmick.physicsMax']) &&
+      (!def.requiresSecret || budget > 0) &&
+      (!def.fits || def.fits(slot)));
+    if (!fit.length) continue;
+    const def = r.weighted(fit, (x) => {
+      let wt = x.weight;
+      if (x.offersSecret && budget > offers.length) wt *= t['gimmick.secretBoost'];
+      if (onMain && prevMain) {
+        if (x.axes.some((a) => prevMain!.axes.includes(a))) wt *= t['gimmick.sameAxisMul'];
+        if (x.intensity >= 2 && prevMain.intensity >= 2) wt *= t['gimmick.intenseRunMul'];
+      }
+      return wt;
+    });
+    const built = tryBuild(def, slot, g, geo, r, t, p, depth);
+    if (!built) continue;
+    // 隠しが無いと成り立たない仕掛けは、ここで隠しを付ける（付けられなければ仕掛けごと取り消す）
+    const required = built.offers.filter((o) => o.required);
+    // 隠しが無いと成り立たない仕掛けが、途中で組むのをやめて隠しの元を出さなかったときは取り消す
+    if (def.requiresSecret && !required.length) { built.restore(); continue; }
+    let ok = true;
+    for (const o of required) {
+      const sec = attachSecret(world, g, o, modeOf(o), sr.fork(`req${index}`), t, index);
+      if (!sec) { ok = false; result.attachFailures++; break; }
+      result.secrets.push(sec);
+      index++;
+      budget--;
+    }
+    if (!ok) { built.restore(); continue; }
+    keepOut.set(g.cell.id, [...(keepOut.get(g.cell.id) ?? []), ...built.keepOut]);
+    for (const o of built.offers) if (!o.required) offers.push({ offer: o, host: g, gimmick: built.id });
+    const placed = built.id;
+    if (def.physics) physicsUsed++;
+    if (onMain) prevMain = def;
+    result.gimmicks.push({ id: placed, def: def.id, cell: g.cell.id, main: onMain });
+  }
+
+  // ⑤ 隠し（残りの数だけ、差し出された元から重みで選ぶ）
+  const pool = offers.slice();
+  while (budget > 0 && pool.length) {
+    const pick = sr.weighted(pool, (x) => x.offer.weight);
+    pool.splice(pool.indexOf(pick), 1);
+    const s = attachSecret(world, pick.host, pick.offer, modeOf(pick.offer), sr.fork(`s${index}`), t, index);
+    if (s) { result.secrets.push(s); index++; budget--; } else result.attachFailures++;
+  }
+  // 足りなければ、仕掛けとは別の元: 脇道・寄り道の部屋の暗がりの入口（存在型。近くの照明を外して暗くする）
+  if (budget > 0) {
+    const hosts = sr.shuffle(geo.cells.filter((g) => g.kind === 'room' && (g.cell.role === 'side' || g.cell.role === 'rest') && !result.gimmicks.some((x) => x.cell === g.cell.id)));
+    for (const g of hosts) {
+      if (budget <= 0) break;
+      const offer = darkCornerOffer(g, sr);
+      if (!offer) continue;
+      const s = attachSecret(world, g, offer, 'present', sr.fork(`d${index}`), t, index);
+      if (!s) { result.attachFailures++; continue; }
+      result.secrets.push(s);
+      index++;
+      budget--;
+      // 入口の近くの照明を外す（暗がり）
+      const c = offer.doorway;
+      const near = (x: number, z: number): boolean => (c.dir === 0 || c.dir === 2 ? Math.abs(x - c.at) < 2.2 : Math.abs(z - c.at) < 2.2);
+      g.cell.lights = g.cell.lights.filter((l) => !near(l.pos[0], l.pos[2]));
+      g.cell.boxes = g.cell.boxes.filter((b) => !(b.mat === g.cell.palette.light && !b.solid && near((b.min[0] + b.max[0]) / 2, (b.min[2] + b.max[2]) / 2)));
+    }
+  }
+  return result;
+}
+
+interface Built { id: string; offers: SecretOffer[]; keepOut: AABB[]; restore(): void }
+
+/** 暗がりの入口の元: 開口の無い壁の、入口から遠い端 */
+function darkCornerOffer(g: GeoCell, rng: Rng): SecretOffer | null {
+  const rect = g.cell.footprint.reduce((a, x) => ((x.x1 - x.x0) * (x.z1 - x.z0) > (a.x1 - a.x0) * (a.z1 - a.z0) ? x : a));
+  const ent = g.openings[0];
+  if (!ent) return null;
+  const dirs = ([0, 1, 2, 3] as const).filter((d) => !g.openings.some((o) => o.dir === d));
+  for (const d of rng.shuffle([...dirs])) {
+    const [a0, a1] = d === 0 || d === 2 ? [rect.x0 + 0.9, rect.x1 - 0.9] : [rect.z0 + 0.9, rect.z1 - 0.9];
+    if (a1 - a0 < 1.2) continue;
+    const e = d === 0 || d === 2 ? ent.pos[0] : ent.pos[2];
+    const at = Math.abs(a0 - e) > Math.abs(a1 - e) ? a0 + 0.1 : a1 - 0.1;
+    return { hook: 'generic.darkCorner', modes: ['present'], weight: 0.5, doorway: { dir: d, at, y: g.cell.floorY, width: 0.9, height: 2.0 }, tell: '暗がり' };
+  }
+  return null;
+}
+
+/** 仕掛けを組む。区画の開口どうしが歩いてつながらなければ取り消して null */
+function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeometry, rng: Rng, t: Tuning, p: FloorProfile, depth: number): Built | null {
+  const id = `g:${def.id}:${g.cell.id}`;
+  const snapshot = { boxes: g.cell.boxes.slice(), lights: g.cell.lights.map((l) => ({ ...l })), zones: g.cell.zones.slice(), entities: geo.entities.length, doors: JSON.stringify(geo.entities.filter((e) => e.type === 'door' && e.cell === g.cell.id)) };
+  const myKeep: AABB[] = [];
+  const myOffers: SecretOffer[] = [];
+  const assist: Box[] = [];
+  let added = 0;
+  const ctx: GimmickContext = {
+    slot, rng, tuning: t, id,
+    floor: { id: p.id, seed: p.seed, depth, rarity: p.rarity, family: p.family.id },
+    addBox(b) { g.cell.boxes.push(b); added++; return b; },
+    addEntity(name, e) { const eid = `${id}.${name}`; geo.entities.push({ ...e, id: eid, cell: e.cell ?? g.cell.id } as EntitySpec); added++; return eid; },
+    addZone(z: Zone) { g.cell.zones.push(z); },
+    keepOut(a) { myKeep.push(a); },
+    frontOf: (o, d = 1.0) => frontOf(o, d),
+    offerSecret(o) { myOffers.push(o); },
+    doorAt(o) {
+      const c: [number, number] = [o.pos[0], o.pos[2]];
+      return geo.entities.find((e) => e.type === 'door' && (() => { const pn = e.params.panel as { min: number[]; max: number[] }; return Math.hypot((pn.min[0]! + pn.max[0]!) / 2 - c[0], (pn.min[2]! + pn.max[2]!) / 2 - c[1]) < 0.5; })()) ?? null;
+    },
+    removeBoxes(pred) { g.cell.boxes = g.cell.boxes.filter((b) => !pred(b)); },
+    reachAssist(b) { assist.push(b); },
+  };
+  def.build(ctx);
+  const openingsBefore = g.openings.length;
+  const portalsBefore = geo.portals.length;
+  const cellsBefore = geo.cells.length;
+  const exitsBefore = geo.exits.length;
+  const restore = (): void => {
+    g.cell.boxes = snapshot.boxes;
+    g.cell.lights = snapshot.lights;
+    g.cell.zones = snapshot.zones;
+    geo.entities.length = snapshot.entities;
+    g.openings.length = openingsBefore;
+    geo.portals.length = portalsBefore;
+    geo.cells.length = cellsBefore;
+    geo.exits.length = exitsBefore;
+    const doors = JSON.parse(snapshot.doors) as EntitySpec[];
+    for (const d of doors) { const e = geo.entities.find((x) => x.id === d.id); if (e) { e.params = d.params; if (d.inputs) e.inputs = d.inputs; else delete e.inputs; } }
+  };
+  if (!added) { restore(); return null; }
+  // 閉じ込めない: 開口どうしが歩いてつながる（部品が作る床は reachAssist で足す）
+  if (g.openings.length >= 2) {
+    const reach = reachOpenings({ footprint: g.cell.footprint, floorY: g.cell.floorY, boxes: assist.length ? [...g.cell.boxes, ...assist] : g.cell.boxes }, g.openings, 0.1);
+    if (reach && reach.blocked.length) { restore(); return null; }
+  }
+  return { id, offers: myOffers, keepOut: myKeep, restore };
+}

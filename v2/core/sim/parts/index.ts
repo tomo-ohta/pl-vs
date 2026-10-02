@@ -6,3 +6,4 @@ import './logic.ts';
 import './sensors.ts';
 import './actuators.ts';
 import './motion.ts';
+import './gimmicks.ts';

@@ -115,6 +115,12 @@ function rectOf(ctx: PartContext): { x0: number; z0: number; x1: number; z1: num
   return { x0: Math.min(x0, x1), z0: Math.min(z0, z1), x1: Math.max(x0, x1), z1: Math.max(z0, z1) };
 }
 
+/** プレイヤーが立てる範囲（params.walkRect。無ければ板と同じ）。板と穴の壁の隙間から落ちないよう、壁まで広げる */
+function walkRect(ctx: PartContext, plate: { x0: number; z0: number; x1: number; z1: number }): { x0: number; z0: number; x1: number; z1: number } {
+  const w = ctx.spec.params.walkRect as { [k: string]: Json } | undefined;
+  return w ? { x0: w.x0 as number, z0: w.z0 as number, x1: w.x1 as number, z1: w.z1 as number } : plate;
+}
+
 /** 傾き (gx, gz)（低い側へ向かう角度）から、面の法線と剛体の中心 */
 function tiltPose(top: Vec3, gx: number, gz: number, thickness: number): { normal: Vec3; rot: Quat; center: Vec3 } {
   const n0: Vec3 = [Math.tan(gx), 1, Math.tan(gz)];
@@ -137,7 +143,7 @@ definePart<TiltState>({
     const top: Vec3 = [(r.x0 + r.x1) / 2, y, (r.z0 + r.z1) / 2];
     const pose = tiltPose(top, 0, 0, th);
     const handle = ctx.physics!.addKinematicBox(pose.center, [(r.x1 - r.x0) / 2, th / 2, (r.z1 - r.z0) / 2], pNum(ctx.spec, 'friction', 0.5));
-    ctx.setSurface('top', { id: `${ctx.id}:top`, rect: r, origin: top, normal: pose.normal });
+    ctx.setSurface('top', { id: `${ctx.id}:top`, rect: walkRect(ctx, r), origin: top, normal: pose.normal });
     return { gx: 0, gz: 0, handle, normal: pose.normal, rot: pose.rot, center: pose.center };
   },
   step(s, ctx) {
@@ -181,7 +187,7 @@ definePart<TiltState>({
     s.rot = pose.rot;
     s.center = pose.center;
     ctx.physics!.setKinematicPose(s.handle, pose.center, pose.rot);
-    ctx.setSurface('top', { id: `${ctx.id}:top`, rect: r, origin: top, normal: pose.normal });
+    ctx.setSurface('top', { id: `${ctx.id}:top`, rect: walkRect(ctx, r), origin: top, normal: pose.normal });
     ctx.output('gx', s.gx);
     ctx.output('gz', s.gz);
     ctx.output('tilt', Math.hypot(s.gx, s.gz) / Math.max(1e-6, max));
