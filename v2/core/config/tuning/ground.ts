@@ -37,4 +37,12 @@ export const GROUND_TUNING = {
   'ground.still.soffitM': num(1.8, 1.74, 1.9, '立ち止まると見える道: 溝の上の下がり天井の高さ（m）'),
   'ground.still.firstSec': num(1.5, 0.5, 5, '立ち止まると見える道: 光の四角で止まって 1 本目の橋が現れるまで（秒）'),
   'ground.still.secondSec': num(6, 3, 20, '立ち止まると見える道: さらに長く止まって 2 本目の橋が現れるまで（秒。止まり始めてから）'),
+  // 沈む床（sinkFloor）・せり上がる床（riseFloor）・天秤の床（balanceRoom）・床下の明かり（underHatch）
+  'ground.sink.depthM': num(3.0, 2.0, 6, '沈む床: 縦穴の深さ（m）'),
+  'ground.sink.speed': num(0.35, 0.1, 1.5, '沈む床: 沈む・戻る速さ（m/s。ゆっくり）'),
+  'ground.sink.gotoSec': num(1.2, 0.2, 5, '沈む床: 底で止まっていて、1 つ下のフロアへ移るまで（秒）'),
+  'ground.rise.maxM': num(2.0, 1.3, 3, 'せり上がる床: 高い扉の高さの上限（m。天井の高さ − 2.25 m まで）'),
+  'ground.rise.speed': num(0.45, 0.1, 1.5, 'せり上がる床: 上下の速さ（m/s）'),
+  'ground.balance.holdSec': num(2, 0.5, 8, '天秤の床: 釣り合ってから間の床が下がり始めるまで（秒）'),
+  'ground.hatch.depthM': num(2.4, 1.8, 3.05, '床下の明かり: 地下の小部屋の深さ（m）'),
 } as const satisfies Record<string, Spec>;

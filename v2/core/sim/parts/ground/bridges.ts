@@ -6,7 +6,7 @@
  *     （鎖が当たるか、入力 drop で倒れる）。出力 fallen
  * - crate: 升目の上の箱。調べると押した人から離れる向きへ 1 升動く（ほかの箱・塞がった升・人のいる升には動かない）。
  *     穴の升（'o'）へ押すと落ちて床になる（上に乗れる）。'x' は人だけが通れる升。入力 reset で最初の位置へ戻る（穴も空に戻る）。
- *     liftBy の升の上では、その部品（mover）の高さに合わせて上下する（天秤の皿の上）
+ *     liftBy の升の上では、その部品（mover）の高さ（+ offset）に合わせて上下する（天秤の皿の上）
  * - loadPlate: 区画の上の重さ（人 1 人 = 1、箱 = 箱の weight）。出力 load・pressed（load ≥ need）
  * - balanceScale: 天秤の 2 枚の皿の重さを比べ、皿の高さ（mover の target）を出す。両方に同じ重さ（> 0）が holdSec 秒載ると balanced
  * - floorGoto: 入力 go が入ったら、Cue 'floor.goto' でフロアを移る（ClientGame。data.to = 'depth.variant'、無ければ 1 つ下）
@@ -132,12 +132,12 @@ definePart<CrateState>({
     }
     // 皿の上: その部品の高さ（mover の状態 pos[1]）に合わせる
     s.dy = 0;
-    const lift = ctx.spec.params.liftBy as { cells: number[][]; entity: string }[] | undefined;
+    const lift = ctx.spec.params.liftBy as { cells: number[][]; entity: string; offset?: number }[] | undefined;
     if (lift && !s.dropped) for (const l of lift) {
       if (!l.cells.some((c) => c[0] === s.i && c[1] === s.k)) continue;
       const st = ctx.stateOf(l.entity);
       const p = st && Array.isArray(st.pos) ? (st.pos as number[]) : null;
-      if (p) s.dy = p[1]!;
+      if (p) s.dy = p[1]! + (l.offset ?? 0);
     }
     const b = crateBox(ctx, s);
     ctx.setCollider('box', b);
@@ -191,7 +191,8 @@ definePart<{ load: number }>({
 
 /** 区画の上の重さ: 人 1 人 = 1（withPlayers）、箱 = weight（区画の中に真ん中がある、落ちていない箱） */
 function plateLoad(ctx: PartContext, a: AABB, crates: string[], withPlayers = true): number {
-  let load = withPlayers ? ctx.players.filter((p) => playerIn(p, a) && p.onGround).length : 0;
+  // 人は区画の中にいれば数える（動く皿の上では接地が切れる tick があるので、接地は見ない）
+  let load = withPlayers ? ctx.players.filter((p) => playerIn(p, a)).length : 0;
   for (const id of crates) {
     const st = ctx.stateOf(id) as CrateState | null;
     if (!st || st.dropped || st.t < 1) continue;

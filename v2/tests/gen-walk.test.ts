@@ -42,6 +42,9 @@ test('開口と扉は、ジャンプせずに両向きに通れる（見えな�
         n++;
         const from = [...c] as [number, number, number], to = [...c] as [number, number, number];
         from[axis] -= s * 0.9; to[axis] += s * 0.9;
+        // 開口の高さに床が無い側（動く床で届く高い扉・床が下がると現れる低い扉。段階 4 の ground）は、立って歩いて通る開口ではないので見ない
+        const floorAt = (q: [number, number, number]): boolean => sim.colliders.query(q[0] - 0.3, q[1] - 0.1, q[2] - 0.3, q[0] + 0.3, q[1] + 0.05, q[2] + 0.3).some((b) => Math.abs(b.max[1] - q[1]) < 0.06);
+        if (!floorAt(from) || !floorAt(to)) { n--; continue; }
         sim.teleport(0, [from[0], from[1] + 0.4, from[2]], 0);
         const yaw = Math.atan2(-(to[0] - from[0]), -(to[2] - from[2]));
         let ok = false;
