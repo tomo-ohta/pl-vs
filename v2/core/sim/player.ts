@@ -461,8 +461,9 @@ function applyZones(p: PlayerState, zones: Iterable<Zone>): ZoneInfo {
     switch (z.kind) {
       case 'water':
         p.zoneSlow = Math.min(p.zoneSlow, z.params?.slow ?? 0.7);
-        // dry: 水ではないが足が取られる所（物の海など）。遅くなるだけで水の足音にしない
-        if (!z.params?.dry) p.inWater = true;
+        // dry: 水ではないが足が取られる所（物の海など）。遅くなるだけで水の足音にしない。
+        // submerged: 水槽の無い水（部屋ごと水の中）。水の足音にする
+        if (!z.params?.dry || z.params?.submerged) p.inWater = true;
         break;
       case 'swim': {
         const surf = typeof prm?.surface === 'number' ? prm.surface : a.max[1];
@@ -477,6 +478,8 @@ function applyZones(p: PlayerState, zones: Iterable<Zone>): ZoneInfo {
       case 'gravity': {
         const sc = clamp(Number(z.params?.scale ?? 0.4), 0.1, 3);
         if (Math.abs(sc - 1) > Math.abs(p.zoneGravity - 1)) p.zoneGravity = sc;
+        // 重い部屋: 歩きも重い（slow）
+        if (typeof prm?.slow === 'number') p.zoneSlow = Math.min(p.zoneSlow, prm.slow);
         break;
       }
       case 'force': {

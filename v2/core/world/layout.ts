@@ -109,7 +109,8 @@ export interface RenderOverrides {
  * swim: 深い水（params.surface = 水面の高さ。無ければ aabb の上端。深ければ浮いて泳ぐ・しゃがむで潜る・跳ぶで浮く・縁へ押すと這い上がる）/
  * magnet: 磁力の面（vector = 面の外向き = その面に立ったときの上。aabb は面から 1 m の厚み。向かって歩くと乗り移る）。
  * water / force のほかの params: sink（足が沈む深さ m）・drag（落ちる速さの上限 m/s）・air（force: 宙にいる間の倍率）。
- * force の vector の上向きの成分は、上昇気流（上へ向かう速さ）として効く。gravity の scale は 1 より大きくてもよい（重い部屋）
+ * force の vector の上向きの成分は、上昇気流（上へ向かう速さ）として効く。gravity の scale は 1 より大きくてもよい（重い部屋。
+ * params.slow で歩きも遅く）。water の submerged: 水槽の無い水（dry と一緒に使い、水の足音にする。部屋ごと水の中）
  */
 export type ZoneKind = 'water' | 'friction' | 'force' | 'crawl' | 'hazard' | 'marker' | 'gravity' | 'climb' | 'swim' | 'magnet';
 export interface Zone {

@@ -102,7 +102,16 @@ test('浸水は遅く、軽い部屋は高く跳べる（ゾーンが効く）',
       const cell = r.floor.cells.find((c) => c.id === a.cell)!;
       const z = cell.zones.find((x) => x.kind === (a.def === 'flood' ? 'water' : 'gravity'))!;
       const sim = new Sim(r.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
-      const p0: [number, number, number] = [(z.aabb.min[0] + z.aabb.max[0]) / 2, cell.floorY + 0.02, (z.aabb.min[2] + z.aabb.max[2]) / 2];
+      let p0: [number, number, number] = [(z.aabb.min[0] + z.aabb.max[0]) / 2, cell.floorY + 0.02, (z.aabb.min[2] + z.aabb.max[2]) / 2];
+      // 段階 4 で足した: 頭の上に当たる物（浮かんだ家具・宙の足場）の無い所を選ぶ（真ん中の上に物が浮いていると跳んでも頭を打つ）
+      const clear = (x: number, zz: number): boolean => !cell.boxes.some((b) => b.solid && b.min[1] > cell.floorY + 0.05 && b.min[1] < cell.floorY + cell.height - 0.2 && x + 0.6 > b.min[0] && x - 0.6 < b.max[0] && zz + 0.6 > b.min[2] && zz - 0.6 < b.max[2]) && !cell.boxes.some((b) => b.solid && b.max[1] > cell.floorY + 0.05 && b.min[1] < cell.floorY + 0.05 && x + 0.4 > b.min[0] && x - 0.4 < b.max[0] && zz + 0.4 > b.min[2] && zz - 0.4 < b.max[2]);
+      if (a.def === 'lowGravity' && !clear(p0[0], p0[2])) {
+        outer: for (let k = 1; k < 12; k++) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]] as const) {
+          const x = p0[0] + dx * k * 0.3, zz = p0[2] + dz * k * 0.3;
+          if (x < z.aabb.min[0] + 0.5 || x > z.aabb.max[0] - 0.5 || zz < z.aabb.min[2] + 0.5 || zz > z.aabb.max[2] - 0.5) continue;
+          if (clear(x, zz)) { p0 = [x, p0[1], zz]; break outer; }
+        }
+      }
       sim.teleport(0, p0, 0);
       for (let i = 0; i < 20; i++) sim.step([{ ...IDLE_COMMAND }]);
       const pl = sim.players[0]!;

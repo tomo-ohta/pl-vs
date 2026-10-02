@@ -6,3 +6,4 @@ import './flow.ts';
 import './chasm.ts';
 import './mech.ts';
 import './ride.ts';
+import './water.ts';

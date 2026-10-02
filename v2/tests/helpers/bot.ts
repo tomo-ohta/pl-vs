@@ -274,6 +274,8 @@ export function liftsOf(sim: Sim, b: { min: number[]; max: number[] }): { x0: nu
   for (const z of sim.zones) {
     if (!near(z.aabb)) continue;
     if (z.kind === 'climb') out.push({ x0: z.aabb.min[0] + 0.1, z0: z.aabb.min[2] + 0.1, x1: z.aabb.max[0] - 0.1, z1: z.aabb.max[2] - 0.1, base: z.aabb.min[1], top: z.aabb.max[1] - 0.3 });
+    // 深い水（泳ぐ）: 底から、水面から這い上がれる高さまで
+    else if (z.kind === 'swim') out.push({ x0: z.aabb.min[0], z0: z.aabb.min[2], x1: z.aabb.max[0], z1: z.aabb.max[2], base: z.aabb.min[1], top: Number(z.params?.surface ?? z.aabb.max[1]) + 0.6 });
     else if (z.kind === 'force' && z.vector && z.vector[1] > 0.5) {
       const v = (z.params?.speed ?? 1) * z.vector[1] / Math.hypot(z.vector[0], z.vector[1], z.vector[2]);
       out.push({ x0: z.aabb.min[0] + 0.1, z0: z.aabb.min[2] + 0.1, x1: z.aabb.max[0] - 0.1, z1: z.aabb.max[2] - 0.1, base: z.aabb.min[1], top: z.aabb.max[1] + (v * v) / (2 * PLAYER.gravity) - 0.2 });

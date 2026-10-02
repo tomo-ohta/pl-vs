@@ -88,6 +88,8 @@ export function playerCond(p: PlayerState, cond: string): boolean {
     case 'stand': return !p.crouching;
     case 'still': return p.moveRank === 'still';
     case 'moving': return p.moveRank !== 'still';
+    // 操作していない（押されて動いていても）
+    case 'idle': return Math.abs(p.input.x) + Math.abs(p.input.y) < 0.05 && !p.input.jump;
     case 'dash': return p.moveRank === 'dash';
     case 'backward': {
       // 後ろ向きに進んでいる: 進む向きと視線の向きが逆

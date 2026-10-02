@@ -15,8 +15,8 @@ import { box, type Box, type MatId } from '../../../world/layout.ts';
 import { buildPit, planPit, type PitPlan } from '../pit.ts';
 import { defineGimmick, type GimmickContext } from '../types.ts';
 import { aabbJson, type WallFrame } from '../util.ts';
+import { stripsFits } from './common.ts';
 
-const opposite = (s: { entrance: { dir: number } | null; exit: { dir: number } | null }): boolean => !!s.entrance && !!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4;
 
 /** 入口の壁の座標の向き（u / v の単位）を世界の向きへ */
 export function dirOf(F: WallFrame, du: number, dv: number): Vec3 {
@@ -88,7 +88,7 @@ export function sideWall(ctx: GimmickContext, F: WallFrame, u: number, v0: numbe
 
 defineGimmick({
   id: 'escalator', name: '逆走エスカレーター', axes: ['move'], kinds: ['room', 'hall'], minSize: [4.2, 7.0], minHeight: 2.4, weight: 0.7, intensity: 2, offersSecret: true, onMainPath: true,
-  fits: opposite,
+  fits: stripsFits,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;
@@ -142,7 +142,7 @@ export function sideDirOf(F: WallFrame, hi: boolean): Dir {
 
 defineGimmick({
   id: 'slideRoom', name: '滑り台の部屋', axes: ['move', 'floor'], kinds: ['room', 'hall'], minSize: [5.2, 7.2], minHeight: 2.4, weight: 0.7, intensity: 1, offersSecret: true, onMainPath: true,
-  fits: opposite,
+  fits: stripsFits,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;

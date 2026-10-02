@@ -17,8 +17,8 @@ import { carveMaze, edgeKey, gridNeighbors, mazePath } from '../maze.ts';
 import { buildPit, pitSecret, planPit, type PitPlan } from '../pit.ts';
 import { defineGimmick, type GimmickContext } from '../types.ts';
 import { fillRects } from '../util.ts';
+import { stripsFits } from './common.ts';
 
-const opposite = (s: { entrance: { dir: number } | null; exit: { dir: number } | null }): boolean => !!s.entrance && !!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4;
 
 /** 穴の部屋の共通: 計画・穴・底の隠し */
 function chasm(ctx: GimmickContext, strips: boolean, hook: string, tell: string): PitPlan | null {
@@ -106,7 +106,7 @@ defineGimmick({
 
 defineGimmick({
   id: 'ghostBridge', name: '見えない足場', axes: ['floor', 'sight'], kinds: ['room', 'hall'], minSize: [4.8, 6.4], minHeight: 2.4, weight: 0.7, intensity: 2, offersSecret: true, onMainPath: true,
-  fits: opposite,
+  fits: stripsFits,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;
@@ -159,7 +159,7 @@ defineGimmick({
 
 defineGimmick({
   id: 'swayBridge', name: '吊り橋', axes: ['floor', 'body'], kinds: ['room', 'hall'], minSize: [4.2, 6.4], minHeight: 2.4, weight: 0.8, intensity: 2, offersSecret: true, onMainPath: true,
-  fits: opposite,
+  fits: stripsFits,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;
@@ -190,7 +190,7 @@ defineGimmick({
 
 defineGimmick({
   id: 'pendulumHall', name: '振り子の通路', axes: ['floor', 'move'], kinds: ['room', 'hall'], minSize: [5.3, 6.6], minHeight: 2.6, weight: 0.8, intensity: 2, offersSecret: true, onMainPath: true,
-  fits: opposite,
+  fits: stripsFits,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;

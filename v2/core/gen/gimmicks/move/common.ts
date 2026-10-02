@@ -87,3 +87,11 @@ export function removeLightsIn(ctx: GimmickContext, pred: (x: number, z: number)
   ctx.removeBoxes((b) => b.mat === s.cell.palette.light && !b.solid && pred((b.min[0] + b.max[0]) / 2, (b.min[2] + b.max[2]) / 2));
   s.cell.lights = s.cell.lights.filter((l) => !pred(l.pos[0], l.pos[2]));
 }
+
+/**
+ * 穴の部屋（入口・出口の壁沿いの固い床 strips だけが岸）に使える区画: 入口と出口が向かい合い、ほかの開口も入口か出口の壁にある
+ * （横の壁の開口の前の床は、穴を渡る道（橋・乗り物）がつながらない島になる）
+ */
+export function stripsFits(s: { entrance: WallOpening | null; exit: WallOpening | null; openings: WallOpening[] }): boolean {
+  return !!s.entrance && !!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4 && s.openings.every((o) => o.dir === s.entrance!.dir || o.dir === s.exit!.dir);
+}

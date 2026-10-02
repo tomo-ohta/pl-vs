@@ -123,4 +123,22 @@ export const MOVE_TUNING = {
   'move.atrium.cartDeg': num(28, 15, 40, '台車: 坂の傾き（度）'),
   'move.atrium.cartMax': num(7, 2, 12, '台車: 速さの上限（m/s）'),
   'move.atrium.carWait': num(3, 1, 10, 'ゴンドラ: 乗り場で待つ秒数'),
+
+  // ---- 水・球の中: 深いプール（泳ぐ [M23]・跳び石 [M25]）・ボールプール [M40] ----
+  'move.pool.depthM': num(2.2, 1.6, 3, '深いプール: 深さ（m）'),
+  'move.pool.surfaceM': num(0.35, 0.15, 0.55, '深いプール: 水面が床より低い分（m。這い上がれる高さ move.swim.mantle より低く）'),
+  'move.pool.stoneChance': num(0.5, 0, 1, '深いプール: 跳び石になる確率'),
+  'move.balls.shallowSlow': num(0.8, 0.3, 1, 'ボールプール: 浅い道の速さの倍率'),
+  'move.balls.deepSlow': num(0.42, 0.15, 1, 'ボールプール: 深い所の速さの倍率'),
+  'move.balls.jostle': num(0.5, 0, 2, 'ボールプール: 深い所で球に押される強さ（m/s）'),
+  'move.balls.diveSec': num(2, 0.5, 8, 'ボールプール（出現型の隠し）: いちばん深い所でしゃがんでじっとしている秒数'),
+
+  // ---- 異変: 重い部屋 [M19]・水の中の部屋 [M22] ----
+  'move.heavy.scaleMin': num(1.6, 1.2, 2.5, '重い部屋: 重さの倍率の下限'),
+  'move.heavy.scaleMax': num(1.85, 1.2, 2.8, '重い部屋: 重さの倍率の上限'),
+  'move.heavy.slow': num(0.78, 0.4, 1, '重い部屋: 歩く速さの倍率'),
+  'move.underwater.slow': num(0.6, 0.3, 1, '水の中の部屋: 速さの倍率'),
+  'move.underwater.drag': num(1.8, 0.5, 5, '水の中の部屋: 落ちる速さの上限（m/s）'),
+  'move.underwater.gravity': num(0.55, 0.2, 1, '水の中の部屋: 重さの倍率（ふわりと跳ぶ）'),
+  'move.underwater.fogFar': num(10, 4, 30, '水の中の部屋: 霧の届く距離（m）'),
 } as const satisfies Record<string, Spec>;

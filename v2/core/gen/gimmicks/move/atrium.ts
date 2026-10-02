@@ -14,13 +14,13 @@ import { box, type MatId } from '../../../world/layout.ts';
 import { buildPit, planPit } from '../pit.ts';
 import { defineGimmick } from '../types.ts';
 import { laneSide, slope } from './slopes.ts';
+import { stripsFits } from './common.ts';
 
 type Variant = 'rope' | 'zip' | 'cart' | 'gondola';
-const opposite = (s: { entrance: { dir: number } | null; exit: { dir: number } | null }): boolean => !!s.entrance && !!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4;
 
 defineGimmick({
   id: 'atrium', name: '吹き抜けを渡る部屋', axes: ['move'], kinds: ['room', 'hall'], minSize: [5.2, 8.0], minHeight: 2.6, weight: 0.8, intensity: 2, onMainPath: true,
-  fits: opposite,
+  fits: stripsFits,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning, y = s.cell.floorY, h = s.cell.height;
     const depth = t['move.atrium.depthM'];
