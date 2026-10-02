@@ -41,23 +41,33 @@ export class Visibility {
 
   update(built: BuiltFloor, sim: Sim, camera: THREE.Camera): ReadonlySet<string> {
     camera.updateMatrixWorld();
+    this.compute(built, sim, camera, this.visible);
+    for (const [id, c] of built.cells) c.group.visible = this.visible.has(id);
+    return this.visible;
+  }
+
+  /**
+   * カメラから見える区画を集める（描画の入れ物には写さない）。窓・枠の向こうを描く仮のカメラ（client/world/Portals.ts）にも使う。
+   * カメラの matrixWorld・matrixWorldInverse はできていること
+   */
+  compute(built: BuiltFloor, sim: Sim, camera: THREE.Camera, out = new Set<string>()): Set<string> {
     this.m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.m);
-    const pos = camera.position;
+    const pos = new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld);
     const start = cellAt(built, [pos.x, pos.y - 1.5, pos.z]) ?? cellAt(built, [pos.x, pos.y, pos.z]);
-    this.visible.clear();
+    out.clear();
     if (!start) {
       // 区画の外（落下中など）: 全部
-      for (const id of built.cells.keys()) this.visible.add(id);
+      for (const id of built.cells.keys()) out.add(id);
     } else {
-      this.visible.add(start.id);
+      out.add(start.id);
       const q: [string, number][] = [[start.id, 0]];
       for (let h = 0; h < q.length; h++) {
         const [id, d] = q[h]!;
         if (d >= this.maxDepth) continue;
         for (const p of this.byCell.get(id) ?? []) {
           const other = p.cells[0] === id ? p.cells[1] : p.cells[0];
-          if (this.visible.has(other)) continue;
+          if (out.has(other)) continue;
           if (p.doorId && sim.outputOf(p.doorId, 'angle') < 0.02) continue;
           const g = this.concealed.get(p.id);
           if (g && !sim.isRevealed(g)) continue;
@@ -67,12 +77,11 @@ export class Visibility {
           this.box.max.set(a.max[0] + 0.05, a.max[1] + 0.05, a.max[2] + 0.05);
           const near = this.box.distanceToPoint(pos) < 1.5;
           if (!near && !this.frustum.intersectsBox(this.box)) continue;
-          this.visible.add(other);
+          out.add(other);
           q.push([other, d + 1]);
         }
       }
     }
-    for (const [id, c] of built.cells) c.group.visible = this.visible.has(id);
-    return this.visible;
+    return out;
   }
 }

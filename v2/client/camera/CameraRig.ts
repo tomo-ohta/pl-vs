@@ -116,6 +116,11 @@ export class CameraRig {
     this.dispPitch = s.pitch;
   }
 
+  /** 継ぎ目の無い移動で向きを回したとき（warp）: 表示の視線も同じだけ回す（遅れの補間で振り向いて見えないように） */
+  shiftYaw(d: number): void {
+    this.dispYaw += d;
+  }
+
   update(dt: number, s: CameraSubject): void {
     const F = CAMERA_FEEL;
     const sup = this.suppressed;

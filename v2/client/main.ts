@@ -16,6 +16,7 @@ import { makeTuning, parseTuneParam, tuningVersion } from '../core/config/tuning
 import { labFloor } from '../core/lab/lab.ts';
 import { dressCell } from '../core/gen/dress/index.ts';
 import { generateFloorReport, type GenReport } from '../core/gen/floor/index.ts';
+import { floorLoopTarget, loopSpawn } from '../core/gen/gimmicks/warp/floorLoop.ts';
 import type { TourStop } from '../core/gen/floor/gimmicks.ts';
 import { showcaseFloor } from '../core/gen/floor/showcase.ts';
 import type { PatternId } from '../core/gen/floor/themes.ts';
@@ -131,6 +132,8 @@ document.body.appendChild(fade);
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 let moving = false;
 let moved = false;
+/** 前の階に戻る輪を通った階（同じ階からは 1 回だけ） */
+const loopedFrom = new Set<number>();
 game.onFloorExit = (_exit, _kind, to): void => {
   if (moving || useLab) return;
   moving = true;
@@ -139,10 +142,15 @@ game.onFloorExit = (_exit, _kind, to): void => {
     await sleep(550);
     // 行き先: 隠しの穴は 'depth.variant'（別のフロア・裏のフロア）、ふつうの出口は 1 つ下の表のフロア
     const m = to ? /^(\d+)\.(\d+)$/.exec(to) : null;
-    if (m) { depth = Number(m[1]); variant = Number(m[2]); } else { depth++; variant = 0; }
+    // 前の階に戻る輪（F30。段階 4 warp で足した）: ふつうの出口が前の階へ戻ることがある（同じ階からは 1 回だけ）。着くのは別の入口
+    // 駅の車両（F35）で降りたときは戻らない（駅の線が続く）
+    const back = !m && _exit !== 'train' && !loopedFrom.has(depth) ? floorLoopTarget(seed, depth, tuning) : null;
+    if (back !== null) loopedFrom.add(depth);
+    if (m) { depth = Number(m[1]); variant = Number(m[2]); } else if (back !== null) { depth = back; variant = 0; } else { depth++; variant = 0; }
     moved = true;
     const t0 = performance.now();
     const next = makeFloor(depth, variant);
+    if (back !== null) next.spawn = loopSpawn(next, seed);
     await game.loadFloor(next);
     if (game.sim) maps.setFloor(game.sim.floor, lastReport, { world: seed, depth, variant });
     // 駅の車両で着いた: 次のフロアにも車両があれば、その中に出る（扉が閉まった車両の中から、着いて扉が開く）

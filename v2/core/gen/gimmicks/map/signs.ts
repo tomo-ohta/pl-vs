@@ -124,7 +124,8 @@ export function placeMapSigns(p: FloorProfile, geo: FloorGeometry, gimmicks: Gim
   const rng = new Rng(hashAll(p.seed, 'mapSigns'));
   const res: MapSignsResult = { guide: null, here: [], note: null, lie: null };
   const byId = new Map(geo.cells.map((g) => [g.cell.id, g]));
-  const busy = new Set([...gimmicks.gimmicks.map((x) => x.cell), ...anomalies.map((a) => a.cell)]);
+  // 仕掛け・異変の区画と、継ぎ目の無い移動の別の空間・双子の区画（warp: 写した区画と同じ見た目でないと移したのが分かる）には置かない
+  const busy = new Set([...gimmicks.gimmicks.map((x) => x.cell), ...anomalies.map((a) => a.cell), ...(gimmicks.noDress ?? []), ...geo.cells.filter((g) => g.cell.pocket).map((g) => g.cell.id)]);
   const secretCells = new Set(geo.cells.filter((g) => g.cell.role === 'secret').map((g) => g.cell.id));
   const exit = geo.exits.find((x) => x.id === 'down') ?? geo.exits[0];
   const exitXZ: [number, number] | null = exit ? [r2((exit.aabb.min[0] + exit.aabb.max[0]) / 2), r2((exit.aabb.min[2] + exit.aabb.max[2]) / 2)] : null;

@@ -308,6 +308,9 @@ export class Sim implements PlayerWorld {
         player.respawn = { pos: [...at.pos], yaw: at.yaw };
       },
       colliders: this.colliders,
+      sightClear(from, to) {
+        return sim.sightClear(from, to);
+      },
     };
   }
 
@@ -317,6 +320,18 @@ export class Sim implements PlayerWorld {
     (this.revealBoxes.get(group) ?? []).forEach((b, i) => this.colliders.setDynamic(`reveal:${group}:${i}`, b));
     (this.concealBoxes.get(group) ?? []).forEach((_b, i) => this.colliders.setDynamic(`conceal:${group}:${i}`, null));
     this.events.push({ type: 'reveal', tick: this.tick, entity: by, data: { group } });
+  }
+
+  /** 点 from から to まで当たり判定の箱に遮られないか（0.2 m 刻み。終わりの 0.35 m は見ない。warp の「見ていない間に作り替える」に使う） */
+  sightClear(from: Vec3, to: Vec3): boolean {
+    const d = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
+    if (d < 0.4) return true;
+    const n = Math.ceil((d - 0.35) / 0.2);
+    for (let i = 1; i <= n; i++) {
+      const k = Math.min(d - 0.35, i * 0.2) / d;
+      if (this.colliders.pointBlocked(from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k, from[2] + (to[2] - from[2]) * k)) return false;
+    }
+    return true;
   }
 
   /** 開発用: プレイヤーを pos へ移す（向き yaw）。イベントは player.respawn（cause 'teleport'） */
@@ -341,6 +356,10 @@ export class Sim implements PlayerWorld {
     }
     p.yaw = yaw;
     p.surfaceId = null;
+    // この tick の操作の視線も同じだけ回す（部品の後にプレイヤーが動くので、操作の視線で向きが戻らないように。warp で足した）
+    const pi = this.players.indexOf(p);
+    const cmd = this.cmds[pi];
+    if (cmd && Math.abs(dYaw) > 1e-9) this.cmds[pi] = { ...cmd, yaw: cmd.yaw + dYaw };
     this.events.push({ type: 'player.respawn', tick: this.tick, player: p.id, pos: [...pos], entity: by, data: { cause: 'warp', yaw, seamless, dx: delta[0], dy: delta[1], dz: delta[2], dYaw } });
   }
 

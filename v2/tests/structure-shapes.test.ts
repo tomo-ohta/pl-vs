@@ -47,7 +47,8 @@ function pathLen(f: FloorLayout, portals = walkPortals(f)): number {
 
 test('F03 くねる部屋の連なり: 廊下が無く、部屋どうしが壁 1 枚でつながる・道のりが長い', () => {
   for (const r of floors('chain')) {
-    assert.equal(cellsNamed(r.floor, '廊下').length, 0, `${r.floor.id}: 廊下が無い`);
+    // warp の仕掛けが上空に作る別の空間（pocket）の廊下は数えない
+    assert.equal(cellsNamed(r.floor, '廊下').filter((c) => !c.pocket).length, 0, `${r.floor.id}: 廊下が無い`);
     const rooms = r.floor.cells.filter((c) => /^r\d|^hall/.test(c.id));
     assert.ok(rooms.length >= 8, `${r.floor.id}: 部屋 ${rooms.length}`);
     assert.ok(pathLen(r.floor) >= 5, `${r.floor.id}: 入口から出口まで ${pathLen(r.floor)} 区画`);

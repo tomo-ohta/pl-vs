@@ -182,13 +182,22 @@ test('異変: それぞれ見て分かる形になっている（浸水の水・
           break;
         case 'upsideDown':
           assert.ok(c.boxes.some((b) => b.solid && b.propGroup && (b.min[1] + b.max[1]) / 2 > fy + c.height / 2), `${msg}: 天井の側に付いた家具`);
-          assert.ok(c.boxes.some((b) => b.mat === c.palette.light && !b.solid && b.max[1] < fy + 0.1), `${msg}: 床の照明`);
+          // 床の照明（天井の照明の無い暗い部屋では、逆さまにする照明が無い）
+          if (c.boxes.some((b) => b.mat === c.palette.light && !b.solid)) assert.ok(c.boxes.some((b) => b.mat === c.palette.light && !b.solid && b.max[1] < fy + 0.1), `${msg}: 床の照明`);
           break;
-        case 'stack':
-          // 積まれた家具: 何かの上に載った家具（当たる箱のいちばん下が床から 0.5 m より上の組）。段階 4 で仕掛けが増えて生成が変わり、
-          // 低い家具の 2 段の塔（0.73 m の上に棚）が出るようになったので、「0.9 m より上に当たる箱」から改めた
-          assert.ok([...groups].some((g) => { const sb = c.boxes.filter((b) => b.solid && b.propGroup === g); return sb.length > 0 && Math.min(...sb.map((b) => b.min[1])) > fy + 0.5; }), `${msg}: 積まれた家具`);
+        case 'stack': {
+          // 積まれた家具: 別の家具の上（8 cm 以内）に載った当たる箱があり、その底が床から 0.4 m より上
+          // （warp で足した: 以前は「底が 0.9 m より上」だったが、低い冷蔵ケースの上に寝かせた棚を積んだ塔を見落とした）
+          const solid = c.boxes.filter((b) => b.solid && b.propGroup);
+          // 家具ごとの外形（当たる箱の）で見る（籠の枠のように、上の物の底と下の物の上面の箱が重ならない物がある）
+          const bbs = new Map<string, { min: number[]; max: number[] }>();
+          for (const b of solid) { const g = bbs.get(b.propGroup!); if (!g) bbs.set(b.propGroup!, { min: [...b.min], max: [...b.max] }); else for (let k = 0; k < 3; k++) { g.min[k] = Math.min(g.min[k]!, b.min[k]!); g.max[k] = Math.max(g.max[k]!, b.max[k]!); } }
+          const onTop = [...bbs].some(([gb, b]) => b.min[1]! > fy + 0.4 && [...bbs].some(([go, o]) => go !== gb && Math.abs(o.max[1]! - b.min[1]!) < 0.08 && o.min[0]! < b.max[0]! && o.max[0]! > b.min[0]! && o.min[2]! < b.max[2]! && o.max[2]! > b.min[2]!));
+          // ground の判定（当たる箱のいちばん下が床から 0.5 m より上の組）でもよい
+          const lifted = [...groups].some((g) => { const sb = c.boxes.filter((b) => b.solid && b.propGroup === g); return sb.length > 0 && Math.min(...sb.map((b) => b.min[1])) > fy + 0.5; });
+          assert.ok(onTop || lifted || solid.some((b) => b.min[1] > fy + 0.9), `${msg}: 積まれた家具`);
           break;
+        }
         case 'scatter':
           assert.ok(c.boxes.some((b) => b.kind === 'scatteredPaper'), msg);
           break;

@@ -12,7 +12,7 @@ import type { AABB } from '../../math/aabb.ts';
 import type { Rng } from '../../math/rng.ts';
 import type { Dir, Vec3 } from '../../math/vec.ts';
 import type { Rect } from '../../world/footprint.ts';
-import type { Box, CellLayout, EntitySpec, WallOpening, Zone } from '../../world/layout.ts';
+import type { Box, CellLayout, EntitySpec, PortalSpec, WallOpening, Zone } from '../../world/layout.ts';
 import type { DressKind } from '../dress/types.ts';
 import type { Rarity } from '../floor/profile.ts';
 
@@ -71,6 +71,15 @@ export interface GimmickContext {
   addToCell?(cell: string, b: Box): Box;
   /** 段階 4（carry）: 別の区画の、中身の家具を置かない範囲 */
   keepOutIn?(cell: string, a: AABB): void;
+  // ---- 段階 4（warp）で足した: 仕掛けが区画を足す（継ぎ目の無い移動の別の空間）。取り消すと足した区画・開口も消える
+  /** 区画を足す（kind は中身の作り方の種類。openings は区画の壁の開口） */
+  addCell?(cell: CellLayout, kind: DressKind, openings: WallOpening[]): void;
+  /** 区画どうしの開口を足す */
+  addPortal?(p: PortalSpec): void;
+  /** フロアの区画（読むだけ。別の空間の置き場所を決めるのに使う） */
+  cells?(): readonly CellLayout[];
+  /** 区画の中身（家具）を置かない（省略は仕掛けの区画）。双子の区画の見た目を揃えるため */
+  noDress?(cellId?: string): void;
 }
 
 /** 段階 4（carry）: 手がかりを置ける区画 */
@@ -134,6 +143,8 @@ export interface SecretOffer {
   required?: boolean;
   /** 隠し場所の床の高さ（無ければ入口の y） */
   floorY?: number;
+  /** 隠しの入口を付ける区画（省略は仕掛けの区画。warp の別の空間の区画に付けるとき。段階 4 で足した） */
+  cell?: string;
 }
 
 /** 隠し場所への入口: 区画の壁（向き dir）の位置 at（壁に沿った座標）・高さ y に開口を開けて、壁の向こうに隠し部屋を置く */

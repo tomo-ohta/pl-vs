@@ -34,6 +34,8 @@ export interface GimmickResult {
   keepOut: Map<string, AABB[]>;
   /** 仕掛けと、仕掛けとは別の隠し（暗がり）を見て回る順 */
   tour: TourStop[];
+  /** 区画の中身（家具）を置かない区画（仕掛けが ctx.noDress で言う。warp の双子の区画。段階 4 で足した） */
+  noDress: Set<string>;
 }
 
 /** 開口 o のすぐ外（0.6 m）に、区画の中を向いて立つ位置 */
@@ -91,7 +93,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   const main = mainCells(geo);
   const mainSet = new Set(main);
   const keepOut = new Map<string, AABB[]>();
-  const result: GimmickResult = { gimmicks: [], secrets: [], keepOut, budget: 0, attachFailures: 0, tour: [] };
+  const result: GimmickResult = { gimmicks: [], secrets: [], keepOut, budget: 0, attachFailures: 0, tour: [], noDress: new Set() };
   const offers: { offer: SecretOffer; host: GeoCell; gimmick: string }[] = [];
   const defs = gimmickDefs();
   let physicsUsed = 0;
@@ -112,6 +114,8 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
    * 行き止まりでない行き先を先に試す（後の隠しは置けないことがあるので、最初の方で満たしておく）
    */
   const attach = (g: GeoCell, o: SecretOffer, mode: SecretMode, rng: Rng, left: number): PlacedSecret | null => {
+    // 隠しの入口を付ける区画が別にある（warp の別の空間）
+    if (o.cell) g = geo.cells.find((c) => c.cell.id === o.cell) ?? g;
     const opts: AttachOptions = {};
     if (showcase) { opts.dest = SHOWCASE_DESTS[index % SHOWCASE_DESTS.length]!; opts.rare = SHOWCASE_RARE[index % SHOWCASE_RARE.length]!; }
     const needThrough = result.secrets.length + left >= 2 && through < t['secrets.throughMin'];
@@ -205,6 +209,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
     if (!ok) { built.restore(); continue; }
     keepOut.set(g.cell.id, [...(keepOut.get(g.cell.id) ?? []), ...built.keepOut]);
     for (const [c, a] of built.keepOutOther) keepOut.set(c, [...(keepOut.get(c) ?? []), a]);
+    for (const c of built.noDress) result.noDress.add(c);
     for (const o of built.offers) if (!o.required) offers.push({ offer: o, host: g, gimmick: built.id });
     const placed = built.id;
     if (def.physics) physicsUsed++;
@@ -248,7 +253,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   return result;
 }
 
-interface Built { id: string; offers: SecretOffer[]; keepOut: AABB[]; restore(): void; /** 段階 4（carry）: 別の区画の家具を置かない範囲 */ keepOutOther: [string, AABB][] }
+interface Built { id: string; offers: SecretOffer[]; keepOut: AABB[]; restore(): void; /** 段階 4（carry）: 別の区画の家具を置かない範囲 */ keepOutOther: [string, AABB][]; /** 段階 4（warp）: 中身を置かない区画 */ noDress: string[] }
 
 /**
  * 段階 4（carry）: 手がかりを置ける区画。置く順が過ぎて仕掛けの無い区画（before）・仕掛けを置かない区画（入口と出口の部屋・曲がり角）。
@@ -302,6 +307,7 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
   // 段階 4（carry）: 別の区画に足した箱（取り消しのときに戻す）と、その区画の家具を置かない範囲
   const touched = new Map<string, { g: GeoCell; boxes: Box[] }>();
   const keepOther: [string, AABB][] = [];
+  const myNoDress: string[] = [];
   let added = 0;
   const ctx: GimmickContext = {
     slot, rng, tuning: t, id,
@@ -330,7 +336,13 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
       },
       keepOutIn(cellId: string, a: AABB): void { keepOther.push([cellId, a]); },
     } : {}),
+    addCell(cell, kind, ops) { geo.cells.push({ cell, kind, openings: ops, node: -1 }); added++; },
+    addPortal(p) { geo.portals.push(p); },
+    cells: () => geo.cells.map((c) => c.cell),
+    noDress(cellId) { myNoDress.push(cellId ?? g.cell.id); },
   };
+  // 仕掛けが足す区画・開口（warp）は、組む前の数まで戻す
+  const cellsAtStart = geo.cells.length, portalsAtStart = geo.portals.length;
   def.build(ctx);
   const openingsBefore = g.openings.length;
   const portalsBefore = geo.portals.length;
@@ -345,6 +357,8 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
     g.openings.length = openingsBefore;
     geo.portals.length = portalsBefore;
     geo.cells.length = cellsBefore;
+    geo.cells.length = Math.min(geo.cells.length, cellsAtStart);
+    geo.portals.length = Math.min(geo.portals.length, portalsAtStart);
     geo.exits.length = exitsBefore;
     const doors = JSON.parse(snapshot.doors) as EntitySpec[];
     for (const d of doors) { const e = geo.entities.find((x) => x.id === d.id); if (e) { e.params = d.params; if (d.inputs) e.inputs = d.inputs; else delete e.inputs; } }
@@ -367,5 +381,5 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
     const before = reachOpenings({ ...x.g.cell, boxes: x.boxes }, x.g.openings, 0.1)?.blocked.length ?? 0;
     if (after > before) { restore(); return null; }
   }
-  return { id, offers: myOffers, keepOut: myKeep, restore, keepOutOther: keepOther };
+  return { id, offers: myOffers, keepOut: myKeep, restore, keepOutOther: keepOther, noDress: myNoDress };
 }

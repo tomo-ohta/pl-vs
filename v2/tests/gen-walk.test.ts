@@ -16,7 +16,9 @@ const t = defaultTuning();
 /** 隠しの壁を全部消し、スイッチで開く扉は開いたままにする（歩く人はスイッチを探さない） */
 function prepare(sim: Sim, floor: FloorLayout): void {
   for (const e of floor.entities) if (e.type === 'reveal') (sim as unknown as { revealGroup(g: string, b: string): void }).revealGroup(String(e.params.group), 'test');
-  const wired = floor.entities.filter((e) => e.type === 'door' && e.inputs?.open).map((e) => e.id);
+  // 控え室（warpAnteroom）が開け閉めする扉は除く（開いたままにすると、双子の部屋へ移す前の「扉が閉じている」が満たせない）
+  const ante = new Set(floor.entities.filter((e) => e.type === 'warpAnteroom').map((e) => e.id));
+  const wired = floor.entities.filter((e) => e.type === 'door' && e.inputs?.open && !ante.has(String(e.inputs.open).split('.').slice(0, -1).join('.'))).map((e) => e.id);
   // 段階 4（carry）: 重さで開く床の蓋（mover の params.hatch）も開いたままにする（歩く人は板に物を載せない）
   const hatches = floor.entities.filter((e) => e.type === 'mover' && e.params.hatch === true).map((e) => e.id);
   const step = sim.step.bind(sim);

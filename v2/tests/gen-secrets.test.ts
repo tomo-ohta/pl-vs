@@ -77,8 +77,10 @@ test('謎のパズル: 手がかりの順にボタンを押すと扉が現れる
   const R = await loadRapier();
   let solved = 0;
   // 段階 4（carry）: パズルの種類が増えて謎のパズルの出る割合が下がったので、探すフロアを 60 → 400 に
+  // 謎のパズルを出やすくする（段階 4 でパズルが 12 種増え、ふつうの重みでは少ない）
+  const tp = { ...t, 'gimmick.w.puzzleRoom': 6 } as typeof t;
   for (let w = 1; w <= 400 && solved < 4; w++) {
-    const r = generateFloorReport({ world: w, depth: 2, variant: 0 }, t);
+    const r = generateFloorReport({ world: w, depth: 2, variant: 0 }, tp);
     const sec = r.gimmicks?.secrets.find((s) => s.hook === 'puzzle.sequence');
     if (!sec) continue;
     const floor = r.floor;

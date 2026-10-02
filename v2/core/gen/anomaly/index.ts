@@ -304,7 +304,8 @@ export function planAnomalies(p: FloorProfile, geo: FloorGeometry, gimmicks: Gim
   const active: Active[] = [];
   const byCell = new Map<string, Active>();
 
-  const rooms = geo.cells.filter((g) => ROOM_KINDS.has(g.kind) && !NOT_ROLES.has(g.cell.role) && g.openings.length > 0 && !geo.reserved?.has(g.cell.id));
+  // 継ぎ目の無い移動の別の空間・双子の区画（warp）には掛けない（写した区画と同じ見た目でないと、移したのが分かる）
+  const rooms = geo.cells.filter((g) => ROOM_KINDS.has(g.kind) && !NOT_ROLES.has(g.cell.role) && g.openings.length > 0 && !geo.reserved?.has(g.cell.id) && !g.cell.pocket && !gimmicks?.noDress.has(g.cell.id));
   /** 入ってくる開口: 本道なら前の区画の側、そうでなければ扉のある開口（無ければ最初の開口） */
   const entranceOf = (g: GeoCell): WallOpening => {
     const i = mainIdx.get(g.cell.id);

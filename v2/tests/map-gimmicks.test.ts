@@ -89,7 +89,7 @@ function frontOfSecret(floor: FloorLayout, host: string, cell: string): [number,
 }
 
 test('霧の中の塔の隠し: 出現型は塔から離れて霧の奥にいると現れ、奥まで歩ける / 存在型は最初から扉がある', () => {
-  const found = withSecret('landmark.away', 4);
+  const found = withSecret('landmark.away', 4, 400, { ...t, 'gimmick.w.fogTower': 10 } as typeof t);
   assert.ok(found.length >= 2, `霧の中の塔の隠し ${found.length}`);
   for (const { r, sec } of found) {
     const sim = simOf(r.floor);

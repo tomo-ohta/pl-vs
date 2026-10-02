@@ -69,6 +69,11 @@ export interface PartContext {
   setRespawn(player: PlayerState, at: { pos: Vec3; yaw: number }): void;
   /** 段階 4（carry）: 当たり判定（静的な箱と、部品が置いた動く箱。読むだけ）。置く物の支え・投げた物の当たりに使う */
   readonly colliders: ColliderIndex;
+  /**
+   * 点 from から点 to まで、当たり判定の箱（静的な箱と、閉じた扉などの動く箱）に遮られずに見通せるか（終わりの 0.35 m は見ない）。
+   * 見ていない間に作り替える仕掛け（warp）が使う。段階 4 で足した
+   */
+  sightClear?(from: Vec3, to: Vec3): boolean;
 }
 
 export interface PartDef<S extends PartState = PartState> {

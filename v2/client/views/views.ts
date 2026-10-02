@@ -15,6 +15,7 @@ import type { QualityTier } from '../render/quality.ts';
 import type { Sim } from '../../core/sim/sim.ts';
 import type { EntitySpec, Json, MatId } from '../../core/world/layout.ts';
 import type { MaterialLibrary } from '../render/MaterialLibrary.ts';
+import type { PortalRenderer } from '../world/Portals.ts';
 import { surfaceBox } from '../render/SurfaceGeometry.ts';
 import { cellAt, sampleCellLight, type BuiltFloor } from '../world/FloorBuilder.ts';
 
@@ -37,6 +38,8 @@ export interface ViewContext {
   onEvent?(f: (e: SimEvent) => void): () => void;
   /** 今の画質の段（重い描画 = 映り込み・監視映像を軽くする）。テストでは無いことがある（担当 sense が足した） */
   quality?(): QualityTier;
+  /** 窓・枠の向こうに別の所を描く（段階 4 warp で足した。client/world/Portals.ts）。テストでは無いことがある */
+  portals?: PortalRenderer;
 }
 
 export interface EntityView {

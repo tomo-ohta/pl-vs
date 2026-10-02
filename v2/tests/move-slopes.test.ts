@@ -135,12 +135,14 @@ test('滑り台: 入口の床から乗ると速く底へ（上へは戻れない
 test('坂の部屋: 生成したフロアに出て、入口から出口の先まで歩ける・同じ鍵なら同じ', async () => {
   const R = await loadRapier();
   for (const def of ['escalator', 'slideRoom']) {
-    const list = findRooms(def, 2, { maxWorld: 900 });
+    // 出やすくして探す（段階 4 で仕掛けが 150 種近くになり、ふつうの重みでは 900 フロアに出ないことがある）
+    const tb = { ...t, [`gimmick.w.${def}`]: 8 } as typeof t;
+    const list = findRooms(def, 2, { maxWorld: 900, t: tb });
     assert.ok(list.length >= 1, `${def}: 見つかった部屋 ${list.length}`);
     for (const room of list) {
       const res = await walkThrough(room, 220);
       assert.ok(res.ok, `${room.floor.id} ${room.id}: ${res.reason}`);
-      assert.equal(JSON.stringify(regenerate(room)), JSON.stringify(room.floor));
+      assert.equal(JSON.stringify(regenerate(room, { t: tb })), JSON.stringify(room.floor));
     }
   }
 });

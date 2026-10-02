@@ -56,7 +56,15 @@ export interface Box {
    * min / max は傾ける前（低い端の高さ）の箱。当たり判定は付けない（solid は false にする）
    */
   slope?: { axis: 'x' | 'z'; rise: number };
+  /** 描画の模様の基準（warp の双子の箱）: 模様（UV）をこの写し方の逆で戻した位置で計算する。無ければ区画の uvFrame */
+  uvFrame?: UvFrame;
 }
+
+/**
+ * 模様の基準の写し方（warp の双子。同じ形の所どうしで床・壁の模様を揃える）: 元の位置 p を、点 pivot を中心に 1/4 回転 q だけ回して
+ * offset だけずらした位置に写す（pivot 省略は原点）。描画はこの逆で戻した位置で UV を計算してから、箱をこの位置に置く
+ */
+export interface UvFrame { offset: Vec3; q: Dir; pivot?: Vec3 }
 
 export interface LightSpec {
   pos: Vec3;
@@ -173,6 +181,10 @@ export interface CellLayout {
   map?: CellMapInfo;
   /** 部屋の形（core/gen/rooms の形の id。柱林・段々の部屋 …）。地図・図鑑・試験が読む。無ければ普通の箱の部屋 */
   shape?: string;
+  /** 継ぎ目の無い移動の別の空間（warp の仕掛けがフロアの上空に作る区画）: 作った仕掛けの id。地図・図鑑には出さない */
+  pocket?: string;
+  /** 描画の模様の基準（warp の双子の区画）。箱ごとの Box.uvFrame が優先 */
+  uvFrame?: UvFrame;
 }
 
 /**
