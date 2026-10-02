@@ -1,0 +1,150 @@
+/*
+ * 画面の部品の見た目（v1 src/style.css から移植。ui/dom.ts の mountUi が作る要素と SettingsPanel・RecOverlay 用）。
+ * 読み込み: main.ts で `import './ui/style.css';`（Vite が <style> / <link> にする）。
+ * v1 の見た目のまま: ビデオカメラの画面の四隅の枠・等幅の OSD / REC / タイムコード・人型ピクトグラム・琥珀の差し色・うっすら走査線。
+ * v1 から移していないもの: 部屋名 HUD・ミニマップ・デバッグ表示・暗転・開始画面・マップ / フロアリスト / フロアの詳細（MenuUI は v2 で作り直す）。
+ * REC・タイムコード（#rec-overlay）は ui/RecOverlay.ts が要素に直接書く（v1 と同じ）。
+ */
+:root {
+  --ui-bg: rgba(10, 12, 18, 0.72);
+  --ui-fg: #e6e8ee;
+  --ui-dim: #9aa3b2;
+  --accent: #f2c14e;
+  --mono: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  background: #000; color: var(--ui-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none;
+  overscroll-behavior: none;
+}
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+/* ---------------------------------------------------------------- HUD（照準・1 行の案内） */
+#reticle { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,0.75); pointer-events: none; }
+#hud-hint {
+  position: fixed; left: 50%; top: 58%; transform: translateX(-50%); font-size: 14px; color: var(--ui-fg); background: var(--ui-bg);
+  padding: 4px 10px; border-radius: 6px; pointer-events: none; text-shadow: 0 1px 2px #000;
+}
+#hud-hint:empty { display: none; }
+
+/* ---------------------------------------------------------------- スマホの操作 */
+#touch-ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+#stick {
+  position: absolute; left: 28px; bottom: 28px; width: 132px; height: 132px; border-radius: 50%;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.25); pointer-events: auto; touch-action: none;
+}
+#stick-knob {
+  position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
+  background: rgba(255,255,255,0.35); pointer-events: none;
+}
+.tbtn {
+  position: absolute; pointer-events: auto; touch-action: none; width: 72px; height: 72px;
+  /* 塗りの円は無し: ビデオカメラの画面の四隅の枠 + 人型ピクトグラム + 下に小さな文字（REC・タイムコードと同じ等幅）。明るい場面でも読めるよう影 */
+  background: none; border: none; border-radius: 0; padding: 0 0 4px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  color: #f2efe6; opacity: 0.93; -webkit-tap-highlight-color: transparent;
+  font-family: var(--mono);
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 5px rgba(0, 0, 0, 0.45));
+}
+.tbtn .tframe { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.8; }
+.tbtn .ticon { width: 40px; height: 40px; display: block; }
+.tbtn .tlabel { font-size: 9px; line-height: 1; letter-spacing: 0.12em; white-space: nowrap; }
+.tbtn:active { transform: scale(0.94); opacity: 1; }
+#btn-dash { right: 24px; bottom: 26px; }
+#btn-jump { right: 24px; bottom: 110px; }
+#btn-crouch { right: 24px; bottom: 194px; }
+/* 右上の ●REC（RecOverlay、上から 14 px）の下に置く（塗りが無いので重なると読めない） */
+#btn-menu { right: 8px; top: calc(40px + env(safe-area-inset-top, 0px)); width: 54px; height: 54px; }
+#btn-menu .ticon { width: 26px; height: 26px; }
+#btn-menu .tlabel { font-size: 8px; }
+/* 押している間 / しゃがみ切替中はアクセント色で点灯（塗りは使わない） */
+.tbtn.active { color: var(--accent); opacity: 1; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 8px rgba(242, 193, 78, 0.5)); }
+.tbtn.active .tframe { opacity: 1; }
+
+/* ---------------------------------------------------------------- 設定パネル（ui/SettingsPanel.ts。v1 はパネル自身が差し込んでいた基本の見た目） */
+#settings-slot { margin: 8px 0; text-align: left; }
+#settings-slot:empty { display: none; }
+#settings-panel { margin: 10px 0 12px; padding: 10px 12px; border: 1px solid #2a2f3d; border-radius: 8px; text-align: left; }
+#settings-panel .settings-row { display: grid; grid-template-columns: 5.5em 1fr 3.5em; align-items: center; gap: 10px; padding: 4px 0; font-size: 14px; }
+#settings-panel .settings-value { font-family: ui-monospace, Menlo, monospace; font-size: 12px; text-align: right; color: var(--ui-dim); }
+#settings-panel input[type=range] { width: 100%; min-width: 0; accent-color: var(--accent); touch-action: pan-x; }
+#settings-panel select { width: 100%; min-width: 0; font-size: 13px; }
+#settings-panel .settings-reset { margin-top: 6px; font-size: 12px; background: transparent; color: var(--ui-dim); border: 1px solid #3a4054; border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+#settings-panel .settings-reset:hover { border-color: var(--accent); color: var(--ui-fg); }
+
+/* ================================================================ 一時停止の画面（ui/dom.ts の #pause。v1 第21回のメニュー #menu の枠）
+   ビデオカメラの一時停止画面: 黒の半透明・四隅の枠・等幅の OSD 文字・琥珀の差し色・うっすら走査線 */
+#pause {
+  --m-fg: #ece9e0; --m-dim: #8f939c; --m-line: rgba(236, 233, 224, 0.12); --m-line2: rgba(236, 233, 224, 0.22);
+  --m-bg: rgba(9, 10, 13, 0.9);
+  position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 40%, rgba(20, 20, 24, 0.55), rgba(0, 0, 0, 0.82));
+  -webkit-backdrop-filter: blur(5px) saturate(0.7); backdrop-filter: blur(5px) saturate(0.7);
+  color: var(--m-fg); font-size: 14px;
+}
+#pause .mono { font-family: var(--mono); }
+/* v1 の枠は 1100 × 780（マップ・フロアリスト用）。設定と案内だけなので幅を詰め、高さは中身に合わせる（上限は v1 と同じ） */
+#pause .menu-frame {
+  position: relative; display: flex; flex-direction: column;
+  width: min(980px, calc(100vw - 48px)); max-height: min(780px, calc(100vh - 48px));
+  background: var(--m-bg); border: 1px solid var(--m-line);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+/* 走査線 */
+#pause .menu-frame::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px);
+}
+#pause .mf-corner { position: absolute; width: 18px; height: 18px; border: 0 solid var(--m-fg); opacity: 0.7; pointer-events: none; }
+#pause .mf-corner.tl { left: -6px; top: -6px; border-left-width: 1.5px; border-top-width: 1.5px; }
+#pause .mf-corner.tr { right: -6px; top: -6px; border-right-width: 1.5px; border-top-width: 1.5px; }
+#pause .mf-corner.bl { left: -6px; bottom: -6px; border-left-width: 1.5px; border-bottom-width: 1.5px; }
+#pause .mf-corner.br { right: -6px; bottom: -6px; border-right-width: 1.5px; border-bottom-width: 1.5px; }
+
+/* v1 は下にタブが並んでいた（下の余白はタブの分）。v2 はタブ無しなので下にも余白を取る */
+#pause .menu-head { flex: none; padding: 16px 22px 14px; border-bottom: 1px solid var(--m-line); }
+#pause .menu-osd { display: flex; align-items: center; gap: 18px; min-height: 30px; }
+#pause .osd-pause { color: var(--accent); letter-spacing: 0.2em; font-size: 13px; animation: osd-blink 1.6s steps(1) infinite; white-space: nowrap; }
+@keyframes osd-blink { 50% { opacity: 0.35; } }
+/* 題（v1 は「いまどこか」= フロアと部屋の名前） */
+#pause .osd-where { flex: 1; min-width: 0; color: var(--m-fg); font-size: 15px; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#pause .menu-resume {
+  margin-left: auto; background: transparent; color: var(--m-fg); border: 1px solid var(--m-line2);
+  padding: 6px 14px; font-size: 13px; letter-spacing: 0.1em; cursor: pointer; white-space: nowrap;
+}
+#pause .menu-resume:hover, #pause .menu-resume:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+#pause .menu-body { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 18px 22px; touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+#pause .menu-foot { flex: none; padding: 9px 22px; border-top: 1px solid var(--m-line); color: var(--m-dim); font-size: 11px; letter-spacing: 0.06em; }
+
+/* ---------------------------------------------------------------- 一時停止の画面の中身（v1 の「設定」タブ） */
+#pause .set-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 28px; max-width: 980px; }
+.set-h { margin: 18px 0 8px; font-size: 11px; font-weight: 500; letter-spacing: 0.24em; color: var(--accent); font-family: var(--mono); }
+.set-h:first-child { margin-top: 0; }
+/*
+ * 設定の行は v1 で実際に見えていた形に合わせる: v1 はパネルが基本の見た目を後から差し込んでいたため、同じ強さの
+ * メニュー側の指定（行の高さ・列の幅・値の色・既定に戻すボタン）より基本の見た目が勝っていた。ここでは勝っていた値をそのまま使い、
+ * メニュー側で効いていた分（枠なし・行の区切り線・名前の色・select の暗い地）だけを足す
+ */
+#pause #settings-panel { margin: 0; padding: 0; border: none; }
+#pause .settings-row { border-bottom: 1px solid var(--m-line); }
+#pause .settings-label { color: var(--m-fg); }
+#pause select { background: #121318; color: var(--m-fg); border: 1px solid var(--m-line2); border-radius: 0; padding: 5px 6px; }
+/* 操作の案内（右列。v1 の開始画面の文言） */
+#pause .pause-help p { margin: 0; padding: 7px 0; border-bottom: 1px solid var(--m-line); color: var(--m-dim); font-size: 13px; line-height: 1.6; }
+#pause .pause-help b { display: block; color: var(--m-fg); font-weight: 500; font-size: 12px; letter-spacing: 0.08em; }
+
+/* ---------------------------------------------------------------- スマホ・狭い画面 */
+@media (max-width: 760px), (pointer: coarse) and (max-height: 520px) {
+  #pause .menu-frame { width: 100vw; height: 100vh; height: 100dvh; max-height: none; border: none; }
+  #pause .mf-corner { display: none; }
+  #pause .menu-head { padding: calc(10px + env(safe-area-inset-top, 0px)) calc(14px + env(safe-area-inset-right, 0px)) 10px calc(14px + env(safe-area-inset-left, 0px)); }
+  #pause .menu-body { padding: 12px calc(14px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px)); }
+  #pause .menu-foot { display: none; }
+  #pause .set-grid { grid-template-columns: 1fr; gap: 0; }
+  /* 1 列のときは操作の案内が設定の下に続くので、見出しの前を空ける */
+  #pause .pause-help { margin-top: 18px; }
+}

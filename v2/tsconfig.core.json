@@ -1,5 +1,6 @@
 {
-  // core/ はサーバーとクライアントで共有する純粋な TypeScript。DOM の型を入れない（window / document を使うと型エラーになる）
+  // core/ はサーバーとクライアントで共有する純粋な TypeScript。
+  // - DOM の型を入れない（window / document を使うと型エラーになる）
   // three.js を import していないかは tools/check-boundaries.mjs が確かめる
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
