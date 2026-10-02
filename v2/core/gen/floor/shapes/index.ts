@@ -7,7 +7,14 @@ import type { Rng } from '../../../math/rng.ts';
 import type { FloorGeometry } from '../geometry.ts';
 import type { FloorProfile } from '../profile.ts';
 import type { PatternId } from '../themes.ts';
+import { buildRooftop } from './rooftop.ts';
+import { buildShrink } from './shrink.ts';
+import { buildSpiral } from './spiral.ts';
 
 export type ShapeBuilder = (p: FloorProfile, rng: Rng, t: Tuning) => FloorGeometry;
 
-export const SHAPES: Partial<Record<PatternId, ShapeBuilder>> = {};
+export const SHAPES: Partial<Record<PatternId, ShapeBuilder>> = {
+  spiral: buildSpiral,
+  shrink: buildShrink,
+  rooftop: buildRooftop,
+};

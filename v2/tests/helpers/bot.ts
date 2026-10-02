@@ -53,9 +53,9 @@ const R = 0.36;
  * 点 (x, z) の半幅 S の正方形の下で立てる面の高さの一覧（当たり判定の箱の上面と面）。yTop + 0.36 より上は見ない。
  * 穴・溝の部屋では 1 つの点に、底・床板・梁のように高さの違う面が重なる
  */
-function surfacesAt(sim: Sim, x: number, z: number, yTop: number, S: number): number[] {
+function surfacesAt(sim: Sim, x: number, z: number, yTop: number, S: number, yLow = yTop - 7): number[] {
   const out: number[] = [];
-  for (const b of sim.colliders.query(x - S, yTop - 7, z - S, x + S, yTop + 0.4, z + S)) {
+  for (const b of sim.colliders.query(x - S, yLow, z - S, x + S, yTop + 0.4, z + S)) {
     if (b.max[1] > yTop + 0.36) continue; // 上にある物は足場にならない
     if (b.max[0] <= x - S || b.min[0] >= x + S || b.max[2] <= z - S || b.min[2] >= z + S) continue;
     out.push(b.max[1]);
@@ -115,6 +115,8 @@ function pathInCellR(sim: Sim, cell: CellLayout, from: [number, number, number],
   // 足場として見る高さの上限: 床から 0.5 m（階段・踊り場のある区画はその上面まで）。壁・天井の上面を足場にしない
   const stairTop = Math.max(-Infinity, ...cell.boxes.filter((x) => x.kind === 'stairStep' || x.kind === 'landing').map((x) => x.max[1]));
   const top = Math.max(cell.floorY + 0.15, Number.isFinite(stairTop) ? stairTop : -Infinity, from[1] + 0.05) - 0.36 + 0.5;
+  // 段階 4（フロアの形）: 足場を探す下の端（区画の底まで。階段室は 2 階分下りることがある）
+  const low = Math.min(top - 7, b.min[1] - 0.5);
   const zones = [...sim.zones].filter((zn) => zn.kind === 'force' && zn.vector && (zn.params?.speed ?? 0) >= STRONG && zn.aabb.max[0] >= b.min[0] && zn.aabb.min[0] <= b.max[0] && zn.aabb.max[2] >= b.min[2] && zn.aabb.min[2] <= b.max[2]);
   const cellOf = (x: number, z: number): [number, number] => [Math.round((x - b.min[0]) / G), Math.round((z - b.min[2]) / G)];
   // 点ごとの面: 体の真ん中の下（±0.05 m。真ん中が面の上に無い道、つまり梁・床の縁を体の端だけで歩く道は選ばない。
@@ -128,7 +130,7 @@ function pathInCellR(sim: Sim, cell: CellLayout, from: [number, number, number],
     let v = surf.get(j);
     if (!v) {
       const x = b.min[0] + i * G, z = b.min[2] + k * G;
-      v = inside(x, z) ? [surfacesAt(sim, x, z, top, 0.05), surfacesAt(sim, x, z, top, PLAYER.radius)] : [[], []];
+      v = inside(x, z) ? [surfacesAt(sim, x, z, top, 0.05, low), surfacesAt(sim, x, z, top, PLAYER.radius, low)] : [[], []];
       surf.set(j, v);
     }
     return v;
@@ -270,7 +272,8 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
       continue;
     }
     const prev = r[i - 1], next = r[i + 1];
-    const gap = (q: PortalSpec | undefined): number => { if (!q) return Infinity; const [qx, , qz] = center(q); return Math.hypot(qx - x, qz - z) / 2; };
+    // 段階 4（フロアの形）: 階段室の上下の扉のように、同じ所の高さの違う開口どうしも離れているとみなす（高さも距離に入れる）
+    const gap = (q: PortalSpec | undefined): number => { if (!q) return Infinity; const [qx, qy, qz] = center(q); return Math.hypot(qx - x, qy - y, qz - z) / 2; };
     const kb = Math.min(0.9, gap(prev)) * forward, ka = Math.min(0.9, gap(next)) * forward;
     legs.push({ x: x - d[0]! * kb, y, z: z - d[1]! * kb, portal: p });
     legs.push({ x: x + d[0]! * ka, y, z: z + d[1]! * ka, via: true });

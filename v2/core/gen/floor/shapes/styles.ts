@@ -115,7 +115,11 @@ export function holeWindow(g: GeoBuild, outer: Placed, inner: Placed, side: Dir,
 
 /** 区画の中に、もう 1 つの区画（穴）を作る: 外の足跡から引き、壁を切り、天井をふさぐ */
 export function carveInner(g: GeoBuild, outer: Placed, hole: Rect, inner: Omit<Placed, 'rect'>, skin?: MatId, cap = true): Placed {
-  outer.rects = (outer.rects ?? [outer.rect]).flatMap((r) => (r.x0 <= hole.x0 + 1e-6 && r.x1 >= hole.x1 - 1e-6 && r.z0 <= hole.z0 + 1e-6 && r.z1 >= hole.z1 - 1e-6 ? subtractRect(r, hole) : [r]));
+  // 穴と重なる矩形ごとに、重なる所を引く（前に開けた穴で矩形が分かれていても）
+  outer.rects = (outer.rects ?? [outer.rect]).flatMap((r) => {
+    const i: Rect = { x0: Math.max(r.x0, hole.x0), x1: Math.min(r.x1, hole.x1), z0: Math.max(r.z0, hole.z0), z1: Math.min(r.z1, hole.z1) };
+    return i.x1 - i.x0 > 1e-6 && i.z1 - i.z0 > 1e-6 ? subtractRect(r, i) : [r];
+  });
   const pl: Placed = { ...inner, rect: hole };
   const top = pl.y + pl.height + 0.2;
   const ceil = cap && !outer.opts?.noCeiling ? outer.y + outer.height : undefined;
@@ -196,11 +200,13 @@ function courtyard(g: GeoBuild, pl: Placed, rng: Rng): void {
   const env = outdoorEnv('day', g.t['structure.outdoor.fogNear'], g.t['structure.outdoor.fogFar']);
   pl.theme = 'OrganicZone';
   pl.height = 3.6;
-  pl.opts = { ...(pl.opts ?? {}), noCeiling: true, lights: 'none', palette: { floor: 'grass', wall: 'wallBrick', ambient: env.ambient, fog: env.fog }, render: env.render, lighting: env.lighting, name: '中庭', audio: '換気・遠い車道音', role: 'landmark' };
+  pl.opts = { ...(pl.opts ?? {}), noCeiling: true, lights: 'none', palette: { floor: 'floorConcrete', wall: 'wallBrick', ambient: env.ambient, fog: env.fog }, render: env.render, lighting: env.lighting, name: '中庭', audio: '換気・遠い車道音', role: 'landmark' };
   g.reserved.add(pl.cellId);
   const r = pl.rect, y = pl.y;
   const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
   (pl.post ??= []).push((cell) => {
+    // 芝（床の上の薄い草の面。草の材質は当たり判定を作らないので、床そのものはコンクリート）
+    cell.boxes.push(box([r.x0 + WALL_T, y, r.z0 + WALL_T], [r.x1 - WALL_T, y + 0.02, r.z1 - WALL_T], 'grass', false));
     // 真ん中の噴水（低い縁と水面）と、四隅の街灯
     const s = Math.min(1.6, (r.x1 - r.x0) / 6, (r.z1 - r.z0) / 6);
     cell.boxes.push(box([cx - s, y, cz - s], [cx + s, y + 0.45, cz + s], 'columnConcrete'));

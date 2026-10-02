@@ -41,7 +41,7 @@ export function outdoorEnv(kind: 'day' | 'void' | 'water', near = 3, far = 26): 
  * 区画の辺のうち、開口の無い所を手すりの胸壁にする開口を足す（区画を作る前に呼ぶ）。
  * rects の外周の辺ごとに、既にある開口と重ならない区間を開口（sill = rail・上まで）にする。y は区画の床
  */
-export function addRailings(g: GeoBuild, cellId: string, rects: Rect[], y: number, height: number, rail: number, skip: (dir: Dir, at: number) => boolean = () => false): void {
+export function addRailings(g: GeoBuild, cellId: string, rects: Rect[], y: number, height: number, rail: number, skip: (dir: Dir, at: number, coord: number) => boolean = () => false): void {
   const ops = g.openings.get(cellId) ?? [];
   for (const r of rects) {
     const edges: { dir: Dir; coord: number; a0: number; a1: number }[] = [
@@ -60,7 +60,7 @@ export function addRailings(g: GeoBuild, cellId: string, rects: Rect[], y: numbe
       if (e.a1 - 0.3 > cur + 0.4) free.push([cur, e.a1 - 0.3]);
       for (const [p, q] of free) {
         const at = (p + q) / 2;
-        if (skip(e.dir, at)) continue;
+        if (skip(e.dir, at, e.coord)) continue;
         const pos: [number, number, number] = e.dir === 0 || e.dir === 2 ? [at, y, e.coord] : [e.coord, y, at];
         const o = opening(`${cellId}:rail:${e.dir}:${at.toFixed(2)}`, pos, e.dir, q - p, height - rail + 0.5, rail);
         g.addOpening(cellId, o);

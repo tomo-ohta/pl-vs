@@ -618,7 +618,7 @@ export function entryStairs(g: GeoBuild, entry: Placed, hc: number, opts: { x?: 
 }
 
 /** 出口の階段（次の階へ降りる）。区画 pl の向き dir の辺の外へ。y は出口の区画の床（背の高い区画では、出口の階の床） */
-export function exitStairs(g: GeoBuild, pl: Placed, dir: Dir, y: number, hc: number, o: { id: string; exitId: string; doorId: string; to?: string; at?: number; outdoor?: boolean } = { id: 'exitStairs', exitId: 'down', doorId: 'door:exit' }): void {
+export function exitStairs(g: GeoBuild, pl: Placed, dir: Dir, y: number, hc: number, o: { id: string; exitId: string; doorId: string; to?: string; at?: number; outdoor?: boolean; doorW?: number; doorH?: number } = { id: 'exitStairs', exitId: 'down', doorId: 'door:exit' }): void {
   const LH = g.t['floor.levelHeightM'];
   const r = pl.rect;
   const rise = LH;
@@ -636,15 +636,17 @@ export function exitStairs(g: GeoBuild, pl: Placed, dir: Dir, y: number, hc: num
   const spec: StraightSpec = { id: o.id, axis, a0, a1, center: c, width: 2.2, y: low, height: rise + hc, kind: 'exit', role: 'exit', name: '下りの階段', stairs: { lowEnd, offset: bottomLen, rise }, lightMat: 'lightGreen' };
   if (o.outdoor) spec.outdoor = { rail: g.t['structure.railM'], style: 'walkway', fog: [g.t['structure.outdoor.fogNear'], g.t['structure.outdoor.fogFar']] };
   g.straights.push(spec);
-  const roomSide = opening(`${pl.cellId}:${o.id}`, axis === 'z' ? [c, y, edge] : [edge, y, c], dir, DOOR_W, DOOR_H);
+  // 扉の大きさ（縮むくり返しの最後の部屋は小さい扉）
+  const dw = o.doorW ?? DOOR_W, dh = o.doorH ?? DOOR_H;
+  const roomSide = opening(`${pl.cellId}:${o.id}`, axis === 'z' ? [c, y, edge] : [edge, y, c], dir, dw, dh);
   g.addOpening(pl.cellId, roomSide);
-  g.addOpening(o.id, opening(`${o.id}:top`, axis === 'z' ? [c, y, edge] : [edge, y, c], ((dir + 2) % 4) as Dir, DOOR_W, DOOR_H));
+  g.addOpening(o.id, opening(`${o.id}:top`, axis === 'z' ? [c, y, edge] : [edge, y, c], ((dir + 2) % 4) as Dir, dw, dh));
   if (o.outdoor) railingSides(spec, g);
-  g.out.entities.push({ id: o.doorId, type: 'door', cell: pl.cellId, params: { panel: aabbJson(doorPanel(axis, edge, c, DOOR_W, y, DOOR_H)), axis, mat: 'doorMetal', hinge: 1, swing: sgn } });
-  g.out.portals.push(portal(`p:${o.id}`, pl.cellId, o.id, portalAabb(axis, edge, c, DOOR_W, y, DOOR_H), dir, 'door', o.doorId));
+  g.out.entities.push({ id: o.doorId, type: 'door', cell: pl.cellId, params: { panel: aabbJson(doorPanel(axis, edge, c, dw, y, dh)), axis, mat: 'doorMetal', hinge: 1, swing: sgn } });
+  g.out.portals.push(portal(`p:${o.id}`, pl.cellId, o.id, portalAabb(axis, edge, c, dw, y, dh), dir, 'door', o.doorId));
   // 扉の上の非常口の灯り（部屋の内側の壁）
   const inner = edge - sgn * WALL_T;
-  const ly = y + DOOR_H + 0.12;
+  const ly = y + dh + 0.12;
   g.addBox(pl.cellId, axis === 'z'
     ? box([c - 0.25, ly, Math.min(inner, inner - sgn * 0.05)], [c + 0.25, ly + 0.14, Math.max(inner, inner - sgn * 0.05)], 'lightGreen', false)
     : box([Math.min(inner, inner - sgn * 0.05), ly, c - 0.25], [Math.max(inner, inner - sgn * 0.05), ly + 0.14, c + 0.25], 'lightGreen', false));
