@@ -105,7 +105,10 @@ test('控え室: 3 枚目の扉はほかの扉が閉じているときだけ開�
     // 双子の部屋の入口の扉 → 元の部屋へ戻り、本物の入口の扉が開く
     const a1 = `${room.id}.a1.a`;
     walkIn(sim, R1, doorFront(f, R1, a1));
+    // 双子の部屋の 3 枚目の扉が開いていれば、閉まってから戻す（開いた扉の向こうが、戻した先で変わって見えないように）
     w = interact(sim, a1);
+    assert.equal(w.length, 0, `${R.id}: 3 枚目の扉が開いている間は、まだ戻さない`);
+    for (let i = 0; i < 90 && !w.length; i++) w.push(...stepWith(sim, 1, () => ({})));
     assert.equal(w.length, 1, `${R.id}: 双子の部屋の扉で戻る`);
     assert.ok(Math.abs(sim.players[0]!.pos[1] - R.floorY) < 0.5, '元の部屋の高さ');
     const realA = (ent(f, `${room.id}.ante`).params.doors as { real: string[] }).real[0]!;

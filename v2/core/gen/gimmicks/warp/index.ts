@@ -10,3 +10,4 @@ import './lookBack.ts';
 import './fourRights.ts';
 import './cornerSwap.ts';
 import './turnRoom.ts';
+import './twoDoors.ts';

@@ -55,4 +55,8 @@ export const WARP_TUNING = {
   'warp.turnRoom.gapM': num(1.1, 0.9, 1.6, '回転する部屋: 筒の入口の幅（m）'),
   'warp.turnRoom.periodSec': num(40, 15, 120, '回転する部屋: 1 回りの秒数'),
   'warp.turnRoom.drift': num(0.12, 0, 0.6, '回転する部屋: 外へ押す強さ（軸から 1 m 離れるごとの m/s）'),
+  // ---- 2 つの扉が同じ部屋へ（twoDoors: W12）
+  'warp.twoDoors.weight': num(0.5, 0, 10, '2 つの扉が同じ部屋へ: 出やすさ（相対）'),
+  'warp.twoDoors.spacingM': num(2.6, 2.2, 4, '2 つの扉が同じ部屋へ: 並んだ扉の真ん中どうしの間隔（m）'),
+  'warp.twoDoors.depthM': num(4.8, 3.6, 7, '2 つの扉が同じ部屋へ: 居間の奥行き（扉 A から扉 B まで。m）'),
 } as const satisfies Record<string, Spec>;
