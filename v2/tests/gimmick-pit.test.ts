@@ -126,7 +126,14 @@ test('崩れる床: 乗り続けると揺れて落ち、穴の底へ落ちる。
   for (const room of ROOMS.crumbleFloor.slice(0, 6)) {
     const tiles = room.floor.entities.filter((e) => e.type === 'crumbleTile' && e.cell === room.cell.id);
     assert.ok(tiles.length >= 6, `${room.cell.id}: 床板 ${tiles.length}`);
-    const tile = tiles[Math.floor(tiles.length / 2)]!;
+    // 真ん中に立った体（幅 0.7 m）が、ほかの床板・固い床に掛からない床板（段階 4 で生成が変わり、真ん中の床板が細い切れ端になることがあった）
+    const solidTop = room.cell.boxes.filter((x) => x.solid && Math.abs(x.max[1] - room.cell.floorY) < 1e-3);
+    const fits = (e: (typeof tiles)[number]): boolean => {
+      const bb = e.params.box as { min: number[]; max: number[] }, cx = (bb.min[0]! + bb.max[0]!) / 2, cz = (bb.min[2]! + bb.max[2]!) / 2, R = 0.36;
+      const others = [...solidTop, ...tiles.filter((x) => x !== e).map((x) => x.params.box as { min: number[]; max: number[] })];
+      return !others.some((x) => x.min[0]! < cx + R && x.max[0]! > cx - R && x.min[2]! < cz + R && x.max[2]! > cz - R);
+    };
+    const tile = tiles.slice(Math.floor(tiles.length / 2)).concat(tiles).find(fits) ?? tiles[Math.floor(tiles.length / 2)]!;
     const b = tile.params.box as { min: number[]; max: number[] };
     const sim = await newSim(room);
     sim.teleport(0, [(b.min[0]! + b.max[0]!) / 2, room.cell.floorY + 0.02, (b.min[2]! + b.max[2]!) / 2], 0);

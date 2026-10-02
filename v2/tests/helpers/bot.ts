@@ -21,11 +21,12 @@ export interface WalkResult { ok: boolean; reason: string; seconds: number; rout
  * - steps: 立つ所 at（足元）まで歩き、look があればそちらを調べ（E）、wait 秒と until（`部品.出力` が入るまで）待つ。crouch でしゃがんで待つ
  * - enterAt: この開口（外面の床の位置 [x, z]）から入ったときだけ（入口の向きで手順が違う仕掛け。無ければいつでも）
  * - only 'secret': 隠し場所（role 'secret' の区画）へ入るときだけ
+ * - exitAt: この開口（外面の床の位置 [x, z]）から出るときだけ（スイッチで開く扉）
  * - doneIf: `部品.出力` が入っていれば手順を飛ばす（もう解けている）
  * - replanSec: この区画では道をこの間隔で引き直す（動く床）
  */
 export interface BotStep { at: [number, number, number]; look?: [number, number, number]; wait?: number; until?: string; crouch?: boolean }
-export interface BotHint { steps: BotStep[]; enterAt?: [number, number]; only?: 'secret'; doneIf?: string; replanSec?: number }
+export interface BotHint { steps: BotStep[]; enterAt?: [number, number]; exitAt?: [number, number]; only?: 'secret'; doneIf?: string; replanSec?: number }
 
 const outputRef = (sim: Sim, ref: string): number => { const i = ref.lastIndexOf('.'); return sim.outputOf(ref.slice(0, i), ref.slice(i + 1)); };
 
@@ -34,7 +35,7 @@ function hintSteps(floor: FloorLayout, cell: string, exit: PortalSpec, prev: Por
   const out: { step: BotStep; doneIf?: string }[] = [];
   const other = exit.cells[0] === cell ? exit.cells[1] : exit.cells[0];
   const toSecret = floor.cells.find((c) => c.id === other)?.role === 'secret';
-  const hints = floor.entities.filter((e) => e.cell === cell && e.params.bot).flatMap((e) => (Array.isArray(e.params.bot) ? e.params.bot : [e.params.bot]) as unknown as BotHint[]).filter((h) => h.steps?.length && (h.only !== 'secret' || toSecret));
+  const hints = floor.entities.filter((e) => e.cell === cell && e.params.bot).flatMap((e) => (Array.isArray(e.params.bot) ? e.params.bot : [e.params.bot]) as unknown as BotHint[]).filter((h) => h.steps?.length && (h.only !== 'secret' || toSecret) && (!h.exitAt || Math.hypot(h.exitAt[0] - center(exit)[0], h.exitAt[1] - center(exit)[2]) < 1.2));
   const directed = hints.filter((h) => h.enterAt);
   let pickDirected: BotHint[] = [];
   if (prev) {
@@ -295,7 +296,7 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
   for (let n = 0; n < ticks; n++) {
     const L = legs[leg];
     if (!L) return { ok: true, reason: '', seconds: n * sim.dt, route: r.map((p) => p.id) };
-    if (L.hint && hintT < 0 && L.doneIf && outputRef(sim, L.doneIf) > 0.5) { leg++; path = []; continue; }
+    if (L.hint && hintT < 0 && L.doneIf && outputRef(sim, L.doneIf) > 0.5) { leg++; path = []; stuck = 0; bestD = Infinity; legT = 0; continue; }
     if (L.hint && hintT >= 0) {
       const h = L.hint;
       const hc: InputCommand = { ...IDLE_COMMAND, yaw: player.yaw, pitch: player.pitch, crouch: !!h.crouch };

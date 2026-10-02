@@ -52,4 +52,10 @@ export const GROUND_TUNING = {
   'ground.avoid.tileM': num(1.0, 0.8, 1.6, '踏まない区画: 升目の大きさ（m）'),
   'ground.avoid.decoy': num(0.12, 0, 0.6, '踏まない区画: 道の外の升目のうち、白い（踏んでよい）おとりの割合'),
   'ground.visit.stopSec': num(0.6, 0.2, 3, '順番の区画: 印の上で立ち止まって「訪れた」になるまで（秒）'),
+  // 光る床の迷路（glowMaze）・足跡が残る床（footLoop）・他人の足跡（strangerTrail）・水たまりの鏡（mirrorPuddle）
+  'ground.glow.fadeSec': num(30, 5, 120, '光る床: 踏んだ所が光って消えるまで（秒）'),
+  'ground.trail.stopSec': num(1.5, 0.5, 6, '足跡: 足跡の終わりで立ち止まって扉が現れるまで（秒）'),
+  'ground.loop.corridorM': num(1.5, 1.2, 2.5, '足跡が残る床: 真ん中の塊のまわりの通路の幅（m）'),
+  'ground.loop.prints': num(320, 40, 800, '足跡が残る床: 残る足跡の数の上限（古い物から消える）', true),
+  'ground.mirror.gazeSec': num(1.2, 0.3, 5, '水たまりの鏡: 水面に映った扉を見続けて、本当の扉が現れるまで（秒）'),
 } as const satisfies Record<string, Spec>;

@@ -96,7 +96,10 @@ defineGimmick({
       const wallC = d === 0 ? r.z1 : d === 2 ? r.z0 : d === 1 ? r.x1 : r.x0;
       const sgn = d === 0 || d === 1 ? -1 : 1;
       const bx = d === 0 || d === 2 ? { min: [span.at - 0.12, y, Math.min(wallC, wallC + sgn * 0.06)], max: [span.at + 0.12, y + 0.22, Math.max(wallC, wallC + sgn * 0.06)] } : { min: [Math.min(wallC, wallC + sgn * 0.06), y, span.at - 0.12], max: [Math.max(wallC, wallC + sgn * 0.06), y + 0.22, span.at + 0.12] };
-      const btn = ctx.addEntity('button', { type: 'button', params: { box: { min: bx.min, max: bx.max }, mat: 'plasticRed' } });
+      // 歩く人（tests/helpers/bot.ts）: 脇の扉から出るときは、先にボタンを押す（段階 4 の ground で足した）
+      const stand = d === 0 || d === 2 ? [span.at, s.cell.floorY, wallC + sgn * 1.0] : [wallC + sgn * 1.0, s.cell.floorY, span.at];
+      const bot = { steps: [{ at: stand, look: [(bx.min[0]! + bx.max[0]!) / 2, y + 0.11, (bx.min[2]! + bx.max[2]!) / 2], wait: 1.0 }], exitAt: [side.pos[0], side.pos[2]], doneIf: `${ctx.id}.latch.out` };
+      const btn = ctx.addEntity('button', { type: 'button', params: { box: { min: bx.min, max: bx.max }, mat: 'plasticRed', bot } });
       const latch = ctx.addEntity('latch', { type: 'latch', params: {}, inputs: { set: `${btn}.pressed` } });
       door.inputs = { ...(door.inputs ?? {}), open: `${latch}.out` };
       door.params.autoCloseSec = 0;
