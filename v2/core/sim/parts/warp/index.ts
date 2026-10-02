@@ -6,3 +6,4 @@ import './gate.ts';
 import './anteroom.ts';
 import './swap.ts';
 import './treadmill.ts';
+import './recede.ts';

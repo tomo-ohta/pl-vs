@@ -108,7 +108,7 @@ test('控え室: 3 枚目の扉はほかの扉が閉じているときだけ開�
     w = interact(sim, a1);
     assert.equal(w.length, 1, `${R.id}: 双子の部屋の扉で戻る`);
     assert.ok(Math.abs(sim.players[0]!.pos[1] - R.floorY) < 0.5, '元の部屋の高さ');
-    const realA = (ent(f, `${room.id}.ante`).params.doors as { a: string }).a;
+    const realA = (ent(f, `${room.id}.ante`).params.doors as { real: string[] }).real[0]!;
     stepWith(sim, 50, () => ({}));
     assert.ok(Number(sim.stateOf(realA)?.angle) > 0.5, '本物の扉が開いている');
     // 扉が開いていると 3 枚目の扉は開かない（鍵の音）
@@ -127,7 +127,7 @@ test('閉じた輪の廊下: 前へ歩くと何度も戻され、lapsOut 周で�
   for (const room of ROOMS) {
     const f = room.floor, R = room.cell;
     const sim = simIn(room);
-    const Q = `${R.id}~a2`;
+    const Q = `${R.id}~hall.q`;
     let res = walkTo(sim, Q, undefined, 240);
     assert.ok(res.ok, `${f.id} ${R.id}: 奥の双子の部屋へ: ${res.reason}`);
     assert.equal(sim.outputOf(`${room.id}.loop`, 'laps'), t['warp.loopHall.lapsOut'], '前の周');

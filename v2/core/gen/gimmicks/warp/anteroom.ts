@@ -21,8 +21,10 @@ import { addPocketCell, axisOf, canPocket, carveDoorway, copyCell, doorSpec, fro
 
 export interface AnteroomPlan {
   host: CellLayout;
+  /** 部屋の扉（入口が先） */
+  doors: { o: WallOpening; door: EntitySpec }[];
+  /** 入口の扉（doors[0]） */
   a: { o: WallOpening; door: EntitySpec };
-  b: { o: WallOpening; door: EntitySpec } | null;
   /** 3 枚目の扉（R の壁の外面の床位置・外向き） */
   pod: { pos: Vec3; dir: Dir };
   rise: number;
@@ -43,9 +45,9 @@ export function planAnteroom(ctx: GimmickContext, o: AnteroomOptions = {}): Ante
   const s = ctx.slot;
   if (s.kind !== 'room' || !s.entrance || s.cell.footprint.length !== 1) return null;
   const doors = s.openings.map((op) => ({ o: op, door: ctx.doorAt(op) }));
-  if (doors.some((d) => !d.door) || doors.length > 2) return null;
+  if (doors.some((d) => !d.door) || doors.length > 4) return null;
   const a = doors.find((d) => d.o === s.entrance)!;
-  const bRaw = doors.find((d) => d.o !== s.entrance) ?? null;
+  const all = [a, ...doors.filter((d) => d !== a)].map((d) => ({ o: d.o, door: d.door! }));
   // pod: A から遠い壁（向かいの壁を先に）
   const order: Dir[] = o.dir !== undefined ? [o.dir] : ([((s.entrance.dir + 2) % 4) as Dir, ((s.entrance.dir + 1) % 4) as Dir, ((s.entrance.dir + 3) % 4) as Dir, s.entrance.dir]);
   const y = s.cell.floorY;
@@ -63,7 +65,7 @@ export function planAnteroom(ctx: GimmickContext, o: AnteroomOptions = {}): Ante
     }
     const r = s.rect;
     const pos: Vec3 = d === 0 ? [at, y, r.z1] : d === 2 ? [at, y, r.z0] : d === 1 ? [r.x1, y, at] : [r.x0, y, at];
-    return { host: s.cell, a: { o: a.o, door: a.door! }, b: bRaw ? { o: bRaw.o, door: bRaw.door! } : null, pod: { pos, dir: d }, rise: nextPocketRise(ctx) };
+    return { host: s.cell, doors: all, a: all[0]!, pod: { pos, dir: d }, rise: nextPocketRise(ctx) };
   }
   return null;
 }
@@ -90,8 +92,9 @@ export function xDoorParams(x: Xform, p: EntitySpec['params']): EntitySpec['para
 export interface RoomCopy {
   cell: CellLayout;
   xform: Xform;
+  /** 部屋の扉の双子（plan.doors と同じ並び。a は入口の双子） */
+  doors: string[];
   a: string;
-  b: string | null;
   pod: string;
   /** pod の開口（写した先の壁の外面・外向き） */
   podOut: { pos: Vec3; dir: Dir };
@@ -207,12 +210,11 @@ export function buildAnteroom(ctx: GimmickContext, plan: AnteroomPlan): Anteroom
     const cell = copyCell(R, x, { id, pocket: ctx.id, name: R.name ?? '部屋' });
     const ops = [...ctx.slot.openings.map((o, i) => xOpening(x, o, `${id}:o${i}`)), xOpening(x, podOp, `${id}:pod`)];
     addPocketCell(ctx, cell, 'room', ops);
-    const a = addDoor(`${suffix}.a`, id, { ...xDoorParams(x, plan.a.door.params), autoCloseSec: 0 });
-    const b = plan.b ? addDoor(`${suffix}.b`, id, { ...xDoorParams(x, plan.b.door.params), autoCloseSec: 0 }) : null;
+    const twins = plan.doors.map((d, i) => addDoor(`${suffix}.${i === 0 ? 'a' : `d${i}`}`, id, { ...xDoorParams(x, d.door.params), autoCloseSec: 0 }));
     const pod = addDoor(`${suffix}.pod`, id, { ...xDoorParams(x, podParams), autoCloseSec: 6 });
     const podOut = { pos: xPoint(x, plan.pod.pos), dir: ((plan.pod.dir + x.q) % 4) as Dir };
     lampAt(podOut.pos, podOut.dir, id, false, `${suffix}.lamp`);
-    const c: RoomCopy = { cell, xform: x, a, b, pod, podOut };
+    const c: RoomCopy = { cell, xform: x, doors: twins, a: twins[0]!, pod, podOut };
     copies.push(c);
     return c;
   };
@@ -222,16 +224,15 @@ export function buildAnteroom(ctx: GimmickContext, plan: AnteroomPlan): Anteroom
     plan, ctrl, podDoor, entry, copies,
     addCopy: makeCopy,
     finish(extra = {}) {
-      const A = plan.a.door, B = plan.b?.door ?? null;
       // 足した扉（pod・双子の部屋の扉）はこの部品が開け閉めする（入力 open を d<i> へ）
-      const managed: string[] = [podDoor, ...copies.flatMap((c) => [c.a, ...(c.b ? [c.b] : []), c.pod])];
+      const managed: string[] = [podDoor, ...copies.flatMap((c) => [...c.doors, c.pod])];
       const auto: Record<string, Json> = {};
       for (const id of managed) auto[id] = 6;
       auto[podDoor] = 0;
-      for (const c of copies) { auto[c.a] = 0; if (c.b) auto[c.b] = 0; }
+      for (const c of copies) for (const dd of c.doors) auto[dd] = 0;
       managed.forEach((id, i) => { const inp = inputs.get(id); if (inp) inp.open = `${ctrl}.d${i}`; });
-      // R の A・B はふつうの扉のまま。入力 lock をいつも 0 の出力につなぎ、この部品の後に動くようにする（双子の部屋から戻した tick に開くため）
-      for (const e of [A, ...(B ? [B] : [])]) e.inputs = { ...(e.inputs ?? {}), lock: `${ctrl}.free` };
+      // 部屋の扉はふつうの扉のまま。入力 lock をいつも 0 の出力につなぎ、この部品の後に動くようにする（双子の部屋から戻した tick に開くため）
+      for (const { door: e } of plan.doors) e.inputs = { ...(e.inputs ?? {}), lock: `${ctrl}.free` };
       const room = innerRect(ctx.slot, 0);
       // 歩く人（試験）の道順: pod を調べると R'、双子の部屋の A を調べると R
       const links: Json[] = [{ from: R.id, to: entry.cell.id, at: [...frontPoint(plan.pod, 0.75)], interact: podDoor }];
@@ -244,8 +245,8 @@ export function buildAnteroom(ctx: GimmickContext, plan: AnteroomPlan): Anteroom
         params: {
           managed, auto,
           room: { min: [room.x0, y - 0.3, room.z0], max: [room.x1, y + 2.5, room.z1] },
-          doors: { a: A.id, b: B?.id ?? null, pod: podDoor },
-          copies: copies.map((c) => ({ a: c.a, b: c.b, pod: c.pod, xform: xJson(c.xform) })),
+          doors: { real: plan.doors.map((d) => d.door.id), pod: podDoor },
+          copies: copies.map((c) => ({ doors: c.doors, pod: c.pod, xform: xJson(c.xform) })),
           warpLinks: [...links, ...(extra.warpLinks ?? [])],
         },
       });

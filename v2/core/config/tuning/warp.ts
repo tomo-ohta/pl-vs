@@ -19,4 +19,11 @@ export const WARP_TUNING = {
   'warp.loopHall.lapsBack': num(3, 1, 12, '閉じた輪の廊下（BX02）: 輪が閉じたあと、後ろへ何周すると後ろの輪がほどけて隠しの入口が現れるか', true),
   'warp.loopHall.giveUpSec': num(80, 20, 600, '閉じた輪の廊下: 抜けられなくてもこの秒数で前も後ろもほどける（閉じ込めない）'),
   'warp.loopHall.secretWeight': num(1.4, 0, 5, '閉じた輪の廊下（BX02）: 隠しの元の重み'),
+  // ---- 遠ざかる廊下（recedingHall: W05）
+  'warp.recede.weight': num(0.45, 0, 10, '遠ざかる廊下: 出やすさ（相対）'),
+  'warp.recede.periods': num(4, 2, 8, '遠ざかる廊下: 廊下の長さ（12 m のくり返しの数）', true),
+  'warp.recede.startM': num(9, 4, 20, '遠ざかる廊下: 扉を開けたときに見える突き当たりまでの距離（m）'),
+  'warp.recede.rate': num(0.5, 0, 3, '遠ざかる廊下: 1 m 歩くごとに残りの距離が伸びる量（m。v1 E13 と同じ 0.5）'),
+  'warp.recede.widthM': num(2.4, 1.8, 3.2, '遠ざかる廊下: 廊下の幅（壁を含む）'),
+  'warp.recede.heightM': num(2.7, 2.4, 3.2, '遠ざかる廊下: 天井の高さ'),
 } as const satisfies Record<string, Spec>;
