@@ -396,6 +396,8 @@ export class ClientGame {
           else if (name === 'mannequin.caught') { this.audio.play('shutter', { gain: 0.9 }); this.postfx.videoPass?.forceJitter?.(); }
           else if (name === 'guide.arrive') this.audio.play('chime', { pos: e.pos, gain: 0.4 });
           else if (name === 'lamp.on') this.audio.play('clank', { pos: e.pos, gain: 0.15 });
+          // 部品が頼むフロアの移動（エレベーター・沈む床。段階 4 の ground）: data.to は 'depth.variant'（無ければ 1 つ下の表のフロア）
+          else if (name === 'floor.goto') this.onFloorExit?.(String(e.entity ?? ''), String(e.data?.kind ?? 'elevator'), e.data?.to ? String(e.data.to) : null);
           break;
         }
         case 'reveal': this.onReveal(String(e.data?.group ?? ''), String(e.data?.style ?? 'fadeIn')); break;

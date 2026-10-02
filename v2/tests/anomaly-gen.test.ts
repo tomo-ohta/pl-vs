@@ -185,8 +185,9 @@ test('異変: それぞれ見て分かる形になっている（浸水の水・
           assert.ok(c.boxes.some((b) => b.mat === c.palette.light && !b.solid && b.max[1] < fy + 0.1), `${msg}: 床の照明`);
           break;
         case 'stack':
-          // 段階 4（carry）: 背の低い物（0.8 m のかご台車）を 2 つ積んだ塔もあるので、床から 0.6 m より上に底のある家具
-          assert.ok(c.boxes.some((b) => b.solid && b.propGroup && b.min[1] > fy + 0.6), `${msg}: 積まれた家具`);
+          // 積まれた家具: 何かの上に載った家具（当たる箱のいちばん下が床から 0.5 m より上の組）。段階 4 で仕掛けが増えて生成が変わり、
+          // 低い家具の 2 段の塔（0.73 m の上に棚）が出るようになったので、「0.9 m より上に当たる箱」から改めた
+          assert.ok([...groups].some((g) => { const sb = c.boxes.filter((b) => b.solid && b.propGroup === g); return sb.length > 0 && Math.min(...sb.map((b) => b.min[1])) > fy + 0.5; }), `${msg}: 積まれた家具`);
           break;
         case 'scatter':
           assert.ok(c.boxes.some((b) => b.kind === 'scatteredPaper'), msg);

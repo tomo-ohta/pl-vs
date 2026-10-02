@@ -177,6 +177,9 @@ export function addLever(ctx: GimmickContext, name: string, d: Dir, at: number, 
   if (style === 'lever') ctx.addBox(wallBox(ctx, d, at, 0.16, y1 + 0.06, y1 + 0.18, 0, 0.012, 'signPlate'));
   const hit = wallBox(ctx, d, at, half + 0.08, y0 - 0.05, y1 + 0.05, 0, style === 'lever' ? 0.3 : 0.12, 'metalDark');
   const [px, pz] = wallPoint(ctx, d, at, style === 'lever' ? 0.1 : 0.015);
+  // レバーの前（幅 1.2 m・奥行き 1.4 m）に家具を置かない（台車がレバーの前に置かれて手が届かないことがあった）
+  const front = wallBox(ctx, d, at, 0.6, y, y + 2.0, 0, 1.4, 'void');
+  ctx.keepOut({ min: front.min, max: front.max });
   const { wall } = wallCoord(ctx, d);
   return ctx.addEntity(name, { type: 'lever', params: { box: aabbJson(hit), sec, style, dir: d, wall, at, pos: [px, (y0 + y1) / 2, pz], ...extra } as never, ...(inputs ? { inputs } : {}) });
 }

@@ -141,7 +141,7 @@ test('迷路: 光について行けば出口の前に着く・ついて行く人
 test('迷路: 光が止まっている人を待つ / 行き止まりで光を無視し続けると隠しの扉が現れる（出現型）', async () => {
   const R = await loadRapier();
   let checked = 0;
-  for (let w = 1; w <= 300 && checked < 4; w++) {
+  for (let w = 1; w <= 900 && checked < 4; w++) {
     const r = generateFloorReport({ world: w, depth: 1 + (w % 9), variant: w % 3 === 0 ? 1 : 0 }, t);
     for (const sec of r.gimmicks?.secrets ?? []) {
       if (sec.hook !== 'light.ignore' || sec.mode !== 'appear') continue;

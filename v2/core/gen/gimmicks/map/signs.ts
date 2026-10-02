@@ -189,6 +189,8 @@ export function placeMapSigns(p: FloorProfile, geo: FloorGeometry, gimmicks: Gim
       }
       const junction = [...drawn].map((id) => byId.get(id)!).find((c) => c.kind === 'junction');
       if (junction) { const c = cellCenter(junction); mark(c[0], c[1], 'ここで迷った', 'note'); }
+      // 書き込みが落とした所だけになる短いフロア（屋上など）は、入ってきた所にも書く
+      if (!marks.length) mark(geo.spawn.pos[0], geo.spawn.pos[2], 'ここから入った', 'note');
       mark(x, z, 'ここで落とした？', 'note');
       const trail: number[] = [r2(geo.spawn.pos[0]), r2(geo.spawn.pos[2]), ...route.pts.flatMap(([px, pz]) => [r2(px), r2(pz)]), r2(x), r2(z)];
       res.note = push({

@@ -22,6 +22,8 @@ export function pitShell(ctx: GimmickContext, hole: Rect, depth: number): void {
   const r = innerRect(s);
   const mat = s.cell.palette.wall;
   const t = 0.15;
+  // 区画の外形の下端を穴の底まで下げる（隠し場所・下の階の区画が穴の中に入り込まないように。段階 4 で足した）
+  s.cell.bounds.min[1] = Math.min(s.cell.bounds.min[1], y - depth - 0.2);
   ctx.addBox(box([hole.x0, y - depth - 0.2, hole.z0], [hole.x1, y - depth, hole.z1], s.cell.palette.floor));
   const atWall = { x0: Math.abs(hole.x0 - r.x0) < 1e-3, x1: Math.abs(hole.x1 - r.x1) < 1e-3, z0: Math.abs(hole.z0 - r.z0) < 1e-3, z1: Math.abs(hole.z1 - r.z1) < 1e-3 };
   // 各辺の壁の厚みの範囲（外: 壁の中 / 内: 穴の内側）

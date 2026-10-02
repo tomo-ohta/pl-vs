@@ -4,6 +4,7 @@ import { defaultTuning } from '../core/config/tuning.ts';
 import { generateFloorReport } from '../core/gen/floor/index.ts';
 import { BSIDE_TONES } from '../core/gen/floor/bside.ts';
 import { showcaseFloor, STAGE3_GIMMICKS } from '../core/gen/floor/showcase.ts';
+import { anomalyDefs } from '../core/gen/anomaly/index.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
 import '../core/sim/parts/index.ts';
@@ -12,8 +13,8 @@ import { IDLE_COMMAND } from '../core/sim/types.ts';
 import type { FloorLayout } from '../core/world/layout.ts';
 
 const t = defaultTuning();
-/** 形 = 区画の足跡と床の高さ（天井の高さは部屋まるごとの異変 vast が上げることがあるので見ない） */
-const shape = (f: FloorLayout): string => f.cells.filter((c) => c.role !== 'secret').map((c) => `${c.id}:${c.bounds.min.join(',')}:${c.bounds.max[0]},${c.bounds.max[2]}`).join('|');
+/** 形 = 区画の足跡と床の高さ（外形の上下の端は見ない: 天井は部屋まるごとの異変 vast が上げ、下端は穴の仕掛け・床に沈めた水槽が下げる。中身なので表と裏で違ってよい） */
+const shape = (f: FloorLayout): string => f.cells.filter((c) => c.role !== 'secret').map((c) => `${c.id}:${c.bounds.min[0]},${c.bounds.min[2]}:${c.bounds.max[0]},${c.bounds.max[2]}:${c.floorY}`).join('|');
 
 test('裏のフロア: 表と同じ形・中身と調子は裏の seed で決まる（決定的）', () => {
   const tones = new Set<string>();
@@ -40,7 +41,9 @@ test('見本のフロア: 仕掛けを全種置き、見て回る位置はどれ
   const all = [...STAGE3_GIMMICKS];
   const modesBy: string[][] = [];
   for (const flip of [false, true]) {
-    const r = showcaseFloor(t, { flip });
+    const anomalies = anomalyDefs().map((d) => d.id);
+    const half = Math.ceil(anomalies.length / 2);
+    const r = showcaseFloor(t, { flip, ids: [...all, ...(flip ? anomalies.slice(half) : anomalies.slice(0, half))] });
     const g = r.gimmicks!;
     assert.deepEqual(new Set(g.gimmicks.map((x) => x.def)), new Set(all), '全種');
     assert.equal(g.tour.length, g.gimmicks.length + g.secrets.filter((s) => s.hook === 'generic.darkCorner').length + r.anomalies.length);

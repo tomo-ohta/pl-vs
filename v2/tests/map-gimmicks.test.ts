@@ -106,7 +106,7 @@ test('霧の中の塔の隠し: 出現型は塔から離れて霧の奥にいる
 });
 
 test('地図の空白（BX04）: 製図台の地図と自分の地図に、壁の向こうの隠し場所が白い空白で出る・入ると消える', () => {
-  const found = withSecret('map.blank', 4);
+  const found = withSecret('map.blank', 4, 400, { ...t, 'gimmick.w.mapBlank': 20 } as typeof t);
   assert.ok(found.length >= 3, `地図の空白 ${found.length}`);
   for (const { r, sec } of found) {
     const info = buildMapInfo(r.floor, t);
