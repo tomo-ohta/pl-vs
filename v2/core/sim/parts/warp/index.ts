@@ -9,3 +9,4 @@ import './treadmill.ts';
 import './recede.ts';
 import './lap.ts';
 import './sign.ts';
+import './stairs.ts';

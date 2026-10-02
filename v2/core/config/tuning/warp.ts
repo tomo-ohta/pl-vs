@@ -25,6 +25,10 @@ export const WARP_TUNING = {
   'warp.lapHall.chance': num(0.55, 0, 1, '異変の廊下: 周に異変がある確率（間違えた次の周と最初の周は異変なし）'),
   'warp.lapHall.secretRun': num(3, 1, 8, '異変の廊下（BX01）: 一度も引き返さずに、異変のある周を何回進むと、異変の部屋の扉が現れるか', true),
   'warp.lapHall.secretWeight': num(1.6, 0, 5, '異変の廊下（BX01）: 隠しの元の重み'),
+  // ---- 階段の数（endlessStairs: W14）
+  'warp.stairs.weight': num(0.45, 0, 10, '階段の数: 出やすさ（相対）'),
+  'warp.stairs.goal': num(6, 1, 20, '階段の数: 何階上ると、同じ踊り場から抜けて上の階へ出られるか', true),
+  'warp.stairs.giveUpSec': num(150, 30, 900, '階段の数: 階段室に入ってからこの秒数で、上の階へ必ず抜けられる'),
   // ---- 遠ざかる廊下（recedingHall: W05）
   'warp.recede.weight': num(0.45, 0, 10, '遠ざかる廊下: 出やすさ（相対）'),
   'warp.recede.periods': num(4, 2, 8, '遠ざかる廊下: 廊下の長さ（12 m のくり返しの数）', true),

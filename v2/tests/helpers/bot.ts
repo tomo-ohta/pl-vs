@@ -107,7 +107,8 @@ function planLegs(floor: FloorLayout, from: string, targetCell: string, goal?: [
     const forward = p.cells[0] === cell ? 1 : -1;
     const d = [[0, 1], [1, 0], [0, -1], [-1, 0]][p.dir]!;
     const prevP = steps[i - 1]?.portal, nextP = steps[i + 1]?.portal;
-    const gap = (q: PortalSpec | undefined): number => { if (!q) return Infinity; const [qx, , qz] = center(q); return Math.hypot(qx - x, qz - z) / 2; };
+    // 開口どうしの間の半分（縦に重なった開口（階段室の階ごとの扉）は高さの差で測る）
+    const gap = (q: PortalSpec | undefined): number => { if (!q) return Infinity; const [qx, qy, qz] = center(q); const h = Math.hypot(qx - x, qz - z); return (h < 0.5 && Math.abs(qy - y) > 1.5 ? Math.abs(qy - y) : h) / 2; };
     const kb = Math.min(0.9, gap(prevP)) * forward, ka = Math.min(0.9, gap(nextP)) * forward;
     legs.push({ x: x - d[0]! * kb, y, z: z - d[1]! * kb, portal: p });
     legs.push({ x: x + d[0]! * ka, y, z: z + d[1]! * ka, via: true });
@@ -126,11 +127,12 @@ const R = 0.36;
 
 /**
  * 点 (x, z) の半幅 S の正方形の下で立てる面の高さの一覧（当たり判定の箱の上面と面）。yTop + 0.36 より上は見ない。
- * 穴・溝の部屋では 1 つの点に、底・床板・梁のように高さの違う面が重なる
+ * 穴・溝の部屋では 1 つの点に、底・床板・梁のように高さの違う面が重なる。
+ * 下は yTop の 14 m 下まで見る（warp: 4 階ぶん積んだ階段室。以前は 7 m）
  */
 function surfacesAt(sim: Sim, x: number, z: number, yTop: number, S: number): number[] {
   const out: number[] = [];
-  for (const b of sim.colliders.query(x - S, yTop - 7, z - S, x + S, yTop + 0.4, z + S)) {
+  for (const b of sim.colliders.query(x - S, yTop - 14, z - S, x + S, yTop + 0.4, z + S)) {
     if (b.max[1] > yTop + 0.36) continue; // 上にある物は足場にならない
     if (b.max[0] <= x - S || b.min[0] >= x + S || b.max[2] <= z - S || b.min[2] >= z + S) continue;
     out.push(b.max[1]);

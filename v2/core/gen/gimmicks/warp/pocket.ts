@@ -243,6 +243,29 @@ export function splitAlong(cell: CellLayout, f: Frame, cuts: readonly number[]):
   cell.boxes = out;
 }
 
+/** 区画の箱を、フロアの座標の軸 axis（0: x / 1: y / 2: z）の値 coords で切り分ける（縦に積んだ階の壁を階ごとに分ける） */
+export function splitAt(cell: CellLayout, axis: 0 | 1 | 2, coords: readonly number[]): void {
+  const out: Box[] = [];
+  for (const b of cell.boxes) {
+    let pieces: Box[] = [b];
+    for (const w of coords) {
+      const next: Box[] = [];
+      for (const p of pieces) {
+        if (p.min[axis] < w - 1e-3 && p.max[axis] > w + 1e-3 && !p.propGroup && !p.slope) {
+          const lo: Box = { ...p, min: [...p.min], max: [...p.max] };
+          const hi: Box = { ...p, min: [...p.min], max: [...p.max] };
+          lo.max[axis] = w;
+          hi.min[axis] = w;
+          next.push(lo, hi);
+        } else next.push(p);
+      }
+      pieces = next;
+    }
+    out.push(...pieces);
+  }
+  cell.boxes = out;
+}
+
 /**
  * 模様の繰り返しの長さが 12 m を割り切る材質（client/render/MaterialLibrary の SURFACES の meters。くり返す廊下を 12 m・6 m ずらしても
  * 模様が揃う）。木目（1.1 m）・座面（0.45 m）・白い塗装（0.7 m）などは揃わないので、別の空間の廊下の色の組には使わない

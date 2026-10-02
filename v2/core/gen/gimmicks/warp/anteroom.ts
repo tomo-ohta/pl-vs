@@ -150,8 +150,8 @@ function furnishAnteroom(ctx: GimmickContext, R: CellLayout, ops: WallOpening[])
     const fy = y + 1.45;
     const fr = along ? box([cx - 0.45, fy, Math.min(wallC, wallC + sg * 0.03)], [cx + 0.45, fy + 0.6, Math.max(wallC, wallC + sg * 0.03)], 'woodPanel', false)
       : box([Math.min(wallC, wallC + sg * 0.03), fy, cz - 0.45], [Math.max(wallC, wallC + sg * 0.03), fy + 0.6, cz + 0.45], 'woodPanel', false);
-    const pic = along ? box([cx - 0.38, fy + 0.07, Math.min(wallC + sg * 0.03, wallC + sg * 0.035)], [cx + 0.38, fy + 0.53, Math.max(wallC + sg * 0.03, wallC + sg * 0.035)], 'skyOvercast', false)
-      : box([Math.min(wallC + sg * 0.03, wallC + sg * 0.035), fy + 0.07, cz - 0.38], [Math.max(wallC + sg * 0.03, wallC + sg * 0.035), fy + 0.53, cz + 0.38], 'skyOvercast', false);
+    const pic = along ? box([cx - 0.38, fy + 0.07, Math.min(wallC + sg * 0.03, wallC + sg * 0.042)], [cx + 0.38, fy + 0.53, Math.max(wallC + sg * 0.03, wallC + sg * 0.042)], 'skyOvercast', false)
+      : box([Math.min(wallC + sg * 0.03, wallC + sg * 0.042), fy + 0.07, cz - 0.38], [Math.max(wallC + sg * 0.03, wallC + sg * 0.042), fy + 0.53, cz + 0.38], 'skyOvercast', false);
     B.push(fr, pic);
     break;
   }
