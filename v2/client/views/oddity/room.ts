@@ -101,7 +101,7 @@ defineView('oddWaves', (spec, ctx) => {
 });
 
 /** 1 日の中の位置 → 空の色（朝・昼・夕・夜） */
-const SKY: [number, number][] = [[0, 0xc7d9ea], [0.25, 0x8ec0f0], [0.45, 0xf2b070], [0.53, 0xe0704a], [0.62, 0x3a3570], [0.75, 0x070b1e], [0.92, 0x1a1f3e], [1, 0xc7d9ea]];
+const SKY: [number, number][] = [[0, 0xc7d9ea], [0.25, 0x8ec0f0], [0.45, 0xf2b070], [0.53, 0xe0704a], [0.62, 0x3a3570], [0.72, 0x070b1e], [0.86, 0x1a1f3e], [0.93, 0x9a8aa8], [1, 0xc7d9ea]];
 export function skyColor(phase: number, out = new THREE.Color()): THREE.Color {
   const p = ((phase % 1) + 1) % 1;
   for (let i = 1; i < SKY.length; i++) {
@@ -164,7 +164,7 @@ defineView('oddClock', (spec, ctx) => {
       if (inside(room, eyeOf(ctx), 0.05)) {
         // 画面: 夕方は橙、夜は青く暗く
         const dusk = Math.max(0, 1 - Math.abs(phase - 0.5) / 0.09);
-        const night = phase > 0.6 && phase < 0.94 ? Math.min(1, (phase - 0.6) / 0.06, (0.94 - phase) / 0.06) : 0;
+        const night = phase > 0.6 && phase < 0.9 ? Math.min(1, (phase - 0.6) / 0.06, (0.9 - phase) / 0.06) : 0;
         ctx.postfx?.setRoomGrade(key, { tint: [1 + 0.2 * dusk - 0.15 * night, 1 - 0.05 * dusk - 0.08 * night, 1 - 0.25 * dusk + 0.12 * night], saturation: 1 - 0.3 * night, vignette: 0.25 * night });
       }
     },

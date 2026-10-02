@@ -115,12 +115,15 @@ interface Snapshot {
   palette: Palette;
   render: RenderOverrides | undefined;
   lighting: LightingOverrides | undefined;
+  /** 天井の高さ・外形・環境音・地図の情報（部屋の形を変える異変 vast・環境音を変える異変が書き換える。段階 4 で足した） */
+  shape: Pick<CellLayout, 'height' | 'bounds' | 'audioPreset' | 'map'>;
 }
 
 function snapshot(cell: CellLayout): Snapshot {
   return {
     boxes: cell.boxes.slice(), data: clone(cell.boxes), lights: clone(cell.lights), zones: clone(cell.zones),
     palette: { ...cell.palette }, render: cell.render ? clone(cell.render) : undefined, lighting: cell.lighting ? clone(cell.lighting) : undefined,
+    shape: clone({ height: cell.height, bounds: cell.bounds, audioPreset: cell.audioPreset, map: cell.map }),
   };
 }
 
@@ -135,6 +138,10 @@ function restore(cell: CellLayout, s: Snapshot): void {
   cell.palette = { ...s.palette };
   if (s.render) cell.render = clone(s.render); else delete cell.render;
   if (s.lighting) cell.lighting = clone(s.lighting); else delete cell.lighting;
+  cell.height = s.shape.height;
+  cell.bounds = clone(s.shape.bounds);
+  if (s.shape.audioPreset !== undefined) cell.audioPreset = s.shape.audioPreset; else delete cell.audioPreset;
+  if (s.shape.map) cell.map = clone(s.shape.map); else delete cell.map;
 }
 
 // ---------------------------------------------------------------- 到達の確認

@@ -37,12 +37,12 @@ definePart<{ inside: number; sec: number; total: number }>({
 /** 1 日の中の位置 phase（0 = 朝・0.25 = 昼・0.5 = 夕・0.75 = 夜）→ 日の明るさ */
 export function sunLevel(phase: number): number {
   const p = ((phase % 1) + 1) % 1;
-  // 朝（0）から昼（0.25）へ上がり、夕（0.5）で傾き、夜（0.62〜0.95）は 0、夜明け前に戻る
+  // 朝（0）から昼（0.25）へ上がり、夕（0.5）で傾き、夜（0.62〜0.86）は 0、夜明けに戻る
   if (p < 0.25) return 0.55 + 0.45 * (p / 0.25);
   if (p < 0.5) return 1 - 0.55 * ((p - 0.25) / 0.25);
   if (p < 0.62) return 0.45 * (1 - (p - 0.5) / 0.12);
-  if (p < 0.92) return 0;
-  return 0.55 * ((p - 0.92) / 0.08);
+  if (p < 0.86) return 0;
+  return 0.55 * ((p - 0.86) / 0.14);
 }
 
 definePart<{ t: number; inside: number }>({

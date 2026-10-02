@@ -275,7 +275,9 @@ defineAnomaly({
     const prev = ctx.prev;
     if (!prev || prev.cell === cell) return false;
     const pc = prev.cell;
-    const theirs = groupsOf(pc.boxes.filter((b) => b.propGroup && !b.propGroup.includes('/a-') && !isFloorFixture(b) && b.min[1] >= pc.floorY - 0.01)).filter((g) => g.solid && !isWallDecor(g, pc) && !hasSlope(g));
+    // 前の部屋の中身の家具だけ（異変・仕掛けが足した物、写した物は除く）
+    const own = (pg: string): boolean => !/\/(a|g|x|c)-/.test(pg);
+    const theirs = groupsOf(pc.boxes.filter((b) => b.propGroup && own(b.propGroup) && !isFloorFixture(b) && b.min[1] >= pc.floorY - 0.01)).filter((g) => g.solid && !isWallDecor(g, pc) && !hasSlope(g));
     if (theirs.length < 2) return false;
     const vol = (g: Group): number => { const bb = bbOf(g.boxes); return (bb.max[0] - bb.min[0]) * (bb.max[1] - bb.min[1]) * (bb.max[2] - bb.min[2]); };
     const pick = theirs.sort((a, b) => vol(b) - vol(a)).slice(0, ctx.tuning['anomaly.carryover.items']);

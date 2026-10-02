@@ -158,11 +158,22 @@ export interface CellLayout {
    * 床・壁の素材の柄と色合いを揃える（区画の境目で色が切り替わらないように）
    */
   materialKey?: string;
-  /**
-   * 地図に出す「見かけの足跡」（無ければ footprint）。地図と中の広さが合わない部屋（W18。中は大広間なのに地図では小部屋）が使う。
-   * 地図の描画は、これがあればこちらを描く（段階 4 で足した。部屋まるごとの異変 vast）
-   */
-  mapFootprint?: Rect[];
+  /** 地図に出す情報（client/map が読む。無ければ足跡のとおりに描く） */
+  map?: CellMapInfo;
+}
+
+/**
+ * 区画の地図の情報（段階 4・地図の担当。client/map/MapInfo.ts が読む）。
+ * - hidden: 地図に記録されない区画（N08 地図にない部屋）。入っても地図に残らず、調査率にも数えない
+ * - apparent: 地図での見かけの足跡（無ければ footprint）。地図と合わない部屋（W18 中が広い部屋など）に使う
+ * - label: 地図に添える名前（無ければ描かない）
+ * 部屋まるごとの異変・仕掛けが地図を変えるときは、取り消しで消える部品（mapFx・mapBoard）を使う（core/sim/parts/map）。
+ * 異変・仕掛けの取り消しは区画のこの欄を戻さないので、ここに書くのは取り消されない所（フロアの形・区画の中身）から
+ */
+export interface CellMapInfo {
+  hidden?: boolean;
+  apparent?: Rect[];
+  label?: string;
 }
 
 /** 区画どうしの開口（cell and portal の描画で、ここを通して隣の区画が見える） */

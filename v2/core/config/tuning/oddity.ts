@@ -50,7 +50,7 @@ export const ODDITY_TUNING = {
   'anomaly.snow.flakesMax': num(450, 50, 2000, '雪の室内: 降る雪の粒の数の上限（描画）', true),
   'anomaly.snow.fogFar': num(16, 6, 40, '雪の室内: 部屋の白い霞の見える距離（m）'),
   // ---- 風の向き（wind）----
-  'anomaly.wind.push': num(0.7, 0, 2.5, '風の向き: 体を押す風の強さ（m/s。歩く速さ 3.0 より十分弱く）'),
+  'anomaly.wind.push': num(0.6, 0, 2.5, '風の向き: 体を押す風の強さ（m/s。歩く速さ 3.0 より十分弱く）'),
   'anomaly.wind.itemsMax': num(90, 10, 300, '風の向き: 流れる紙・葉の数の上限（描画）', true),
   // ---- 温度（thermal）----
   'anomaly.thermal.fogFar': num(5.5, 2, 12, '温度: 冷たい霧の見える距離（m。先の開口は入口から見えない）'),

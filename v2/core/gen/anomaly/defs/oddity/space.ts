@@ -23,7 +23,7 @@ const hasSlope = (g: Group): boolean => g.boxes.some((b) => b.slope);
 /**
  * 中が広い部屋: 扉は普通の大きさなのに、中の天井が 9〜14 m もある（廊下や隣の部屋の天井より、ずっと上まで続いている）。
  * 天井の照明は遥か上、太い柱が並ぶ。割合 anomaly.vast.narrow で、入口のすぐ内側が狭く低い通り口になっていて、
- * 抜けた途端に巨大な空間が開ける（W09 扉の大きさと中の大きさ）。地図には小さな部屋として出る（CellLayout.mapFootprint。W18）
+ * 抜けた途端に巨大な空間が開ける（W09 扉の大きさと中の大きさ）。地図には小さな部屋として出る（CellLayout.map.apparent。W18）
  */
 defineAnomaly({
   id: 'vast', name: '中が広い部屋', weight: 0.8, intensity: 1, kinds: ['room', 'hall'], minSize: [4.2, 5],
@@ -79,9 +79,10 @@ defineAnomaly({
     // 狭く低い通り口（W09）: 入口のすぐ内側に幅 1.7 m・高さ 1.95 m・奥行き 1.8 m の通り口
     let narrow = false;
     const f = faceOfOpening(ctx, ctx.entrance);
-    if (f && ctx.rng.chance(t['anomaly.vast.narrow'])) {
+    if (f && ctx.entrance.width <= 1.2 && ctx.rng.chance(t['anomaly.vast.narrow'])) {
       const at = along(ctx.entrance.dir, ctx.entrance.pos[0], ctx.entrance.pos[2]);
-      const half = 0.86, deep = 1.8, wall = 0.14;
+      // 仕切りは開口の前の空ける範囲（幅の半分 0.8 m 以上）の外
+      const half = Math.max(0.86, ctx.entrance.width / 2 + 0.36), deep = 1.8, wall = 0.14;
       const P = [wallSheet(f, at - half - wall, at - half, fy, top0, cell.palette.wall, 0, deep), wallSheet(f, at + half, at + half + wall, fy, top0, cell.palette.wall, 0, deep)];
       for (const b of P) b.solid = true;
       // 天井（当たらない）と、通り口の上の壁（元の天井の高さまで）
@@ -101,7 +102,7 @@ defineAnomaly({
     // 地図の見かけ: 主の矩形を真ん中に向けて縮めた小部屋（W18）
     const k = t['anomaly.vast.mapScale'];
     const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
-    cell.mapFootprint = [{ x0: cx - ((r.x1 - r.x0) * k) / 2, x1: cx + ((r.x1 - r.x0) * k) / 2, z0: cz - ((r.z1 - r.z0) * k) / 2, z1: cz + ((r.z1 - r.z0) * k) / 2 }];
+    cell.map = { ...cell.map, apparent: [{ x0: cx - ((r.x1 - r.x0) * k) / 2, x1: cx + ((r.x1 - r.x0) * k) / 2, z0: cz - ((r.z1 - r.z0) * k) / 2, z1: cz + ((r.z1 - r.z0) * k) / 2 }] };
     cell.render = { ...cell.render, fog: { color: mixFog(cell.palette.fog), near: 6, far: Math.max(30, H * 3) } };
     cell.audioPreset = '巨大反響・低い空調';
     ctx.memo.height = H;
@@ -216,7 +217,7 @@ defineAnomaly({
     const frame = (a0: number, a1: number, y0: number, y1: number, d: number, mat: MatId): Box => (axis === 'x' ? box([at - d, y0, a0], [at + d, y1, a1], mat, false) : box([a0, y0, at - d], [a1, y1, at + d], mat, false));
     B.push(frame(span[0]!, span[0]! + 0.12, fy, fy + h, 0.06, 'goldTrim'), frame(span[1]! - 0.12, span[1]!, fy, fy + h, 0.06, 'goldTrim'));
     B.push(frame(span[0]!, span[1]!, fy + h - 0.14, fy + h, 0.06, 'goldTrim'), frame(span[0]!, span[1]!, fy, fy + 0.02, 0.06, 'goldTrim'));
-    B.push(frame(span[0]! + 0.12, span[1]! - 0.12, fy + 0.02, fy + h - 0.14, 0.004, 'glass'));
+    // 鏡の面そのものは描かない（透過の材質は描画が重い。向こうは鏡写しの部屋そのもの）
     addGroup(ctx, B, 'mirror');
     roomFx(ctx, { kind: 'figure', axis, at, floorY: fy });
     ctx.memo.plane = { axis, at };
@@ -332,6 +333,7 @@ defineAnomaly({
     const t = ctx.tuning, cell = ctx.cell, fy = cell.floorY, h = cell.height;
     if (!entranceOnMain(ctx)) return false;
     const F = depthFrame(mainRect(cell), ctx.entrance.dir);
+    const D2 = F;
     if (F.depth < 5) return false;
     ctx.skipDress();
     const n = t['anomaly.perspective.bands'];
@@ -405,7 +407,14 @@ defineAnomaly({
       const [ax, az] = far.horizontal ? [at, far.face] : [far.face, at];
       roomFx(ctx, { kind: 'grow', boxes: boxesJ(D), anchor: [ax, fy, az], far: t['anomaly.perspective.doorFar'], near: 1.6, from: F.depth, to: 1.6 });
     }
-    cell.lights = cell.lights.map((l) => ({ ...l, pos: [l.pos[0], Math.min(l.pos[1], lowest - 0.3), l.pos[2]] }));
+    // 点光源は、その帯の下がった天井の下へ
+    const bandCeil = (x: number, z: number): number => {
+      const vv = D2.v(x, z);
+      let i = 0;
+      while (i < n - 1 && vv > v[i + 1]!) i++;
+      return fy + h - (fy + h - lowest) * (i / (n - 1));
+    };
+    cell.lights = cell.lights.map((l) => ({ ...l, pos: [l.pos[0], Math.min(l.pos[1], bandCeil(l.pos[0], l.pos[2]) - 0.3), l.pos[2]] }));
     return ctx.reachOk();
   },
 });

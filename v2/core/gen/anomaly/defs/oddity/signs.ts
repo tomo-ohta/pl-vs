@@ -264,13 +264,25 @@ defineAnomaly({
       made++;
     }
     if (made < 2) return false;
+    let fwdSign = false;
     for (const o of ctx.geo.openings) {
       const f = faceOfOpening(ctx, o);
       if (!f) continue;
       const top = o.pos[1] + (o.sill ?? 0) + o.height;
-      if (top + 0.25 > fy + cell.height) continue;
-      sign(f, along(o.dir, o.pos[0], o.pos[2]), top + 0.17, `#exit:${o === fwd ? other : facing}`, `exitSign@${o.id}`);
+      const at = along(o.dir, o.pos[0], o.pos[2]);
+      // 開口の上に収まらなければ（天井の低い部屋・背の高い開口）、開口の脇の壁に
+      let a = at, y = top + 0.17;
+      if (top + 0.25 > fy + cell.height) {
+        a = at + o.width / 2 + 0.45;
+        if (a + 0.3 > f.a1 - 0.15) a = at - o.width / 2 - 0.45;
+        if (a - 0.3 < f.a0 + 0.15) continue;
+        y = Math.min(fy + 1.95, fy + cell.height - 0.2);
+      }
+      sign(f, a, y, `#exit:${o === fwd ? other : facing}`, `exitSign@${o.id}`);
+      if (o === fwd) fwdSign = true;
     }
+    // 本当の先の開口の印が無ければ、この異変は成り立たない
+    if (!fwdSign) return false;
     roomFx(ctx, { kind: 'labels', items });
     return true;
   },

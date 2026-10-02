@@ -54,7 +54,7 @@ export const ODDITY_CATALOG: CatalogEntry[] = [
   { idea: 'W15', name: '遠近法の錯覚', status: 'done', impl: [A('perspective'), V('oddRoom')], note: '奥へ家具の列・天井の照明・絨毯・腰壁が少しずつ小さく低くなり、天井も下がる。入口から見ると何倍も奥深い。奥の壁の小さな扉は、遠くからは小さく、近づくと普通の大きさになる（描画 grow）。奥の家具は人形の大きさ' },
   { idea: 'W16', name: '鏡の部屋', status: 'done', impl: [A('mirror'), V('oddRoom')], note: '部屋の真ん中に大きな鏡の枠。向こうは、こちらの半分の鏡写し（家具・飾り・開かない扉）。でも自分が映らず、影のような人影がこちらと鏡写しに動く。枠をくぐると鏡の中の部屋に入れ、人影はこちら側に現れる' },
   { idea: 'W17', name: '縦横が入れ替わる部屋', status: 'done', impl: [A('sideways')], note: '横倒しの部屋: 開口の無い壁の 1 枚が床（床材）で、家具がそこから横向きに生える。向かいの壁が天井（照明が縦に光る）。床と天井は壁紙、壁の飾りは床に寝ている。重力はそのまま' },
-  { idea: 'W18', name: '地図と合わない部屋', status: 'merged', impl: [A('vast')], note: '中が広い部屋に、地図に出す見かけの足跡 CellLayout.mapFootprint（主の矩形を 0.55 倍に縮めた小部屋）を付けた。地図の描画（map の担当）は mapFootprint があればそれを描く取り決め' },
+  { idea: 'W18', name: '地図と合わない部屋', status: 'merged', impl: [A('vast')], note: '中が広い部屋に、地図に出す見かけの足跡 CellLayout.map.apparent（主の矩形を 0.55 倍に縮めた小部屋。地図の担当の CellMapInfo）を付けた。地図はその形で描く' },
   // ---- 2.9 時間 ----
   { idea: 'T02', name: '時刻が進む部屋', status: 'done', impl: [A('dayCycle'), P('oddClock'), P('oddLevel'), V('oddClock')], note: '大きな窓のある部屋。中にいる間だけ時刻が進み、1 分半で朝 → 昼 → 夕焼け → 夜。窓の空の色・差し込む日の筋・部屋の明るさ（日の光の照明）が移り、日が暮れると天井の照明が点く。壁の時計の針が速く回る。出ると止まり、入ると続き' },
   { idea: 'T08', name: '古くなる廊下', status: 'done', impl: [A('aging'), V('oddRoom')], note: '異変は部屋・広間に掛けるので「古くなる部屋」にした。入口は新しく、奥ほど年代が古い（壁紙の黄ばみ → 染み → 剥がれた漆喰と煉瓦、照明は黄ばんで暗く、奥は切れている、家具は倒れて埃・蜘蛛の巣）。舞う埃・画面も奥ほど褪せる' },

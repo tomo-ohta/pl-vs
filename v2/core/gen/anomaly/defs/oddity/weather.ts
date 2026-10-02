@@ -103,13 +103,15 @@ defineAnomaly({
     const furnTops = tops(ctx.furniture, fy, 0.4, 1.3, 0.12).filter((b) => b.solid);
     const pts = ctx.rng.shuffle(gridPoints(ctx, 0.8, 0.5, 0.2));
     const chosen: [number, number][] = [];
+    let i = 0, puddles = 0;
     for (const [x, z] of pts) {
-      if (chosen.length >= want) break;
+      // 水たまりができた所だけ数える（机の下・物の下で水たまりが置けない所は飛ばす）
+      if (puddles >= want) break;
       if (chosen.some(([a, b]) => Math.hypot(a - x, b - z) < 1.4)) continue;
+      const top0 = furnTops.find((b) => x > b.min[0] + 0.1 && x < b.max[0] - 0.1 && z > b.min[2] + 0.1 && z < b.max[2] - 0.1);
+      if (!top0 && blockedAt(solids, x, z, 0.3, fy - 0.1, fy + 0.3)) continue;
       chosen.push([x, z]);
-    }
-    let i = 0;
-    for (const [x, z] of chosen) {
+      puddles++;
       i++;
       const s = ctx.rng.float(0.45, 0.9);
       addGroup(ctx, [ceilingSheet({ x0: x - s / 2, z0: z - s / 2, x1: x + s / 2, z1: z + s / 2 }, fy + h, 'shadowDecal')], `stain${i}`);
@@ -120,10 +122,9 @@ defineAnomaly({
         addGroup(ctx, [box([Math.max(top.min[0] + 0.03, x - w / 2), top.max[1] + 0.002, Math.max(top.min[2] + 0.03, z - d / 2)], [Math.min(top.max[0] - 0.03, x + w / 2), top.max[1] + 0.006, Math.min(top.max[2] - 0.03, z + d / 2)], 'puddle', false)], `deskPuddle${i}`);
         continue;
       }
-      if (blockedAt(solids, x, z, 0.3, fy - 0.1, fy + 0.3)) continue;
       const pw = ctx.rng.float(0.7, 1.5), pd = ctx.rng.float(0.6, 1.3);
       const pr = { x0: x - pw / 2, z0: z - pd / 2, x1: x + pw / 2, z1: z + pd / 2 };
-      if (!ctx.rects.some((r) => pr.x0 >= r.x0 && pr.x1 <= r.x1 && pr.z0 >= r.z0 && pr.z1 <= r.z1)) continue;
+      for (const r of ctx.rects) if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) { pr.x0 = Math.max(pr.x0, r.x0 + 0.05); pr.x1 = Math.min(pr.x1, r.x1 - 0.05); pr.z0 = Math.max(pr.z0, r.z0 + 0.05); pr.z1 = Math.min(pr.z1, r.z1 - 0.05); }
       addGroup(ctx, [floorSheet(pr, fy + 0.002, 'puddle', 0.004)], `puddle${i}`);
       ctx.addZone({ kind: 'water', aabb: { min: [pr.x0, fy - 0.1, pr.z0], max: [pr.x1, fy + 0.3, pr.z1] }, params: { slow: t['anomaly.leak.slow'] } });
       // バケツ（当たる。通り道を塞ぐなら置かない）

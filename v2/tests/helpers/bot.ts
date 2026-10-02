@@ -276,7 +276,13 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     const dx = tgt[0] - player.pos[0], dz = tgt[1] - player.pos[2];
     const dist = Math.hypot(dx, dz);
     const legD = Math.hypot(L.x - player.pos[0], L.z - player.pos[2]);
-    const cmd: InputCommand = { ...IDLE_COMMAND, yaw: Math.atan2(-dx, -dz), pitch: 0, moveY: dist > 0.15 ? 1 : 0, crouch: crouch > 0 };
+    // 弱い外力（部屋を吹き抜ける風など）は、押される分だけ逆へ向けて歩く（人と同じ。強い流れは上で別に扱う）
+    let ax = dx, az = dz;
+    if (fl > 1e-3 && fl < STRONG && dist > 1e-6) {
+      const sp = PLAYER.walk * (player.crouching ? PLAYER.crouchSpeed : 1) * player.zoneSlow;
+      ax = (dx / dist) * sp - fz[0]; az = (dz / dist) * sp - fz[2];
+    }
+    const cmd: InputCommand = { ...IDLE_COMMAND, yaw: Math.atan2(-ax, -az), pitch: 0, moveY: dist > 0.15 ? 1 : 0, crouch: crouch > 0 };
     if (waitDoor > 0) waitDoor -= sim.dt;
     if (crouch > 0) crouch -= sim.dt;
     // 同じ区画のマネキンからは目を離さない: マネキンの方を向いたまま、目標へ横歩きする（実際の遊び手と同じ）
