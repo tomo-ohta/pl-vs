@@ -9,6 +9,8 @@
  *   v1 は後から置いた物を順に外したが、ここでは置いた順に並べて「つながりを壊した最初の物」を二分探索で探して外し、
  *   それより後の物を戻して確かめ直す（8 回まで。それでもだめなら残りを外す）。物を外すほどつながりは良くなる、と見なす
  * - 乱数は渡された r.rng だけ。区画の id・テーマ・種類・大きさ・density で違いを出す（部屋 ID の直書きはしない）
+ * - 床に沈めた水槽（basin.ts）は置く単位を通さずに区画へ直接足す（床より下なので到達に関係しない）。水面の範囲（basins）には
+ *   床に置く物を置かない（canPlace）
  */
 import type { AABB } from '../../math/aabb.ts';
 import type { Rng } from '../../math/rng.ts';
@@ -68,6 +70,11 @@ export interface DressCtx {
   boxCount: number;
   /** 壁に付ける家具の壁からの離れ（壁の帯の出より前に出す。wallBands が更新する） */
   standoff: number;
+  /**
+   * 床に沈めた水槽の水面の範囲（basin.ts の sinkBasin が足す）。床に置く物（底が床から 0.05 m 未満の箱）はここに掛けない
+   * （水の上に浮いて見えるので）。水の中・水面の物は sinkBasin の側で足す
+   */
+  basins: Rect[];
 }
 
 /** 箱の高さを床からの値にする / フロア座標に戻す */
@@ -95,7 +102,7 @@ export function makeCtx(r: DressRoom): DressCtx {
   return {
     room: r, cell, kind: r.kind, theme: cell.theme ?? '', rects, bounds: unionBounds(rects), area: rects.reduce((a, q) => a + rectArea(q), 0),
     h, y0, rng: r.rng, density: Math.min(1, Math.max(0, r.density)), faces: innerFaces(rects), openings: r.openings.slice(),
-    doors, keepOut, zones: [...doors, ...keepOut], fixed, units: [], zonesOut: [], boxCount: 0, standoff: 0.02,
+    doors, keepOut, zones: [...doors, ...keepOut], fixed, units: [], zonesOut: [], boxCount: 0, standoff: 0.02, basins: [],
   };
 }
 
@@ -150,6 +157,7 @@ export function canPlace(c: DressCtx, boxes: readonly Box[], o: PlaceOpts = {}):
   for (const b of boxes) {
     if (b.min[1] < -1e-3 || b.max[1] > c.h + 1e-3) return false;
     if (!(b.max[0] > b.min[0] && b.max[1] > b.min[1] && b.max[2] > b.min[2])) return false;
+    if (b.min[1] < 0.05 && overWater(c, b)) return false;
     if (!b.solid) {
       if (!insideFootprint(c.rects, b)) return false;
       continue;
@@ -163,6 +171,11 @@ export function canPlace(c: DressCtx, boxes: readonly Box[], o: PlaceOpts = {}):
     }
   }
   return true;
+}
+
+/** 箱の水平の範囲が沈めた水槽の水面（c.basins）に掛かるか（2 cm までの掛かりは見ない: 縁石の上の物） */
+export function overWater(c: DressCtx, b: Box | AABB, eps = 0.02): boolean {
+  return c.basins.some((w) => b.min[0] < w.x1 - eps && b.max[0] > w.x0 + eps && b.min[2] < w.z1 - eps && b.max[2] > w.z0 + eps);
 }
 
 /** 置けたら区画に足す（取り消しの 1 単位）。propGroup には区画の id を前に付けて、フロアの中で一意にする */

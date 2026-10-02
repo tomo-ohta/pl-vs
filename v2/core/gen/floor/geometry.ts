@@ -142,8 +142,10 @@ export function buildGeometry(p: FloorProfile, sk: Skeleton, rng: Rng, t: Tuning
     if (L < 0.3) throw new GenError(`区画が近すぎます: ${l.a}-${l.b}`);
     const center = axis === 'x' ? cz(sk.nodes[l.a]!.row) : cx(sk.nodes[l.a]!.col);
     const h = Math.min(hc, F.height, T.height);
-    const doorF = F.kind === 'room' && F.node.id !== sk.entry && F.node.id !== sk.exit && doorRng.chance(fam.doorChance);
-    const doorT = T.kind === 'room' && T.node.id !== sk.entry && T.node.id !== sk.exit && doorRng.chance(fam.doorChance);
+    // 部屋は基本的に扉の向こう（扉を開けるまで中が見えない。docs/game-design.md 2 章）。広間は一部だけ。入口・出口の部屋は扉なし
+    const doorOf = (P: Placed): boolean => P.node.id !== sk.entry && P.node.id !== sk.exit && (P.kind === 'room' ? doorRng.chance(t['floor.roomDoorChance']) : P.kind === 'hall' ? doorRng.chance(t['floor.hallDoorChance']) : false);
+    const doorF = doorOf(F);
+    const doorT = doorOf(T);
     const dirPos: Dir = axis === 'x' ? 1 : 0; // 軸の正の向き
     const dirNeg: Dir = axis === 'x' ? 3 : 2;
     const roomOpening = (pl: Placed, dir: Dir, coord: number, door: boolean): WallOpening => {

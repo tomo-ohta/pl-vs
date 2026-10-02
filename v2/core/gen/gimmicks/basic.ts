@@ -1,6 +1,5 @@
 /**
- * 基本の仕掛け（段階 3 の 10 種のうち 6 種）。
- * - walkway 動く歩道 [WS M01]: 廊下・広間の真ん中を、出口の向きへ押し流す帯
+ * 基本の仕掛け（5 種）。動く歩道（walkway）は部屋まるごとの「一方通行の歩道迷路」（belts.ts の beltMaze）に作り直した。
  * - sensorLights 人感センサー [WS L01]: 廊下の照明が、歩いた所だけつく（離れると消える）
  * - lowCeiling 低い天井 [WS M02]: 廊下の途中が 1.25 m に下がる。しゃがんで通る
  * - soundGuide 音の道しるべ [WS A01]: 暗い部屋。出口の前で小さな音が鳴る（音を消していても、懐中電灯で進める）
@@ -11,31 +10,6 @@ import { box } from '../../world/layout.ts';
 import { lightPanel } from '../../world/build.ts';
 import { defineGimmick } from './types.ts';
 import { aabbJson, doorZone, freeWallSpan, frontOf, innerRect, mainAxis, rectD, rectW } from './util.ts';
-
-defineGimmick({
-  id: 'walkway', name: '動く歩道', axes: ['move'], kinds: ['corridor', 'hall'], minSize: [1.8, 7], weight: 1, intensity: 1, onMainPath: true,
-  build(ctx) {
-    const s = ctx.slot;
-    const r = innerRect(s);
-    const { axis, sign } = mainAxis(s);
-    const y = s.cell.floorY;
-    // 帯: 長い向きの真ん中。両端は開口の前を空ける
-    const along = axis === 'x' ? [r.x0 + 1.0, r.x1 - 1.0] : [r.z0 + 1.0, r.z1 - 1.0];
-    const across = axis === 'x' ? (r.z0 + r.z1) / 2 : (r.x0 + r.x1) / 2;
-    const half = Math.min(1.0, ((axis === 'x' ? rectD(r) : rectW(r)) - 0.4) / 2);
-    if (along[1]! - along[0]! < 3 || half < 0.5) return;
-    const belt = axis === 'x' ? { min: [along[0]!, y, across - half] as [number, number, number], max: [along[1]!, y + 0.03, across + half] as [number, number, number] } : { min: [across - half, y, along[0]!] as [number, number, number], max: [across + half, y + 0.03, along[1]!] as [number, number, number] };
-    const b = ctx.addBox(box(belt.min, belt.max, 'rubber', false));
-    b.kind = 'belt';
-    // 手すり（見た目だけ）
-    for (const side of [-1, 1]) {
-      const c = across + side * (half + 0.05);
-      ctx.addBox(axis === 'x' ? box([along[0]!, y + 0.85, c - 0.03], [along[1]!, y + 0.92, c + 0.03], 'rubber', false) : box([c - 0.03, y + 0.85, along[0]!], [c + 0.03, y + 0.92, along[1]!], 'rubber', false));
-    }
-    const speed = ctx.rng.float(0.9, 1.4);
-    ctx.addEntity('belt', { type: 'forceZone', params: { aabb: aabbJson({ min: [belt.min[0], y - 0.1, belt.min[2]], max: [belt.max[0], y + 0.6, belt.max[2]] }), vector: axis === 'x' ? [sign, 0, 0] : [0, 0, sign], speed, visual: 'belt' } });
-  },
-});
 
 defineGimmick({
   id: 'sensorLights', name: '人感センサー', axes: ['light'], kinds: ['corridor'], minSize: [1.4, 6], weight: 1, intensity: 0, onMainPath: true,
@@ -135,7 +109,7 @@ defineGimmick({
 });
 
 defineGimmick({
-  id: 'mannequin', name: '視線のマネキン', axes: ['sight'], kinds: ['room', 'hall'], minSize: [5, 6], weight: 0.7, intensity: 2, onMainPath: true,
+  id: 'mannequin', name: '視線のマネキン', axes: ['sight'], kinds: ['room', 'hall'], minSize: [5, 6], weight: 0.55, intensity: 2, onMainPath: true,
   fits: (s) => !!s.entrance,
   build(ctx) {
     const s = ctx.slot;

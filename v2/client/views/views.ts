@@ -402,7 +402,9 @@ defineView('guideLight', (spec, ctx) => {
   const color = typeof spec.params.color === 'number' ? spec.params.color : 0xfff1d0;
   const geo = new THREE.SphereGeometry(0.1, 16, 12);
   const orb = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, fog: true }));
-  const light = new THREE.PointLight(color, 2.2, 7, 2);
+  // 照らす距離（迷路では仕切りの向こうへ漏れにくいよう短い。影は付けない）
+  const range = typeof spec.params.range === 'number' ? spec.params.range : 7;
+  const light = new THREE.PointLight(color, 2.2, range, 2);
   orb.add(light);
   ctx.root.add(orb);
   let t = 0;
@@ -414,5 +416,66 @@ defineView('guideLight', (spec, ctx) => {
       light.intensity = 2.0 + Math.sin(t * 7.3) * 0.15;
     },
     dispose() { orb.removeFromParent(); geo.dispose(); (orb.material as THREE.Material).dispose(); },
+  };
+});
+
+// ---------------------------------------------------------------- 動く歩道（流れる向きの矢印）
+/**
+ * forceZone の visual 'belt': 帯の上に「>」の形の矢印を並べ、流れる速さで動かす（止めて見ても向きが分かる形。帯の両端では隠す）。
+ * 帯の面（Box kind 'belt'）は区画の描画が作る。矢印は暗い部屋でも見えるよう、照明に依らない色（MeshBasicMaterial）
+ */
+defineView('forceZone', (spec, ctx) => {
+  if (spec.params.visual !== 'belt') return null;
+  const a = aabbOf(spec.params.aabb);
+  const v = (spec.params.vector as number[] | undefined) ?? [0, 0, 1];
+  const speed = typeof spec.params.speed === 'number' ? spec.params.speed : 1.2;
+  const alongX = Math.abs(v[0]!) >= Math.abs(v[2]!);
+  const sgn = Math.sign(alongX ? v[0]! : v[2]!) || 1;
+  const len = alongX ? a.max[0] - a.min[0] : a.max[2] - a.min[2];
+  const wid = alongX ? a.max[2] - a.min[2] : a.max[0] - a.min[0];
+  // 帯の面（ゾーンの下端 + 0.1 が床、帯の箱は床から 3 cm）の少し上
+  const y = a.min[1] + 0.1 + 0.034;
+  // 矢印の間隔: 速い帯でも 1 フレームで間隔の半分より動かない（逆に回って見えない）ように 0.75 m 以上
+  const spacing = Math.max(0.75, speed / 24);
+  const count = Math.max(1, Math.ceil(len / spacing) + 1);
+  // 「>」: 幅 w・奥行き d の山形（先が +u）。2 本の細い帯を合わせた形
+  const w = Math.min(0.9, wid * 0.62), d = Math.min(0.32, spacing * 0.42), th = 0.07;
+  const shape = new THREE.Shape();
+  shape.moveTo(d / 2, 0);
+  shape.lineTo(-d / 2, w / 2);
+  shape.lineTo(-d / 2 - th, w / 2 - th * 0.8);
+  shape.lineTo(d / 2 - th * 1.3, 0);
+  shape.lineTo(-d / 2 - th, -w / 2 + th * 0.8);
+  shape.lineTo(-d / 2, -w / 2);
+  shape.closePath();
+  const geo = new THREE.ShapeGeometry(shape);
+  // 形の xy（x = 進む向き u, y = 横 w）を床の xz へ
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xd9c46a, transparent: true, opacity: 0.85, depthWrite: false, fog: true, side: THREE.DoubleSide });
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  mesh.frustumCulled = false;
+  ctx.root.add(mesh);
+  const u0 = alongX ? a.min[0] : a.min[2];
+  const c = alongX ? (a.min[2] + a.max[2]) / 2 : (a.min[0] + a.max[0]) / 2;
+  const m4 = new THREE.Matrix4();
+  const rot = new THREE.Matrix4().makeRotationY(alongX ? (sgn > 0 ? 0 : Math.PI) : (sgn > 0 ? -Math.PI / 2 : Math.PI / 2));
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  let t = 0;
+  return {
+    update(_s, dt) {
+      t += dt;
+      const off = (t * speed) % spacing;
+      for (let i = 0; i < count; i++) {
+        // 流れる向きに進む（sgn < 0 なら u が減る向き）
+        const k = i * spacing + off;
+        const u = sgn > 0 ? u0 + k : u0 + len - k;
+        if (k < d + th || k > len - d / 2) { mesh.setMatrixAt(i, zero); continue; }
+        m4.copy(rot);
+        if (alongX) m4.setPosition(u, y, c); else m4.setPosition(c, y, u);
+        mesh.setMatrixAt(i, m4);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+    dispose() { mesh.removeFromParent(); geo.dispose(); mat.dispose(); },
   };
 });

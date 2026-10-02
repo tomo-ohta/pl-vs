@@ -4,6 +4,8 @@
  * - bouncePad: 乗ると跳ね上げる床（speed m/s 上向き）[QR][WS]
  * - soundBeacon: period 秒ごとに位置のある音を鳴らす（Cue 'beacon'。音はクライアント）[WS 音の道しるべ]
  * - guideLight: 経路に沿って先導する光。プレイヤーが離れると待ち、近づくと進む。終点で止まる [QR 霧の誘導灯][WS 灯りを追って]
+ *     follow 'path' なら離れ具合を経路に沿って測り、経路から onPath m より外れていても待つ（迷路の仕切り越しに進まない）。
+ *     lost（region の中の人が誰もついて来ていない間 1。光が終点に着いた後も）を時間で数えると「光を無視した」ことが分かる
  * - mannequin: 見ている間は止まり、目を離すと近づく。触れたら近くからやり直し（体力は減らさない）[QR 視線のマネキン]
  */
 import { aabbCenter } from '../../math/aabb.ts';
@@ -117,9 +119,29 @@ function at(pts: Vec3[], d: number): Vec3 {
   return pts.length ? [...pts[pts.length - 1]!] : [0, 0, 0];
 }
 
+/**
+ * 経路の上での位置（始まりからの道のり）: 点 p から横へ onPath m 以内にある区間のうち、いちばん近い区間へ下ろした足の道のり。
+ * どの区間からも離れていれば -1（道から外れている。迷路では仕切りの向こうの通路にいる）
+ */
+function progressOn(pts: Vec3[], p: Vec3, onPath: number): number {
+  let best = -1, bestD = onPath;
+  let acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1]!, b = pts[i]!;
+    const ex = b[0] - a[0], ez = b[2] - a[2];
+    const l2 = ex * ex + ez * ez;
+    const k = l2 > 1e-9 ? clamp(((p[0] - a[0]) * ex + (p[2] - a[2]) * ez) / l2, 0, 1) : 0;
+    const d = Math.hypot(a[0] + ex * k - p[0], a[2] + ez * k - p[2]);
+    const l = dist3(a, b);
+    if (d <= bestD + 1e-6) { bestD = d; best = acc + l * k; }
+    acc += l;
+  }
+  return best;
+}
+
 definePart<GuideState>({
   type: 'guideLight',
-  outputs: ['progress', 'done', 'waiting'],
+  outputs: ['progress', 'done', 'waiting', 'lost'],
   init(ctx) {
     const pts = polyline(ctx);
     return { d: 0, pos: at(pts, 0), done: 0 };
@@ -131,7 +153,12 @@ definePart<GuideState>({
     const lead = pNum(ctx.spec, 'lead', 3.5);
     const wait = pNum(ctx.spec, 'waitDist', 6);
     const start = pAabb(ctx.spec, 'startZone');
-    const near = ctx.players.reduce((m, p) => Math.min(m, distXZ(p.pos, s.pos as Vec3)), Infinity);
+    // follow 'path'（迷路）: 離れ具合を経路に沿って測る（仕切り越しに近くても、道を外れていれば待つ）。既定は光との直線の距離
+    const byPath = pStr(ctx.spec, 'follow', 'near') === 'path';
+    const onPath = pNum(ctx.spec, 'onPath', 1.0);
+    const near = byPath
+      ? ctx.players.reduce((m, p) => { const g = progressOn(pts, p.pos, onPath); return g < 0 ? m : Math.min(m, Math.max(0, s.d - g)); }, Infinity)
+      : ctx.players.reduce((m, p) => Math.min(m, distXZ(p.pos, s.pos as Vec3)), Infinity);
     const begun = s.d > 0 || ctx.players.some((p) => playerIn(p, start));
     let waiting = 0;
     if (begun && !s.done) {
@@ -142,9 +169,22 @@ definePart<GuideState>({
       if (s.d >= total - 1e-3) { s.done = 1; ctx.cue('guide.arrive', at(pts, total)); }
     }
     s.pos = at(pts, s.d);
+    // lost: 動き出した後、区画 region の中にいる人が誰も光について来ていない（道を外れた・waitDist より遅れた）。
+    // 光が終点に着いた後も数える（光を無視した時間を数える隠しの元）
+    let lost = 0;
+    if (begun && ctx.spec.params.region) {
+      const region = pAabb(ctx.spec, 'region');
+      const inside = ctx.players.filter((p) => playerIn(p, region));
+      if (inside.length && inside.every((p) => {
+        if (!byPath) return distXZ(p.pos, s.pos as Vec3) > wait;
+        const g = progressOn(pts, p.pos, onPath);
+        return g < 0 || s.d - g > wait;
+      })) lost = 1;
+    }
     ctx.output('progress', total > 0 ? s.d / total : 1);
     ctx.output('done', s.done);
     ctx.output('waiting', waiting);
+    ctx.output('lost', lost);
   },
 });
 

@@ -4,8 +4,9 @@
  */
 import type { Dir } from '../../../math/vec.ts';
 import type { Rect } from '../../../world/footprint.ts';
-import { WALL_T, type Box, type MatId, type Zone } from '../../../world/layout.ts';
-import { build, maybe, occupancy, placeNear, placeUnit, splitAlongFace, type DressCtx } from '../ctx.ts';
+import { WALL_T, type Box, type MatId } from '../../../world/layout.ts';
+import { addSunk, BASIN, basinAreas, basinLadder, hasWater, poolsidePuddles, sinkBasin } from '../basin.ts';
+import { build, maybe, occupancy, placeNear, placeUnit, reserve, splitAlongFace, type DressCtx } from '../ctx.ts';
 import { addDecor, board, sconce, wallBands, wallScreen } from '../decor.ts';
 import { bench, counter, floorLine, linkedSeats } from '../furniture.ts';
 import { alongFace, facePoint, faceOut, freeRuns, innerRect, lineFace, longX, type Face } from '../geom.ts';
@@ -387,45 +388,54 @@ export function playArea(c: DressCtx): void {
 }
 
 // ---------------------------------------------------------------- 屋内プール
+// 水は床に沈めた水槽に入れる（basin.ts。床の上に水の板を置かない）。デッキは床そのもの（扉前も同じ高さ）
 
-/** 矩形 a から矩形 b を引いた残り（最大 4 つ） */
-export function subtractRect(a: Rect, b: Rect): Rect[] {
-  if (b.x1 <= a.x0 || b.x0 >= a.x1 || b.z1 <= a.z0 || b.z0 >= a.z1) return [a];
-  const out: Rect[] = [];
-  if (b.z0 > a.z0) out.push({ x0: a.x0, z0: a.z0, x1: a.x1, z1: b.z0 });
-  if (b.z1 < a.z1) out.push({ x0: a.x0, z0: b.z1, x1: a.x1, z1: a.z1 });
-  const z0 = Math.max(a.z0, b.z0), z1 = Math.min(a.z1, b.z1);
-  if (b.x0 > a.x0) out.push({ x0: a.x0, z0, x1: b.x0, z1 });
-  if (b.x1 < a.x1) out.push({ x0: b.x1, z0, x1: a.x1, z1 });
-  return out.filter((r) => r.x1 - r.x0 > 0.05 && r.z1 - r.z0 > 0.05);
+/** 水槽 W の底のレーンライン（長い向き）と、ropes なら水面のコースロープ（レーンの境）。レーンの数を返す */
+function laneMarks(c: DressCtx, W: Rect, ropes: boolean): number {
+  const alongX = longX(W);
+  const span = alongX ? W.z1 - W.z0 : W.x1 - W.x0;
+  const lanes = Math.max(1, Math.floor(span / 2.0));
+  const lw = span / lanes;
+  const yb = -BASIN.depth, ys = -BASIN.level;
+  const a0 = alongX ? W.x0 : W.z0, a1 = alongX ? W.x1 : W.z1, c0 = alongX ? W.z0 : W.x0;
+  // p: 長い向き、q: 横の向き
+  const put = (B: Box[], p0: number, p1: number, q0: number, q1: number, y0: number, y1: number, mat: MatId): void => {
+    B.push(alongX ? { min: [p0, y0, q0], max: [p1, y1, q1], mat, solid: false } : { min: [q0, y0, p0], max: [q1, y1, p1], mat, solid: false });
+  };
+  const B: Box[] = [];
+  for (let k = 0; k < lanes; k++) {
+    const m = c0 + lw * (k + 0.5);
+    if (a1 - a0 > 3) {
+      put(B, a0 + 1.0, a1 - 1.0, m - 0.1, m + 0.1, yb + 0.002, yb + 0.008, 'wallDark');
+      // 線の両端の T 字
+      for (const e of [a0 + 1.0, a1 - 1.0]) put(B, e - 0.1, e + 0.1, m - 0.4, m + 0.4, yb + 0.002, yb + 0.008, 'wallDark');
+    }
+    if (ropes && k > 0) {
+      const e = c0 + lw * k;
+      for (let t = a0, i = 0; t < a1 - 0.05; t += 0.5, i++) put(B, t, Math.min(a1, t + 0.5), e - 0.04, e + 0.04, ys - 0.03, ys + 0.025, i % 2 ? 'paintWhite' : 'plasticRed');
+    }
+  }
+  if (B.length) addSunk(c, B);
+  return lanes;
 }
 
-/** 浅い水面（非ソリッドの 'waterShallow'）を rects に敷き、扉前（前庭）を除く。水のゾーン（遅くなる）も足す */
-function water(c: DressCtx, rects: Rect[], depth = 0.25, slow = 0.7): void {
-  let pieces = rects.slice();
-  for (const z of c.doors) {
-    const cut: Rect = { x0: z.min[0], z0: z.min[2], x1: z.max[0], z1: z.max[2] };
-    pieces = pieces.flatMap((p) => subtractRect(p, cut));
-  }
-  const B: Box[] = pieces.map((p) => ({ min: [p.x0, 0.01, p.z0], max: [p.x1, depth, p.z1], mat: 'waterShallow', solid: false }));
-  if (!B.length || !addDecor(c, B)) return;
-  for (const p of pieces) {
-    const zn: Zone = { kind: 'water', aabb: { min: [p.x0, -0.1, p.z0], max: [p.x1, depth + 0.1, p.z1] }, params: { slow, depth } };
-    c.zonesOut.push(zn);
-  }
+/** 水槽 W の長い辺のはしご（端から 2 m）。はしごの足元（デッキ）は当たる物を置かない範囲にする */
+function poolLadder(c: DressCtx, W: Rect): void {
+  const alongX = longX(W);
+  const len = alongX ? W.x1 - W.x0 : W.z1 - W.z0;
+  if (len < 4.5) return;
+  const side: 0 | 1 | 2 | 3 = alongX ? (c.rng.chance(0.5) ? 0 : 2) : (c.rng.chance(0.5) ? 3 : 1);
+  const at = c.rng.chance(0.5) ? (alongX ? W.x0 : W.z0) + 2.0 : (alongX ? W.x1 : W.z1) - 2.0;
+  basinLadder(c, W, side, at);
+  const d = BASIN.wall + 0.35;
+  const [x0, x1, z0, z1] = side === 0 ? [at - 0.4, at + 0.4, W.z0 - d, W.z0] : side === 2 ? [at - 0.4, at + 0.4, W.z1, W.z1 + d] : side === 3 ? [W.x0 - d, W.x0, at - 0.4, at + 0.4] : [W.x1, W.x1 + d, at - 0.4, at + 0.4];
+  reserve(c, { min: [x0, 0, z0], max: [x1, 1.0, z1] });
 }
-
-/** 箱の組の高さを dy だけ上げる（デッキの上に置く物） */
-const lift = (B: Box[], from: number, dy: number): void => {
-  for (let i = from; i < B.length; i++) { B[i]!.min[1] += dy; B[i]!.max[1] += dy; }
-};
-
-/** 歩道デッキの上面（段差 0.35 m 未満なので歩いて上がれる） */
-const DECK_TOP = 0.32;
 
 /**
- * 屋内プール（部屋・広間）: 壁沿いの歩道デッキ（扉の前は切る）、内側の水面（浅水 + 水のゾーン）、底のレーンライン、
- * コースロープ、飛び込み台、はしご、監視台、壁際の長椅子、タイルの色帯。狭い部屋は床一面の浅水
+ * 屋内プール（部屋・広間）: 壁沿いの歩道デッキ（床の高さ）の内側に、床に沈めた水槽（縁の笠石・底のレーンライン・水面のコースロープ）。
+ * 扉前・仕掛けの場所は乾いた渡りにして水槽を切る。飛び込み台・はしご・監視台・壁際の長椅子・タイルの色帯・デッキの水たまり。
+ * 狭い部屋は回廊と同じ（水路）
  */
 export function pool(c: DressCtx): void {
   const band = c.rng.pick<MatId>(['wallGreen', 'wallDark', 'trim', 'plasticBlue']);
@@ -434,77 +444,38 @@ export function pool(c: DressCtx): void {
   const minDim = Math.min(r.x1 - r.x0, r.z1 - r.z0);
   if (minDim < 6.5) { poolCorridor(c); return; }
   const deck = Math.min(3.0, Math.max(1.7, minDim * 0.18));
-  // デッキ（壁ごと。扉前で切る）
-  for (const f of c.faces) {
-    const fr = f.rect ?? r;
-    // 縦の面のデッキは隅で横の面のデッキと重ならないよう deck だけ縮める
-    const trim = f.horizontal ? WALL_T : WALL_T + deck;
-    const lim0 = f.horizontal ? fr.x0 + trim : fr.z0 + trim, lim1 = f.horizontal ? fr.x1 - trim : fr.z1 - trim;
-    const a0 = Math.max(f.a0, lim0), a1 = Math.min(f.a1, lim1);
-    const cuts: [number, number][] = [];
-    for (const z of c.doors) {
-      const zb = alongFace(f, a0, a1 - a0, 0, deck, 0, DECK_TOP, 'floorTile', true);
-      if (zb.max[0] <= z.min[0] || zb.min[0] >= z.max[0] || zb.max[2] <= z.min[2] || zb.min[2] >= z.max[2]) continue;
-      cuts.push(f.horizontal ? [z.min[0], z.max[0]] : [z.min[2], z.max[2]]);
-    }
-    let cur = a0;
-    const pieces: [number, number][] = [];
-    for (const [p, q] of cuts.sort((x, y) => x[0] - y[0])) { if (p > cur + 0.6) pieces.push([cur, p]); cur = Math.max(cur, q); }
-    if (a1 > cur + 0.6) pieces.push([cur, a1]);
-    for (const [p, q] of pieces) {
-      for (let s = p; s < q - 0.05; s += 6) {
-        const e = Math.min(q, s + 6);
-        placeUnit(c, [alongFace(f, s, e - s, 0, deck, 0, DECK_TOP, 'floorTile', true), alongFace(f, s, e - s, deck - 0.12, deck, DECK_TOP - 0.004, DECK_TOP + 0.004, 'paintWhite', false)]);
+  // 水槽（デッキの内側）
+  const pools: Rect[] = [];
+  if (!hasWater(c)) {
+    for (const q of c.rects) {
+      const R = innerRect(q, WALL_T + deck);
+      if (R.x1 - R.x0 < 1.8 || R.z1 - R.z0 < 1.8) continue;
+      for (const a of basinAreas(c, R, 0.25, 1.8)) {
+        const W = sinkBasin(c, a, { slow: 0.65 });
+        if (W) pools.push(W);
       }
     }
   }
-  // 水面（デッキの内側）
-  const basins: Rect[] = [];
-  for (const q of c.rects) {
-    const b = innerRect(q, WALL_T + deck);
-    if (b.x1 - b.x0 > 1.5 && b.z1 - b.z0 > 1.5) basins.push(b);
-  }
-  water(c, basins, 0.27, 0.65);
-  // レーンライン（底）とコースロープ（水面）
-  for (const b of basins) {
-    const alongX = longX(b);
-    const W = alongX ? b.z1 - b.z0 : b.x1 - b.x0;
-    const lanes = Math.max(1, Math.floor(W / 2.0));
-    const lw = W / lanes;
-    const B: Box[] = [];
-    for (let k = 0; k < lanes; k++) {
-      const m = (alongX ? b.z0 : b.x0) + lw * (k + 0.5);
-      const a0 = (alongX ? b.x0 : b.z0) + 1.0, a1 = (alongX ? b.x1 : b.z1) - 1.0;
-      if (a1 - a0 > 1) B.push(alongX ? { min: [a0, 0.012, m - 0.1], max: [a1, 0.02, m + 0.1], mat: 'wallDark', solid: false } : { min: [m - 0.1, 0.012, a0], max: [m + 0.1, 0.02, a1], mat: 'wallDark', solid: false });
-      if (k > 0) {
-        const e = (alongX ? b.z0 : b.x0) + lw * k;
-        const r0 = alongX ? b.x0 : b.z0, r1 = alongX ? b.x1 : b.z1;
-        for (let t = r0; t < r1 - 0.05; t += 1.0) {
-          const t1 = Math.min(r1, t + 0.5);
-          B.push(alongX ? { min: [t, 0.24, e - 0.04], max: [t1, 0.3, e + 0.04], mat: 'plasticRed', solid: false } : { min: [e - 0.04, 0.24, t], max: [e + 0.04, 0.3, t1], mat: 'plasticRed', solid: false });
-          if (t1 < r1) B.push(alongX ? { min: [t1, 0.24, e - 0.04], max: [Math.min(r1, t1 + 0.5), 0.3, e + 0.04], mat: 'paintWhite', solid: false } : { min: [e - 0.04, 0.24, t1], max: [e + 0.04, 0.3, Math.min(r1, t1 + 0.5)], mat: 'paintWhite', solid: false });
-        }
-      }
-    }
-    if (B.length) addDecor(c, B);
-    // 飛び込み台（短い辺のデッキの上）
+  for (const W of pools) {
+    const alongX = longX(W);
+    const lanes = laneMarks(c, W, true);
+    const lw = (alongX ? W.z1 - W.z0 : W.x1 - W.x0) / lanes;
+    // 飛び込み台（短い辺の笠石の上。台の先は水際まで）
     if (maybe(c, 0.8)) {
-      const end = alongX ? (c.rng.chance(0.5) ? b.x0 - 0.45 : b.x1 + 0.45) : (c.rng.chance(0.5) ? b.z0 - 0.45 : b.z1 + 0.45);
-      const toward: Dir = alongX ? (end < b.x0 ? 1 : 3) : (end < b.z0 ? 0 : 2);
+      const low = c.rng.chance(0.5);
+      const end = alongX ? (low ? W.x0 - 0.3 : W.x1 + 0.3) : (low ? W.z0 - 0.3 : W.z1 + 0.3);
+      const toward: Dir = alongX ? (low ? 1 : 3) : (low ? 0 : 2);
       for (let k = 0; k < lanes; k++) {
-        const m = (alongX ? b.z0 : b.x0) + lw * (k + 0.5);
-        build(c, (T) => { startBlock(T, alongX ? end : m, alongX ? m : end, toward); lift(T, 0, DECK_TOP); });
+        const m = (alongX ? W.z0 : W.x0) + lw * (k + 0.5);
+        build(c, (T) => startBlock(T, alongX ? end : m, alongX ? m : end, toward));
       }
     }
-    // はしご（水際。当たらない金物）
-    const lad: Box[] = [];
-    const lx = alongX ? b.x0 + 2.0 : b.x0 - 0.05, lz = alongX ? b.z0 - 0.05 : b.z0 + 2.0;
-    for (const o of [-0.25, 0.25]) lad.push(alongX ? { min: [lx + o - 0.02, 0.05, lz - 0.04], max: [lx + o + 0.02, DECK_TOP + 0.6, lz], mat: 'metal', solid: false } : { min: [lx - 0.04, 0.05, lz + o - 0.02], max: [lx, DECK_TOP + 0.6, lz + o + 0.02], mat: 'metal', solid: false });
-    addDecor(c, lad);
+    poolLadder(c, W);
   }
-  // 監視台・長椅子（デッキの上）
-  if (deck >= 2.0 && maybe(c, 0.6)) onSomeWall(c, 0.8, (B, f, at) => { const [x, z] = facePoint(f, at + 0.4, deck - 0.5); lifeguardChair(B, x, z, faceOut(f)); lift(B, 0, DECK_TOP); }, { pad: 1.2 });
-  for (let i = 0; i < count(c, 2, 4); i++) onSomeWall(c, 1.8, (B, f, at) => { const [x, z] = facePoint(f, at + 0.9, 0.3); bench(B, f.horizontal, x, z, 1.8, 'floorTile'); lift(B, 0, DECK_TOP); }, { pad: 1.2 });
+  // 監視台・長椅子（デッキの上）・デッキの水たまり
+  if (deck >= 2.0 && maybe(c, 0.6)) onSomeWall(c, 0.8, (B, f, at) => { const [x, z] = facePoint(f, at + 0.4, deck - 0.5); lifeguardChair(B, x, z, faceOut(f)); }, { pad: 1.2 });
+  for (let i = 0; i < count(c, 2, 4); i++) onSomeWall(c, 1.8, (B, f, at) => { const [x, z] = facePoint(f, at + 0.9, 0.3); bench(B, f.horizontal, x, z, 1.8, 'floorTile'); }, { pad: 1.2 });
+  poolsidePuddles(c, count(c, 2, 5));
 }
 
 /** デッキの幅（v1 deckWidthFor: 回廊の幅 5 m 未満は無し） */
@@ -514,45 +485,51 @@ export function deckWidthFor(width: number): number {
 }
 
 /**
- * プールの回廊（v1 PoolGenerator.decor）: タイルの色帯、幅 5 m 以上は長い辺に歩道デッキと柱、床（デッキの間）は浅水。
- * 扉の前は乾いた前庭。底のレーンライン・排水溝、狭い回廊はタイルのベンチ
+ * プールの回廊（v1 PoolGenerator.decor）: タイルの色帯、床に沈めた水路（幅 5 m 以上は長い辺に歩道デッキと柱を残した真ん中、
+ * 細い回廊は壁から壁まで）。扉の前は乾いた渡り。水路の底のレーンライン・排水溝、乾いた所のタイルのベンチと水たまり
  */
 export function poolCorridor(c: DressCtx): void {
   if (!c.units.length) wallBands(c, [{ y0: 1.05, y1: 1.25, mat: c.rng.pick<MatId>(['wallGreen', 'wallDark', 'trim']), depth: 0.012 }]);
-  const channels: Rect[] = [];
+  const water = !hasWater(c);
   for (const r of c.rects) {
     const alongZ = r.z1 - r.z0 >= r.x1 - r.x0;
     const width = alongZ ? r.x1 - r.x0 : r.z1 - r.z0;
     const deckW = deckWidthFor(width);
-    if (deckW > 0) {
+    // 水路（デッキの間）
+    const inset = deckW > 0 ? WALL_T + deckW : WALL_T;
+    const R: Rect = alongZ ? { x0: r.x0 + inset, z0: r.z0 + WALL_T, x1: r.x1 - inset, z1: r.z1 - WALL_T } : { x0: r.x0 + WALL_T, z0: r.z0 + inset, x1: r.x1 - WALL_T, z1: r.z1 - inset };
+    const ws: Rect[] = [];
+    if (water) {
+      for (const a of basinAreas(c, R)) {
+        const W = sinkBasin(c, a, { slow: 0.7 });
+        if (W) ws.push(W);
+      }
+    }
+    // 柱（幅 6 m 以上。デッキの縁。水路の縁に掛けない）
+    if (deckW > 0 && width >= 6) {
       for (const f of c.faces.filter((g) => g.rect === r && g.horizontal !== alongZ)) {
         for (const [p, q] of freeRuns(f, c.openings, 0.4)) {
-          for (let s = p; s < q - 0.8; s += 6) {
-            const e = Math.min(q, s + 6);
-            placeUnit(c, [alongFace(f, s, e - s, 0, deckW, 0, DECK_TOP, 'floorTile', true)]);
-          }
-          // 柱（幅 6 m 以上。デッキの縁）
-          if (width >= 6) {
-            for (let t = p + 2.2; t <= q - 2.2; t += 4.5) {
-              const [x, z] = facePoint(f, t, deckW - 0.2);
-              build(c, (B) => B.push({ min: [x - 0.25, 0, z - 0.25], max: [x + 0.25, c.h, z + 0.25], mat: c.cell.palette.wall === 'floorTile' ? 'floorTile' : 'columnConcrete', solid: true, kind: 'column' }));
-            }
+          for (let t = p + 2.2; t <= q - 2.2; t += 4.5) {
+            const [x, z] = facePoint(f, t, deckW - 0.32);
+            build(c, (B) => B.push({ min: [x - 0.25, 0, z - 0.25], max: [x + 0.25, c.h, z + 0.25], mat: c.cell.palette.wall === 'floorTile' ? 'floorTile' : 'columnConcrete', solid: true, kind: 'column' }));
           }
         }
       }
     }
-    const inset = deckW > 0 ? WALL_T + deckW : WALL_T;
-    channels.push(alongZ ? { x0: r.x0 + inset, z0: r.z0 + WALL_T, x1: r.x1 - inset, z1: r.z1 - WALL_T } : { x0: r.x0 + WALL_T, z0: r.z0 + inset, x1: r.x1 - WALL_T, z1: r.z1 - inset });
-    // レーンライン・グレーチング（水面の下）
-    const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
-    const a0 = (alongZ ? r.z0 : r.x0) + 1.0, a1 = (alongZ ? r.z1 : r.x1) - 1.0;
-    const B: Box[] = [];
-    if (a1 - a0 > 1) B.push(alongZ ? { min: [cx - 0.06, 0.004, a0], max: [cx + 0.06, 0.014, a1], mat: 'wallWhite', solid: false } : { min: [a0, 0.004, cz - 0.06], max: [a1, 0.014, cz + 0.06], mat: 'wallWhite', solid: false });
-    for (let t = a0 + 1.0; t + 0.6 <= a1; t += 6) B.push(alongZ ? { min: [cx - 0.3, 0.003, t], max: [cx + 0.3, 0.02, t + 0.6], mat: 'metal', solid: false } : { min: [t, 0.003, cz - 0.3], max: [t + 0.6, 0.02, cz + 0.3], mat: 'metal', solid: false });
-    if (B.length) addDecor(c, B);
+    // 水路の底のレーンライン・排水溝のグレーチング
+    for (const W of ws) {
+      const alongX = longX(W);
+      const cx = (W.x0 + W.x1) / 2, cz = (W.z0 + W.z1) / 2;
+      const a0 = (alongX ? W.x0 : W.z0) + 0.6, a1 = (alongX ? W.x1 : W.z1) - 0.6;
+      const yb = -BASIN.depth;
+      const B: Box[] = [];
+      if (a1 - a0 > 1) B.push(alongX ? { min: [a0, yb + 0.002, cz - 0.06], max: [a1, yb + 0.008, cz + 0.06], mat: 'wallWhite', solid: false } : { min: [cx - 0.06, yb + 0.002, a0], max: [cx + 0.06, yb + 0.008, a1], mat: 'wallWhite', solid: false });
+      for (let t = a0 + 1.0; t + 0.6 <= a1; t += 6) B.push(alongX ? { min: [t, yb + 0.001, cz - 0.3], max: [t + 0.6, yb + 0.012, cz + 0.3], mat: 'metal', solid: false } : { min: [cx - 0.3, yb + 0.001, t], max: [cx + 0.3, yb + 0.012, t + 0.6], mat: 'metal', solid: false });
+      if (B.length) addSunk(c, B);
+    }
   }
-  water(c, channels, 0.25, 0.7);
-  // 狭い回廊: タイルのベンチ（壁際。水の中に置く）
+  // タイルのベンチ（壁際の乾いた床。水路の上には置かれない）
   for (let i = 0; i < count(c, 1.0, 2); i++) onSomeWall(c, 2.0, (B, f, at) => B.push(alongFace(f, at, 2.0, 0, 0.4, 0, 0.45, 'floorTile', true)), { pad: 1.2 });
+  poolsidePuddles(c, count(c, 1.2, 3));
   if (maybe(c, 0.5)) wallExtras(c, ['clock'], 1);
 }

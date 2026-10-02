@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { BASIN } from '../core/gen/dress/basin.ts';
 import { DRESS_KINDS, DRESS_THEMES, dressCell } from '../core/gen/dress/index.ts';
 import type { DressKind, DressRoom } from '../core/gen/dress/types.ts';
 import { reachOpenings } from '../core/gen/reach.ts';
@@ -14,7 +15,7 @@ import { themePalette } from '../core/world/palettes.ts';
 /**
  * 区画の中身（dressCell）の検査: テーマ × 種類ごとに乱数の区画（1 つの矩形 / 2 つの矩形の L 字、床の高さ 0 / 1.8 / -3.6、
  * 開口 2〜4）を作って中身を置き、(a) 開口どうしが歩いてつながる (b) 当たる箱が扉前・keepOut に掛からない
- * (c) 箱が区画の中 (d) 同じ seed なら同じ箱 (e) 箱が床より下に無い、を確かめる
+ * (c) 箱が区画の中 (d) 同じ seed なら同じ箱 (e) 箱が床より下に無い（床に沈めた水槽の箱 kind 'basin*' だけは水槽の底まで）、を確かめる
  */
 
 const CELLS_PER_COMBO = 30;
@@ -215,7 +216,8 @@ for (const theme of DRESS_THEMES) {
         // (b) 当たる箱が扉前・keepOut に掛からない
         const zones = testDoorZones(m.openings, m.floorY);
         for (const b of added) {
-          if (!b.solid) continue;
+          // 床の高さより下の箱（沈めた水槽の縁・底・切った床板の残り）は通り道を塞がない
+          if (!b.solid || b.max[1] <= m.floorY + 1e-6) continue;
           for (const z of zones) assert.ok(!overlaps(b, z), `${where}: 扉前に当たる箱 ${b.mat}/${b.kind ?? ''} ${JSON.stringify([b.min, b.max])}`);
           for (const k of m.keepOut) assert.ok(!overlaps(b, k), `${where}: keepOut に当たる箱 ${b.mat}/${b.kind ?? ''}`);
         }
@@ -226,10 +228,11 @@ for (const theme of DRESS_THEMES) {
           assert.ok(b.max[1] <= m.floorY + m.cell.height + 0.21, `${where}: 天井より上の箱 ${b.mat} ${b.max[1]}`);
           const xs = [b.min[0], (b.min[0] + b.max[0]) / 2, b.max[0]], zs = [b.min[2], (b.min[2] + b.max[2]) / 2, b.max[2]];
           assert.ok(xs.every((x) => zs.every((z) => inFoot(m.cell.footprint, x, z))), `${where}: 足跡の外の箱 ${b.mat} ${JSON.stringify([b.min, b.max])}`);
-          assert.ok(b.min[1] >= m.floorY - 0.01, `${where}: 床より下の箱 ${b.mat} ${b.min[1]}`);
+          const basin = !!b.kind?.startsWith('basin');
+          assert.ok(b.min[1] >= m.floorY - 0.01 || (basin && b.min[1] >= m.floorY - BASIN.depth - BASIN.slab - 0.2 - 1e-6), `${where}: 床より下の箱 ${b.mat}/${b.kind ?? ''} ${b.min[1]}`);
           assert.ok(b.max[0] > b.min[0] && b.max[1] > b.min[1] && b.max[2] > b.min[2], `${where}: 大きさの無い箱 ${b.mat}`);
         }
-        for (const z of m.cell.zones) assert.ok(z.aabb.min[1] >= m.floorY - 0.2 && z.aabb.max[1] <= m.floorY + m.cell.height + 0.2, `${where}: ゾーンの高さ`);
+        for (const z of m.cell.zones) assert.ok(z.aabb.min[1] >= m.floorY - (z.kind === 'water' ? BASIN.depth + 0.1 + 1e-6 : 0.2) && z.aabb.max[1] <= m.floorY + m.cell.height + 0.2, `${where}: ゾーンの高さ`);
         // (d) 同じ seed なら同じ箱（区画も作り直して比べる）
         const again = dress(makeRoom(theme, kind, seed), seed, density, kind);
         assert.equal(JSON.stringify(again), JSON.stringify(added), `${where}: 同じ seed で違う箱`);

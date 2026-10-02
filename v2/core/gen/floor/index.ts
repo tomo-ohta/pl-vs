@@ -14,6 +14,7 @@ import { hashAll, Rng } from '../../math/rng.ts';
 import { rectsOverlap } from '../../world/footprint.ts';
 import type { FloorLayout } from '../../world/layout.ts';
 import type { DressRoom } from '../dress/types.ts';
+import { planAnomalies, type AnomalyShowcase, type PlacedAnomaly } from '../anomaly/index.ts';
 import { reachOpenings } from '../reach.ts';
 import { applyBSide } from './bside.ts';
 import { buildGeometry, GenError, type FloorGeometry } from './geometry.ts';
@@ -30,13 +31,15 @@ export interface GenOptions {
   /** 仕掛けと隠しを置かない（段階 2 の確認用） */
   noGimmicks?: boolean;
   /** 見本のフロア（確認用）: 仕掛けを 1 つずつ置き、隠しを全部付ける。系統・型・大きさも見本用に決める */
-  showcase?: ShowcaseOptions;
+  showcase?: ShowcaseOptions & Partial<AnomalyShowcase>;
 }
 
 export interface GenReport {
   floor: FloorLayout;
   profile: FloorProfile;
   gimmicks: GimmickResult | null;
+  /** 部屋まるごとの異変（core/gen/anomaly） */
+  anomalies: PlacedAnomaly[];
   attempts: number;
   /** 合格した形の作り直しの回数（同じ性質のまま。裏のフロアが表と同じ形を作るのに使う） */
   geoTry: number;
@@ -61,7 +64,8 @@ export function generateFloorReport(key: FloorKey, t: Tuning, opts: GenOptions =
     const profile = front ? { ...rollProfile({ ...key, variant: 0 }, t, front.attempts - 1), key, id: floorId(key) } : rollProfile(key, t, attempt);
     if (opts.showcase) {
       // 見本: 天井の高い系統（弾む床が置けるように）・格子・広め
-      Object.assign(profile, { family: { ...familyById('library'), hallChance: 0.3, levelChance: 0, doorChance: 0.4 }, pattern: 'grid', cols: 5, rows: 5, spacing: 15, rarity: 'Rare' });
+      // 仕掛け 13 種 + 異変の部屋が入るように 6×6
+      Object.assign(profile, { family: { ...familyById('library'), hallChance: 0.3, levelChance: 0, doorChance: 0.4 }, pattern: 'grid', cols: 6, rows: 6, spacing: 15, rarity: 'Rare' });
     }
     const rng = new Rng(profile.seed);
     // 形がうまく行かない（階段が収まらない・区画が近すぎる）ときは、性質と骨組みはそのままで形だけ作り直す（系統の出方を偏らせない）
@@ -81,20 +85,28 @@ export function generateFloorReport(key: FloorKey, t: Tuning, opts: GenOptions =
     // 中身の seed: 表は性質の seed、裏は裏の seed（置き直すたびに変える）
     const content: FloorProfile = front ? { ...profile, seed: hashAll(floorSeed(key), 'content', attempt) } : profile;
     const gimmicks = opts.noGimmicks ? null : placeGimmicks(content, geo, t, key.depth, opts.showcase);
+    // 部屋まるごとの異変: 残りの部屋から選び、中身を置く前の変化（pre）を掛ける
+    const anomalies = opts.noGimmicks ? null : planAnomalies(content, geo, gimmicks, t, key.depth, opts.showcase?.anomalies ? { anomalies: opts.showcase.anomalies } : undefined);
+    // 見て回る順（見本のフロアのワープ）に異変の部屋も入れる
+    if (gimmicks && anomalies) gimmicks.tour.push(...anomalies.tour);
+    const dressedFrom = new Map<string, number>();
     if (opts.dress) {
-      // 隠し部屋のうち、中身が決まっているもの（別のフロアへの穴・私室）には置かない（穴の上に物が浮かないように）
+      // 隠し部屋のうち、中身が決まっているもの（別のフロアへの穴・私室）と、異変が自分で埋める部屋には置かない
       const fixed = new Set(gimmicks?.secrets.flatMap((x) => x.fixed));
       for (const g of geo.cells) {
-        if (fixed.has(g.cell.id)) continue;
+        if (fixed.has(g.cell.id) || anomalies?.noDress.has(g.cell.id)) continue;
+        dressedFrom.set(g.cell.id, g.cell.boxes.length);
         opts.dress({ cell: g.cell, kind: g.kind, openings: g.openings, keepOut: gimmicks?.keepOut.get(g.cell.id) ?? [], rng: new Rng(hashAll(content.seed, 'dress', g.cell.id)), density: 0.5 });
       }
     }
+    // 異変の中身を置いた後の変化（post: 家具の変形）
+    anomalies?.post(dressedFrom);
     const floor = assemble(key, content, geo, t);
-    const tone = front ? applyBSide(floor, new Rng(hashAll(floorSeed(key), 'tone'))).id : undefined;
+    const tone = front ? applyBSide(floor, new Rng(hashAll(floorSeed(key), 'tone')), new Set(anomalies?.placed.map((x) => x.cell))).id : undefined;
     // 仕掛けを置いた区画は置くときに到達を確かめている（部品が作る床を含めて）ので、ここでは見ない
     const checked = new Set(gimmicks?.gimmicks.map((g) => g.cell) ?? []);
     const issues = validateFloor(floor, geo, checked);
-    const res = { floor, profile: content, gimmicks, geoTry, ...(tone ? { tone } : {}) };
+    const res = { floor, profile: content, gimmicks, anomalies: anomalies?.placed ?? [], geoTry, ...(tone ? { tone } : {}) };
     if (!issues.length) return { ...res, attempts: attempt + 1, issues: errors, ms: Date.now() - t0 };
     errors.push(...issues.map((s) => `#${attempt}: ${s}`));
     last = res;

@@ -115,8 +115,8 @@ test('謎のパズル: 手がかりの順にボタンを押すと扉が現れる
 test('細い道: 落ちた先の隠し部屋まで歩いて行ける（存在型）', async () => {
   const R = await loadRapier();
   let ok = 0, n = 0;
-  for (let w = 1; w <= 150 && n < 4; w++) {
-    const r = generateFloorReport({ world: w, depth: 5, variant: 0 }, t);
+  for (let w = 1; w <= 600 && n < 4; w++) {
+    const r = generateFloorReport({ world: w, depth: 1 + (w % 8), variant: 0 }, t);
     const sec = r.gimmicks?.secrets.find((s) => s.hook === 'fall.below');
     if (!sec) continue;
     n++;

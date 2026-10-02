@@ -48,11 +48,14 @@ export const BSIDE_TONES: readonly BSideTone[] = [
 
 const isPanel = (cell: CellLayout, mat: MatId, kind?: string): boolean => mat === cell.palette.light && !kind?.startsWith('lamp:');
 
-/** 裏の調子をフロアに掛ける（区画の配列は表と同じもの。表のフロアの物は共有していない前提） */
-export function applyBSide(floor: FloorLayout, rng: Rng): BSideTone {
+/**
+ * 裏の調子をフロアに掛ける（区画の配列は表と同じもの。表のフロアの物は共有していない前提）。
+ * keep: 調子を掛けない区画（部屋まるごとの異変の部屋。異変の照明・霧・色をそのまま見せる）
+ */
+export function applyBSide(floor: FloorLayout, rng: Rng, keep: ReadonlySet<string> = new Set()): BSideTone {
   const tone = rng.pick(BSIDE_TONES);
   for (const cell of floor.cells) {
-    if (cell.role === 'secret') continue;
+    if (cell.role === 'secret' || keep.has(cell.id)) continue;
     const r = rng.fork(`bside:${cell.id}`);
     const old = cell.palette;
     const swap = (m: MatId): MatId => tone.mats[m] ?? m;

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { BASIN } from '../core/gen/dress/basin.ts';
 import { kit, MAX_BOXES, placeUnit, type DressCtx } from '../core/gen/dress/ctx.ts';
 import { DRESS_KINDS, DRESS_THEMES, dressCell, kitFor } from '../core/gen/dress/index.ts';
 import type { DressKind } from '../core/gen/dress/types.ts';
@@ -128,7 +129,8 @@ test('箱の数は上限まで。プールの水面のゾーンはフロア座�
       assert.ok(cell.boxes.length - n0 <= MAX_BOXES, `${theme} ${kind}: ${cell.boxes.length - n0} 箱`);
       if (theme === 'PoolCorridor') {
         assert.ok(cell.zones.some((z) => z.kind === 'water'), '水のゾーン');
-        for (const z of cell.zones) assert.ok(z.aabb.min[1] >= 1.8 - 0.11 && z.aabb.max[1] <= 1.8 + 0.5, `ゾーンの高さ ${z.aabb.min[1]}..${z.aabb.max[1]}`);
+        // 水のゾーンは床に沈めた水槽の底（床 − BASIN.depth）の少し下から、水面の少し上まで
+        for (const z of cell.zones) assert.ok(z.aabb.min[1] >= 1.8 - BASIN.depth - 0.11 && z.aabb.max[1] <= 1.8 + 0.5, `ゾーンの高さ ${z.aabb.min[1]}..${z.aabb.max[1]}`);
       }
     }
   }

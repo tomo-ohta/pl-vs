@@ -14,6 +14,9 @@
  * - ライトマップ（mid / high。v1 の RoomBuilder と同じ流れ。Lightmap.ts の冒頭）: 区画ごとにアトラスを作って Worker で焼き、届いたら
  *   頂点焼き込みからクロスフェードする。見えている区画から先に焼く。部品で入切する照明のある区画は焼かない
  *   （照明の入切は頂点焼き込みの混ぜ合わせで出す。ライトマップは 1 通りしか持てない）
+ * - 形の特別扱い（BoxShapes.ts）: 水面（water / waterShallow）は上面だけ、水たまり（puddle）は不定形の輪郭、傾けた箱（Box.slope。
+ *   階段の手すり）は剪断。水面のメッシュは原点を箱の底に置く（材質の水深 = メッシュの座標の y なので、床に沈めた水槽でも
+ *   「底 .. 水面」が水深になる）。傾けた箱は焼き込みの遮蔽物に入れず（外接の箱が大きすぎる）、ライトマップの対象にもしない
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -24,7 +27,8 @@ import { allocateLightmapAtlas, createLightmapTexture, isLightmapTarget, LIGHTMA
 import { L2_FLAGS, materialOverridesFor, SURFACES, type MaterialLibrary, type UploadHandle } from '../render/MaterialLibrary.ts';
 import type { QualityTierId } from '../render/quality.ts';
 import { appearanceSeed, attachSurfaceAppearance } from '../render/SurfaceAppearance.ts';
-import { SurfaceLighting, surfaceBox } from '../render/SurfaceGeometry.ts';
+import { SurfaceLighting } from '../render/SurfaceGeometry.ts';
+import { boxGeometry, slopeBounds, waterBase } from '../render/BoxShapes.ts';
 import { attachWindowRoom, WINDOW_ROOM_MATS } from '../render/WindowRoom.ts';
 import { OUTSIDE_VIEW_MAT } from '../render/OutsideView.ts';
 import type { LitLayout } from '../render/litLayout.ts';
@@ -162,8 +166,10 @@ export class FloorBuilder {
     for (const b of [...drawn, ...borrowed]) if (b.kind?.startsWith('lamp:')) lampIds.add(b.kind.slice(5));
     for (const l of [...cell.lights, ...borrowedLights]) if (l.lampId) lampIds.add(l.lampId);
 
-    // 焼き込み: 全部の照明あり（on）と、lamp ごとに「その照明なし」（off）
-    const lit = (boxes: Box[], lightsIn: LightSpec[]): LitLayout => ({ bounds: cell.bounds, footprint: cell.footprint, height: cell.height, boxes, lights: lightsIn, palette: cell.palette, ...(cell.lighting ? { lighting: cell.lighting } : {}) });
+    // 焼き込み: 全部の照明あり（on）と、lamp ごとに「その照明なし」（off）。
+    // 焼き込みの範囲の下端は床板の下（floorY − 0.2）のまま（床に沈めた水槽で cell.bounds が下がっても、壁の足元の陰りの基準を変えない）
+    const litBounds: AABB = { min: [cell.bounds.min[0], Math.max(cell.bounds.min[1], fy - 0.2), cell.bounds.min[2]], max: cell.bounds.max };
+    const lit = (boxes: Box[], lightsIn: LightSpec[]): LitLayout => ({ bounds: litBounds, footprint: cell.footprint, height: cell.height, boxes: boxes.filter((b) => !b.slope), lights: lightsIn, palette: cell.palette, ...(cell.lighting ? { lighting: cell.lighting } : {}) });
     const all = [...drawn, ...borrowed];
     const allLights = [...cell.lights, ...borrowedLights];
     const bakeOn = new SurfaceLighting(lit(all, allLights));
@@ -181,7 +187,7 @@ export class FloorBuilder {
     const lmTargets: Box[] = [];
     if (lmWanted) {
       for (const b of drawn) {
-        if (b.kind?.startsWith('lamp:') || b.revealGroup || b.concealGroup) continue;
+        if (b.kind?.startsWith('lamp:') || b.revealGroup || b.concealGroup || b.slope) continue;
         const sf = SURFACES[b.mat];
         if (isLightmapTarget(b, !!sf?.emission, !!sf?.decal)) { targetOf.set(b, lmTargets.length); lmTargets.push(b); }
       }
@@ -191,11 +197,12 @@ export class FloorBuilder {
     const atlas = lmCfg && lmTargets.length ? allocateLightmapAtlas(lmTargets, { texel: lmCfg.texel, maxSize: lmCfg.maxSize, footprint: cell.footprint, bounds: cell.bounds, shell }) : null;
     const lmTex = atlas ? createLightmapTexture(atlas.width, atlas.height) : null;
 
-    // 箱 → ジオメトリ（区分 bucket と材質ごとに結合する）。ranges: 結合後のメッシュの中でライトマップ対象の頂点範囲（[start, count] の列）
-    const buckets = new Map<string, { mat: MatId; geos: THREE.BufferGeometry[]; kind: string; group: string; ranges: number[]; offset: number }>();
-    const put = (key: string, mat: MatId, kind: string, grp: string, g: THREE.BufferGeometry, ranges: [number, number][] | null): void => {
+    // 箱 → ジオメトリ（区分 bucket と材質ごとに結合する）。ranges: 結合後のメッシュの中でライトマップ対象の頂点範囲（[start, count] の列）。
+    // base: メッシュの原点の高さ（区画の Group から。水面は箱の底、ほかは 0 = 床）
+    const buckets = new Map<string, { mat: MatId; geos: THREE.BufferGeometry[]; kind: string; group: string; ranges: number[]; offset: number; base: number }>();
+    const put = (key: string, mat: MatId, kind: string, grp: string, g: THREE.BufferGeometry, ranges: [number, number][] | null, base = 0): void => {
       let b = buckets.get(key);
-      if (!b) buckets.set(key, (b = { mat, geos: [], kind, group: grp, ranges: [], offset: 0 }));
+      if (!b) buckets.set(key, (b = { mat, geos: [], kind, group: grp, ranges: [], offset: 0, base }));
       if (ranges) for (const [st, c] of ranges) b.ranges.push(b.offset + st, c);
       b.offset += g.getAttribute('position').count;
       b.geos.push(g);
@@ -210,7 +217,7 @@ export class FloorBuilder {
             : [{ mat: b.mat, kind: 'static', grp: '' }];
       for (const v of variants) {
         const box: Box = v.mat === b.mat ? b : { ...b, mat: v.mat };
-        let g = surfaceBox(box);
+        let g = boxGeometry(box);
         if (WINDOW_ROOM_MATS.has(box.mat) || box.mat === OUTSIDE_VIEW_MAT) attachWindowRoom(g, box.min, box.max);
         // uv1（ライトマップ）。結合する全ジオメトリが同じ属性を持つよう、対象外の箱にも黒テクセルの uv1 を付ける。範囲は toNonIndexed 後の頂点範囲
         let ranges: [number, number][] | null = null;
@@ -220,18 +227,23 @@ export class FloorBuilder {
           else writeConstantUV1(g, atlas.blackU, atlas.blackV);
         }
         attachSurfaceAppearance(g, appearanceSeed(floor.seed, matKey, box.mat));
-        bakeOn.bake(g, box);
+        // 傾けた箱は、傾けた後の外接の箱を「自分の箱」として焼く（近くの器具・遮蔽物の絞り込みの中心と大きさ）
+        const own = slopeBounds(box);
+        bakeOn.bake(g, own);
         // 照明ごとの「なし」の焼き込みを別の属性に（結合のため全部の箱に同じ属性を付ける）
         for (const id of lampList) {
           const tmp = g.clone();
-          bakeOff.get(id)!.bake(tmp, box);
+          bakeOff.get(id)!.bake(tmp, own);
           g.setAttribute(`bakedOff_${id}`, tmp.getAttribute('bakedLight'));
           tmp.dispose();
         }
         if (g.index) { const flat = g.toNonIndexed(); g.dispose(); g = flat; }
-        if (fy !== 0) g.translate(0, -fy, 0);
+        // 水面: メッシュの原点を箱の底に（水深 = メッシュの座標の y）。底の高さごとに別のメッシュ
+        const wb = waterBase(box);
+        const origin = wb ?? fy;
+        if (origin !== 0) g.translate(0, -origin, 0);
         triangles += g.getAttribute('position').count / 3;
-        put(`${v.kind}|${v.grp}|${v.mat}`, v.mat, v.kind, v.grp, g, ranges);
+        put(`${v.kind}|${v.grp}|${v.mat}${wb === null ? '' : `|base${(wb - fy).toFixed(3)}`}`, v.mat, v.kind, v.grp, g, ranges, wb === null ? 0 : wb - fy);
       }
     }
 
@@ -247,6 +259,7 @@ export class FloorBuilder {
       const mesh = new THREE.Mesh(merged, mat);
       if (lit) lmMeshes.push({ mesh, ranges: b.ranges });
       mesh.name = `${cell.id}:${key}`;
+      mesh.position.y = b.base;
       mesh.matrixAutoUpdate = false;
       mesh.updateMatrix();
       group.add(mesh);

@@ -352,10 +352,17 @@ export class Sim implements PlayerWorld {
     return best.id;
   }
 
-  /** 剛体を使う部品のある区画の、静的な箱（床・壁・家具）を物理に入れる */
+  /**
+   * 剛体を使う部品のある区画と、その隣の区画（開口でつながる）の静的な箱（床・壁・家具）を物理に入れる。
+   * 隣も入れるのは、扉から押し出された物が隣の廊下の床を抜けて落ちないように
+   */
   private addPhysicsStatics(): void {
     const cells = new Set<string>();
     for (const rt of this.order) if (rt.def.physics) cells.add(rt.spec.cell ?? '*');
+    for (const p of this.floor.portals) {
+      if (cells.has(p.cells[0])) cells.add(p.cells[1]);
+      else if (cells.has(p.cells[1])) cells.add(p.cells[0]);
+    }
     for (const cell of this.floor.cells) {
       if (!cells.has('*') && !cells.has(cell.id)) continue;
       for (const b of cell.boxes) {

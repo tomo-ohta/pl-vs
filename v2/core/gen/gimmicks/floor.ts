@@ -1,52 +1,84 @@
 /**
- * 床の仕掛け（段階 3 の 10 種のうち 3 種）。どれも閉じ込めない: 落ちた先から歩いて戻れる。
- * - crumbleFloor 崩れる床 [QR][WS G02]: 部屋の真ん中の浅い穴（0.7 m）の上に、乗ると崩れる床板を敷く。落ちても段で上がれる
+ * 床の仕掛け（3 種）。どれも閉じ込めない: 落ちた先から歩いて戻れる。
+ * - crumbleFloor 崩れる床 [QR][WS G02]: 部屋の床全部が深い穴（約 2.8 m）の上の床板。乗り続けると揺れて落ちる（しばらくで戻る）。
+ *     落ちたら穴の底の階段で入口の床へ戻ってやり直し。隠し: 穴の底の壁の扉（crumble.fall・存在型）
  * - bouncePad 弾む床 [QR][WS M04]: 高い棚の手前の弾む床。跳ねて棚に乗れる（棚の上に小さな物）
  * - appearPath 立ち止まると見える道 [WS G08]: 深い溝（2 m）を渡る見えない橋。光の四角で 1.5 秒止まると現れる。落ちたら階段で戻る
  */
 import { box, type Box } from '../../world/layout.ts';
 import type { Rect } from '../../world/footprint.ts';
 import { defineGimmick } from './types.ts';
-import { aabbJson, cutFloorSlab, hitsDoorZones, innerRect, mainAxis, pitBoxes, rectD, rectW } from './util.ts';
+import { buildPit, pitInner, pitSecret, pitShell, planPit } from './pit.ts';
+import { aabbJson, cutFloorSlab, hitsDoorZones, innerRect, mainAxis, rectD, rectGap, rectW } from './util.ts';
 
 const snap = (v: number): number => Math.round(v * 20) / 20;
 
+/**
+ * 床板の並び: area から holes を除いた所を、大きさ tile の升目で敷く（holes の縁で切る。minPiece より細い切れ端は隣と合わせる）
+ */
+function tileGrid(area: Rect, holes: readonly Rect[], tile: number, minPiece = 0.3): Rect[] {
+  const lines = (a0: number, a1: number, edges: number[]): number[] => {
+    // 必ず残す線（area の端・holes の縁）と、升目の線（近すぎれば捨てる）
+    const must = [...new Set([a0, a1, ...edges.filter((v) => v > a0 + 1e-6 && v < a1 - 1e-6)])].sort((p, q) => p - q);
+    const out: number[] = [];
+    for (let i = 0; i + 1 < must.length; i++) {
+      const p = must[i]!, q = must[i + 1]!;
+      out.push(p);
+      const n = Math.max(1, Math.round((q - p) / tile));
+      for (let k = 1; k < n; k++) out.push(p + ((q - p) * k) / n);
+    }
+    out.push(a1);
+    return out.filter((v, i, arr) => i === 0 || v - arr[i - 1]! > Math.min(minPiece, 0.05) - 1e-9);
+  };
+  const xs = lines(area.x0, area.x1, holes.flatMap((h) => [h.x0, h.x1]));
+  const zs = lines(area.z0, area.z1, holes.flatMap((h) => [h.z0, h.z1]));
+  const out: Rect[] = [];
+  for (let k = 0; k + 1 < zs.length; k++) for (let i = 0; i + 1 < xs.length; i++) {
+    const r: Rect = { x0: xs[i]!, x1: xs[i + 1]!, z0: zs[k]!, z1: zs[k + 1]! };
+    const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
+    if (holes.some((h) => cx > h.x0 && cx < h.x1 && cz > h.z0 && cz < h.z1)) continue;
+    out.push(r);
+  }
+  return out;
+}
+
+/**
+ * 崩れる床: 部屋の床全部（開口の前の固い床を除く）が深い穴（gimmick.crumble.depthM）の上の床板。乗り続けると揺れて落ち、しばらくで戻る。
+ * 止まらずに渡れば落ちない（歩いて 1 枚あたり約 0.33 秒、揺れ始めるまで約 0.4 秒）。落ちたら穴の底の階段で入口の床へ戻ってやり直し。
+ * 崩れない床板が少しだけある（入口の床と同じ材質。並べて道にはしない）。隠し: 穴の底の壁の扉（落ちた人だけが見つける）
+ */
 defineGimmick({
-  id: 'crumbleFloor', name: '崩れる床', axes: ['floor'], kinds: ['room', 'hall'], minSize: [5.5, 6], weight: 0.8, intensity: 2, onMainPath: true,
+  id: 'crumbleFloor', name: '崩れる床', axes: ['floor'], kinds: ['room', 'hall'], minSize: [4.8, 6], minHeight: 2.4, weight: 1.4, intensity: 2, offersSecret: true, onMainPath: true,
+  fits: (s) => !!s.entrance && !!s.exit,
   build(ctx) {
     const s = ctx.slot;
+    const t = ctx.tuning;
     const y = s.cell.floorY;
-    // 穴: 内側から 1.4 m（開口の前を空ける）。開口の前と重なるなら諦める
-    const r = innerRect(s, 1.4);
-    if (rectW(r) < 2.4 || rectD(r) < 2.4 || hitsDoorZones(s, r, 1.35)) return;
-    const hole: Rect = { x0: snap(r.x0), z0: snap(r.z0), x1: snap(r.x1), z1: snap(r.z1) };
-    const depth = 0.7;
-    cutFloorSlab(s, hole);
-    for (const b of pitBoxes(s, hole, depth)) ctx.addBox(b);
-    // 穴から上がる段（四辺の真ん中に 2 段）
-    const mx = (hole.x0 + hole.x1) / 2, mz = (hole.z0 + hole.z1) / 2;
-    for (const [x, z, alongX] of [[mx, hole.z0 + 0.15, true], [mx, hole.z1 - 0.15, true], [hole.x0 + 0.15, mz, false], [hole.x1 - 0.15, mz, false]] as const) {
-      for (let k = 0; k < 2; k++) {
-        const top = y - depth + 0.35 * (k + 1);
-        const off = 0.3 * (2 - k);
-        const sgnZ = z < mz ? 1 : -1, sgnX = x < mx ? 1 : -1;
-        ctx.addBox(alongX
-          ? box([x - 0.6, y - depth, Math.min(z, z + sgnZ * off)], [x + 0.6, top, Math.max(z, z + sgnZ * off)], s.cell.palette.floor)
-          : box([Math.min(x, x + sgnX * off), y - depth, z - 0.6], [Math.max(x, x + sgnX * off), top, z + 0.6], s.cell.palette.floor));
-      }
+    const plan = planPit(ctx, { depth: t['gimmick.crumble.depthM'], preferAlongEntry: true });
+    if (!plan) return;
+    buildPit(ctx, plan);
+    const pieces = tileGrid(plan.hole, plan.solidTop, t['gimmick.crumble.tileM']);
+    const floorMat = s.cell.palette.floor;
+    const mat = ctx.rng.pick((['floorTile', 'floorLino', 'floorWood', 'floorCarpetGrey'] as const).filter((m) => m !== floorMat));
+    // 崩れない床板: 固い床・ほかの崩れない床板に接しない所から選ぶ
+    const safe = new Set<number>();
+    const want = Math.floor(pieces.length * t['gimmick.crumble.safeRatio']);
+    for (const i of ctx.rng.shuffle([...pieces.keys()])) {
+      if (safe.size >= want) break;
+      const r = pieces[i]!;
+      if (plan.solidTop.some((q) => rectGap(q, r) < 0.05) || [...safe].some((j) => rectGap(pieces[j]!, r) < 0.05)) continue;
+      safe.add(i);
     }
-    // 床板（0.9 m 角、隙間 0.04）
-    const tile = 0.9;
-    const nx = Math.floor(rectW(hole) / tile), nz = Math.floor(rectD(hole) / tile);
-    const ox = hole.x0 + (rectW(hole) - nx * tile) / 2, oz = hole.z0 + (rectD(hole) - nz * tile) / 2;
-    const mat = ctx.rng.pick([s.cell.palette.floor, 'floorTile', 'floorLino'] as const);
-    for (let i = 0; i < nx; i++) {
-      for (let k = 0; k < nz; k++) {
-        const b = { min: [ox + i * tile + 0.02, y - 0.12, oz + k * tile + 0.02], max: [ox + (i + 1) * tile - 0.02, y, oz + (k + 1) * tile - 0.02] };
-        ctx.addEntity(`t${i}_${k}`, { type: 'crumbleTile', params: { box: { min: b.min, max: b.max }, mat, standSec: ctx.rng.float(0.25, 0.5), shakeSec: ctx.rng.float(0.6, 1.1), respawnSec: 9 } });
-      }
-    }
-    ctx.keepOut({ min: [hole.x0, y - depth, hole.z0], max: [hole.x1, y + 3, hole.z1] });
+    // 床板の隙間（下の暗い穴が見える。普通の床ではないと一目で分かる）
+    const gi = t['gimmick.crumble.gapM'] / 2;
+    pieces.forEach((r, i) => {
+      const b = { min: [r.x0 + gi, y - 0.12, r.z0 + gi], max: [r.x1 - gi, y, r.z1 - gi] };
+      if (safe.has(i)) { ctx.addBox(box(b.min as [number, number, number], b.max as [number, number, number], floorMat)); return; }
+      ctx.addEntity(`t${i}`, { type: 'crumbleTile', params: { box: b, mat, standSec: t['gimmick.crumble.standSec'] * ctx.rng.float(0.85, 1.25), shakeSec: t['gimmick.crumble.shakeSec'] * ctx.rng.float(0.8, 1.3), respawnSec: t['gimmick.crumble.respawnSec'] } });
+    });
+    const offer = pitSecret(ctx, plan, 'crumble.fall', '床板の隙間から下の灯りが見える');
+    if (offer) ctx.offerSecret(offer);
+    ctx.keepOut({ min: [plan.hole.x0, y - plan.depth, plan.hole.z0], max: [plan.hole.x1, y + 3, plan.hole.z1] });
   },
 });
 
@@ -101,15 +133,22 @@ defineGimmick({
     if (hitsDoorZones(s, hole, 1.35)) return;
     const depth = 2.0;
     cutFloorSlab(s, hole);
-    for (const b of pitBoxes(s, hole, depth)) ctx.addBox(b);
-    // 溝から戻る階段（端の壁沿い）
-    const steps = Math.ceil(depth / 0.17);
-    const tread = Math.min(0.28, (axis === 'x' ? rectD(hole) : rectW(hole)) / (steps + 1));
-    for (let i = 0; i < steps; i++) {
-      const top = y - depth + (i + 1) * (depth / steps);
-      ctx.addBox(axis === 'x'
-        ? box([hole.x0 + 0.15, y - depth, hole.z0 + 0.15 + i * tread], [hole.x1 - 0.15, top, hole.z0 + 0.15 + (i + 1) * tread], s.cell.palette.floor)
-        : box([hole.x0 + 0.15 + i * tread, y - depth, hole.z0 + 0.15], [hole.x0 + 0.15 + (i + 1) * tread, top, hole.z1 - 0.15], s.cell.palette.floor));
+    pitShell(ctx, hole, depth);
+    // 溝から戻る階段: 入口側の溝の縁に沿って（幅 1.0 m）、部屋の端の壁から溝の真ん中の方へ下りる。上の端は入口側の床へ上がる。
+    // 下の端の先は溝の底が空いている（以前は溝の全幅に段を並べて端の壁から上っていたので、底から見ると一段目が壁際にあって
+    // 上れず、上の段は溝を渡る橋になっていた）
+    const nearLo = far > 0; // 入口側は溝の低い座標の側（溝は入口から遠い側へずらしてある）
+    const inner = pitInner(ctx, hole);
+    const riseMax = ctx.tuning['gimmick.pit.stairRise'], tread = ctx.tuning['gimmick.pit.stairTread'];
+    const n = Math.max(1, Math.ceil(depth / riseMax) - 1);
+    const rise = depth / (n + 1);
+    const laneW = 1.0;
+    const lane0 = axis === 'x' ? (nearLo ? inner.x0 : inner.x1 - laneW) : (nearLo ? inner.z0 : inner.z1 - laneW);
+    const a0 = axis === 'x' ? inner.z0 : inner.x0;
+    for (let i = 0; i < n; i++) {
+      const top = y - rise * (i + 1);
+      const s0 = a0 + i * tread, s1 = a0 + (i + 1) * tread;
+      ctx.addBox(axis === 'x' ? box([lane0, y - depth, s0], [lane0 + laneW, top, s1], s.cell.palette.floor) : box([s0, y - depth, lane0], [s1, top, lane0 + laneW], s.cell.palette.floor));
     }
     // 見えない橋（出現型の箱）: 溝の真ん中を幅 1.0 m で渡す
     const group = `${ctx.id}.bridge`;

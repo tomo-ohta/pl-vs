@@ -42,7 +42,7 @@ test('見本のフロア: 仕掛けを全種置き、見て回る位置はどれ
     const r = showcaseFloor(t, { flip });
     const g = r.gimmicks!;
     assert.deepEqual(new Set(g.gimmicks.map((x) => x.def)), new Set(all), '全種');
-    assert.equal(g.tour.length, g.gimmicks.length + g.secrets.filter((s) => s.hook === 'generic.darkCorner').length);
+    assert.equal(g.tour.length, g.gimmicks.length + g.secrets.filter((s) => s.hook === 'generic.darkCorner').length + r.anomalies.length);
     const sim = new Sim(r.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
     for (const s of g.tour) {
       sim.teleport(0, s.pos, s.yaw);

@@ -68,6 +68,16 @@ test('隠し場所の奥まで歩いて行ける・通り抜けは出口の部�
       n++;
       const sim = new Sim(r.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
       prepare(sim, r.floor);
+      // 崩れる床の穴の底の隠しは、床板が崩れて落ちてから行く（落ちた後に歩けることは gimmick-pit で確かめる）。ここでは穴の底から歩く
+      if (s.hook === 'crumble.fall') {
+        const host = r.floor.cells.find((c) => c.id === s.host)!;
+        const door = r.floor.portals.find((p) => p.cells[0] === s.host && p.cells[1] === s.cell)!;
+        const dc = [(door.aabb.min[0] + door.aabb.max[0]) / 2, (door.aabb.min[2] + door.aabb.max[2]) / 2];
+        const hc = [(host.bounds.min[0] + host.bounds.max[0]) / 2, (host.bounds.min[2] + host.bounds.max[2]) / 2];
+        const l = Math.hypot(hc[0]! - dc[0]!, hc[1]! - dc[1]!);
+        sim.teleport(0, [dc[0]! + ((hc[0]! - dc[0]!) / l) * 1.2, door.aabb.min[1] + 0.05, dc[1]! + ((hc[1]! - dc[1]!) / l) * 1.2], 0);
+        for (let i = 0; i < 30; i++) sim.step([{ ...IDLE_COMMAND }]);
+      }
       let res = walkTo(sim, s.cells[s.cells.length - 1]!, undefined, 200);
       if (res.ok && s.dest === 'loop') { loops++; res = walkTo(sim, s.to!, undefined, 120); }
       if (!res.ok) fails.push(`${r.floor.id} ${s.id} ${s.dest}: ${res.reason}`);

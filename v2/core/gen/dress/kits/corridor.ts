@@ -410,43 +410,188 @@ export function dressJunction(c: DressCtx, st: CorridorStyle, prefer: CorridorPr
 
 // ---------------------------------------------------------------- 階段・出口
 
+/** 手すりの高さ（段鼻を結ぶ線・床から手すりの上端まで） */
+export const RAIL_HEIGHT = 0.87;
+/** 手すりの太さ（断面の一辺。傾いた所は上下の厚みを 1/cos だけ増やして、太さを同じに見せる） */
+const RAIL_T = 0.05;
+/** 段として扱う高さの差の上限（これより大きい段差では手すりを切る） */
+const RAIL_STEP_MAX = 0.36;
+/** 踏面とみなす長さの上限（これより長い平らな所は踊り場・床） */
+const RAIL_TREAD_MAX = 0.6;
+/** 段が 1 つだけのときの踏面（core/gen/floor/geometry.ts の TREAD と同じ） */
+const RAIL_TREAD = 0.28;
+
+/** 面に沿った足元の高さの区間（a0..a1 で高さ top） */
+interface Tread { a0: number; a1: number; top: number }
+
 /**
- * 手すり（壁付け）。段の箱（先に置かれていた当たる箱 = 階段の段・踊り場）の上面に沿って高さを変える:
- * 面に沿って 0.14 m ごとに、壁際 0.5 m の帯に掛かる段の上面の最大を見て、そこから 0.85 m に手すりを通す。
- * 段の高さが変わる所は縦のつなぎを入れ、約 1.2 m ごとに壁からの持ち送り（金物）を付ける
+ * 面 f の壁際 0.5 m の帯の足元の高さ（先に置かれていた当たる箱 = 階段の段・踊り場の上面。無ければ床 0）を、
+ * 面に沿った区間 a0..a1 の区切りの列にする（同じ高さの続きはまとめる）
  */
-export function stairRail(c: DressCtx, f: Face, mat: MatId = 'handrailWood', y = 0.85, out = 0.07): void {
+export function treadProfile(c: DressCtx, f: Face, a0: number, a1: number): Tread[] {
+  const strip = alongFace(f, a0, a1 - a0, 0, 0.5, 0, c.h, 'void', true);
+  const ax = f.horizontal ? 0 : 2;
+  // 壁・柱のような背の高い物は見ない
+  const under = c.fixed.filter((s) => s.max[1] <= c.h - 0.6 && s.min[0] < strip.max[0] && s.max[0] > strip.min[0] && s.min[2] < strip.max[2] && s.max[2] > strip.min[2]);
+  const cuts = [...new Set([a0, a1, ...under.flatMap((s) => [s.min[ax], s.max[ax]]).filter((v) => v > a0 + 1e-6 && v < a1 - 1e-6)])].sort((p, q) => p - q);
+  const out: Tread[] = [];
+  for (let i = 0; i + 1 < cuts.length; i++) {
+    const p = cuts[i]!, q = cuts[i + 1]!;
+    if (q - p < 1e-6) continue;
+    const mid = (p + q) / 2;
+    let top = 0;
+    for (const s of under) if (s.min[ax] <= mid && s.max[ax] >= mid) top = Math.max(top, s.max[1]);
+    const last = out[out.length - 1];
+    if (last && Math.abs(last.top - top) < 1e-3) last.a1 = q;
+    else out.push({ a0: p, a1: q, top });
+  }
+  return out;
+}
+
+/** 手すりの線（面に沿った位置 a → 手すりの上端の高さ）の折れ点の列 */
+export type RailLine = [number, number][];
+
+/**
+ * 足元の高さの列から手すりの線を作る（実物の壁付けの手すりと同じ形）:
+ * - 平らな所（床・踊り場）は高さ + h の水平
+ * - 段の続き（踏面 0.6 m 以下・同じ向きの段差 0.36 m 以下）は、段鼻（段の角）を結ぶ線 + h のまっすぐな傾き。
+ *   低い側は段鼻の線を 1 段ぶん延ばして床の上の水平につなぎ、高い側は最後の段鼻から水平にする
+ * - それより大きい段差では線を切る（別の線にする）
+ * 線は「平らな所 + h」と「傾き」の大きい方（上の包絡線）で、つながっていて折れ点だけを持つ
+ */
+export function railLines(prof: readonly Tread[], h: number, maxY = Infinity): RailLine[] {
+  const lines: RailLine[] = [];
+  let s = 0;
+  for (let i = 0; i < prof.length; i++) {
+    const nx = prof[i + 1];
+    if (nx && Math.abs(nx.top - prof[i]!.top) <= RAIL_STEP_MAX) continue;
+    lines.push(railLine(prof.slice(s, i + 1), h, maxY));
+    s = i + 1;
+  }
+  return lines.filter((l) => l.length >= 2 && l[l.length - 1]![0] - l[0]![0] > 0.3);
+}
+
+function railLine(ps: readonly Tread[], h: number, maxY: number): RailLine {
+  const a0 = ps[0]!.a0, a1 = ps[ps.length - 1]!.a1;
+  // 段の続き（段鼻の列）: 境 j は ps[j] と ps[j + 1] の間。段鼻は境の位置で、高い方の高さ
+  const flights: { s0: number; s1: number; at: number; y: number; k: number }[] = [];
+  for (let j = 0; j + 1 < ps.length;) {
+    const sgn = Math.sign(ps[j + 1]!.top - ps[j]!.top);
+    let k = j;
+    while (k + 2 < ps.length && Math.sign(ps[k + 2]!.top - ps[k + 1]!.top) === sgn && ps[k + 1]!.a1 - ps[k + 1]!.a0 <= RAIL_TREAD_MAX) k++;
+    const n0 = { a: ps[j]!.a1, y: Math.max(ps[j]!.top, ps[j + 1]!.top) };
+    const n1 = { a: ps[k]!.a1, y: Math.max(ps[k]!.top, ps[k + 1]!.top) };
+    const slope = k > j ? (n1.y - n0.y) / (n1.a - n0.a) : (sgn * Math.abs(ps[j + 1]!.top - ps[j]!.top)) / RAIL_TREAD;
+    if (Math.abs(slope) > 1e-6) {
+      // 低い側は 1 段ぶん延ばす（低い所の高さに届くまで）
+      const low = sgn > 0 ? ps[j]!.top : ps[k + 1]!.top;
+      const s0 = sgn > 0 ? n0.a - (n0.y - low) / slope : n0.a;
+      const s1 = sgn > 0 ? n1.a : n1.a + (n1.y - low) / -slope;
+      flights.push({ s0: Math.max(a0, s0), s1: Math.min(a1, s1), at: n0.a, y: n0.y, k: slope });
+    }
+    j = k + 1;
+  }
+  const flatAt = (a: number): number => {
+    let top = -Infinity;
+    for (const p of ps) if (a >= p.a0 - 1e-9 && a <= p.a1 + 1e-9) top = Math.max(top, p.top);
+    return top;
+  };
+  const fl = (f: (typeof flights)[number], a: number): number => f.y + f.k * (a - f.at);
+  const env = (a: number): number => {
+    let y = flatAt(a);
+    for (const f of flights) if (a >= f.s0 - 1e-9 && a <= f.s1 + 1e-9) y = Math.max(y, fl(f, a));
+    return Math.min(y + h, maxY);
+  };
+  // 折れ点の候補: 区間の端・傾きの端・区間の中での線どうし / 線と平らな所の交わり
+  const xs = new Set<number>([a0, a1]);
+  for (const p of ps) { xs.add(p.a0); xs.add(p.a1); }
+  for (const f of flights) { xs.add(f.s0); xs.add(f.s1); }
+  const base = [...xs].sort((p, q) => p - q);
+  for (let i = 0; i + 1 < base.length; i++) {
+    const u = base[i]!, v = base[i + 1]!, m = (u + v) / 2;
+    const act = flights.filter((f) => m >= f.s0 && m <= f.s1);
+    const flatY = flatAt(m);
+    for (const f of act) {
+      const t = f.at + (flatY - f.y) / f.k;
+      if (t > u + 1e-6 && t < v - 1e-6) xs.add(t);
+      for (const g of act) {
+        if (g === f || Math.abs(g.k - f.k) < 1e-9) continue;
+        const tt = (g.y - g.k * g.at - f.y + f.k * f.at) / (f.k - g.k);
+        if (tt > u + 1e-6 && tt < v - 1e-6) xs.add(tt);
+      }
+    }
+  }
+  const pts: RailLine = [...xs].sort((p, q) => p - q).filter((a) => a >= a0 - 1e-9 && a <= a1 + 1e-9).map((a) => [a, env(a)]);
+  // 同じ傾きの続きは 1 本にまとめる
+  const out: RailLine = [];
+  for (const p of pts) {
+    if (out.length && p[0] - out[out.length - 1]![0] < 1e-4) continue;
+    if (out.length >= 2) {
+      const a = out[out.length - 2]!, b = out[out.length - 1]!;
+      const k1 = (b[1] - a[1]) / (b[0] - a[0]), k2 = (p[1] - b[1]) / (p[0] - b[0]);
+      if (Math.abs(k1 - k2) < 1e-4) out.pop();
+    }
+    out.push(p);
+  }
+  return out;
+}
+
+/** 手すりの線の位置 a での上端の高さ */
+function railY(l: RailLine, a: number): number {
+  for (let i = 0; i + 1 < l.length; i++) {
+    const p = l[i]!, q = l[i + 1]!;
+    if (a <= q[0] || i + 2 === l.length) return p[1] + ((q[1] - p[1]) * (a - p[0])) / Math.max(1e-9, q[0] - p[0]);
+  }
+  return l[0]![1];
+}
+
+/** 線の位置 a での上下の厚み（傾いた所は 1/cos 倍） */
+function railThick(l: RailLine, a: number): number {
+  for (let i = 0; i + 1 < l.length; i++) {
+    const p = l[i]!, q = l[i + 1]!;
+    if (a <= q[0] || i + 2 === l.length) return (RAIL_T * Math.hypot(q[0] - p[0], q[1] - p[1])) / Math.max(1e-9, q[0] - p[0]);
+  }
+  return RAIL_T;
+}
+
+/**
+ * 手すり（壁付け）: 段の箱（先に置かれていた当たる箱 = 階段の段・踊り場）に沿う、まっすぐな手すり。
+ * 段の続きでは段鼻を結ぶ線から y の高さに 1 本の傾いた棒（Box.slope。描画だけの平行六面体）、床と踊り場では水平の棒。
+ * 両端は壁へ折り返し、約 1.1 m ごとに壁からの持ち送り（金物の座・腕・受け）を付ける。壁から out 離す（通り道をほとんど狭めない）
+ */
+export function stairRail(c: DressCtx, f: Face, mat: MatId = 'handrailWood', y = RAIL_HEIGHT, out = 0.07): void {
   const B: Box[] = [];
+  const axis: 'x' | 'z' = f.horizontal ? 'x' : 'z';
+  const d0 = out, d1 = out + RAIL_T;
   for (const [p, q] of freeRuns(f, c.openings, 0.15)) {
     const a0 = p + 0.25, a1 = q - 0.25;
     if (a1 - a0 < 0.6) continue;
-    const pieces: { p0: number; p1: number; top: number }[] = [];
-    for (let a = a0; a < a1 - 1e-6; a += 0.14) {
-      const b1 = Math.min(a1, a + 0.14);
-      const strip = alongFace(f, a, b1 - a, 0, 0.5, 0, c.h, 'void', true);
-      let top = 0;
-      for (const s of c.fixed) {
-        if (s.max[1] > c.h - 0.6) continue; // 壁・柱のような背の高い物は見ない
-        if (s.min[0] < strip.max[0] && s.max[0] > strip.min[0] && s.min[2] < strip.max[2] && s.max[2] > strip.min[2]) top = Math.max(top, s.max[1]);
+    for (const l of railLines(treadProfile(c, f, a0, a1), y, c.h - 0.1)) {
+      const s0 = l[0]![0], s1 = l[l.length - 1]![0];
+      // 棒: 折れ点の間ごとに 1 本（つなぎ目は 1 cm 重ねる）
+      for (let i = 0; i + 1 < l.length; i++) {
+        const [u, yu] = l[i]!, [v, yv] = l[i + 1]!;
+        const ov0 = i === 0 ? 0 : 0.01, ov1 = i + 2 === l.length ? 0 : 0.01;
+        const k = (yv - yu) / (v - u);
+        const tv = (RAIL_T * Math.hypot(v - u, yv - yu)) / (v - u);
+        const top0 = yu - k * ov0;
+        const bar = alongFace(f, u - ov0, v - u + ov0 + ov1, d0, d1, top0 - tv, top0, mat, false);
+        if (Math.abs(yv - yu) > 1e-3) bar.slope = { axis, rise: k * (v - u + ov0 + ov1) };
+        B.push(bar);
       }
-      const last = pieces[pieces.length - 1];
-      if (last && Math.abs(last.top - top) < 1e-3) last.p1 = b1;
-      else pieces.push({ p0: a, p1: b1, top });
-    }
-    let since = 1.2;
-    for (let i = 0; i < pieces.length; i++) {
-      const pc = pieces[i]!;
-      const yy = Math.min(pc.top + y, c.h - 0.1);
-      B.push(alongFace(f, pc.p0, pc.p1 - pc.p0, out, out + 0.05, yy, yy + 0.05, mat, false));
-      const nx = pieces[i + 1];
-      if (nx) {
-        const y2 = Math.min(nx.top + y, c.h - 0.1);
-        B.push(alongFace(f, pc.p1 - 0.025, 0.05, out, out + 0.05, Math.min(yy, y2), Math.max(yy, y2) + 0.05, mat, false));
+      // 両端の壁への折り返し
+      for (const [a, dir] of [[s0, 1], [s1, -1]] as const) {
+        const top = railY(l, a), tv = railThick(l, a);
+        B.push(alongFace(f, dir > 0 ? a : a - RAIL_T, RAIL_T, 0, d0, top - tv, top, mat, false));
       }
-      since += pc.p1 - pc.p0;
-      if (since >= 1.2) {
-        B.push(alongFace(f, pc.p0 + 0.02, 0.03, 0, out, yy - 0.07, yy - 0.04, 'metal', false));
-        since = 0;
+      // 持ち送り（両端の近くと、そのあいだを 1.1 m 以下の等間隔）
+      const n = Math.max(1, Math.ceil((s1 - s0 - 0.3) / 1.1));
+      for (let i = 0; i <= n; i++) {
+        const a = s0 + 0.15 + ((s1 - s0 - 0.3) * i) / n;
+        const yb = railY(l, a) - railThick(l, a);
+        B.push(alongFace(f, a - 0.035, 0.07, 0, 0.012, yb - 0.1, yb - 0.02, 'metal', false)); // 壁の座
+        B.push(alongFace(f, a - 0.012, 0.024, 0.012, (d0 + d1) / 2 + 0.008, yb - 0.065, yb - 0.045, 'metal', false)); // 腕
+        B.push(alongFace(f, a - 0.012, 0.024, (d0 + d1) / 2 - 0.008, (d0 + d1) / 2 + 0.008, yb - 0.065, yb + 0.004, 'metal', false)); // 受け
       }
     }
   }

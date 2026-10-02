@@ -43,6 +43,8 @@ export interface PlayerState {
   inWater: boolean;
   zoneSlow: number;
   zoneFriction: number;
+  /** 重さの倍率（gravity ゾーン。1 が普通） */
+  zoneGravity: number;
   /** ゾーン（force）の外力 */
   zoneForce: Vec3;
   /** 乗っている動く物（動く床）の速度 */

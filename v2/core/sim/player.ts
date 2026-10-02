@@ -55,6 +55,7 @@ export function createPlayer(id: string, pos: Vec3, yaw: number): PlayerState {
     inWater: false,
     zoneSlow: 1,
     zoneFriction: 1,
+    zoneGravity: 1,
     zoneForce: [0, 0, 0],
     carry: [0, 0, 0],
     stillSec: 0,
@@ -129,7 +130,7 @@ export function stepPlayer(p: PlayerState, cmd: InputCommand, world: PlayerWorld
     p.surfaceId = null;
     events.push({ type: 'player.jump', tick, player: p.id, pos: [...p.pos] });
   }
-  p.vel[1] -= PLAYER.gravity * dt;
+  p.vel[1] -= PLAYER.gravity * p.zoneGravity * dt;
   if (p.vel[1] < -PLAYER.maxFall) p.vel[1] = -PLAYER.maxFall;
 
   const dx = p.vel[0] * dt;
@@ -205,6 +206,7 @@ function updateEye(p: PlayerState, dt: number): void {
 function applyZones(p: PlayerState, zones: Iterable<Zone>): void {
   p.zoneSlow = 1;
   p.zoneFriction = 1;
+  p.zoneGravity = 1;
   p.zoneForce = [0, 0, 0];
   p.inWater = false;
   const px = p.pos[0];
@@ -216,10 +218,14 @@ function applyZones(p: PlayerState, zones: Iterable<Zone>): void {
     switch (z.kind) {
       case 'water':
         p.zoneSlow = Math.min(p.zoneSlow, z.params?.slow ?? 0.7);
-        p.inWater = true;
+        // dry: 水ではないが足が取られる所（物の海など）。遅くなるだけで水の足音にしない
+        if (!z.params?.dry) p.inWater = true;
         break;
       case 'friction':
         p.zoneFriction = Math.min(p.zoneFriction, Math.max(0.05, z.params?.friction ?? 0.35));
+        break;
+      case 'gravity':
+        p.zoneGravity = Math.min(p.zoneGravity, Math.max(0.1, Number(z.params?.scale ?? 0.4)));
         break;
       case 'force': {
         const v = z.vector;

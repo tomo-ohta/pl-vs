@@ -50,6 +50,11 @@ export interface Box {
   revealGroup?: string;
   /** 出現型の隠し: この組が「現れた」ときに消える（行き止まりの壁が開く）。それまでは描画・当たり判定に入る */
   concealGroup?: string;
+  /**
+   * 傾けた箱（描画だけ。階段の手すり・斜めの梁など）: 軸 axis の向きに、min[axis] で 0・max[axis] で rise だけ上下がずれる平行六面体。
+   * min / max は傾ける前（低い端の高さ）の箱。当たり判定は付けない（solid は false にする）
+   */
+  slope?: { axis: 'x' | 'z'; rise: number };
 }
 
 export interface LightSpec {
@@ -97,7 +102,8 @@ export interface RenderOverrides {
  * water: 水平速度 ×slow / friction: 滑る（params.friction）/ force: 外力（vector × params.speed）/ crawl: しゃがみ通路 /
  * hazard: 体力（v2 の後半。今は効果なし）/ marker: 効果なし（地図・部品の目印）
  */
-export type ZoneKind = 'water' | 'friction' | 'force' | 'crawl' | 'hazard' | 'marker';
+/** gravity: 重さの倍率（params.scale。0.4 なら軽い部屋）。ほかは v1 と同じ */
+export type ZoneKind = 'water' | 'friction' | 'force' | 'crawl' | 'hazard' | 'marker' | 'gravity';
 export interface Zone {
   id?: string;
   kind: ZoneKind;

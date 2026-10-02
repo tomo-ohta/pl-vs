@@ -155,7 +155,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
       (!todo || todo.includes(def.id)));
     if (!fit.length) continue;
     // 見本: 残りの一覧の先頭から、この区画に置けるもの
-    const def = todo ? fit.sort((a, b) => todo.indexOf(a.id) - todo.indexOf(b.id))[0]! : r.weighted(fit, (x) => {
+    const weightOf = (x: GimmickDef): number => {
       let wt = x.weight;
       if (x.offersSecret && budget > offers.length) wt *= t['gimmick.secretBoost'];
       wt *= t['gimmick.repeatMul'] ** result.gimmicks.filter((y) => y.def === x.id).length;
@@ -164,8 +164,17 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
         if (x.intensity >= 2 && prevMain.intensity >= 2) wt *= t['gimmick.intenseRunMul'];
       }
       return wt;
-    });
-    const built = tryBuild(def, slot, g, geo, r, t, p, depth);
+    };
+    // 重みで引き、その部屋に組めなければ次の候補（部屋の形に合わせて作る大きな仕掛けは組めないことがあるので、部屋を空けない）
+    const order: GimmickDef[] = [];
+    if (todo) order.push(fit.sort((a, b) => todo.indexOf(a.id) - todo.indexOf(b.id))[0]!);
+    else {
+      const pool = fit.slice();
+      for (let k = 0; k < t['gimmick.buildTries'] && pool.length; k++) { const x = r.weighted(pool, weightOf); order.push(x); pool.splice(pool.indexOf(x), 1); }
+    }
+    let def = order[0]!;
+    let built: Built | null = null;
+    for (const cand of order) { built = tryBuild(cand, slot, g, geo, r, t, p, depth); if (built) { def = cand; break; } }
     if (!built) continue;
     // 隠しが無いと成り立たない仕掛けは、ここで隠しを付ける（付けられなければ仕掛けごと取り消す）
     const required = built.offers.filter((o) => o.required);
