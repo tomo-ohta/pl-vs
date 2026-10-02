@@ -8,7 +8,7 @@
 import { lightPanel } from '../../../world/build.ts';
 import { defineGimmick } from '../types.ts';
 import { aabbJson } from '../util.ts';
-import { hallAabb, hallBox, hallOf, hallPoint, removeLightsIn } from './common.ts';
+import { hallAabb, hallBox, hallOf, hallPoint, removeLightsIn, sideDir } from './common.ts';
 
 const opposite = (s: { entrance: { dir: number } | null; exit: { dir: number } | null }): boolean => !!s.entrance && !!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4;
 
@@ -67,9 +67,11 @@ defineGimmick({
     for (let k = -20; k <= 20; k++) {
       const v = T + k * P;
       if (v < land0 - 0.3 || v > H.L - land1 + 0.3) continue;
-      // 柱（両側の壁から少し張り出す）
+      // 柱（両側の壁から少し張り出す）。横の開口の前には置かない
       for (const hi of [false, true]) {
         const u = hi ? H.F.u1 : H.F.u0;
+        const dir = sideDir(H, hi);
+        if (s.openings.some((o) => o.dir === dir && Math.abs(H.F.v(o.pos[0], o.pos[2]) - v) < o.width / 2 + 0.5)) continue;
         ctx.addBox(hallBox(H, hi ? u - 0.18 : u, v - 0.15, hi ? u : u + 0.18, v + 0.15, 0, H.h, 'columnConcrete'));
       }
       const lv = v + P / 2;

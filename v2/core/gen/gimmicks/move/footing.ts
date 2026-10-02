@@ -79,7 +79,8 @@ function buildHole(ctx: GimmickContext, r: Rect, name: string, water: boolean): 
   const depth = ctx.tuning['move.foot.holeDepthM'];
   cutFloorSlab(ctx.slot, r);
   pitShell(ctx, r, depth);
-  if (water) ctx.addBox(box([r.x0, y - depth, r.z0], [r.x1, y - 0.35, r.z1], 'water', false));
+  // 冷たい水（青く光る。浅い水槽の水 water / waterShallow とは別の物: 浅い水槽の決まりは掛からない）
+  if (water) ctx.addBox(box([r.x0, y - 0.37, r.z0], [r.x1, y - 0.35, r.z1], 'aquariumBlue', false));
   ctx.addEntity(`${name}Back`, { type: 'respawnZone', params: { aabb: aabbJson({ min: [r.x0, y - depth - 0.1, r.z0], max: [r.x1, y - 0.25, r.z1] }), ...backAt(ctx) } });
 }
 

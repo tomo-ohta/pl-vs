@@ -60,4 +60,19 @@ export const MOVE_TUNING = {
   'move.stretch.periodM': num(1.8, 1.2, 3, '伸びる廊下: 柱と照明の間隔（m）。歩いて境目を越えると、この長さだけ戻される'),
   'move.stretch.stillSec': num(1.0, 0.3, 4, '伸びる廊下: 立ち止まってから前へ滑り始めるまでの秒数'),
   'move.stretch.glide': num(1.3, 0.5, 3, '伸びる廊下: 立ち止まっている間に前へ滑る速さ（m/s）'),
+
+  // ---- 溝・穴を渡る部屋: 走ると抜ける床 [M43]・見えない足場 [M44]・吊り橋 [M15]・振り子 [M39] ----
+  'move.chasm.depthM': num(2.7, 2.2, 3.05, '溝・穴の部屋: 穴の深さ（m。3.1 m 以上は隠し部屋が隣の区画の下に入り込む）'),
+  'move.chasm.tileM': num(1.0, 0.6, 1.6, '走ると抜ける床: 床板の大きさ（m）'),
+  'move.chasm.trapSpeed': num(4.0, 3.2, 5.4, '走ると抜ける床: これより速く動くと床板が開く（m/s。歩く 3.0 と走る 5.5 の間）'),
+  'move.chasm.trapOpenSec': num(3, 1, 10, '走ると抜ける床: 開いた床板が閉じるまで（秒）'),
+  'move.chasm.ghostCellM': num(0.95, 0.9, 1.4, '見えない足場: 足場の 1 升の大きさ（m）'),
+  'move.chasm.bridgeW': num(0.85, 0.75, 1.4, '吊り橋: 橋板の幅（m）'),
+  'move.chasm.swayGain': num(4, 0.5, 20, '吊り橋: 歩くより速く動いたときに揺れが大きくなる強さ（度 / 秒 /（m/s）²）'),
+  'move.chasm.swayMaxDeg': num(16, 4, 30, '吊り橋: 揺れの傾きの上限（度）'),
+  'move.chasm.swayPush': num(0.6, 0.1, 2, '吊り橋: 傾きで横へ押す強さ（重さに対する割合）'),
+  'move.chasm.walkW': num(1.2, 0.9, 2, '振り子の通路: 橋の幅（m）'),
+  'move.chasm.pendulumPitch': num(1.9, 1.5, 3, '振り子の通路: 振り子の間隔（m。間で待てる）'),
+  'move.chasm.pendulumPeriod': num(2.6, 1.6, 5, '振り子の通路: 振り子の周期（秒）'),
+  'move.chasm.rideSec': num(1.2, 0.3, 5, '振り子の通路（出現型の隠し）: 振り子の板に乗っている秒数'),
 } as const satisfies Record<string, Spec>;

@@ -210,6 +210,38 @@ function distToSegment(x: number, z: number, a: [number, number], b: [number, nu
   return Math.hypot(a[0] + ex * k - x, a[1] + ez * k - z);
 }
 
+/**
+ * 段階 4（移動と身体）: 進む向き (dx, dz) の 0.8 m 先が振り子の板の払う所（板の面の前後 0.45 m）に入るなら、渡り切るまでの間
+ * （歩く速さで払う所を抜ける時間）の板の位置を、振り子の式（params の周期・位相・振れ幅）で先読みし、体に当たるなら true（待つ）。
+ * 払う所の中にいるなら止まらない
+ */
+function pendulumAhead(sim: Sim, p: { pos: number[] }, dx: number, dz: number): boolean {
+  const dl = Math.hypot(dx, dz);
+  if (dl < 1e-6) return false;
+  const ux = dx / dl, uz = dz / dl;
+  const time = sim.tick * sim.dt;
+  for (const e of sim.floor.entities) {
+    if (e.type !== 'pendulum') continue;
+    const piv = e.params.pivot as number[], sw = e.params.swing as number[], half = e.params.half as number[];
+    if (Math.hypot(piv[0]! - p.pos[0]!, piv[2]! - p.pos[2]!) > 4) continue;
+    const ax = -sw[2]!, az = sw[0]!;
+    const slab = Math.abs(ax) * half[0]! + Math.abs(az) * half[2]! + 0.45;
+    const now = Math.abs((p.pos[0]! - piv[0]!) * ax + (p.pos[2]! - piv[2]!) * az);
+    const ahead = Math.abs((p.pos[0]! + ux * 0.4 - piv[0]!) * ax + (p.pos[2]! + uz * 0.4 - piv[2]!) * az);
+    if (now < slab || ahead >= slab) continue;
+    const len = Number(e.params.len), amp = Number(e.params.amp), period = Number(e.params.period), phase = Number(e.params.phase ?? 0);
+    const across = Math.abs(sw[0]!) * half[0]! + Math.abs(sw[2]!) * half[2]! + PLAYER.radius + 0.1;
+    const me = (p.pos[0]! - piv[0]!) * sw[0]! + (p.pos[2]! - piv[2]!) * sw[2]!;
+    // 払う所を抜けるまでの時間（歩き出しの遅れを足す）
+    const T = (now + slab) / PLAYER.walk + 0.12;
+    for (let k = 0; k * 0.04 <= T; k++) {
+      const th = amp * Math.sin(((time + k * 0.04) / period) * Math.PI * 2 + phase);
+      if (Math.abs(Math.sin(th) * len - me) < across) return true;
+    }
+  }
+  return false;
+}
+
 /** 段階 4（移動と身体）: 部品 type の範囲（params.aabb）に足元が入っているか */
 function moveRegion(floor: FloorLayout, type: string, p: readonly number[]): boolean {
   for (const e of floor.entities) {
@@ -272,6 +304,8 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     if (botDebug.trace && n % 60 === 0) botDebug.trace(`t=${(n * sim.dt).toFixed(0)} leg ${leg}/${legs.length} pos ${player.pos.map((v) => v.toFixed(2)).join(',')} path ${path.length} best ${bestD.toFixed(2)} stuck ${stuck}`);
     // 区画の中の道を引き直す（区間の始まり・止まったとき・流された・落ちたとき）
     if (!path.length) {
+      // 段階 4（移動と身体）: 道を引くときは振り子の板を見ない（払う所の前で待つ。板の当たり判定は次の tick に部品が置き直す）
+      for (const e of floor.entities) if (e.type === 'pendulum') sim.colliders.setDynamic(`${e.id}:bob`, null);
       const c = cellAtPos(floor, player.pos);
       path = (c && !L.via ? pathInCell(sim, c, player.pos, [L.x, L.y, L.z]) : null) ?? [];
       path.push([L.x, L.z]);
@@ -307,6 +341,9 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     if (moveRegion(floor, 'facingPush', player.pos)) { cmd.yaw += Math.PI; cmd.moveY = -cmd.moveY; cmd.moveX = -cmd.moveX; }
     // 段階 4: 歩くと伸びる廊下（stretchWarp）で進めなくなったら、しばらく立ち止まる（立ち止まると前へ滑る）
     if (idle > 0) { idle -= sim.dt; cmd.moveX = 0; cmd.moveY = 0; }
+    // 段階 4: 振り子（pendulum）の払う所へ入る前は、板が通り過ぎて離れていくまで待つ（待つ間は止まったと数えない）
+    const waiting = pendulumAhead(sim, player, dx, dz);
+    if (waiting) { cmd.moveX = 0; cmd.moveY = 0; }
     const door = L.portal?.doorId;
     if (door && legD < 0.7 && Math.abs(player.pos[1] - L.y) < 1.2 && sim.outputOf(door, 'open') < 0.5 && waitDoor <= 0) {
       waitDoor = 1.0;
@@ -331,7 +368,7 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     const rem = remaining();
     // 段階 4（移動と身体）: 向かい風・人の流れに押し戻されている間は、止まったと数えない（しゃがむと遅くなって渡れない）
     const pushedBack = fl > PLAYER.walk * 0.9 && fz[0] * dx + fz[2] * dz < 0;
-    if (rem < bestD - 0.05 || waitDoor > 0 || pushedBack) { bestD = Math.min(bestD, rem); stuck = 0; } else stuck++;
+    if (rem < bestD - 0.05 || waitDoor > 0 || pushedBack || waiting) { bestD = Math.min(bestD, rem); stuck = 0; } else stuck++;
     // 進めないとき: しゃがんでみる・跳んでみる → 道を引き直す（段階 4: 伸びる廊下では立ち止まってみる）
     if (stuck * sim.dt > 1.0 && idle <= 0 && moveRegion(floor, 'stretchWarp', player.pos)) { idle = 3.2; stuck = 0; }
     if (stuck * sim.dt > 1.0 && crouch <= 0) { crouch = 3; path = []; }

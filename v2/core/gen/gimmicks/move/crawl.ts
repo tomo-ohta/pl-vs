@@ -22,7 +22,8 @@ defineGimmick({
     const s = ctx.slot;
     const opp = !!s.exit && s.exit.dir === (s.entrance!.dir + 2) % 4;
     const H = opp ? hallOf(s) : null;
-    if (H && H.L >= 6.5 && ctx.rng.chance(ctx.tuning['move.crawl.shrinkChance'])) buildShrink(ctx, H);
+    // 縮むトンネルは部屋の幅いっぱいを枠で埋めるので、開口が入口と出口だけの部屋（横の開口を塞がない）
+    if (H && H.L >= 6.5 && s.openings.length === 2 && ctx.rng.chance(ctx.tuning['move.crawl.shrinkChance'])) buildShrink(ctx, H);
     else buildDuct(ctx);
   },
 });

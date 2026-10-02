@@ -6,3 +6,4 @@ import './wind.ts';
 import './footing.ts';
 import './halls.ts';
 import './crawl.ts';
+import './chasm.ts';
