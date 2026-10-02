@@ -52,21 +52,53 @@ function boxGeometry(size: [number, number, number], mat: MatId): THREE.BufferGe
   return g;
 }
 
-/** 単位の大きさの棚（-0.5..0.5）: 幅の向きの両端の側板・天板・底板・棚板 2 枚。前後は開いている。wideX: 幅が x の向き */
+/** 単位の大きさの棚（-0.5..0.5）: 幅の向きの両端の側板・天板・底板・棚板 2 枚・真ん中の背板（向こうが透けない）。wideX: 幅が x の向き */
 function shelfGeometry(mat: MatId, wideX: boolean): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   const add = (c: [number, number, number], size: [number, number, number]): void => {
-    const g = boxGeometry(size, mat);
-    g.translate(c[0], c[1], c[2]);
+    const g = boxGeometry(wideX ? size : [size[2], size[1], size[0]], mat);
+    g.translate(...(wideX ? c : [c[2], c[1], c[0]] as [number, number, number]));
     parts.push(g);
   };
   const t = 0.06;
-  if (wideX) { add([-0.5 + t / 2, 0, 0], [t, 1, 1]); add([0.5 - t / 2, 0, 0], [t, 1, 1]); }
-  else { add([0, 0, -0.5 + t / 2], [1, 1, t]); add([0, 0, 0.5 - t / 2], [1, 1, t]); }
-  for (const y of [-0.5 + 0.02, -0.18, 0.15, 0.5 - 0.02]) add([0, y, 0], wideX ? [1 - 2 * t, 0.04, 0.96] : [0.96, 0.04, 1 - 2 * t]);
+  add([-0.5 + t / 2, 0, 0], [t, 1, 1]);
+  add([0.5 - t / 2, 0, 0], [t, 1, 1]);
+  for (const y of SHELF_BOARDS) add([0, y, 0], [1 - 2 * t, 0.04, 0.96]);
+  add([0, 0, 0], [1 - 2 * t, 0.98, 0.03]);
   const merged = mergeGeometries(parts, false);
   for (const g of parts) g.dispose();
   return merged ?? boxGeometry([1, 1, 1], mat);
+}
+
+/** 棚板の高さ（単位の大きさ。下から） */
+const SHELF_BOARDS = [-0.5 + 0.02, -0.18, 0.15, 0.5 - 0.02];
+
+/** 棚の中身（単位の大きさ）: 各段の前後に、大きさの揃わない箱を詰める（決まった並び。棚の寸法で引き伸ばされる） */
+function shelfFillGeometry(mat: MatId, wideX: boolean): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  let k = 7;
+  const rnd = (): number => { k = (k * 16807) % 2147483647; return k / 2147483647; };
+  for (let i = 0; i + 1 < SHELF_BOARDS.length; i++) {
+    const y0 = SHELF_BOARDS[i]! + 0.02, room = SHELF_BOARDS[i + 1]! - 0.02 - y0;
+    for (const side of [-1, 1]) {
+      let x = -0.44;
+      while (x < 0.4) {
+        const w = Math.min(0.44 - x, 0.12 + rnd() * 0.16);
+        const h = room * (0.62 + rnd() * 0.33);
+        const d = 0.3 + rnd() * 0.12;
+        const z0 = side > 0 ? 0.02 : -0.02 - d;
+        const size: [number, number, number] = [w - 0.01, h, d];
+        const c: [number, number, number] = [x + w / 2, y0 + h / 2, z0 + d / 2];
+        const g = boxGeometry(wideX ? size : [size[2], size[1], size[0]], mat);
+        g.translate(...(wideX ? c : [c[2], c[1], c[0]] as [number, number, number]));
+        parts.push(g);
+        x += w;
+      }
+    }
+  }
+  const merged = mergeGeometries(parts, false);
+  for (const g of parts) g.dispose();
+  return merged ?? boxGeometry([0.1, 0.1, 0.1], mat);
 }
 
 /** ジオメトリの bakedLight を一色に（区画の陰影をその位置で測った値） */
@@ -88,21 +120,47 @@ defineView('door', (spec, ctx) => {
   const axis = spec.params.axis === 'x' ? 'x' : 'z';
   const mat = (spec.params.mat as MatId | undefined) ?? 'doorWood';
   const size: [number, number, number] = [panel.max[0] - panel.min[0], panel.max[1] - panel.min[1], panel.max[2] - panel.min[2]];
-  const g = boxGeometry(size, mat);
-  const mesh = new THREE.Mesh(g, ctx.materials.get(mat));
-  // 蝶番: 'z' の扉（x に沿う板）は x の小さい端、'x' の扉は z の小さい端
-  const pivot = new THREE.Group();
+  // 板は開口より 3 cm ずつ大きく（隙間から向こうが見えない。v1 と同じ）。厚さ 5 cm
+  const W = (axis === 'z' ? size[0] : size[2]) + 0.06;
+  const H = size[1] + 0.03;
+  const T = 0.05;
   const hingeSign = spec.params.hinge === 1 ? 1 : -1;
-  if (axis === 'z') {
-    pivot.position.set(hingeSign < 0 ? panel.min[0] : panel.max[0], panel.min[1], (panel.min[2] + panel.max[2]) / 2);
-    mesh.position.set(-hingeSign * size[0] / 2, size[1] / 2, 0);
-  } else {
-    pivot.position.set((panel.min[0] + panel.max[0]) / 2, panel.min[1], hingeSign < 0 ? panel.min[2] : panel.max[2]);
-    mesh.position.set(0, size[1] / 2, -hingeSign * size[2] / 2);
-  }
+  // 蝶番: 'z' の扉（x に沿う板）は x の端、'x' の扉は z の端。板は蝶番から -hingeSign の向きへ伸びる
+  const pivot = new THREE.Group();
+  if (axis === 'z') pivot.position.set(hingeSign < 0 ? panel.min[0] - 0.03 : panel.max[0] + 0.03, panel.min[1], (panel.min[2] + panel.max[2]) / 2);
+  else pivot.position.set((panel.min[0] + panel.max[0]) / 2, panel.min[1], hingeSign < 0 ? panel.min[2] - 0.03 : panel.max[2] + 0.03);
+  const along = (d: number, up: number, out: number): [number, number, number] => (axis === 'z' ? [-hingeSign * d, up, out] : [out, up, -hingeSign * d]);
+  const light = lightAt(ctx, aabbCenter(panel));
+  const geos: THREE.BufferGeometry[] = [];
+  const g = boxGeometry(axis === 'z' ? [W, H, T] : [T, H, W], mat);
+  setBaked(g, light);
+  geos.push(g);
+  const mesh = new THREE.Mesh(g, ctx.materials.get(mat));
+  mesh.position.set(...along(W / 2, H / 2, 0));
   pivot.add(mesh);
+  // ノブ（レバー）: 戸先から 12 cm・床から 1.0 m（低い扉は高さの半分）。両面に出す（v1 と同じ寸法）
+  const metal = ctx.materials.get('metal');
+  const knobD = W - 0.12, knobY = Math.min(1.0, H * 0.5);
+  const spindle = new THREE.CylinderGeometry(0.022, 0.022, T + 0.07, 10);
+  const lever = new THREE.CylinderGeometry(0.014, 0.014, 0.13, 10);
+  for (const cg of [spindle, lever]) {
+    cg.setAttribute('bakedLight', new THREE.BufferAttribute(new Float32Array(cg.getAttribute('position').count * 3), 3));
+    setBaked(cg, light);
+    geos.push(cg);
+  }
+  const sp = new THREE.Mesh(spindle, metal);
+  // 軸は板を貫く向き（'z' の扉は z、'x' の扉は x）
+  if (axis === 'z') sp.rotation.x = Math.PI / 2; else sp.rotation.z = Math.PI / 2;
+  sp.position.set(...along(knobD, knobY, 0));
+  pivot.add(sp);
+  for (const face of [-1, 1]) {
+    const lv = new THREE.Mesh(lever, metal);
+    // レバーは板に沿って蝶番の方へ向く
+    if (axis === 'z') lv.rotation.z = Math.PI / 2; else lv.rotation.x = Math.PI / 2;
+    lv.position.set(...along(knobD - 0.05, knobY, face * (T / 2 + 0.035)));
+    pivot.add(lv);
+  }
   ctx.root.add(pivot);
-  setBaked(g, lightAt(ctx, aabbCenter(panel)));
   const swing = typeof spec.params.swing === 'number' ? spec.params.swing : 1;
   return {
     update(s) {
@@ -111,7 +169,7 @@ defineView('door', (spec, ctx) => {
       const e = a * a * (3 - 2 * a);
       pivot.rotation.y = -hingeSign * swing * e * (95 * Math.PI / 180);
     },
-    dispose() { pivot.removeFromParent(); g.dispose(); },
+    dispose() { pivot.removeFromParent(); for (const x of geos) x.dispose(); },
   };
 });
 
@@ -192,24 +250,30 @@ defineView('propPile', (_spec, ctx) => {
     const kinds = s.kinds as string[];
     const half = s.half as number[];
     const order = new Map<string, number[]>();
-    mats.forEach((m, i) => {
-      const shape = kinds[i] === 'ball' ? 'ball' : kinds[i] === 'shelf' ? (half[i * 3]! >= half[i * 3 + 2]! ? 'shelfX' : 'shelfZ') : 'box';
-      const key = `${m}|${shape}`;
+    const put = (key: string, i: number): void => {
       const list = order.get(key) ?? [];
       list.push(i);
       order.set(key, list);
+    };
+    mats.forEach((m, i) => {
+      const wide = half[i * 3]! >= half[i * 3 + 2]! ? 'X' : 'Z';
+      const shape = kinds[i] === 'ball' ? 'ball' : kinds[i] === 'shelf' ? `shelf${wide}` : 'box';
+      put(`${m}|${shape}`, i);
+      // 棚には中身（箱）を詰める（同じ姿勢で描く別の InstancedMesh）
+      if (kinds[i] === 'shelf') put(`boxCardboard|fill${wide}`, i);
     });
     for (const [key, index] of order) {
       const [mat, shape] = key.split('|') as [MatId, string];
       let geo: THREE.BufferGeometry;
       if (shape === 'ball') geo = sphere;
       else if (shape === 'shelfX' || shape === 'shelfZ') geo = shelfGeometry(mat, shape === 'shelfX');
+      else if (shape === 'fillX' || shape === 'fillZ') geo = shelfFillGeometry(mat, shape === 'fillX');
       else {
         geo = unitBox.get(mat) ?? boxGeometry([1, 1, 1], mat);
         unitBox.set(mat, geo);
       }
       const g = geo.clone();
-      if (shape === 'shelfX' || shape === 'shelfZ') geo.dispose();
+      if (shape !== 'ball' && shape !== 'box') geo.dispose();
       g.deleteAttribute('bakedLight');
       g.setAttribute('bakedLight', new THREE.InstancedBufferAttribute(new Float32Array(index.length * 3).fill(0.2), 3));
       const mesh = new THREE.InstancedMesh(g, ctx.materials.get(mat), index.length);

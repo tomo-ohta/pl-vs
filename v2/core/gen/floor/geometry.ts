@@ -190,10 +190,14 @@ export function buildGeometry(p: FloorProfile, sk: Skeleton, rng: Rng, t: Tuning
     straights.push(...segs);
     // 区画の端の床の高さ（階段は低い端・高い端で違う）
     const endY = (s: StraightSpec, side: 'a0' | 'a1'): number => !s.stairs ? s.y : side === s.stairs.lowEnd ? s.y : s.y + s.stairs.rise;
-    for (const s of segs) {
-      addOpening(s.id, opening(`${s.id}:a0`, axis === 'x' ? [s.a0, endY(s, 'a0'), center] : [center, endY(s, 'a0'), s.a0], dirNeg, cw, h));
-      addOpening(s.id, opening(`${s.id}:a1`, axis === 'x' ? [s.a1, endY(s, 'a1'), center] : [center, endY(s, 'a1'), s.a1], dirPos, cw, h));
-    }
+    // 廊下の両端の開口: 部屋・広間につながる端は、その部屋の開口と同じ大きさ（扉なら扉の大きさ）。廊下どうしの端は廊下の幅いっぱい。
+    // 大きさが違うと、廊下の突き当たりの壁が扉より大きく開き、扉が閉じている間（向こうの区画を描かない）は扉の周りが穴に見えた
+    segs.forEach((s, i) => {
+      const w0 = i === 0 ? oF.width : cw, h0 = i === 0 ? oF.height : h;
+      const w1 = i === segs.length - 1 ? oT.width : cw, h1 = i === segs.length - 1 ? oT.height : h;
+      addOpening(s.id, opening(`${s.id}:a0`, axis === 'x' ? [s.a0, endY(s, 'a0'), center] : [center, endY(s, 'a0'), s.a0], dirNeg, w0, h0));
+      addOpening(s.id, opening(`${s.id}:a1`, axis === 'x' ? [s.a1, endY(s, 'a1'), center] : [center, endY(s, 'a1'), s.a1], dirPos, w1, h1));
+    });
     // 区画どうしの portal と扉
     const join = (a: string, b: string, coord: number, y: number, width: number, height: number, doorRoom: Placed | null, swing: number): void => {
       let doorId: string | undefined;

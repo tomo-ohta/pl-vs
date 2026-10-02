@@ -14,10 +14,13 @@ export interface WalkResult { ok: boolean; reason: string; seconds: number; rout
 function route(floor: FloorLayout, from: string, to: string): PortalSpec[] | null {
   const by = new Map<string, PortalSpec[]>();
   for (const p of floor.portals) for (const c of p.cells) by.set(c, [...(by.get(c) ?? []), p]);
+  // 一方通行の扉（openSide のある扉）は cells[0] → cells[1] の向きだけ通れる（隠し通路の出口）
+  const oneWay = new Set(floor.entities.filter((e) => e.type === 'door' && typeof e.params.openSide === 'number').map((e) => e.id));
   const prev = new Map<string, { cell: string; portal: PortalSpec } | null>([[from, null]]);
   const q = [from];
   for (let h = 0; h < q.length && !prev.has(to); h++) {
     for (const p of by.get(q[h]!) ?? []) {
+      if (p.doorId && oneWay.has(p.doorId) && p.cells[1] === q[h]) continue;
       const o = p.cells[0] === q[h] ? p.cells[1] : p.cells[0];
       if (prev.has(o)) continue;
       prev.set(o, { cell: q[h]!, portal: p });
@@ -124,11 +127,13 @@ export function cellAtPos(floor: FloorLayout, p: [number, number, number]): Cell
 
 export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, number], maxSec = 300): WalkResult {
   const floor = sim.floor;
-  const r = route(floor, floor.spawn.cell, targetCell);
+  // 今いる区画から（初めは出てくる区画）
+  const from = cellAtPos(floor, sim.players[0]!.pos)?.id ?? floor.spawn.cell;
+  const r = route(floor, from, targetCell);
   if (!r) return { ok: false, reason: '道順がありません', seconds: 0, route: [] };
   // 区間の目標: 開口の手前（扉なら調べる）→ 開口の先
   const legs: { x: number; y: number; z: number; portal?: PortalSpec; via?: boolean }[] = [];
-  let cell = floor.spawn.cell;
+  let cell = from;
   for (let i = 0; i < r.length; i++) {
     const p = r[i]!;
     const [x, y, z] = center(p);

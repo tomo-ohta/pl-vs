@@ -108,6 +108,13 @@ defineGimmick({
     const depth = 2.2;
     const mid = axis === 'x' ? (r.x0 + r.x1) / 2 : (r.z0 + r.z1) / 2;
     const hole: Rect = axis === 'x' ? { x0: snap(mid - L / 2), x1: snap(mid + L / 2), z0: r.z0, z1: r.z1 } : { x0: r.x0, x1: r.x1, z0: snap(mid - L / 2), z1: snap(mid + L / 2) };
+    // 溝は部屋の端から端まで横切る。横の壁の開口（広間の 3 つ目・4 つ目の出入り口）の前が溝にならないこと（出た途端に落ちない）
+    const h0 = axis === 'x' ? hole.x0 : hole.z0, h1 = axis === 'x' ? hole.x1 : hole.z1;
+    for (const o of s.openings) {
+      if (o.dir % 2 === e0.dir % 2) continue;
+      const at = axis === 'x' ? o.pos[0] : o.pos[2];
+      if (at + o.width / 2 + 0.8 > h0 && at - o.width / 2 - 0.8 < h1) return;
+    }
     cutFloorSlab(s, hole);
     for (const b of pitBoxes(s, hole, depth)) ctx.addBox(b);
     // 梁: 入口の位置の延長線（幅 0.5 m）

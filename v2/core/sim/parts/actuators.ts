@@ -36,7 +36,11 @@ definePart<{ angle: number; target: number; idle: number }>({
     } else {
       const who = ctx.interactedBy();
       if (who) {
-        if (locked) ctx.cue('door.locked', center);
+        // 一方通行（openSide = ±1）: 閉じているとき、板の法線の向きでその側にいる人だけが開けられる（隠し通路の出口など）
+        const side = pNum(ctx.spec, 'openSide', 0);
+        const n = panel.max[0] - panel.min[0] < panel.max[2] - panel.min[2] ? 0 : 2;
+        const wrongSide = side !== 0 && s.target < ON && Math.sign(who.pos[n] - center[n]) !== Math.sign(side);
+        if (locked || wrongSide) ctx.cue('door.locked', center);
         else s.target = s.target > ON ? 0 : 1;
       }
       // 自動で閉まる: 近くに誰もいない時間が autoCloseSec 秒（0 で閉まらない）

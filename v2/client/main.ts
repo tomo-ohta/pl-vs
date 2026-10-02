@@ -14,6 +14,7 @@ import { dressCell } from '../core/gen/dress/index.ts';
 import { generateFloorReport, type GenReport } from '../core/gen/floor/index.ts';
 import type { TourStop } from '../core/gen/floor/gimmicks.ts';
 import { showcaseFloor } from '../core/gen/floor/showcase.ts';
+import { RARE_DEFS } from '../core/gen/secrets/index.ts';
 import type { FloorLayout } from '../core/world/layout.ts';
 import { ClientGame } from './game/ClientGame.ts';
 import { mountUi } from './ui/dom.ts';
@@ -70,14 +71,15 @@ function makeFloor(d: number, v = 0): FloorLayout {
 }
 
 const MODE_JA = { present: '存在型（最初からある）', appear: '出現型（条件で現れる）' } as const;
-const DEST_JA: Record<string, string> = { passage: '抜け道', room: '小部屋', privateRoom: '私室', rareRoom: '珍しい部屋', floorLink: '下のフロアへの穴', bFloor: '裏のフロアへの穴', clue: '手がかり' };
+const DEST_JA: Record<string, string> = { rareRoom: 'レア部屋', passageRare: '隠し通路の先にレア部屋', loop: '隠し通路で別の部屋へ抜ける', floorLink: '下のフロアへの穴', bFloor: '裏のフロアへの穴' };
 /** 見て回る順と、その場所の隠し（型と行き先） */
 function tourOf(r: GenReport): { stop: TourStop; text: string }[] {
   const g = r.gimmicks;
   if (!g) return [];
   return g.tour.map((stop, i) => {
     const sec = g.secrets.filter((s) => s.host === stop.cell);
-    const tail = sec.length ? ` — 隠し: ${sec.map((s) => `${MODE_JA[s.mode]}・${DEST_JA[s.dest] ?? s.dest}`).join(' / ')}` : '';
+    const rareName = (k?: string): string => (k ? `（${RARE_DEFS.find((d) => d.id === k)?.name ?? k}）` : '');
+    const tail = sec.length ? ` — 隠し: ${sec.map((s) => `${MODE_JA[s.mode]}・${DEST_JA[s.dest] ?? s.dest}${rareName(s.rare)}`).join(' / ')}` : '';
     return { stop, text: `${i + 1}/${g.tour.length} ${stop.label}${tail}` };
   });
 }

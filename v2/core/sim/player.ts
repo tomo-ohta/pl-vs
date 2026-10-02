@@ -140,12 +140,14 @@ export function stepPlayer(p: PlayerState, cmd: InputCommand, world: PlayerWorld
   const start: Vec3 = [p.pos[0], p.pos[1], p.pos[2]];
   const wasOnGround = p.onGround;
   const blocked = moveHorizontal(p, dx, dz, near);
-  if (blocked && wasOnGround) {
+  const rise = blocked && wasOnGround ? stepNeeded(start, dx, dz, near, playerHeight(p)) : 0;
+  if (rise > 0) {
     const afterFlat: Vec3 = [p.pos[0], p.pos[1], p.pos[2]];
-    p.pos[0] = start[0]; p.pos[1] = start[1] + PLAYER.step; p.pos[2] = start[2];
+    // 越えるのに要る高さだけ持ち上げる（v1 は一律 0.35 m 上げていたので、低い開口では頭が上の壁に当たって数 cm の段も越えられなかった）
+    p.pos[0] = start[0]; p.pos[1] = start[1] + rise; p.pos[2] = start[2];
     const blocked2 = moveHorizontal(p, dx, dz, near);
     // 上がった位置から下へ戻す
-    const hit = moveAxis(p, 1, -PLAYER.step, near);
+    const hit = moveAxis(p, 1, -rise, near);
     if (blocked2 || !hit || p.pos[1] < start[1] - 0.001) {
       // 登れなかった → 平面移動の結果に戻す
       p.pos[0] = afterFlat[0]; p.pos[1] = afterFlat[1]; p.pos[2] = afterFlat[2];
@@ -261,6 +263,23 @@ const nearBuf: AABB[] = [];
 function broadphase(p: PlayerState, colliders: ColliderIndex): AABB[] {
   const r = 2.0;
   return colliders.query(p.pos[0] - r, p.pos[1] - 1.5, p.pos[2] - r, p.pos[0] + r, p.pos[1] + PLAYER.height + 1.5, p.pos[2] + r, nearBuf);
+}
+
+/**
+ * 段を越えるのに要る高さ（0 なら越えられない）: 動いた先で足元から段差（0.35 m）以内の高さに上面がある箱の、いちばん高い上面まで。
+ * 段差より高い箱にも当たるなら 0（壁）
+ */
+function stepNeeded(start: Vec3, dx: number, dz: number, near: AABB[], h: number): number {
+  const r = PLAYER.radius;
+  const x = start[0] + dx, z = start[2] + dz, y = start[1];
+  let need = 0;
+  for (const c of near) {
+    if (!(x - r < c.max[0] && x + r > c.min[0] && z - r < c.max[2] && z + r > c.min[2] && y < c.max[1] && y + h > c.min[1])) continue;
+    const up = c.max[1] - y;
+    if (up > PLAYER.step) return 0;
+    if (up > need) need = up;
+  }
+  return need > 0 ? Math.min(PLAYER.step, need + 0.005) : 0;
 }
 
 function moveHorizontal(p: PlayerState, dx: number, dz: number, near: AABB[]): boolean {

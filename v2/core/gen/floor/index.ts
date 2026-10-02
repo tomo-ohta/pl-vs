@@ -83,7 +83,7 @@ export function generateFloorReport(key: FloorKey, t: Tuning, opts: GenOptions =
     const gimmicks = opts.noGimmicks ? null : placeGimmicks(content, geo, t, key.depth, opts.showcase);
     if (opts.dress) {
       // 隠し部屋のうち、中身が決まっているもの（別のフロアへの穴・私室）には置かない（穴の上に物が浮かないように）
-      const fixed = new Set(gimmicks?.secrets.filter((x) => x.dest === 'floorLink' || x.dest === 'bFloor' || x.dest === 'privateRoom').map((x) => x.cell));
+      const fixed = new Set(gimmicks?.secrets.flatMap((x) => x.fixed));
       for (const g of geo.cells) {
         if (fixed.has(g.cell.id)) continue;
         opts.dress({ cell: g.cell, kind: g.kind, openings: g.openings, keepOut: gimmicks?.keepOut.get(g.cell.id) ?? [], rng: new Rng(hashAll(content.seed, 'dress', g.cell.id)), density: 0.5 });

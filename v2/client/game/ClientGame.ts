@@ -67,6 +67,8 @@ export class ClientGame {
   private readonly hemi = new THREE.HemisphereLight(0xe5e4d5, 0x6c665a, 0.1);
   private lightsPool: LightManager;
   private views = new Map<string, EntityView>();
+  /** 部品の描画の入れ物と、それが見えるべき区画（部品の区画。扉は扉の両側の区画） */
+  private viewRoots = new Map<string, { root: THREE.Group; cells: string[] }>();
   private visibility: Visibility | null = null;
   /** 見える区画（cell and portal）。開発用に ?cull=off で全部描く */
   cull = typeof location === 'undefined' || new URLSearchParams(location.search).get('cull') !== 'off';
@@ -171,11 +173,18 @@ export class ClientGame {
     this.built = new FloorBuilder(this.materials, { tier: this.tier.id }).build(floor);
     this.scene.add(this.built.root);
     this.visibility = new Visibility(floor);
-    const ctx = { root: this.built.root, materials: this.materials, built: this.built, sim: this.sim, levelOf: this.lampLevel };
+    // 部品の描画は部品ごとの入れ物に入れ、区画と一緒に隠す（見えない区画の物が暗闇に浮いて見えないように。描く量も減る）
     for (const e of floor.entities) {
-      const v = createView(e, ctx);
-      if (v) this.views.set(e.id, v);
+      const root = new THREE.Group();
+      root.name = `entity:${e.id}`;
+      this.built.root.add(root);
+      const v = createView(e, { root, materials: this.materials, built: this.built, sim: this.sim, levelOf: this.lampLevel });
+      if (!v) { root.removeFromParent(); continue; }
+      this.views.set(e.id, v);
+      const portal = e.type === 'door' ? floor.portals.find((p) => p.doorId === e.id) : undefined;
+      this.viewRoots.set(e.id, { root, cells: portal ? [...portal.cells] : e.cell ? [e.cell] : [] });
     }
+    this.warmUp();
     const p = this.sim.players[0]!;
     this.yaw = p.yaw;
     this.pitch = p.pitch;
@@ -189,9 +198,35 @@ export class ClientGame {
     this.rig.snap(this.subject(1));
   }
 
+  /**
+   * 読み込みの最後に、フロアの全部を 1 度描いてシェーダを作り、テクスチャを GPU へ送っておく（画面は暗転か一時停止の画面の下）。
+   * これをしないと、まだ見ていない区画が初めて見えたとき（扉を開けた瞬間など）にその場で作るので 0.3〜0.5 秒止まる
+   */
+  private warmUp(): void {
+    const built = this.built;
+    if (!built) return;
+    const saved: { o: THREE.Object3D; visible: boolean; culled: boolean }[] = [];
+    built.root.traverse((o) => {
+      saved.push({ o, visible: o.visible, culled: o.frustumCulled });
+      o.visible = true;
+      o.frustumCulled = false;
+    });
+    const textures = new Set<THREE.Texture>();
+    built.root.traverse((o) => {
+      const m = (o as THREE.Mesh).material;
+      for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
+        for (const v of Object.values(mat)) if (v instanceof THREE.Texture) textures.add(v);
+      }
+    });
+    for (const t of textures) this.renderer.initTexture(t);
+    this.postfx.render();
+    for (const s of saved) { s.o.visible = s.visible; s.o.frustumCulled = s.culled; }
+  }
+
   unloadFloor(): void {
     for (const v of this.views.values()) v.dispose();
     this.views.clear();
+    this.viewRoots.clear();
     this.built?.dispose();
     this.built = null;
     this.visibility = null;
@@ -410,13 +445,17 @@ export class ClientGame {
       this.rig.update(dt, subj);
       this.enterCell();
       this.updateEnvironment(dt);
+      const visible = this.cull && this.visibility ? this.visibility.update(built, sim, this.camera) : null;
       for (const [id, v] of this.views) {
+        const vr = this.viewRoots.get(id);
+        const shown = !visible || !vr || !vr.cells.length || vr.cells.some((c) => visible.has(c));
+        if (vr) vr.root.visible = shown;
+        if (!shown) continue;
         const st = sim.stateOf(id);
         if (st) v.update(st, dt);
       }
       for (const c of built.cells.values()) if (c.lamps.length) applyLampLevels(c, this.lampLevel);
       this.updateRevealAnim(dt);
-      const visible = this.cull && this.visibility ? this.visibility.update(built, sim, this.camera) : null;
       this.lightsPool.update(built, this.camera.position, this.lampLevel, visible, dt);
       // 撮像の入力（回転の速さ・静止）
       const yawRate = (this.rig.out.yaw - this.prevCamYaw) / Math.max(1e-3, dt);

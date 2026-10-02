@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultTuning } from '../core/config/tuning.ts';
 import { generateFloorReport } from '../core/gen/floor/index.ts';
+import { THROUGH_DESTS } from '../core/gen/secrets/index.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
 import '../core/sim/parts/index.ts';
@@ -12,12 +13,14 @@ import { walkTo } from './helpers/bot.ts';
 
 const t = defaultTuning();
 
-/** 入口から開口をたどって行ける区画（concealed: 隠しの壁で塞がっている開口を通らない） */
+/** 入口から開口をたどって行ける区画（blocked の開口は通らない。一方通行の扉は cells[0] → cells[1] の向きだけ） */
 function reachable(floor: FloorLayout, blocked: Set<string>): Set<string> {
+  const oneWay = new Set(floor.entities.filter((e) => e.type === 'door' && typeof e.params.openSide === 'number').map((e) => e.id));
   const seen = new Set([floor.spawn.cell]);
   const q = [floor.spawn.cell];
   for (let h = 0; h < q.length; h++) for (const p of floor.portals) {
     if (blocked.has(p.id) || !p.cells.includes(q[h]!)) continue;
+    if (p.doorId && oneWay.has(p.doorId) && p.cells[1] === q[h]) continue;
     const o = p.cells[0] === q[h] ? p.cells[1] : p.cells[0];
     if (!seen.has(o)) { seen.add(o); q.push(o); }
   }
@@ -45,6 +48,29 @@ test('隠し: 出現型は現れる前は行けない・存在型は最初から
   }
   console.log(`  存在型 ${present}・出現型 ${appear}`);
   assert.ok(present > 5 && appear > 5);
+});
+
+test('隠し: 入口には扉がある・行き先がばらける・隠しが 2 つ以上のフロアは全部が行き止まりにならない', () => {
+  const dests: Record<string, number> = {};
+  let multi = 0;
+  for (let w = 1; w <= 80; w++) {
+    const r = generateFloorReport({ world: w, depth: 1 + (w % 7), variant: 0 }, t);
+    const secrets = r.gimmicks?.secrets ?? [];
+    for (const s of secrets) {
+      dests[s.dest] = (dests[s.dest] ?? 0) + 1;
+      const entry = r.floor.portals.find((p) => p.cells[0] === s.host && p.cells[1] === s.cell)!;
+      assert.ok(entry?.doorId, `${r.floor.id} ${s.id}: 入口に扉`);
+      if (s.dest === 'loop') {
+        assert.ok(s.to && r.floor.portals.some((p) => p.cells.includes(s.to!) && s.cells.includes(p.cells[0]) && p.doorId), `${s.id}: 通り抜けの出口に扉`);
+      }
+    }
+    if (secrets.length >= 2) {
+      multi++;
+      assert.ok(secrets.some((s) => THROUGH_DESTS.has(s.dest)), `${r.floor.id}: 隠し ${secrets.length} 個が全部行き止まり（${secrets.map((s) => s.dest).join(', ')}）`);
+    }
+  }
+  console.log('  行き先', JSON.stringify(dests), `隠し 2 つ以上のフロア ${multi}`);
+  for (const k of ['rareRoom', 'passageRare', 'loop', 'floorLink']) assert.ok((dests[k] ?? 0) >= 3, `行き先 ${k} が出る`);
 });
 
 test('謎のパズル: 手がかりの順にボタンを押すと扉が現れる（間違えると現れない）', async () => {
