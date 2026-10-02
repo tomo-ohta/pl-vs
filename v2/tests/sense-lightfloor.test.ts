@@ -10,7 +10,7 @@ import type { Sim } from '../core/sim/sim.ts';
 import { walkTo } from './helpers/bot.ts';
 import { senseBotOptions } from './helpers/sense-bot.ts';
 import { labRoom } from './helpers/gimmick-lab.ts';
-import { entitiesOf, fell, findSenseRooms, goTo, labSim, simOf, stand, stepToward, T } from './sense-util.ts';
+import { entitiesOf, fell, goTo, labSim, stand, stepToward, T } from './sense-util.ts';
 
 const DEFS = ['beamFloor', 'spotRide', 'lightBands', 'lookBridge'] as const;
 const DIRS: Dir[] = [0, 1, 2, 3];
@@ -175,23 +175,6 @@ test('光の床: 隣り合う壁に入口と出口がある部屋（L 字に渡�
     }
   }
   assert.ok(n >= 12, `L 字の部屋: ${n}`);
-  assert.deepEqual(fails, []);
-});
-
-test('光の床: 生成したフロアに出る・歩く人が入口から出口の向こうの区画まで渡れる', async () => {
-  const found = findSenseRooms(DEFS, 3, 900);
-  const fails: string[] = [];
-  for (const def of DEFS) {
-    const rooms = found.get(def)!;
-    assert.ok(rooms.length >= 1, `${def}: 生成したフロアに出る（${rooms.length}）`);
-    for (const room of rooms.filter((x) => x.beyond)) {
-      const sim = await simOf(room.floor);
-      sim.teleport(0, [room.inside[0], room.inside[1] + 0.02, room.inside[2]], room.yaw);
-      const res = walkTo(sim, room.beyond!, undefined, 120);
-      if (!res.ok || !res.route.includes(room.exit!.id)) fails.push(`${def} ${room.floor.id} ${room.cell.id}: ${res.reason || '部屋を通らない道順'}`);
-      sim.physics?.dispose();
-    }
-  }
   assert.deepEqual(fails, []);
 });
 

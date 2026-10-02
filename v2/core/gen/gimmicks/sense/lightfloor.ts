@@ -178,7 +178,9 @@ defineGimmick({
       tiles.push([rr.x0, rr.z0, rr.x1, rr.z1]);
     }
     // 位相: 帯ごとに周期を n 等分してずらす（いつもどれかが点いている。並びは乱数）
-    const on = t['sense.lightBands.onSec'], off = t['sense.lightBands.offSec'];
+    // 点いている長さ: 1 本の帯を歩いて渡り切れる長さより長く（長い穴でも乗り移らずに渡れる）
+    const crossLen = F.depth - 2 * landD;
+    const on = Math.max(t['sense.lightBands.onSec'], crossLen / 2.6 + 1.2), off = t['sense.lightBands.offSec'];
     const order = ctx.rng.shuffle([...Array(n).keys()]);
     const phase = order.map((k) => ((on + off) * k) / n);
     begin(ctx, plan, true);

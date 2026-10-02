@@ -8,9 +8,9 @@
 import type { Dir } from '../../../math/vec.ts';
 import type { Rect } from '../../../world/footprint.ts';
 import { box, type Box, type MatId } from '../../../world/layout.ts';
-import type { GimmickContext } from '../types.ts';
+import type { GimmickContext, GimmickSlot } from '../types.ts';
 import { buildPit, planPit, type PitPlan } from '../pit.ts';
-import { fillRects, innerRect, rectGap } from '../util.ts';
+import { fillRects, frontOf, innerRect, rectGap } from '../util.ts';
 
 /** 部屋の照明を 1 つの lamp 部品につなぐ（on: 最初に点いているか）。戻り値は lamp の id */
 export function darkenRoom(ctx: GimmickContext, name = 'dark', on = false, inputs?: { [k: string]: string }, rate = 6): string {
@@ -71,6 +71,46 @@ export function pitTiles(plan: PitPlan, tile: number, u0: number, u1: number, v0
     }
   }
   return out;
+}
+
+/**
+ * 入口の前（壁から inset m）→ 出口の前の道（軸に沿う折れ線 [x, z]）。向かい合う壁ならまっすぐか Z 字（真ん中で横へ）、
+ * 隣り合う壁なら L 字、同じ壁なら U 字（壁から inset + 1.5 m の所で横へ）。入口・出口が無ければ null
+ */
+export function routeBetween(s: GimmickSlot, inset: number): number[][] | null {
+  const e = s.entrance, x = s.exit;
+  if (!e || !x) return null;
+  const A = frontOf(e, inset), B = frontOf(x, inset);
+  const a = [A[0], A[2]], b = [B[0], B[2]];
+  const alongX = e.dir === 0 || e.dir === 2; // 入口の壁が x に沿う（奥へは z）
+  if (x.dir === e.dir) {
+    const out = frontOf(e, inset + 1.5);
+    return alongX ? [a, [a[0]!, out[2]], [b[0]!, out[2]], b] : [a, [out[0], a[1]!], [out[0], b[1]!], b];
+  }
+  if (x.dir === (e.dir + 2) % 4) {
+    if (alongX ? Math.abs(a[0]! - b[0]!) < 0.05 : Math.abs(a[1]! - b[1]!) < 0.05) return [a, b];
+    const mz = (a[1]! + b[1]!) / 2, mx = (a[0]! + b[0]!) / 2;
+    return alongX ? [a, [a[0]!, mz], [b[0]!, mz], b] : [a, [mx, a[1]!], [mx, b[1]!], b];
+  }
+  return [a, alongX ? [a[0]!, b[1]!] : [b[0]!, a[1]!], b];
+}
+
+/** 折れ線 pts を、幅 w の矩形の列にする（家具を置かない範囲・明るい床の範囲） */
+export function routeRects(pts: readonly number[][], w: number): Rect[] {
+  const out: Rect[] = [];
+  const h = w / 2;
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i - 1]!, q = pts[i]!;
+    out.push({ x0: Math.min(p[0]!, q[0]!) - h, x1: Math.max(p[0]!, q[0]!) + h, z0: Math.min(p[1]!, q[1]!) - h, z1: Math.max(p[1]!, q[1]!) + h });
+  }
+  return out;
+}
+
+/** 区画の壁の内側の、高さ y0..y1 の AABB（部品の region） */
+export function roomRegion(s: GimmickSlot, y0 = -0.5, y1 = 3): { min: number[]; max: number[] } {
+  const r = innerRect(s);
+  const y = s.cell.floorY;
+  return { min: [r.x0, y + y0, r.z0], max: [r.x1, y + y1, r.z1] };
 }
 
 /** 床板の列を、到達判定のときだけ床として扱う（穴を渡れることにする） */

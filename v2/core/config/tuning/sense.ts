@@ -22,4 +22,34 @@ export const SENSE_TUNING = {
   'sense.lightBands.warnSec': num(1.0, 0, 3, '光の帯の橋: 消える前に瞬く秒数'),
   'sense.lookBridge.widthM': num(1.0, 0.6, 1.6, '見ている間だけある橋: 橋の幅（m）'),
   'sense.lookBridge.graceSec': num(0.9, 0.2, 3, '見ている間だけある橋: 目を離してから橋の板が消えるまで（秒）'),
+
+  // ---- 闇に捕まる部屋（gimmicks/sense/dark.ts）----
+  'sense.blinkout.onSec': num(5.5, 2, 15, '消える照明: 照明が点いている秒数'),
+  'sense.blinkout.offSec': num(3.0, 1, 10, '消える照明: 照明が消えている秒数'),
+  'sense.blinkout.flickerSec': num(0.9, 0, 3, '消える照明: 消える前に瞬く秒数（合図）'),
+  'sense.blinkout.graceSec': num(1.3, 0.5, 5, '消える照明: 暗闇にこれだけいると闇に捕まる（秒）'),
+  'sense.blinkout.poolM': num(1.1, 0.7, 2, '消える照明: 消えない灯りの島の半径（m）'),
+  'sense.blinkout.spacingM': num(4.2, 2.5, 8, '消える照明: 消えない灯りの島の間隔（道に沿って m）'),
+  'sense.lightWave.segmentM': num(2.0, 1, 4, '明滅の位相: 照明の区間の長さ（m）'),
+  'sense.lightWave.speed': num(1.5, 0.6, 2.6, '明滅の位相: 光の波の速さ（m/s。歩くより遅い）'),
+  'sense.lightWave.windowM': num(3.2, 2, 6, '明滅の位相: 点いている帯の長さ（m）'),
+  'sense.lightWave.restSec': num(3, 0, 10, '明滅の位相: 波と波の間の、全部消えている秒数'),
+  'sense.lightWave.graceSec': num(1.0, 0.4, 4, '明滅の位相: 暗闇にこれだけいると闇に捕まる（秒）'),
+  // ---- サーチライト（gimmicks/sense/search.ts）----
+  'sense.search.stripM': num(1.6, 1.2, 3, 'サーチライト: 入口・出口の壁沿いの安全な床の奥行き（m）'),
+  'sense.search.laneM': num(1.8, 1.2, 3, 'サーチライト: 光の円が往復する帯の幅（m）'),
+  'sense.search.safeM': num(1.4, 1, 3, 'サーチライト: 帯と帯の間の安全な床の最小の幅（m）'),
+  'sense.search.radiusM': num(0.9, 0.5, 1.6, 'サーチライト: 光の円の半径（m）'),
+  'sense.search.speedMin': num(1.6, 0.5, 5, 'サーチライト: 光の円の速さの下限（m/s）'),
+  'sense.search.speedMax': num(2.6, 0.5, 6, 'サーチライト: 光の円の速さの上限（m/s）'),
+  'sense.search.catchesToCorner': num(2, 1, 10, 'サーチライト: これだけ見つかると、戻される先が隅（隠しの扉の前）になる', true),
+  'sense.lightWave.doorPoolM': num(1.3, 0.8, 2, '明滅の位相: 開口の前の消えない灯りの半径（m）'),
+
+  // ---- 視線と観測（gimmicks/sense/sight.ts）----
+  'sense.daruma.chantMin': num(2.4, 1, 8, 'だるまさん: 数え歌の長さの下限（秒）'),
+  'sense.daruma.chantMax': num(5.0, 1, 10, 'だるまさん: 数え歌の長さの上限（秒）'),
+  'sense.daruma.watchMin': num(1.8, 0.5, 6, 'だるまさん: 振り返って見ている長さの下限（秒）'),
+  'sense.daruma.watchMax': num(3.2, 0.5, 8, 'だるまさん: 振り返って見ている長さの上限（秒）'),
+  'sense.daruma.tolM': num(0.15, 0.05, 0.6, 'だるまさん: 見られている間に動いてよい距離（m。止まりきれない分）'),
+  'sense.daruma.catchesToCorner': num(3, 1, 10, 'だるまさん: これだけ捕まると、入口ではなく隅（隠しの扉の前）へ連れて行かれる', true),
 } as const satisfies Record<string, Spec>;

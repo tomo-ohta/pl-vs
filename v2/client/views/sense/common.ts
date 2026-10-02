@@ -4,7 +4,79 @@
  */
 import * as THREE from 'three';
 import type { Sim } from '../../../core/sim/sim.ts';
+import type { MatId } from '../../../core/world/layout.ts';
+import { surfaceBox } from '../../render/SurfaceGeometry.ts';
+import { cellAt, sampleCellLight } from '../../world/FloorBuilder.ts';
 import type { ViewContext } from '../views.ts';
+
+/**
+ * 部屋の材質で描く物（家具の材質・焼き込み陰影の明るさの頂点属性付き）。parts に箱を足し、build で Group にまとめる。
+ * 明るさは置いた区画の陰影を測って一色に塗る（relight を時々呼ぶ。照明の入切に追従する）
+ */
+export class LitParts {
+  readonly group = new THREE.Group();
+  private readonly geos: THREE.BufferGeometry[] = [];
+  private readonly ctx: ViewContext;
+  constructor(ctx: ViewContext) { this.ctx = ctx; }
+
+  /** 原点中心の大きさ size の箱を、group の座標 at に置く */
+  box(size: [number, number, number], at: [number, number, number], mat: MatId): THREE.Mesh {
+    const g = surfaceBox({ min: [-size[0] / 2, -size[1] / 2, -size[2] / 2], max: [size[0] / 2, size[1] / 2, size[2] / 2], mat, solid: false });
+    if (!g.getAttribute('bakedLight')) g.setAttribute('bakedLight', new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count * 3).fill(0.3), 3));
+    this.geos.push(g);
+    const m = new THREE.Mesh(g, this.ctx.materials.get(mat));
+    m.position.set(...at);
+    this.group.add(m);
+    return m;
+  }
+
+  /** 球（頭など） */
+  sphere(r: number, at: [number, number, number], mat: MatId): THREE.Mesh {
+    const g = new THREE.SphereGeometry(r, 18, 14);
+    g.setAttribute('bakedLight', new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count * 3).fill(0.3), 3));
+    this.geos.push(g);
+    const m = new THREE.Mesh(g, this.ctx.materials.get(mat));
+    m.position.set(...at);
+    this.group.add(m);
+    return m;
+  }
+
+  /** フロア座標の点 at の陰影で、全部の頂点の明るさを塗る */
+  relight(at: [number, number, number]): void {
+    const cell = cellAt(this.ctx.built, at);
+    const c = cell ? sampleCellLight(cell, at, this.ctx.levelOf) : [0.2, 0.2, 0.2];
+    for (const g of this.geos) {
+      const attr = g.getAttribute('bakedLight') as THREE.BufferAttribute;
+      const arr = attr.array as Float32Array;
+      for (let i = 0; i < arr.length; i += 3) { arr[i] = c[0]!; arr[i + 1] = c[1]!; arr[i + 2] = c[2]!; }
+      attr.needsUpdate = true;
+    }
+  }
+
+  dispose(): void {
+    this.group.removeFromParent();
+    for (const g of this.geos) g.dispose();
+  }
+}
+
+/** 区画の部品の id（区画の部品のうち種類 type のもの） */
+export function entityOf(ctx: ViewContext, cell: string | undefined, type: string): string | null {
+  return ctx.sim.floor.entities.find((e) => e.cell === cell && e.type === type)?.id ?? null;
+}
+
+/** 点 (x, z) の近く（0.7 m）に扉の部品があるか（隠しの扉が付いたか） */
+export function doorNear(ctx: ViewContext, x: number, z: number, r = 0.7): boolean {
+  return ctx.sim.floor.entities.some((e) => {
+    if (e.type !== 'door') return false;
+    const pn = e.params.panel as { min: number[]; max: number[] } | undefined;
+    return !!pn && Math.hypot((pn.min[0]! + pn.max[0]!) / 2 - x, (pn.min[2]! + pn.max[2]!) / 2 - z) < r;
+  });
+}
+
+/** 部品の cue（シミュレーションのイベント）を受け取る。戻り値でやめる */
+export function onCue(ctx: ViewContext, id: string, f: (name: string, e: { pos?: number[]; data?: { [k: string]: unknown } }) => void): () => void {
+  return ctx.onEvent?.((e) => { if (e.type === 'cue' && e.entity === id) f(String(e.data?.name ?? ''), e); }) ?? (() => {});
+}
 
 /** 光る物の材質（加算合成。照明に依らず光って見える。暗い部屋で光の床・光の筋に使う） */
 export function glowMaterial(color: number, opacity = 1): THREE.MeshBasicMaterial {

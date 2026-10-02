@@ -7,6 +7,7 @@
  */
 import { lineAt, lineLength } from '../../core/sim/parts/sense/common.ts';
 import { bandPhase, spotCenter } from '../../core/sim/parts/sense/floor.ts';
+import { patternAt, searchSpot } from '../../core/sim/parts/sense/light.ts';
 import type { Sim } from '../../core/sim/sim.ts';
 import { IDLE_COMMAND, type InputCommand } from '../../core/sim/types.ts';
 import type { CellLayout, EntitySpec, FloorLayout } from '../../core/world/layout.ts';
@@ -139,8 +140,8 @@ function lightFloor(sim: Sim, e: EntitySpec, leg3: readonly number[]): InputComm
     // いちばん近い帯で、始まりの点より先へ出ていれば渡っている途中（乗っている帯をそのまま渡る）
     const k = oriented.map((l) => onLine(me, l.a, l.b).off).reduce((bi, v, i, arr) => (v < arr[bi]! ? i : bi), 0);
     const onK = onLine(me, oriented[k]!.a, oriented[k]!.b);
-    if (onK.t * onK.len > 0.15 && onK.off < 0.4) return toward(sim, oriented[k]!.b);
-    const need = Math.hypot(first.b[0] - first.a[0], first.b[1] - first.a[1]) / 2.8 + 0.3;
+    if (onK.t * onK.len > 0.15 && onK.off < 0.4) return toward(sim, oriented[k]!.b, { dash: true });
+    const need = Math.hypot(first.b[0] - first.a[0], first.b[1] - first.a[1]) / 4.8 + 0.4;
     // 岸の上で、いちばん近い帯の手前へ。点いてから need 秒以上残っていれば渡る
     let best = -1, bestScore = Infinity;
     oriented.forEach((l, i) => {
@@ -153,19 +154,119 @@ function lightFloor(sim: Sim, e: EntitySpec, leg3: readonly number[]): InputComm
     const l = oriented[best]!;
     const d = Math.hypot(l.a[0] - me[0], l.a[1] - me[1]);
     if (d > 0.3) return toward(sim, l.a);
-    return bandPhase(t, on, off, phases[best] ?? 0) > need ? toward(sim, l.b) : still(sim);
+    return bandPhase(t, on, off, phases[best] ?? 0) > need ? toward(sim, l.b, { dash: true }) : still(sim);
   }
   // beam / seen: 渡る道に乗り、道に沿って 0.8 m 先を目指し、前（少し下）を見て渡る
   if (mp.d < 0.05 && mp.off > 0.25) return toward(sim, first.a);
   return toward(sim, lineAt(first.pts, Math.min(first.len, mp.d + 0.8)) as V2, { pitch });
 }
 
+const dist2 = (a: V2, b: readonly number[]): number => Math.hypot(a[0] - b[0]!, a[1] - b[1]!);
+
+/**
+ * 消える照明（darkHazard kind 'blink'）: 照明が消える前に、消えない灯りの島へ入って待つ。点いている間に次の島（目標に近い方）まで進む
+ */
+function darkBlink(sim: Sim, e: EntitySpec, leg: V2): InputCommand | null {
+  const pl = sim.players[0]!;
+  const me: V2 = [pl.pos[0], pl.pos[2]];
+  const c = e.params.clock as { on: number; off: number; phase: number; flicker: number };
+  const t = (sim.tick + 1) * sim.dt;
+  const r = patternAt(t, c.on, c.off, c.phase, c.flicker);
+  const isles = ((e.params.pools as number[][]).slice(1)).filter((q) => q.length === 3);
+  const inIsle = isles.some((q) => dist2(me, q) < q[2]! - 0.35);
+  const ahead = isles.filter((q) => dist2(leg, q) < dist2(leg, me) - 0.5).sort((p, q) => dist2(me, p) - dist2(me, q))[0];
+  const need = (ahead ? dist2(me, ahead) : dist2(me, leg)) / 2.8 + 0.6;
+  const safeLeft = r.left > 0 ? r.left - c.flicker : 0;
+  if (safeLeft > need) return null;
+  if (inIsle) return still(sim);
+  // いちばん近い島へ走る
+  const best = isles.slice().sort((p, q) => dist2(me, p) - dist2(me, q))[0];
+  return best ? toward(sim, [best[0]!, best[1]!], { dash: true }) : null;
+}
+
+/** 明滅の位相（darkHazard kind 'wave'）: 光の帯が来るまで入口の灯りで待ち、帯の真ん中について歩く */
+function darkWave(sim: Sim, e: EntitySpec, leg: V2): InputCommand | null {
+  const pl = sim.players[0]!;
+  const me: V2 = [pl.pos[0], pl.pos[2]];
+  const w = e.params.wave as { start: number[]; axis: 'x' | 'z'; sign: number; len: number; speed: number; window: number; period: number; phase: number };
+  const route = (e.params.route as number[][]).map((q) => [q[0]!, q[1]!] as V2);
+  // 区間の目標が道の向こう（出口の側）でなければ手を出さない
+  const k = w.axis === 'x' ? 0 : 1;
+  const u = (p: readonly number[]): number => (p[k]! - w.start[k]!) * w.sign;
+  const endU = Math.max(u(route[0]!), u(route[1]!));
+  if (u(leg) < u(me) + 0.3 || u(me) > endU - 0.15) return null;
+  const t = (sim.tick + 1) * sim.dt;
+  const tau = (((t + w.phase) % w.period) + w.period) % w.period;
+  const front = tau * w.speed, back = front - w.window;
+  const at = (uu: number): V2 => { const p: V2 = [...route[0]!] as V2; p[k] = w.start[k]! + w.sign * uu; return p; };
+  // 帯が来ていない（前が自分より後ろ）・帯がもう先にある（自分は帯の後ろの暗い所にいない = 灯りの中で次の波を待つ）→ 今の所で待つ
+  if (front < u(me) + 0.2 || back > u(me) - 0.2) return still(sim);
+  return toward(sim, at(Math.min(endU, Math.max(back + 1.0, Math.min(front - 0.8, (front + back) / 2)))));
+}
+
+/** サーチライト: 渡る道に沿って、帯の手前で光の円が遠ざかるのを待ち、走って渡る */
+function search(sim: Sim, e: EntitySpec, leg: V2): InputCommand | null {
+  const pl = sim.players[0]!;
+  const me: V2 = [pl.pos[0], pl.pos[2]];
+  const cross = (e.params.cross as number[][]).map((q) => [q[0]!, q[1]!] as V2);
+  const fwd = dist2(leg, cross[1]!) <= dist2(leg, cross[0]!);
+  const [a, b] = fwd ? [cross[0]!, cross[1]!] : [cross[1]!, cross[0]!];
+  const mp = onLine(me, a, b), lp = onLine(leg, a, b);
+  if (lp.t < 0.5 || mp.t * mp.len > mp.len - 0.3) return null;
+  const lanes = e.params.lanes as number[][];
+  const rects = e.params.laneRects as number[][];
+  const R = Number(e.params.radius ?? 0.9);
+  const t = (sim.tick + 1) * sim.dt;
+  const dirv: V2 = [(b[0] - a[0]) / mp.len, (b[1] - a[1]) / mp.len];
+  // 帯ごとの、道の上での範囲（体の幅 + 余裕を足す）
+  const spans = rects.map((r, i) => {
+    const ts = [[r[0]!, r[1]!], [r[2]!, r[3]!]].map((q) => ((q[0]! - a[0]) * dirv[0] + (q[1]! - a[1]) * dirv[1]));
+    return { i, d0: Math.min(ts[0]!, ts[1]!) - 0.55, d1: Math.max(ts[0]!, ts[1]!) + 0.55 };
+  }).sort((p, q) => p.d0 - q.d0);
+  const d = mp.t * mp.len;
+  const inside = spans.find((s) => d > s.d0 && d < s.d1);
+  if (inside) return toward(sim, [a[0] + dirv[0] * (inside.d1 + 0.2), a[1] + dirv[1] * (inside.d1 + 0.2)], { dash: true });
+  // 渡る道から外れている（隅へ戻された）: 今の安全な床の上で、道へ戻る
+  if (mp.off > 0.4) return toward(sim, [a[0] + dirv[0] * d, a[1] + dirv[1] * d]);
+  const next = spans.find((s) => s.d0 >= d);
+  if (!next) return toward(sim, b);
+  if (next.d0 - d > 0.35) return toward(sim, [a[0] + dirv[0] * (next.d0 - 0.15), a[1] + dirv[1] * (next.d0 - 0.15)]);
+  // 帯の手前: 渡り終えるまで（走って）光の円が道に近づかないなら渡る
+  const cross0: V2 = [a[0] + dirv[0] * (next.d0 + next.d1) / 2, a[1] + dirv[1] * (next.d0 + next.d1) / 2];
+  const T = (next.d1 - next.d0) / 5.2 + 0.35;
+  for (let s = 0; s <= T; s += 0.05) {
+    const sp = searchSpot(lanes[next.i]!, t + s);
+    if (dist2(cross0, sp) < R + 0.9) return still(sim);
+  }
+  return toward(sim, b, { dash: true });
+}
+
+/** だるまさん: 歌が終わる少し前から、鬼が前を向き直すまで止まる */
+function daruma(sim: Sim, e: EntitySpec): InputCommand | null {
+  const st = sim.stateOf(e.id) as { phase: number; t: number; dur: number } | null;
+  if (!st) return null;
+  return st.phase !== 0 || st.dur - st.t < 0.55 ? still(sim) : null;
+}
+
 export function senseDrive(sim: Sim, leg: readonly number[]): InputCommand | null {
   const pl = sim.players[0]!;
   const cell = cellOf(sim.floor, pl.pos);
   if (!cell) return null;
+  const leg2: V2 = [leg[0]!, leg[2]!];
   for (const e of partsIn(sim.floor, cell.id, 'lightFloor')) {
     const c = lightFloor(sim, e, leg);
+    if (c) return c;
+  }
+  for (const e of partsIn(sim.floor, cell.id, 'darkHazard')) {
+    const c = e.params.kind === 'wave' ? darkWave(sim, e, leg2) : darkBlink(sim, e, leg2);
+    if (c) return c;
+  }
+  for (const e of partsIn(sim.floor, cell.id, 'searchlight')) {
+    const c = search(sim, e, leg2);
+    if (c) return c;
+  }
+  for (const e of partsIn(sim.floor, cell.id, 'daruma')) {
+    const c = daruma(sim, e);
     if (c) return c;
   }
   return null;

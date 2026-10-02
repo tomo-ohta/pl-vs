@@ -12,14 +12,21 @@ import { gimmickDef, gimmickDefs } from '../gimmicks/types.ts';
 import { anomalyDef, anomalyDefs } from '../anomaly/index.ts';
 import { generateFloorReport, type GenOptions, type GenReport } from './index.ts';
 
+/**
+ * 段階 3 までの仕掛け・異変（?showcase=1 / 2 は段階 3 の見本のまま。段階 4 の担当の物は ?try= / ?group= で見る。
+ * 段階 4 で種類が増え、1 つのフロアに全種は入らない）。担当 sense が足した（統合で見直す）
+ */
+export const STAGE3_GIMMICKS: readonly string[] = ['sensorLights', 'lowCeiling', 'soundGuide', 'switchDoor', 'mannequin', 'beltMaze', 'crumbleFloor', 'bouncePad', 'appearPath', 'tiltRoom', 'narrowPath', 'beamNetwork', 'guideLight', 'puzzleRoom'];
+export const STAGE3_ANOMALIES: readonly string[] = ['flood', 'giant', 'tiny', 'multiply', 'upsideDown', 'stack', 'dark', 'fog', 'tint', 'doors', 'lowGravity', 'ballSea', 'scatter', 'clocks'];
+
 export function showcaseFloor(t: Tuning, opts: { flip?: boolean; from?: number; dress?: GenOptions['dress']; ids?: string[] } = {}): GenReport {
   let all: string[], anomalies: string[];
   if (opts.ids) {
     all = opts.ids.filter((id) => gimmickDef(id));
     anomalies = opts.ids.filter((id) => anomalyDef(id));
   } else {
-    all = gimmickDefs().map((d) => d.id);
-    const ids = anomalyDefs().map((d) => d.id);
+    all = gimmickDefs().map((d) => d.id).filter((id) => STAGE3_GIMMICKS.includes(id));
+    const ids = anomalyDefs().map((d) => d.id).filter((id) => STAGE3_ANOMALIES.includes(id));
     const half = Math.ceil(ids.length / 2);
     anomalies = opts.flip ? ids.slice(half) : ids.slice(0, half);
   }

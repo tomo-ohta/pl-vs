@@ -65,6 +65,7 @@ import {
 } from './Sfx.ts';
 
 import { createShared, type LayerDest, type SharedSources } from './Synth.ts';
+import { isSenseSfx, playSense } from './SenseSfx.ts';
 
 /** 区画の音の設定（v1 RoomDefinition のうち AudioEngine が読む 2 つだけ） */
 export interface AudioRoomInfo {
@@ -171,6 +172,14 @@ export class AudioEngine {
   private ambientDb = -80;
   /** 全体の出力の音割れ防止（足音を持ち上げても全体音量 100% で割れない） */
   private limiter: DynamicsCompressorNode | null = null;
+  /** 部屋の音の効果（担当 sense）: 全体の音量の絞り（無音の部屋）と、こもり（水の中・壁の向こう）。キーごとに重ね、いちばん強いものが効く */
+  private duckNode: GainNode | null = null;
+  private muffleNode: BiquadFilterNode | null = null;
+  private readonly ducks = new Map<string, number>();
+  private readonly muffles = new Map<string, number>();
+  /** 足音を遅らせる秒数（足音が遅れて聞こえる部屋）と、足音の高さの倍率（遅い部屋） */
+  stepDelaySec = 0;
+  stepPitch = 1;
   private reverbProbeBuf: Float32Array<ArrayBuffer> | null = null;
   private reverbProbeNext = 0;
   private reverbResets = 0;
@@ -237,7 +246,14 @@ export class AudioEngine {
     this.limiter.ratio.value = 20;
     this.limiter.attack.value = 0.003;
     this.limiter.release.value = 0.12;
-    this.master.connect(this.limiter).connect(ctx.destination);
+    // 全体の出力 → 部屋の効果（絞り・こもり。ふだんは素通し）→ 音割れ防止
+    this.duckNode = ctx.createGain();
+    this.muffleNode = ctx.createBiquadFilter();
+    this.muffleNode.type = 'lowpass';
+    this.muffleNode.frequency.value = 20000;
+    this.muffleNode.Q.value = 0.5;
+    this.master.connect(this.duckNode).connect(this.muffleNode).connect(this.limiter).connect(ctx.destination);
+    this.applyRoomFx(0);
     this.ambientProbe = ctx.createAnalyser();
     this.ambientProbe.fftSize = 2048;
     this.ambientProbeBuf = new Float32Array(this.ambientProbe.fftSize);
@@ -557,12 +573,22 @@ export class AudioEngine {
    * 左右 ±0.15 の定位を交互に、ピッチ ±6% ランダム
    */
   footstep(floorMat: string | undefined, rank: MoveRank, crouching = false, wet?: boolean, pos?: Vec3): void {
+    // 足音が遅れて聞こえる部屋（担当 sense）: 鳴らすのを遅らせる（他人の足音 = pos 付きは遅らせない）
+    if (this.stepDelaySec > 0 && !pos) {
+      const d = this.stepDelaySec;
+      setTimeout(() => this.footstepNow(floorMat, rank, crouching, wet, pos), d * 1000);
+      return;
+    }
+    this.footstepNow(floorMat, rank, crouching, wet, pos);
+  }
+
+  private footstepNow(floorMat: string | undefined, rank: MoveRank, crouching = false, wet?: boolean, pos?: Vec3): void {
     const sc = this.sfx(true);
     if (!sc) return;
     const floor = floorMat ? floorKindOf(floorMat, wet) : (wet ? 'wet' : this.room.floor);
     this.stepSide = -this.stepSide;
     const send = this.room.silent ? 0.9 : undefined;
-    playFootstep(sc, floor, rank, crouching, wet ?? this.room.floor === 'wet', { pos, pan: pos ? undefined : 0.15 * this.stepSide, send, gain: this.playerGain });
+    playFootstep(sc, floor, rank, crouching, wet ?? this.room.floor === 'wet', { pos, pan: pos ? undefined : 0.15 * this.stepSide, send, gain: this.playerGain, ...(this.stepPitch !== 1 ? { pitch: this.stepPitch } : {}) });
     this.log(`footstep:${floor}:${rank}`, pos ?? this.listenerPos);
   }
 
@@ -654,6 +680,8 @@ export class AudioEngine {
     if (buf) {
       dur = playSample(ctx, buf, sc.dest, { gain: opts.gain, send: opts.send, pos: opts.pos, pitch: opts.pitch });
       sc.onVoice?.(dur);
+    } else if (isSenseSfx(kind)) {
+      dur = playSense(sc, kind, { pos: opts.pos, gain: opts.gain, pan: opts.pan, send: opts.send, pitch: opts.pitch });
     } else if (isSfxKind(kind)) {
       dur = playNamed(sc, kind, { pos: opts.pos, gain: opts.gain, pan: opts.pan, send: opts.send, pitch: opts.pitch });
     } else {
@@ -712,6 +740,32 @@ export class AudioEngine {
   loudnessLevel(rank: MovementRank = 'still', jumped = false): number {
     this.loudness.movementLoudness(rank, jumped);
     return this.loudness.level();
+  }
+
+  // ---------------------------------------------------------------- 部屋の音の効果（担当 sense）
+  /** 全体の音量を絞る（key ごと。gain 1 で外す）。無音の部屋・目を閉じる など */
+  setDuck(key: string, gain: number, fadeSec = 0.4): void {
+    if (gain >= 0.999) this.ducks.delete(key); else this.ducks.set(key, Math.max(0, gain));
+    this.applyRoomFx(fadeSec);
+  }
+
+  /** こもらせる（key ごと。hz 以下だけ通す。null で外す）。水の中・壁の向こう など */
+  setMuffle(key: string, hz: number | null, fadeSec = 0.3): void {
+    if (hz === null) this.muffles.delete(key); else this.muffles.set(key, Math.max(80, hz));
+    this.applyRoomFx(fadeSec);
+  }
+
+  private applyRoomFx(fadeSec: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.duckNode || !this.muffleNode) return;
+    const t = ctx.currentTime;
+    let g = 1;
+    for (const v of this.ducks.values()) g = Math.min(g, v);
+    let hz = 20000;
+    for (const v of this.muffles.values()) hz = Math.min(hz, v);
+    const ramp = (p: AudioParam, v: number): void => { p.cancelScheduledValues(t); p.setValueAtTime(p.value, t); p.linearRampToValueAtTime(v, t + Math.max(0.01, fadeSec)); };
+    ramp(this.duckNode.gain, g);
+    ramp(this.muffleNode.frequency, hz);
   }
 
   // ---------------------------------------------------------------- デバッグ
