@@ -45,7 +45,7 @@ html, body {
 #hud-map { position: fixed; right: 12px; bottom: 12px; width: 180px; pointer-events: none; z-index: 5; }
 #hud-map.under-pause { display: none; }
 #minimap { display: block; width: 180px; height: 180px; border-radius: 8px; }
-#hud-survey { margin-top: 4px; text-align: right; font-size: 11px; letter-spacing: 0.08em; color: rgba(230, 232, 238, 0.85); text-shadow: 0 1px 2px #000; }
+#hud-survey { margin-top: 4px; text-align: right; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; color: rgba(230, 232, 238, 0.85); text-shadow: 0 1px 2px #000; }
 #hud-survey.done { color: var(--accent); }
 @media (pointer: coarse) {
   #hud-map { right: auto; bottom: auto; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); width: 120px; }

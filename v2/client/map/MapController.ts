@@ -177,7 +177,9 @@ export class MapController {
   }
 
   saveNow(): void {
-    if (this.map && this.info) this.store.put(this.info.key, this.map.save());
+    if (!this.map || !this.info) return;
+    this.store.put(this.info.key, this.map.save());
+    this.codex.setSurvey(this.floorKey, this.map.survey(), this.secretsFound());
   }
 
   private onTab(tab: PauseTab): void {
