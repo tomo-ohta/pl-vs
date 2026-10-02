@@ -132,6 +132,8 @@ function goHome(ctx: PartContext, s: ItemState, cfg: ItemCfg, cue = true): void 
   release(ctx, s);
   setRest(s, cfg, cfg.home, cfg.homeYaw);
   s.moved = 0;
+  // 水の入れ物は空で戻る（注いだ・こぼした）
+  if (cfg.fluid) { s.fill = 0; s.spilled = 0; }
   syncBody(ctx, s);
   if (cue) ctx.cue('carry.return', centerOf(s), data(cfg));
 }

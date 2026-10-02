@@ -14,7 +14,8 @@ const MAX_FLOORS = 48;
 const started = new WeakSet<Sim>();
 
 function storage(): Storage | null {
-  try { return typeof localStorage === 'undefined' ? null : localStorage; } catch { return null; }
+  // Node（試験）には window が無い（localStorage を触ると警告が出る）
+  try { return typeof window === 'undefined' || typeof localStorage === 'undefined' ? null : localStorage; } catch { return null; }
 }
 
 function write(sim: Sim): void {

@@ -12,9 +12,18 @@ const WIP = '作業中（段階 4 の carry で作る）';
 
 export const CARRY_CATALOG: CatalogEntry[] = [
   // ---- 2.10 物を運ぶ・置く ----
-  { idea: 'I01', name: '水を運ぶ', status: 'deferred', impl: [], note: WIP },
-  { idea: 'I02', name: '荷物と待つ扉', status: 'deferred', impl: [], note: WIP },
-  { idea: 'I03', name: '本を集める', status: 'deferred', impl: [], note: WIP },
+  {
+    idea: 'I01', name: '水を運ぶ', status: 'done', impl: [{ kind: 'gimmick', id: 'carryWater' }, { kind: 'part', id: 'carryItem' }, { kind: 'part', id: 'carryLevel' }],
+    note: '入口の近くの蛇口でバケツを満たし、奥の台の皿へ注ぐ（置くと注がれてバケツは蛇口へ戻る。何度でも）。速く歩く・跳ぶとこぼれる（しずくと音。carry.water.*）。皿に溜まった量が見えるので「少し足りない」が分かる。運ばなくても通れる',
+  },
+  {
+    idea: 'I02', name: '荷物と待つ扉', status: 'done', impl: [{ kind: 'gimmick', id: 'parcelGate' }, { kind: 'part', id: 'carrySensor' }],
+    note: '配達の部屋: 棚に色の札の荷物 3 つ、別の壁に色の札の受け取り口と床の枠。札と同じ色の荷物を持って枠で待つと枠の灯りが満ちて壁が開く（出現型・必ず付ける。requiresSecret）。何も持たずに待っても何も起きない',
+  },
+  {
+    idea: 'I03', name: '本を集める', status: 'done', impl: [{ kind: 'gimmick', id: 'bookCollect' }, { kind: 'part', id: 'collectSet' }],
+    note: '書庫の床一面に本（6〜10 冊）。歩いて上を通ると拾う（操作は要らない。腕の中に積み上がる）。奥に返却台。全部そろうと台の灯りがつく（記録が埋まる感じ。報酬ではない）。拾う操作を E にしなかったのは、BI03 の「1 冊も拾わない」を遊びにするため',
+  },
   { idea: 'I04', name: '椅子を戻す', status: 'deferred', impl: [], note: WIP },
   { idea: 'I05', name: '鍵ではない鍵', status: 'deferred', impl: [], note: WIP },
   { idea: 'I06', name: '落とし物を届ける', status: 'deferred', impl: [], note: WIP },
@@ -28,9 +37,9 @@ export const CARRY_CATALOG: CatalogEntry[] = [
   { idea: 'I10', name: '重さで開く', status: 'deferred', impl: [], note: WIP },
   { idea: 'I11', name: '運ぶと変わる物', status: 'deferred', impl: [], note: WIP },
   // ---- 4.7 裏の振る舞い: 物を運ぶ・置く ----
-  { idea: 'BI01', name: '水を一滴もこぼさず満杯で運ぶ → 台が沈んで扉', status: 'deferred', impl: [], note: WIP },
-  { idea: 'BI02', name: '待つ扉で違う荷物を持って待つ → 別の扉', status: 'deferred', impl: [], note: WIP },
-  { idea: 'BI03', name: '本を 1 冊も集めない / 全部集める → それぞれ別の扉', status: 'deferred', impl: [], note: WIP },
+  { idea: 'BI01', name: '水を一滴もこぼさず満杯で運ぶ → 台が沈んで扉', status: 'done', impl: [{ kind: 'gimmick', id: 'carryWater' }], note: '満杯（一度もこぼさず）で注ぐと台が沈み、台の横に扉が現れる（出現型 carry.water.full）。こぼさずに運ぶにはしゃがみ歩き（スマホなら少しだけ倒した移動）でゆっくり。普通に歩くと少しこぼれるので現れない（試験で確かめる）' },
+  { idea: 'BI02', name: '待つ扉で違う荷物を持って待つ → 別の扉', status: 'done', impl: [{ kind: 'gimmick', id: 'parcelGate' }], note: '違う色の荷物を持って枠で待つと、受け取り口ではなく別の壁の「返品口」が開く（出現型 carry.parcel.wrong。付けば）' },
+  { idea: 'BI03', name: '本を 1 冊も集めない / 全部集める → それぞれ別の扉', status: 'done', impl: [{ kind: 'gimmick', id: 'bookCollect' }], note: '全部集めて返却台の前 → 台の横の扉（carry.books.all）/ 1 冊も拾わずに返却台まで行く → 別の壁の扉（carry.books.none）。本は返却台までの道に散らばり、拾わずに行ける細い道が必ず 1 本ある（生成で道を先に決め、本を道から離す）' },
   { idea: 'BI04', name: '椅子を全部どかす → 床下収納', status: 'deferred', impl: [], note: WIP },
   { idea: 'BI05', name: '物を全部同じ向きにそろえる → 壁の一部がずれる', status: 'deferred', impl: [], note: WIP },
   { idea: 'BI06', name: '拾った物を元の部屋に戻す → 戻した部屋に新しい扉', status: 'deferred', impl: [], note: WIP },

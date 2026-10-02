@@ -20,4 +20,9 @@ export const CARRY_TUNING = {
   'carry.water.spillRate': num(0.12, 0.05, 2, '水を運ぶ: 速さの超えた分 1 m/s あたり、1 秒にこぼれる割合'),
   'carry.water.jumpSpill': num(0.22, 0, 1, '水を運ぶ: 跳んで着地したときにこぼれる割合'),
   'carry.water.fillSec': num(1.2, 0.2, 5, '水を運ぶ: 蛇口の下で満杯になるまでの秒数'),
+  // ---- 荷物と待つ扉（I02）----
+  'carry.parcel.waitSec': num(2.5, 0.5, 10, '荷物と待つ扉: 荷物を持って枠の中で待つ秒数'),
+  // ---- 本を集める（I03）----
+  'carry.book.pickR': num(0.45, 0.2, 1, '本を集める: 本を拾う半径（体の中心から水平に m）'),
+  'carry.book.routeClear': num(0.45, 0.2, 1.2, '本を集める: 1 冊も拾わずに返却台へ行く道から、本を離す余裕（拾う半径に足す m）'),
 } as const satisfies Record<string, Spec>;

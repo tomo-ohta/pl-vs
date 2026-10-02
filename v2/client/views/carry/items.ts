@@ -43,7 +43,7 @@ export function buildShape(P: Parts, kind: string, half: V3, mat: MatId, params:
       cyl(r * 0.8, r * 0.8, 0.02, mat, [0, -hy + 0.01, 0]);
       const handle = new THREE.TorusGeometry(r * 0.95, 0.008, 6, 20, Math.PI);
       P.add(handle, 'metal', [0, hy, 0]);
-      const water = P.add(new THREE.CylinderGeometry(r * 0.94, r * 0.82, 0.01, 20), 'water', [0, -hy + 0.02, 0]);
+      const water = P.add(new THREE.CylinderGeometry(r * 0.94, r * 0.82, 0.01, 20), 'aquariumBlue', [0, -hy + 0.02, 0]);
       water.name = 'water';
       break;
     }

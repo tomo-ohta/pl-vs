@@ -3,3 +3,5 @@
  * この担当だけがこのファイルを書き換える（docs/stage4-workstreams.md）。ファイルを足したら、ここに import を 1 行足す。
  */
 import './items.ts';
+import './water.ts';
+import './collect.ts';
