@@ -5,7 +5,7 @@
  * - 穴（壁 d に沿った u0..u0+Lu、壁から Lv）: 部屋の側に壁と平行な階段（1 段 rise ≤ 0.3 m。体が登れる 0.35 m より低い）、
  *   底の壁際に扉の前の床。穴から出るには階段を上る（閉じ込めない）
  * - 蓋: 'reveal'（一度開いたら戻らない。concealGroup の床板。開くと沈んで消える）/
- *   'mover'（入力で開け閉めする動く床板。開くと穴の中へ沈んで横へずれる）
+ *   'mover'（入力で開け閉めする動く床板。開くと穴の中へ沈んで横へずれる）/ 'open'（蓋の無い穴）
  * - 開口の前（1.6 m）・部屋の壁の半分より長くは取らない（穴が開いても開口どうしは歩いてつながる）
  */
 import type { Dir } from '../../../math/vec.ts';
@@ -71,7 +71,7 @@ export function planHatch(ctx: GimmickContext, o: { avoid?: Rect[]; walls?: Dir[
  * 計画どおりに穴・階段・蓋を作る。kind 'reveal' は trigger（`部品.出力`）が入ると開く（戻らない）、
  * 'mover' は trigger が入っている間だけ開く（open の入力）。戻り値は蓋の部品の id
  */
-export function buildHatch(ctx: GimmickContext, p: HatchPlan, kind: 'reveal' | 'mover', trigger: string): string {
+export function buildHatch(ctx: GimmickContext, p: HatchPlan, kind: 'reveal' | 'mover' | 'open', trigger: string): string {
   const s = ctx.slot;
   const y = s.cell.floorY;
   cutFloorSlab(s, p.hole);
@@ -86,6 +86,11 @@ export function buildHatch(ctx: GimmickContext, p: HatchPlan, kind: 'reveal' | '
   ctx.addBox(seam(h.x0, h.z1 - 0.025, h.x1, h.z1));
   ctx.addBox(seam(h.x0, h.z0, h.x0 + 0.025, h.z1));
   ctx.addBox(seam(h.x1 - 0.025, h.z0, h.x1, h.z1));
+  // 'open': 蓋の無い穴（ピンボールの落とし穴）。縁に黄色い線
+  if (kind === 'open') {
+    for (const b of s.cell.boxes.slice(-4)) b.mat = 'yellowLine';
+    return '';
+  }
   if (kind === 'reveal') {
     const group = `${ctx.id}.hatch`;
     const lid = box([h.x0, y - 0.15, h.z0], [h.x1, y, h.z1], s.cell.palette.floor);

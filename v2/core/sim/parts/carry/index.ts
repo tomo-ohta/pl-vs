@@ -8,4 +8,5 @@ import './logic.ts';
 import './collect.ts';
 import './replica.ts';
 import './puzzle.ts';
+import './games.ts';
 export { carrySave, carryRestore, type CarrySave } from './persist.ts';

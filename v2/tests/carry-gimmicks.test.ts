@@ -14,7 +14,7 @@ import '../core/sim/parts/index.ts';
 import type { Sim } from '../core/sim/sim.ts';
 import { IDLE_COMMAND } from '../core/sim/types.ts';
 import { walkTo } from './helpers/bot.ts';
-import { ANTI, SOLVERS } from './carry-solvers.ts';
+import { ANTI, bodyFree, SOLVERS } from './carry-solvers.ts';
 import { CARRY_CASES, farPoint, newSim, rooms } from './carry-cases.ts';
 
 for (const c of CARRY_CASES) {
@@ -25,8 +25,24 @@ for (const c of CARRY_CASES) {
     const fails: string[] = [];
     let solved = 0, offered = 0;
     for (const { room, tag } of list) {
-      // 何もしないで通る（行き止まりなら奥へ行って戻る）
-      {
+      // 押される床の部屋: 部屋のあちこち（3 か所）から入口へ歩いて戻れる
+      if (c.walk === 'exit') {
+        const r = room.slot.rect;
+        const probe = await newSim(room);
+        const pts: Vec3[] = [];
+        for (let k = 0; k < 200 && pts.length < 3; k++) {
+          const p: Vec3 = [r.x0 + 0.6 + ((k * 0.37) % 1) * (r.x1 - r.x0 - 1.2), room.cell.floorY, r.z0 + 0.6 + ((k * 0.61) % 1) * (r.z1 - r.z0 - 1.2)];
+          if (bodyFree(probe, p)) pts.push(p);
+        }
+        probe.physics?.dispose();
+        for (const p of pts) {
+          const sim = await newSim(room);
+          sim.teleport(0, [p[0], p[1] + 0.02, p[2]], 0);
+          const res = walkTo(sim, 'room', room.inside, 120);
+          if (!res.ok) fails.push(`${tag}: (${p[0].toFixed(1)}, ${p[2].toFixed(1)}) から入口へ戻れない ${res.reason}`);
+          sim.physics?.dispose();
+        }
+      } else {
         const sim = await newSim(room);
         sim.teleport(0, [room.inside[0], room.cell.floorY + 0.02, room.inside[2]], 0);
         const goal: Vec3 = room.exitInside ?? farPoint(sim, room);
@@ -70,6 +86,8 @@ for (const c of CARRY_CASES) {
         // 'out:<部品>.<出力>' は出力が入っていること
         for (const h of want.filter((x) => x.startsWith('out:'))) { const k = h.lastIndexOf('.'); groups.length; if (sim.outputOf(h.slice(4, k), h.slice(k + 1)) < 0.5) want.push('（出力が入らない）'); }
         const hit = appear.filter((o) => want.includes(o.hook));
+        // 'ok' は解き方の中で確かめた（存在型の隠しへ行ける・落ちても戻れる）
+        if (want.length === 1 && want[0] === 'ok') { solved++; sim.physics?.dispose(); continue; }
         const outs = want.filter((h) => h.startsWith('out:'));
         if (!want.some((h) => h.startsWith('（')) && !hit.length && !groups.length && !outs.length) { sim.physics?.dispose(); continue; }
         if (want.some((h) => h.startsWith('（')) || (!hit.length && !groups.length && !outs.length) || !hit.every((o) => out(sim, o) > 0.5) || !groups.every((g) => sim.isRevealed(g))) fails.push(`${tag}: 解いても現れない（${want.join(', ')}）`);

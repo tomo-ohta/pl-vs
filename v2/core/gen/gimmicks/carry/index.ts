@@ -12,3 +12,5 @@ import './replica.ts';
 import './home.ts';
 import './puzzles.ts';
 import './puzzles2.ts';
+import './games.ts';
+import './games2.ts';

@@ -54,6 +54,8 @@ export interface ItemCfg {
   ball: boolean;
   /** 支えが無くても落ちない（宙の受け口に初めから入っている物） */
   float: boolean;
+  /** 走りながら投げると、床の高さで転がす（ボウリングの球） */
+  roll: boolean;
 }
 
 const CFG = new WeakMap<EntitySpec, ItemCfg>();
@@ -93,6 +95,7 @@ export function itemCfg(spec: EntitySpec, floorCells?: { id: string; bounds: AAB
     persist: pBool(spec, 'persist', true),
     ball: pStr(spec, 'kind', '') === 'ball' || pBool(spec, 'ball', false),
     float: pBool(spec, 'float', false),
+    roll: pBool(spec, 'roll', false),
   };
   CFG.set(spec, c);
   return c;
@@ -218,10 +221,12 @@ function dropFrom(ctx: PartContext, s: ItemState, cfg: ItemCfg, p: PlayerState):
   release(ctx, s);
   const throwIt = cfg.throwable && (p.moveRank === 'dash' || p.pitch > t['carry.item.throwPitch']);
   if (throwIt) {
-    const pitch = Math.max(p.pitch, p.moveRank === 'dash' ? t['carry.item.runPitch'] : 0.05);
+    // 転がす物（roll）を走りながら投げるときは、足元の高さで水平に放す
+    const rolling = cfg.roll && p.pitch <= t['carry.item.throwPitch'];
+    const pitch = rolling ? 0 : Math.max(p.pitch, p.moveRank === 'dash' ? t['carry.item.runPitch'] : 0.05);
     const d = lookDir(p.yaw, pitch);
-    const sp = t['carry.item.throwSpeed'];
-    let c = handPos(p);
+    const sp = t['carry.item.throwSpeed'] * (rolling ? 0.85 : 1);
+    let c = rolling ? [p.pos[0] + d[0] * 0.55, p.pos[1] + cfg.half[1] + 0.03, p.pos[2] + d[2] * 0.55] as Vec3 : handPos(p);
     if (ctx.colliders.pointBlocked(c[0], c[1], c[2])) c = [p.pos[0], p.pos[1] + 1.1, p.pos[2]];
     const q = quatYaw(p.yaw);
     s.poses = [c[0], c[1], c[2], q[0], q[1], q[2], q[3]];

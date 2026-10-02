@@ -9,3 +9,4 @@ import './replica.ts';
 import './puzzle.ts';
 import './puzzle2.ts';
 import './picture.ts';
+import './games.ts';

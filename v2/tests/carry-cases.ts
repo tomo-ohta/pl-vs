@@ -15,7 +15,8 @@ const t = defaultTuning();
 const SIZES: { w: number; d: number; kind: 'room' | 'hall'; height?: number }[] = [{ w: 6.6, d: 8.0, kind: 'room' }, { w: 8.6, d: 12.0, kind: 'hall', height: 3.4 }];
 
 /** 仕掛けと、試す出口の向き（opposite: 入口の向かい / side: 隣の壁 / none: 行き止まり） */
-export const CARRY_CASES: { def: string; exits: ('opposite' | 'side' | 'none')[]; minDirs?: number }[] = [
+/** walk 'exit': 何もしないで通る代わりに、部屋のあちこちから入口へ歩いて戻れる（押される床・弾く柱の部屋） */
+export const CARRY_CASES: { def: string; exits: ('opposite' | 'side' | 'none')[]; minDirs?: number; walk?: 'exit' }[] = [
   { def: 'carryWater', exits: ['opposite', 'side', 'none'] },
   { def: 'parcelGate', exits: ['opposite', 'side', 'none'] },
   { def: 'bookCollect', exits: ['opposite', 'side', 'none'] },
@@ -39,6 +40,18 @@ export const CARRY_CASES: { def: string; exits: ('opposite' | 'side' | 'none')[]
   { def: 'balanceScale', exits: ['none'] },
   { def: 'mazeModel', exits: ['none'] },
   { def: 'footPattern', exits: ['none'] },
+  { def: 'tiltMarble', exits: ['none', 'side'] },
+  { def: 'bowlingLane', exits: ['none', 'side'], minDirs: 2 },
+  { def: 'golfRoom', exits: ['none', 'side'] },
+  { def: 'tagRoom', exits: ['none', 'side'] },
+  { def: 'hideSeek', exits: ['none', 'side'] },
+  { def: 'pinballHall', exits: ['none'], walk: 'exit' },
+  { def: 'cartLoop', exits: ['none', 'side'] },
+  { def: 'targetGallery', exits: ['none', 'side'] },
+  { def: 'memoryRoom', exits: ['none'] },
+  { def: 'shadowPose', exits: ['none', 'side'] },
+  { def: 'pianoFloor', exits: ['none', 'side'] },
+  { def: 'ringRoom', exits: ['none', 'side'] },
 ];
 
 /** 行き止まりの部屋の奥: 入口からいちばん遠い、体を置ける床の点（0.5 m 格子） */

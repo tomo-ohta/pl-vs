@@ -467,6 +467,166 @@ SOLVERS.footPattern = [async (sim, room) => {
   return ['puzzle.feet'];
 }];
 
+/** 試験だけ: 剛体の持てる物を点 p へ置き直す（止まった状態で） */
+function placeBodyAt(sim: Sim, id: string, p: Vec3): void {
+  const st = sim.stateOf(id) as unknown as { poses: number[]; handle: number; vel: number[]; mode: number };
+  st.poses = [p[0], p[1], p[2], 0, 0, 0, 1];
+  st.vel = [0, 0, 0];
+  if (st.handle >= 0) sim.physics?.placeBody(st.handle, p, [0, 0, 0, 1]);
+}
+
+/** 球を暗い穴の上に置く（傾けて転がすのは別の試験。ここでは穴に入ると隠しが現れる配線を見る） */
+SOLVERS.tiltMarble = [async (sim, room) => {
+  const holes = ents(room, 'ballHole')[0]!;
+  const h = (holes.params.holes as number[][])[2]!;
+  run(sim, 0.5);
+  placeBodyAt(sim, String(holes.params.ball), [h[0]!, h[1]! + 0.05, h[2]!]);
+  run(sim, 1.5);
+  return ['game.tilt.darkHole'];
+}];
+/** 投げずにレーンを歩いてピンの所へ行き、奥の床に 3 秒いる（反則） */
+SOLVERS.bowlingLane = [async (sim, room) => {
+  const deck = ents(room, 'dwellSensor')[0]!;
+  const a = deck.params.aabb as { min: number[]; max: number[] };
+  const c: Vec3 = [(a.min[0]! + a.max[0]!) / 2, room.cell.floorY, (a.min[2]! + a.max[2]!) / 2];
+  const p = standNear(sim, c, room.cell.floorY, 0.4) ?? c;
+  walkTo(sim, 'room', p, 60);
+  run(sim, 3.5);
+  return ['game.bowling.deck'];
+}];
+/** 球をねずみ穴の前へ（転がる球の状態を置き直す。蹴るのは別の試験） */
+SOLVERS.golfRoom = [async (sim, room) => {
+  const ball = ents(room, 'rollBall')[0]!;
+  const m = (ball.params.cups as number[][])[1]!;
+  run(sim, 0.2);
+  const st = sim.stateOf(ball.id) as unknown as { pos: number[]; vel: number[]; kicked: number };
+  st.pos = [m[0]!, room.cell.floorY + 0.09, m[1]!];
+  st.vel = [0.2, 0];
+  st.kicked = 1;
+  run(sim, 0.5);
+  return ['game.golf.mouse'];
+}];
+/** 灯りを見ないで、じっと待つ（灯りの方から寄ってきて触れる） */
+SOLVERS.tagRoom = [async (sim, room) => {
+  const tag = ents(room, 'tagLight')[0]!;
+  const home = tag.params.home as number[];
+  const p = sim.players[0]!;
+  // 入口の内側に立ち、灯りと反対を向いて待つ
+  sim.teleport(0, room.inside, 0);
+  run(sim, 0.2);
+  const away = Math.atan2(home[0]! - p.pos[0], home[2]! - p.pos[2]);
+  for (let i = 0; i < 40 * 60 && sim.outputOf(tag.id, 'touched') < 0.5; i++) sim.step([cmd({ yaw: away })]);
+  return ['game.tag.still'];
+}];
+/** 木箱の隙間に入って、しゃがんで 16 秒隠れる（見つかったら、もう一度） */
+SOLVERS.hideSeek = [async (sim, room) => {
+  const seeker = ents(room, 'seeker')[0]!;
+  const a = seeker.params.hide as { min: number[]; max: number[] };
+  const c: Vec3 = [(a.min[0]! + a.max[0]!) / 2, room.cell.floorY, (a.min[2]! + a.max[2]!) / 2];
+  for (let tr = 0; tr < 4 && sim.outputOf(seeker.id, 'hidden') < 0.5; tr++) {
+    walkWith(sim, bodyFree(sim, c) ? c : standNear(sim, c, room.cell.floorY, 0.3) ?? c, (x) => ({ ...x, crouch: true }), 60);
+    for (let i = 0; i < 17 * 60 && sim.outputOf(seeker.id, 'hidden') < 0.5; i++) sim.step([cmd({ crouch: true })]);
+  }
+  return ['game.hide.nook'];
+}];
+/** わざと落とし穴へ落ちて、階段で上がれる */
+SOLVERS.pinballHall = [async (sim, room) => {
+  const y0 = room.cell.floorY;
+  // 穴: 部屋の中のいちばん低い固い床（穴の底）の上
+  const r = room.slot.rect;
+  let pit: Vec3 | null = null;
+  for (let x = r.x0 + 0.5; x < r.x1 - 0.4 && !pit; x += 0.25) for (let z = r.z0 + 0.5; z < r.z1 - 0.4 && !pit; z += 0.25) if (bodyFree(sim, [x, y0 - 2.4, z])) pit = [x, y0, z];
+  if (!pit) return ['（穴が無い）'];
+  sim.teleport(0, [pit[0], y0 + 0.5, pit[2]], 0);
+  run(sim, 2);
+  if (sim.players[0]!.pos[1] > y0 - 1.5) return ['（落ちない）'];
+  if (!walkTo(sim, 'room', room.inside, 90).ok || Math.abs(sim.players[0]!.pos[1] - y0) > 0.1) return ['（上がれない）'];
+  return ['ok'];
+}];
+
+/** 台車の上に乗って、降りずに 3 周 */
+SOLVERS.cartLoop = [async (sim, room) => {
+  const cart = ents(room, 'cartTrack')[0]!;
+  run(sim, 0.1);
+  const p = sim.stateOf(cart.id)!.pos as number[];
+  const h = cart.params.half as number[];
+  sim.teleport(0, [p[0]!, p[1]! + h[1]! * 2 + 0.05, p[2]!], 0);
+  for (let i = 0; i < 70 * 60 && sim.outputOf(cart.id, 'laps') < 3; i++) sim.step([cmd()]);
+  return sim.outputOf(cart.id, 'laps') >= 3 ? ['game.cart.laps'] : [`（${sim.outputOf(cart.id, 'laps')} 周で落ちた）`];
+}];
+/** 球を拾い、線を越えて的の下の杯に手で置く（反則） */
+SOLVERS.targetGallery = [async (sim, room) => {
+  const ball = ents(room, 'carryItem', (e) => e.params.kind === 'ball')[0]!;
+  const cup = ents(room, 'carryReceiver')[0]!;
+  if (!goPick(sim, room, ball.id)) return ['（拾えない）'];
+  if (!goPlace(sim, room, slotPos(cup), undefined, 0.9)) return ['（置けない）'];
+  run(sim, 0.3);
+  return ['game.target.cup'];
+}];
+/** 見せられたあと、暗い中で何もせずにじっと待つ */
+SOLVERS.memoryRoom = [async (sim, room) => {
+  const game = ents(room, 'memoryGame')[0]!;
+  sim.teleport(0, room.inside, 0);
+  for (let i = 0; i < 40 * 60 && sim.outputOf(game.id, 'patient') < 0.5; i++) sim.step([cmd()]);
+  return ['game.memory.patient'];
+}];
+/** 印の無い所（影が扉の大きさになる所）に立つ */
+SOLVERS.shadowPose = [async (sim, room) => {
+  const pose = ents(room, 'shadowPose')[0]!;
+  const m = (pose.params.marks as { pos: number[] }[])[2]!;
+  const p: Vec3 = [m.pos[0]!, room.cell.floorY, m.pos[2]!];
+  if (!walkTo(sim, 'room', bodyFree(sim, p) ? p : standNear(sim, p, room.cell.floorY, 0.2) ?? p, 60).ok) return ['（行けない）'];
+  run(sim, 2);
+  return ['game.shadow.door'];
+}];
+/** 楽譜の旋律を踏む（鍵盤の外の床を回って、次の鍵へ） */
+SOLVERS.pianoFloor = [async (sim, room) => {
+  const keys = ents(room, 'stepPattern')[0]!;
+  const o = keys.params.origin as number[];
+  const C = Number(keys.params.cell), nx = Number(keys.params.nx);
+  const alongX = nx > 1;
+  const center = (k: number): Vec3 => alongX ? [o[0]! + (k + 0.5) * C, room.cell.floorY, o[2]! + C / 2] : [o[0]! + C / 2, room.cell.floorY, o[2]! + (k + 0.5) * C];
+  // 鍵盤の手前（入口の側）の床
+  const ent = room.inside;
+  const side = alongX ? Math.sign(ent[2] - (o[2]! + C / 2)) || 1 : Math.sign(ent[0] - (o[0]! + C / 2)) || 1;
+  const offOf = (k: number): Vec3 => { const c = center(k); return alongX ? [c[0], c[1], c[2] + side * 0.9] : [c[0] + side * 0.9, c[1], c[2]]; };
+  for (const k of keys.params.pattern as number[]) {
+    if (!walkTo(sim, 'room', offOf(k), 30).ok) return ['（鍵盤の前へ行けない）'];
+    if (!walkTo(sim, 'room', center(k), 30).ok) return ['（踏めない）'];
+    run(sim, 0.2);
+    walkTo(sim, 'room', offOf(k), 30);
+  }
+  run(sim, 0.3);
+  return ['game.piano.melody'];
+}];
+/** 輪を逆の順にくぐる（体を輪の手前と奥へ置く。跳んで届く高さかも確かめる） */
+SOLVERS.ringRoom = [async (sim, room) => {
+  const rs = ents(room, 'ringSensor')[0]!;
+  const rings = rs.params.rings as { c: number[]; n: number[] }[];
+  // 跳んで届く高さ（その場で跳ぶ）
+  sim.teleport(0, room.inside, 0);
+  run(sim, 0.5);
+  let top = -Infinity;
+  sim.step([cmd({ jump: true })]);
+  for (let i = 0; i < 6 * 60; i++) { sim.step([cmd()]); top = Math.max(top, sim.players[0]!.pos[1]); }
+  const need = Math.max(...rings.map((r) => r.c[1]!)) - 0.85 - room.cell.floorY;
+  if (top - room.cell.floorY < need) return [`（跳んでも届かない: ${(top - room.cell.floorY).toFixed(2)} < ${need.toFixed(2)}）`];
+  // 輪どうしの間を移るときは、輪の数え方の前の位置を消す（試験だけ。移る間に別の輪の面を横切らないように）
+  const corner = (): void => { (sim.stateOf(rs.id) as unknown as { prev: number[] }).prev = []; };
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const r = rings[i]!;
+    corner();
+    for (const sg of [-1, 1]) {
+      const p = sim.players[0]!;
+      p.pos = [r.c[0]! + sg * r.n[0]! * 0.3, r.c[1]! - 0.85, r.c[2]! + sg * r.n[2]! * 0.3];
+      p.vel = [0, 0, 0];
+      sim.step([cmd()]);
+    }
+  }
+  run(sim, 0.2);
+  return ['game.rings.reverse'];
+}];
+
 /** 普通の遊び方（隠しが現れてはいけない）: 戻り値は、現れてはいけない隠しの元 */
 export const ANTI: Record<string, Solver[]> = {
   // 普通に歩いて運ぶと少しこぼれる → 台は沈まない
@@ -557,6 +717,53 @@ export const ANTI: Record<string, Solver[]> = {
     }
     run(sim, 0.3);
     return ['puzzle.balance'];
+  }],
+  // 灯りを追いかけ回す（捕まえるだけでは扉は開かない）
+  tagRoom: [async (sim, room) => {
+    const tag = ents(room, 'tagLight')[0]!;
+    for (let k = 0; k < 6; k++) {
+      const p = sim.stateOf(tag.id)!.pos as number[];
+      const at = standNear(sim, [p[0]!, room.cell.floorY, p[2]!], room.cell.floorY, 0.3);
+      if (at) walkWith(sim, at, (x) => ({ ...x, dash: true }), 8);
+    }
+    return ['game.tag.still'];
+  }],
+  // 輪を光る順にくぐる（前向き）→ 逆の扉は開かない
+  ringRoom: [async (sim, room) => {
+    const rs = ents(room, 'ringSensor')[0]!;
+    const rings = rs.params.rings as { c: number[]; n: number[] }[];
+    for (let i = 0; i < rings.length; i++) {
+      const r = rings[i]!;
+      (sim.stateOf(rs.id) as unknown as { prev: number[] }).prev = [];
+      for (const sg of [-1, 1]) { const p = sim.players[0]!; p.pos = [r.c[0]! + sg * r.n[0]! * 0.3, r.c[1]! - 0.85, r.c[2]! + sg * r.n[2]! * 0.3]; p.vel = [0, 0, 0]; sim.step([cmd()]); }
+    }
+    run(sim, 0.2);
+    return sim.outputOf(rs.id, 'forward') > 0.5 ? ['game.rings.reverse'] : ['（前向きにもくぐれない）'];
+  }],
+  // 記憶の部屋で、物を全部元に戻す（照明はつくが、扉は開かない）
+  memoryRoom: [async (sim, room) => {
+    const game = ents(room, 'memoryGame')[0]!;
+    const board = ents(room, 'carryReceiver')[0]!;
+    const slots = board.params.slots as { want: string[] }[];
+    sim.teleport(0, room.inside, 0);
+    for (let i = 0; i < 12 * 60 && sim.outputOf(game.id, 'phase') < 2; i++) sim.step([cmd()]);
+    for (let i = 0; i < slots.length; i++) {
+      const it = ents(room, 'carryItem', (e) => e.params.tag === slots[i]!.want[0])[0]!;
+      if (goPick(sim, room, it.id)) goPlace(sim, room, slotPos(board, i), undefined, 0.8);
+    }
+    run(sim, 0.5);
+    return sim.outputOf(game.id, 'solved') > 0.5 ? ['game.memory.patient'] : [];
+  }],
+  // 印の上で立つ・しゃがむ（扉は開かない）
+  shadowPose: [async (sim, room) => {
+    const pose = ents(room, 'shadowPose')[0]!;
+    const marks = pose.params.marks as { pos: number[]; crouch: boolean }[];
+    for (const m of marks.slice(0, 2)) {
+      const p: Vec3 = [m.pos[0]!, room.cell.floorY, m.pos[2]!];
+      walkTo(sim, 'room', bodyFree(sim, p) ? p : standNear(sim, p, room.cell.floorY, 0.2) ?? p, 60);
+      run(sim, 2, { crouch: m.crouch });
+    }
+    return ['game.shadow.door'];
   }],
   // 何も持たずに枠で待つ
   parcelGate: [async (sim, room) => {

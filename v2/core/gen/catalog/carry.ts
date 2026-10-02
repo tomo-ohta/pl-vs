@@ -8,8 +8,6 @@
  */
 import type { CatalogEntry } from './types.ts';
 
-const WIP = '作業中（段階 4 の carry で作る）';
-
 export const CARRY_CATALOG: CatalogEntry[] = [
   // ---- 2.10 物を運ぶ・置く ----
   {
@@ -123,16 +121,52 @@ export const CARRY_CATALOG: CatalogEntry[] = [
     note: '床の 4×4 の升目。別の部屋の足跡の図（入口の側が下）の順に踏むと扉。踏めた升目が灯り、違う升目を踏むと赤く光って最初から（逆から踏んでも開かない）',
   },
   // ---- 2.15 自由に遊べるミニゲーム（脇の部屋。いつでも出られる・失敗は区間の最初へ・報酬なし・普通と違う遊び方で隠し）----
-  { idea: 'U01', name: '球を穴に入れる（床を傾ける）', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U02', name: 'ボウリングの廊下', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U03', name: 'ゴルフの部屋（1 打で入れる）', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U04', name: '鬼ごっこする灯り', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U05', name: 'かくれんぼ（灯りが探しに来る）', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U06', name: 'ピンボールの吹き抜け（自分が球）', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U07', name: 'カートの坂', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U08', name: '的当て（物を投げる）', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U09', name: '記憶の部屋（10 秒見たあと照明が消え、同じ所に物を戻す）', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U10', name: '影絵（光と物を合わせて形を作る）', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U11', name: '音合わせ（ピアノの床）', status: 'deferred', impl: [], note: WIP },
-  { idea: 'U12', name: '無重力の部屋で浮かぶ輪をくぐる', status: 'deferred', impl: [], note: WIP },
+  {
+    idea: 'U01', name: '球を穴に入れる（床を傾ける）', status: 'done', impl: [{ kind: 'gimmick', id: 'tiltMarble' }, { kind: 'part', id: 'ballHole' }, { kind: 'part', id: 'tiltFloor' }],
+    note: '部屋の床がまるごと傾く板（立った方へ傾く。QR の床を傾ける版）。大きな球（剛体）と床の穴 3 つ（明るい輪の穴が的）。穴に入ると鈴、球は始めの所へ戻る。隠し: 部屋の隅の暗い穴に入れる（出現型）。物理を使う（gimmick.physicsMax の内）',
+  },
+  {
+    idea: 'U02', name: 'ボウリングの廊下', status: 'done', impl: [{ kind: 'gimmick', id: 'bowlingLane' }, { kind: 'part', id: 'pinSetter' }, { kind: 'part', id: 'carryBody' }],
+    note: '細長い部屋の手前に球 2 つ、奥にピン 6 本（剛体）。走りながら Q で投げると、足元の高さで転がる（roll）。全部倒れると 3 秒・投げて 10 秒で起き直る。全部倒すとストライクの音。隠し（反則）: 投げずにファウルの線を越えてピンの所まで歩き、奥の床に 3 秒いると、奥の壁（職員用の扉）が開く（出現型）。線を越えると警告音',
+  },
+  {
+    idea: 'U03', name: 'ゴルフの部屋（1 打で入れる）', status: 'done', impl: [{ kind: 'gimmick', id: 'golfRoom' }, { kind: 'part', id: 'rollBall' }],
+    note: '芝の床に球と旗の穴、間に低い壁（まっすぐは入らない。跳ね返して入れる）。体で触れると蹴る（走ると強い）。物理を使わない転がる球（摩擦・壁で跳ね返る）。止まって入っていなければ元の所へ（1 打で）。転がっている間にもう一度蹴ると反則で戻る。隠し: 横の壁の根元のねずみ穴に入れる（出現型）',
+  },
+  {
+    idea: 'U04', name: '鬼ごっこする灯り', status: 'done', impl: [{ kind: 'gimmick', id: 'tagRoom' }, { kind: 'part', id: 'tagLight' }],
+    note: '暗い部屋の灯りの玉（点光源 1 つ）。近づくと逃げる（箱を避けて）。触れると捕まえた数が増えて遠くへ跳ぶ（音が上がっていく）。隠し: 追わずに、灯りを見ないでじっとしていると灯りの方から寄ってきて触れる → 灯りが初めにいた壁に扉（出現型）',
+  },
+  {
+    idea: 'U05', name: 'かくれんぼ（灯りが探しに来る）', status: 'done', impl: [{ kind: 'gimmick', id: 'hideSeek' }, { kind: 'part', id: 'seeker' }],
+    note: '木箱の並ぶ部屋を、光の扇の灯りが見回る（木箱で見通しが切れる。しゃがむと見つかる距離が短い）。見つかると警報で、その回は無効（入口の前から始め直す。体力は減らさない・閉じ込めない）。見つからずに奥の光る円まで行くと勝ちの音。隠し: 奥の隅の木箱の隙間に見つからずに 15 秒隠れ続けると、隙間の奥の壁が開く（出現型）',
+  },
+  {
+    idea: 'U06', name: 'ピンボールの吹き抜け（自分が球）', status: 'done', impl: [{ kind: 'gimmick', id: 'pinballHall' }, { kind: 'part', id: 'bumper' }],
+    note: '自分が球: 部屋の床が滑り、奥から手前の壁へ押される（入口の前は押さない）。丸い柱に向かって触れると弾かれる。奥の 3 つの的を踏むと灯る（全部で鈴）。手前の壁際の落とし穴に落ちると、階段で上がってやり直し。隠し: 落とし穴の底の壁の扉（存在型。わざと落ちる）。吹き抜け（縦）ではなく、傾いた台を部屋まるごとにした（スマホの操作で遊べる形）',
+  },
+  {
+    idea: 'U07', name: 'カートの坂', status: 'done', impl: [{ kind: 'gimmick', id: 'cartLoop' }, { kind: 'part', id: 'cartTrack' }],
+    note: '部屋を回る台車（坂を上って下る。下り坂でも乗っている人を置いて行かない）。乗ると運ばれる（降りても何も起きない）。隠し: 降りずに 3 周乗り続けると、壁が開く（出現型）',
+  },
+  {
+    idea: 'U08', name: '的当て（物を投げる）', status: 'done', impl: [{ kind: 'gimmick', id: 'targetGallery' }, { kind: 'part', id: 'throwTarget' }],
+    note: '手前の線の後ろの籠に球 3 つ、奥の壁に的 4 枚。投げた物の通り道が的を通ると倒れる（全部で鈴、3 秒で起きる）。隠し（反則）: 線を越えて、的の下の棚の金の杯に球を手で置く（投げて入っても開く）と扉（出現型）',
+  },
+  {
+    idea: 'U09', name: '記憶の部屋（10 秒見たあと照明が消え、同じ所に物を戻す）', status: 'done', impl: [{ kind: 'gimmick', id: 'memoryRoom' }, { kind: 'part', id: 'memoryGame' }],
+    note: '台の上に物が 4 つ。部屋に入ると 10 秒見せて照明が消え、物が床に散らばる（暗いので懐中電灯で探す）。元の台に戻すと照明がつく。部屋を出ると最初から。隠し: 暗い間に物に触れず、20 秒じっとしていると扉が現れる（出現型）',
+  },
+  {
+    idea: 'U10', name: '影絵（光と物を合わせて形を作る）', status: 'done', impl: [{ kind: 'gimmick', id: 'shadowPose' }, { kind: 'part', id: 'shadowPose' }],
+    note: '床の低い強い灯りが、向かいの白い壁に自分の影を映す（体の箱を壁へ写す）。壁に人の形の線 2 つ（立った形・しゃがんだ形）と床の印。印の上でその姿勢で立つと線が灯る（両方で鈴）。隠し: 印の無い所で、影がちょうど扉の線の大きさになる位置に立つと、影が扉になる（出現型）。PZ05（影絵の扉）は物の影、こちらは自分の影',
+  },
+  {
+    idea: 'U11', name: '音合わせ（ピアノの床）', status: 'done', impl: [{ kind: 'gimmick', id: 'pianoFloor' }, { kind: 'part', id: 'stepPattern' }],
+    note: '床の鍵盤 8 つ（ドレミファソラシド）。踏むと鳴る（WebAudio の合成）。奥の壁に楽譜（5 音）。隠し: 楽譜の旋律を踏むと扉が現れる（出現型。違う鍵を踏むと最初から。鍵盤の外の床を回って次の鍵へ行ける）',
+  },
+  {
+    idea: 'U12', name: '無重力の部屋で浮かぶ輪をくぐる', status: 'done', impl: [{ kind: 'gimmick', id: 'ringRoom' }, { kind: 'part', id: 'ringSensor' }],
+    note: '体の軽い部屋（gravity ゾーン。跳ぶと天井の近くまで届く）に、宙に浮かぶ輪が 4 つ。光る順にくぐると鈴。隠し: 逆の順（最後の輪から）にくぐると扉が現れる（出現型）',
+  },
 ];
