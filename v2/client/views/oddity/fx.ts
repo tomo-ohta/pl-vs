@@ -88,6 +88,7 @@ const q = new THREE.Quaternion();
 const pos = new THREE.Vector3();
 const scl = new THREE.Vector3();
 const up = new THREE.Vector3(0, 1, 0);
+const ID_Q = new THREE.Quaternion();
 
 /** 粒の入れ物（InstancedMesh）と、毎フレームの置き直し */
 function particles(ctx: ViewContext, geo: THREE.BufferGeometry, mat: THREE.Material, count: number): THREE.InstancedMesh {
@@ -144,7 +145,7 @@ defineFx('rain', ({ p, ctx, room, seed, rects }) => {
         const s = 0.6 + w.t * 3.2;
         pos.set(w.x, floorY + 0.006, w.z);
         scl.set(s, 1, s);
-        m4.compose(pos, new THREE.Quaternion(), scl);
+        m4.compose(pos, ID_Q, scl);
         rings.setMatrixAt(i, m4);
       });
       rings.instanceMatrix.needsUpdate = true;

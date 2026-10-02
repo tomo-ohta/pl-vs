@@ -212,7 +212,7 @@ defineAnomaly({
       decorDoor(D, f, a, cell.palette.door, Math.min(o.width, 1.2) - 0.1, Math.min(2.05, o.height - 0.05));
       B.push(...lift(D, fy));
     }
-    // 鏡の枠（柱・梁・床の縁）と、ほとんど透明な面
+    // 鏡の枠（柱・梁・床の縁。当たらない）
     const span = axis === 'x' ? [r.z0 + WALL_T, r.z1 - WALL_T] : [r.x0 + WALL_T, r.x1 - WALL_T];
     const frame = (a0: number, a1: number, y0: number, y1: number, d: number, mat: MatId): Box => (axis === 'x' ? box([at - d, y0, a0], [at + d, y1, a1], mat, false) : box([a0, y0, at - d], [a1, y1, at + d], mat, false));
     B.push(frame(span[0]!, span[0]! + 0.12, fy, fy + h, 0.06, 'goldTrim'), frame(span[1]! - 0.12, span[1]!, fy, fy + h, 0.06, 'goldTrim'));

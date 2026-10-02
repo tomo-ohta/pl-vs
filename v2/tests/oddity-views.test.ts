@@ -74,6 +74,38 @@ test('oddity の描画: どの異変の部屋の部品も、Node で作って動
   lib.dispose();
 });
 
+test('oddity の文字の札: 名前・番号・非常口の印・矢印を Canvas に書く（Canvas の代わりで、書く手順に例外が無い）', async () => {
+  const { createFx } = await import('../client/views/oddity/fx.ts');
+  await import('../client/views/oddity/labels.ts');
+  const calls: string[] = [];
+  const g = new Proxy({}, { get: (_o, k) => (typeof k === 'string' && !['fillStyle', 'strokeStyle', 'font', 'textAlign', 'textBaseline', 'lineCap', 'lineWidth'].includes(k) ? (...a: unknown[]) => { calls.push(`${k}${k === 'fillText' ? `:${String(a[0])}` : ''}`); } : undefined), set: () => true });
+  const g0 = globalThis as unknown as { document?: unknown };
+  const had = 'document' in g0;
+  g0.document = { createElement: () => ({ width: 0, height: 0, getContext: () => g }) };
+  try {
+    const root = new THREE.Group();
+    const ctx = { root } as never;
+    const items = [
+      { text: '{name} さん\nおかえりなさい', pos: [0, 1.6, 0], dir: 0, w: 2, h: 0.7 },
+      { text: '3', pos: [1, 0.8, 1], dir: 'up', w: 0.3, h: 0.2 },
+      { text: '#exit:L', pos: [2, 2.2, 0], dir: 1, w: 0.5, h: 0.18, glow: true },
+      { text: '#arrow:R', pos: [3, 0, 3], dir: 'up', w: 0.5, h: 0.36, yaw: 1.2 },
+    ];
+    const fx = createFx('labels', { p: { kind: 'labels', items }, ctx, room: { min: [0, 0, 0], max: [5, 3, 5] }, spec: { id: 'x', type: 'oddRoom', params: {} }, seed: 1, key: 'k', rects: [{ x0: 0, z0: 0, x1: 5, z1: 5 }] });
+    assert.ok(fx, '札ができる');
+    assert.equal(root.children.length, 4);
+    assert.ok(calls.includes('fillText:あなた さん'), `名前の入力が無ければ「あなた」: ${calls.filter((c) => c.startsWith('fillText')).join(' ')}`);
+    assert.ok(calls.includes('arc'), '非常口の人');
+    const up = root.children[1]!, arrow = root.children[3]!;
+    assert.ok(Math.abs(up.rotation.x + Math.PI / 2) < 1e-9, '床の札は上を向く');
+    assert.ok(Math.abs(arrow.rotation.z - 1.2) < 1e-9, '床の矢印は向きへ回す');
+    fx!.dispose();
+    assert.equal(root.children.length, 0);
+  } finally {
+    if (!had) delete g0.document;
+  }
+});
+
 test('PostFX の部屋の画面効果: 効果の間だけ pass を差し込み、効果が消えたら外す', async () => {
   const { PostFX } = await import('../client/render/PostFX.ts');
   const { GradePass, mergeGrades, isNeutral } = await import('../client/render/RoomGrade.ts');
