@@ -33,6 +33,7 @@ import type { UiRefs } from '../ui/dom.ts';
 import { createView, type EntityView } from '../views/views.ts';
 import { applyLampLevels, cellAt, FloorBuilder, type BuiltFloor } from '../world/FloorBuilder.ts';
 import { LightManager } from '../world/LightManager.ts';
+import { Visibility } from '../world/Visibility.ts';
 
 const TONE_MAPPINGS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping } as const;
 /** 環境（霧・空の色）の補間時間 */
@@ -60,10 +61,15 @@ export class ClientGame {
   built: BuiltFloor | null = null;
   tier: QualityTier;
   paused = true;
+  /** フロアの出口に入った（main がつぎのフロアを読む） */
+  onFloorExit: ((exitId: string, kind: string) => void) | null = null;
 
   private readonly hemi = new THREE.HemisphereLight(0xe5e4d5, 0x6c665a, 0.1);
   private lightsPool: LightManager;
   private views = new Map<string, EntityView>();
+  private visibility: Visibility | null = null;
+  /** 見える区画（cell and portal）。開発用に ?cull=off で全部描く */
+  cull = typeof location === 'undefined' || new URLSearchParams(location.search).get('cull') !== 'off';
   private yaw = 0;
   private pitch = 0;
   private acc = 0;
@@ -164,6 +170,7 @@ export class ClientGame {
     this.sim = new Sim(floor, { tuning: this.tuning, physics });
     this.built = new FloorBuilder(this.materials).build(floor);
     this.scene.add(this.built.root);
+    this.visibility = new Visibility(floor);
     const ctx = { root: this.built.root, materials: this.materials, built: this.built, sim: this.sim, levelOf: this.lampLevel };
     for (const e of floor.entities) {
       const v = createView(e, ctx);
@@ -187,6 +194,7 @@ export class ClientGame {
     this.views.clear();
     this.built?.dispose();
     this.built = null;
+    this.visibility = null;
     this.sim?.physics?.dispose();
     this.sim = null;
     this.currentCell = null;
@@ -301,6 +309,7 @@ export class ClientGame {
           break;
         }
         case 'reveal': this.onReveal(String(e.data?.group ?? ''), String(e.data?.style ?? 'fadeIn')); break;
+        case 'floor.exit': this.onFloorExit?.(String(e.data?.exit ?? ''), String(e.data?.kind ?? '')); break;
         default: break;
       }
     }
@@ -392,7 +401,8 @@ export class ClientGame {
       }
       for (const c of built.cells.values()) if (c.lamps.length) applyLampLevels(c, this.lampLevel);
       this.updateRevealAnim(dt);
-      this.lightsPool.update(built, this.camera.position, this.lampLevel, null, dt);
+      const visible = this.cull && this.visibility ? this.visibility.update(built, sim, this.camera) : null;
+      this.lightsPool.update(built, this.camera.position, this.lampLevel, visible, dt);
       // 撮像の入力（回転の速さ・静止）
       const yawRate = (this.rig.out.yaw - this.prevCamYaw) / Math.max(1e-3, dt);
       const pitchRate = (this.rig.out.pitch - this.prevCamPitch) / Math.max(1e-3, dt);

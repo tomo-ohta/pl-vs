@@ -43,8 +43,28 @@ export const TUNING_SPEC = {
   'secrets.dest.clue': num(13, 0, 100, '次の隠しの手がかり（入れ子）'),
 
   // ---- フロア（v2-plan.md 5 章）----
-  'floor.sizeM': num(70, 30, 200, '1 フロアの一辺（m）'),
-  'floor.baySpacingM': num(8, 4, 20, '区画の間隔（m）[QR]'),
+  'floor.sizeM': num(70, 30, 200, '1 フロアの一辺の目安（m）'),
+  'floor.baySpacingM': num(11, 6, 24, '区画の間隔（m）。部屋はこの中に収まり、残りが廊下になる [QR は 8]'),
+  'floor.colsMin': num(3, 1, 12, '区画の格子の列の数（最小）', true),
+  'floor.colsMax': num(5, 1, 12, '区画の格子の列の数（最大）', true),
+  'floor.rowsMin': num(3, 1, 12, '区画の格子の行の数（最小）', true),
+  'floor.rowsMax': num(5, 1, 12, '区画の格子の行の数（最大）', true),
+  'floor.loopsPer10': num(2, 0, 10, '区画 10 個あたりに足すループの数（行き止まりばかりにしない）'),
+  'floor.junctionChance': num(0.3, 0, 1, '部屋の代わりに曲がり角（廊下の交差）にする確率'),
+  'floor.levelHeightM': num(1.6, 0.6, 4, '高さの違う区画の段差（m）。階段でつなぐ'),
+  'floor.genRetries': num(6, 1, 30, '検証に通らなかったときに作り直す回数', true),
+
+  // ---- 希少度（v1 第12回の値。v2-plan.md 2 章）----
+  'rarity.w.common': num(33, 0, 100, 'Common の重み'),
+  'rarity.w.uncommon': num(24, 0, 100, 'Uncommon の重み'),
+  'rarity.w.rare': num(19, 0, 100, 'Rare の重み'),
+  'rarity.w.epic': num(18, 0, 100, 'Epic の重み'),
+  'rarity.w.legendary': num(4, 0, 100, 'Legendary の重み'),
+  'rarity.w.mythic': num(6.5, 0, 100, 'Mythic の重み'),
+  'rarity.depth.rare': num(2, 0, 100, 'Rare が出る最小の深さ', true),
+  'rarity.depth.epic': num(5, 0, 100, 'Epic が出る最小の深さ', true),
+  'rarity.depth.legendary': num(10, 0, 100, 'Legendary が出る最小の深さ', true),
+  'rarity.depth.mythic': num(18, 0, 100, 'Mythic が出る最小の深さ', true),
 
   // ---- 物理（v2-plan.md 6.1）----
   'physics.tickHz': num(60, 30, 120, 'シミュレーションの固定 tick', true),
