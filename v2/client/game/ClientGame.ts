@@ -30,7 +30,8 @@ import type { FilmPreset } from '../render/FilmPreset.ts';
 import { mobileTier, QUALITY_TIERS, type QualityTier, type QualityTierId } from '../render/quality.ts';
 import { Settings } from '../settings/Settings.ts';
 import type { UiRefs } from '../ui/dom.ts';
-import { createView, type EntityView } from '../views/views.ts';
+import { PlayerFlashlight } from '../render/PlayerFlashlight.ts';
+import { createView, type EntityView } from '../views/index.ts';
 import { applyLampLevels, cellAt, FloorBuilder, type BuiltFloor } from '../world/FloorBuilder.ts';
 import { LightManager } from '../world/LightManager.ts';
 import { Visibility } from '../world/Visibility.ts';
@@ -77,6 +78,12 @@ export class ClientGame {
   private acc = 0;
   private last = 0;
   private pendingJump = false;
+  private pendingDrop = false;
+  /** 懐中電灯（v1 と同じく最初は点いている。R で切り替え） */
+  private flashlight: PlayerFlashlight | null = null;
+  flashlightOn = true;
+  /** 部品の描画が受け取るシミュレーションのイベント（views の ctx.onEvent） */
+  private eventListeners = new Set<(e: SimEvent) => void>();
   private pendingInteract: { yaw: number; pitch: number } | null = null;
   private prevPos: [number, number, number] = [0, 0, 0];
   private currentCell: string | null = null;
@@ -110,6 +117,9 @@ export class ClientGame {
     this.scene.add(this.camera);
     this.rig = new CameraRig(this.camera);
     this.lightsPool = new LightManager(this.scene, this.tier.maxLights);
+    this.flashlight = new PlayerFlashlight(this.scene);
+    // v2 は影を光の焼き込み（ライトマップ）で表すので、懐中電灯も影を落とさない（影マップを作らない）
+    this.flashlight.light.castShadow = false;
     this.audio = new AudioEngine(this.settings);
     this.input = new InputController(o.canvas, o.ui.input);
     this.input.sensitivityScale = this.settings.data.lookSensitivity;
@@ -178,7 +188,11 @@ export class ClientGame {
       const root = new THREE.Group();
       root.name = `entity:${e.id}`;
       this.built.root.add(root);
-      const v = createView(e, { root, materials: this.materials, built: this.built, sim: this.sim, levelOf: this.lampLevel });
+      const v = createView(e, {
+        root, materials: this.materials, built: this.built, sim: this.sim, levelOf: this.lampLevel,
+        audio: this.audio, postfx: this.postfx, camera: this.camera, scene: this.scene,
+        onEvent: (f) => { this.eventListeners.add(f); return () => this.eventListeners.delete(f); },
+      });
       if (!v) { root.removeFromParent(); continue; }
       this.views.set(e.id, v);
       const portal = e.type === 'door' ? floor.portals.find((p) => p.doorId === e.id) : undefined;
@@ -219,6 +233,8 @@ export class ClientGame {
       }
     });
     for (const t of textures) this.renderer.initTexture(t);
+    // 懐中電灯は消灯中も強度 0 で点けておく（灯の数が変わると全材質のシェーダが作り直される）
+    if (this.flashlight) this.flashlight.light.visible = true;
     this.postfx.render();
     for (const s of saved) { s.o.visible = s.visible; s.o.frustumCulled = s.culled; }
   }
@@ -227,6 +243,7 @@ export class ClientGame {
     for (const v of this.views.values()) v.dispose();
     this.views.clear();
     this.viewRoots.clear();
+    this.eventListeners.clear();
     this.built?.dispose();
     this.built = null;
     this.visibility = null;
@@ -267,7 +284,7 @@ export class ClientGame {
   stepOnce(cmd: Partial<InputCommand> = {}): void {
     if (!this.sim) return;
     const p = this.sim.players[0]!;
-    this.sim.step([{ moveX: 0, moveY: 0, yaw: p.yaw, pitch: p.pitch, jump: false, dash: false, crouch: false, interact: null, ...cmd }]);
+    this.sim.step([{ moveX: 0, moveY: 0, yaw: p.yaw, pitch: p.pitch, jump: false, dash: false, crouch: false, interact: null, flashlight: this.flashlightOn, ...cmd }]);
     this.handleEvents(this.sim.drainEvents());
   }
 
@@ -282,6 +299,12 @@ export class ClientGame {
       this.yaw -= input.lookDX;
       this.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, this.pitch - input.lookDY));
       if (input.jump) this.pendingJump = true;
+      if (input.drop) this.pendingDrop = true;
+      if (input.flashlight) {
+        this.flashlightOn = !this.flashlightOn;
+        this.ui.setHint(this.flashlightOn ? '懐中電灯: オン' : '懐中電灯: オフ');
+        window.setTimeout(() => this.ui.setHint(''), 1500);
+      }
       if (input.interact) this.pendingInteract = { yaw: this.yaw, pitch: this.pitch };
       if (input.tap) this.pendingInteract = this.tapDirection(input.tap);
       this.acc += dt;
@@ -291,6 +314,7 @@ export class ClientGame {
         this.prevPos = [...sim.players[0]!.pos];
         sim.step([this.command(input)]);
         this.pendingJump = false;
+        this.pendingDrop = false;
         this.pendingInteract = null;
         this.acc -= step;
         n++;
@@ -302,7 +326,7 @@ export class ClientGame {
   }
 
   private command(input: InputState): InputCommand {
-    return { moveX: input.moveX, moveY: input.moveY, yaw: this.yaw, pitch: this.pitch, jump: this.pendingJump, dash: input.dash, crouch: input.crouch, interact: this.pendingInteract };
+    return { moveX: input.moveX, moveY: input.moveY, yaw: this.yaw, pitch: this.pitch, jump: this.pendingJump, dash: input.dash, crouch: input.crouch, interact: this.pendingInteract, drop: this.pendingDrop, flashlight: this.flashlightOn };
   }
 
   /** タップした画面の位置（NDC）を、視線の向きにする */
@@ -335,6 +359,7 @@ export class ClientGame {
     const sim = this.sim;
     if (!sim || !this.built) return;
     for (const e of events) {
+      for (const f of this.eventListeners) f(e);
       switch (e.type) {
         case 'player.stride': {
           const mat = e.data?.water ? 'waterShallow' : this.surfaceUnder();
@@ -343,7 +368,18 @@ export class ClientGame {
         }
         case 'player.land': this.audio.land(Number(e.data?.speed ?? 2), this.surfaceUnder()); break;
         case 'player.jump': this.audio.jump(this.surfaceUnder()); break;
-        case 'player.respawn': this.rig.snap(this.subject(1)); this.prevPos = [...sim.players[0]!.pos]; this.yaw = sim.players[0]!.yaw; this.pitch = 0; break;
+        case 'player.respawn': {
+          if (e.data?.cause === 'warp' && e.data?.seamless) {
+            // 継ぎ目なく移す: 補間の始点を同じだけずらし、カメラは切り替えない（同じ形の所どうしなので見た目が変わらない）
+            this.prevPos = [this.prevPos[0] + Number(e.data.dx ?? 0), this.prevPos[1] + Number(e.data.dy ?? 0), this.prevPos[2] + Number(e.data.dz ?? 0)];
+            this.yaw += Number(e.data.dYaw ?? 0);
+            this.flashlight?.reset();
+            break;
+          }
+          this.rig.snap(this.subject(1)); this.prevPos = [...sim.players[0]!.pos]; this.yaw = sim.players[0]!.yaw; this.pitch = 0;
+          this.flashlight?.reset();
+          break;
+        }
         case 'cue': {
           const name = String(e.data?.name ?? '');
           if (name === 'door.open' || name === 'door.close' || name === 'door.locked') {
@@ -374,6 +410,16 @@ export class ClientGame {
       if (hide) this.revealAnim.push({ meshes: hide, t: 0, style, hide: true });
     }
     this.audio.ui('open');
+  }
+
+  /** 懐中電灯の光が当たる面までの距離（当たり判定の箱を 0.2 m ずつたどる。照度を一定に保つのに使う。v1 と同じ役目） */
+  private flashlightHit(): number {
+    const sim = this.sim;
+    if (!sim || !this.flashlightOn) return Infinity;
+    const d = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    const o = this.camera.position;
+    for (let t = 0.3; t <= 12; t += 0.2) if (sim.colliders.pointBlocked(o.x + d.x * t, o.y + d.y * t, o.z + d.z * t)) return t;
+    return Infinity;
   }
 
   /** 足元の床の材質（足音）。現在の区画の箱から、足の高さに上面がある箱を探す */
@@ -457,6 +503,9 @@ export class ClientGame {
       for (const c of built.cells.values()) if (c.lamps.length) applyLampLevels(c, this.lampLevel);
       this.updateRevealAnim(dt);
       this.lightsPool.update(built, this.camera.position, this.lampLevel, visible, dt);
+      if (this.flashlight) {
+        this.flashlight.update(this.camera, this.paused ? 0 : dt, this.flashlightOn, this.tier.id === 'low', this.flashlightHit());
+      }
       // 撮像の入力（回転の速さ・静止）
       const yawRate = (this.rig.out.yaw - this.prevCamYaw) / Math.max(1e-3, dt);
       const pitchRate = (this.rig.out.pitch - this.prevCamPitch) / Math.max(1e-3, dt);

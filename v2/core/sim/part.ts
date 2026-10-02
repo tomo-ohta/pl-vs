@@ -59,6 +59,11 @@ export interface PartContext {
   stateOf(id: string): Readonly<PartState> | null;
   /** プレイヤーを戻す（落下・危険）。位置を省略するとチェックポイント */
   respawn(player: PlayerState, at?: { pos: Vec3; yaw: number }): void;
+  /**
+   * プレイヤーを pos へ移す（向き yaw。省略は今の向き）。seamless（既定 true）なら速度を保ち、クライアントは継ぎ目なく見せる。
+   * 同じ形の場所どうしで移すこと（くり返す廊下・離れた部屋へつながる扉）
+   */
+  warp(player: PlayerState, pos: Vec3, yaw?: number, seamless?: boolean): void;
   /** チェックポイントを変える */
   setRespawn(player: PlayerState, at: { pos: Vec3; yaw: number }): void;
 }

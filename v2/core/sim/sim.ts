@@ -157,6 +157,8 @@ export class Sim implements PlayerWorld {
       const p = this.players[i]!;
       const c = this.cmds[i]!;
       p.interactedId = c.interact ? this.pickInteractable(p, c.interact.yaw, c.interact.pitch) : null;
+      p.flashlight = !!c.flashlight;
+      p.dropPressed = !!c.drop;
       if (c.interact && p.interactedId) this.events.push({ type: 'interact', tick: this.tick, player: p.id, entity: p.interactedId });
     }
 
@@ -298,6 +300,9 @@ export class Sim implements PlayerWorld {
       respawn(player, at) {
         sim.respawnPlayer(player, at ?? null, id);
       },
+      warp(player, pos, yaw, seamless = true) {
+        sim.warpPlayer(player, pos, yaw ?? player.yaw, seamless, id);
+      },
       setRespawn(player, at) {
         player.respawn = { pos: [...at.pos], yaw: at.yaw };
       },
@@ -316,6 +321,25 @@ export class Sim implements PlayerWorld {
   teleport(index: number, pos: Vec3, yaw: number): void {
     const p = this.players[index];
     if (p) this.respawnPlayer(p, { pos, yaw }, 'teleport');
+  }
+
+  /**
+   * プレイヤーを pos へ移す（くり返す廊下・離れた部屋へつながる扉）。seamless なら速度と視線の上下を保ち、
+   * クライアントはカメラを同じだけずらして継ぎ目を見せない（同じ形の所どうしで移すこと）。イベントは player.respawn（cause 'warp'）
+   */
+  warpPlayer(p: PlayerState, pos: Vec3, yaw: number, seamless: boolean, by: string): void {
+    const delta: Vec3 = [pos[0] - p.pos[0], pos[1] - p.pos[1], pos[2] - p.pos[2]];
+    const dYaw = yaw - p.yaw;
+    p.pos = [...pos];
+    if (!seamless) { p.vel = [0, 0, 0]; p.pitch = 0; p.onGround = false; }
+    else if (Math.abs(dYaw) > 1e-9) {
+      // 向きを回すときは速度も回す
+      const c = Math.cos(-dYaw), s = Math.sin(-dYaw);
+      p.vel = [p.vel[0] * c - p.vel[2] * s, p.vel[1], p.vel[0] * s + p.vel[2] * c];
+    }
+    p.yaw = yaw;
+    p.surfaceId = null;
+    this.events.push({ type: 'player.respawn', tick: this.tick, player: p.id, pos: [...pos], entity: by, data: { cause: 'warp', yaw, seamless, dx: delta[0], dy: delta[1], dz: delta[2], dYaw } });
   }
 
   private respawnPlayer(p: PlayerState, at: { pos: Vec3; yaw: number } | null, cause: string): void {

@@ -17,9 +17,13 @@ export interface InputCommand {
   crouch: boolean;
   /** 調べる（扉・ボタン）。視線の向きで当てる。スマホのタップは、タップした方向の視線を入れる */
   interact: { yaw: number; pitch: number } | null;
+  /** 持っている物を置く・投げる（Q キー）。押した tick だけ true */
+  drop?: boolean;
+  /** 懐中電灯が点いているか（R キーで切り替える状態。照らした所だけ現れる物などが読む） */
+  flashlight?: boolean;
 }
 
-export const IDLE_COMMAND: Readonly<InputCommand> = { moveX: 0, moveY: 0, yaw: 0, pitch: 0, jump: false, dash: false, crouch: false, interact: null };
+export const IDLE_COMMAND: Readonly<InputCommand> = { moveX: 0, moveY: 0, yaw: 0, pitch: 0, jump: false, dash: false, crouch: false, interact: null, drop: false, flashlight: false };
 
 export type MoveRank = 'still' | 'walk' | 'dash';
 
@@ -59,6 +63,12 @@ export interface PlayerState {
   lastGround: Vec3;
   /** その tick に調べる操作をしたか（部品の判定用）と、当たった部品 */
   interactedId: string | null;
+  /** 懐中電灯が点いているか（コマンドの flashlight。目の位置・視線の向きで照らす） */
+  flashlight: boolean;
+  /** その tick に「置く」操作をしたか（持ち物の部品が読む） */
+  dropPressed: boolean;
+  /** 持っている物（持ち物の部品の id）。無ければ null */
+  holding: string | null;
 }
 
 /** 1 tick に起きたこと。type ごとに使う欄が違う */

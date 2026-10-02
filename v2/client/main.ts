@@ -5,6 +5,7 @@
  * - `?lab=1` 段階 1 の実験場（core/lab/lab.ts） / `?nodress=1` 区画の中身（家具）を置かない
  * - `?showcase=1` / `?showcase=2` 見本のフロア: 仕掛けを全種 1 つずつ・隠しを全部付けたフロア（2 は隠しの型が逆）。
  *   G で次の仕掛けの入口へ移る（Shift+G で前へ）。`?dev=1` なら、ふつうのフロアでも G が使える
+ * - `?try=id,id` 指定した仕掛け・異変だけを置いた見本のフロア / `?group=<担当>` 担当（core/gen/catalog）の仕掛け・異変を全部置いた見本
  * - 開発用: window.game（ClientGame）。ペインが隠れて rAF が止まるときは game.stepOnce() で 1 tick ずつ進める
  */
 import './ui/style.css';
@@ -15,6 +16,7 @@ import { generateFloorReport, type GenReport } from '../core/gen/floor/index.ts'
 import type { TourStop } from '../core/gen/floor/gimmicks.ts';
 import { showcaseFloor } from '../core/gen/floor/showcase.ts';
 import { RARE_DEFS } from '../core/gen/secrets/index.ts';
+import { CATALOG_BY_WS } from '../core/gen/catalog/index.ts';
 import type { FloorLayout } from '../core/world/layout.ts';
 import { ClientGame } from './game/ClientGame.ts';
 import { mountUi } from './ui/dom.ts';
@@ -27,7 +29,12 @@ if (errors.length) console.warn('[tune]', errors.join(' / '));
 const seed = Number(params.get('seed') ?? 1) >>> 0 || 1;
 const useLab = params.has('lab');
 const showcase = Math.max(0, Number(params.get('showcase') ?? 0) | 0);
-const devTour = showcase > 0 || params.has('dev');
+// 見本に置く仕掛け・異変を選ぶ（?try= / ?group=）
+const tryIds = [...new Set([
+  ...(params.get('try') ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+  ...(CATALOG_BY_WS[params.get('group') ?? ''] ?? []).flatMap((e) => e.impl.filter((m) => m.kind === 'gimmick' || m.kind === 'anomaly').map((m) => m.id)),
+])];
+const devTour = showcase > 0 || tryIds.length > 0 || params.has('dev');
 let depth = Math.max(0, Number(params.get('depth') ?? 0) | 0);
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -40,7 +47,7 @@ const syncRec = (): void => rec.setVisible(game.settings.data.recOverlay && !gam
 syncRec();
 game.settings.onChange(syncRec);
 
-ui.pause.title.textContent = useLab ? 'LIMINAL v2 — 実験場' : showcase ? 'LIMINAL v2 — 見本のフロア' : 'LIMINAL v2';
+ui.pause.title.textContent = useLab ? 'LIMINAL v2 — 実験場' : showcase || tryIds.length ? 'LIMINAL v2 — 見本のフロア' : 'LIMINAL v2';
 if (devTour) {
   const p = document.createElement('p');
   p.innerHTML = '<b class="mono">G</b>次の仕掛けの入口へ移る（Shift+G で前へ）';
@@ -62,7 +69,9 @@ function makeFloor(d: number, v = 0): FloorLayout {
   if (useLab) return labFloor(seed, tuningVersion(tuning));
   // 中身（家具）: ?nodress=1 で置かない（確認用）
   const dress = params.has('nodress') ? undefined : dressCell;
-  const r = showcase && d === 0 && v === 0 && !moved ? showcaseFloor(tuning, { flip: showcase === 2, dress }) : generateFloorReport({ world: seed, depth: d, variant: v }, tuning, { dress });
+  const first = d === 0 && v === 0 && !moved;
+  const r = tryIds.length && first ? showcaseFloor(tuning, { ids: tryIds, flip: showcase === 2, dress })
+    : showcase && first ? showcaseFloor(tuning, { flip: showcase === 2, dress }) : generateFloorReport({ world: seed, depth: d, variant: v }, tuning, { dress });
   console.info(`[gen] ${r.floor.id} ${r.profile.rarity} ${r.profile.family.name}/${r.profile.pattern} ${r.profile.cols}×${r.profile.rows} 区画 ${r.floor.cells.length} 箱 ${r.floor.cells.reduce((a, c) => a + c.boxes.length, 0)}${r.tone ? ` 裏の調子 ${r.tone}` : ''} 作り直し ${r.attempts - 1} ${r.ms} ms`, r.issues);
   tour = tourOf(r);
   tourAt = -1;

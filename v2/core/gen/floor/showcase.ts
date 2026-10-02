@@ -3,19 +3,26 @@
  * 残りの部屋に部屋まるごとの異変を 1 種ずつ掛けたフロア。
  * 全種が置ける世界の seed を from から順に探す（決定的。見つからなければいちばん多く置けたもの）。
  * flip: 型を選べる隠しの存在型 / 出現型を逆にする（1 と 2 で両方の型を見られる）。異変は全種が 1 つのフロアに入らないので、
- * 1 では前半・2 では後半を置く
+ * 1 では前半・2 では後半を置く。
+ * ids: 置く仕掛け・異変の id を指定する（クライアントの ?try=a,b / ?group=<担当>。段階 4 で種類が増えたので、全種ではなく選んで見る）
  */
 import type { Tuning } from '../../config/tuning.ts';
 import '../gimmicks/index.ts';
-import { gimmickDefs } from '../gimmicks/types.ts';
-import { anomalyDefs } from '../anomaly/index.ts';
+import { gimmickDef, gimmickDefs } from '../gimmicks/types.ts';
+import { anomalyDef, anomalyDefs } from '../anomaly/index.ts';
 import { generateFloorReport, type GenOptions, type GenReport } from './index.ts';
 
-export function showcaseFloor(t: Tuning, opts: { flip?: boolean; from?: number; dress?: GenOptions['dress'] } = {}): GenReport {
-  const all = gimmickDefs().map((d) => d.id);
-  const ids = anomalyDefs().map((d) => d.id);
-  const half = Math.ceil(ids.length / 2);
-  const anomalies = opts.flip ? ids.slice(half) : ids.slice(0, half);
+export function showcaseFloor(t: Tuning, opts: { flip?: boolean; from?: number; dress?: GenOptions['dress']; ids?: string[] } = {}): GenReport {
+  let all: string[], anomalies: string[];
+  if (opts.ids) {
+    all = opts.ids.filter((id) => gimmickDef(id));
+    anomalies = opts.ids.filter((id) => anomalyDef(id));
+  } else {
+    all = gimmickDefs().map((d) => d.id);
+    const ids = anomalyDefs().map((d) => d.id);
+    const half = Math.ceil(ids.length / 2);
+    anomalies = opts.flip ? ids.slice(half) : ids.slice(0, half);
+  }
   // 仕掛けを全種置けたかを先に見て、同じなら異変の種類の多い方
   const placed = (r: GenReport): number => new Set(r.gimmicks?.gimmicks.map((g) => g.def)).size * 100 + new Set(r.anomalies.map((a) => a.def)).size;
   let best: GenReport | null = null;

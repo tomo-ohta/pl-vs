@@ -8,6 +8,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { aabbCenter, type AABB } from '../../core/math/aabb.ts';
 import type { PartState } from '../../core/sim/part.ts';
+import type { SimEvent } from '../../core/sim/types.ts';
+import type { AudioEngine } from '../audio/AudioEngine.ts';
+import type { PostFX } from '../render/PostFX.ts';
 import type { Sim } from '../../core/sim/sim.ts';
 import type { EntitySpec, Json, MatId } from '../../core/world/layout.ts';
 import type { MaterialLibrary } from '../render/MaterialLibrary.ts';
@@ -15,12 +18,22 @@ import { surfaceBox } from '../render/SurfaceGeometry.ts';
 import { cellAt, sampleCellLight, type BuiltFloor } from '../world/FloorBuilder.ts';
 
 export interface ViewContext {
+  /** この部品の描画の入れ物（区画が見えない間は隠れる。フロア座標） */
   root: THREE.Group;
   materials: MaterialLibrary;
   built: BuiltFloor;
   sim: Sim;
   /** 照明の明るさ（lamp id → 0..1） */
   levelOf(lampId: string): number;
+  /** 音（部屋の音の異変・効果音）。テストでは無いことがある */
+  audio?: AudioEngine;
+  /** 画面効果（揺れ・ノイズ・色）。テストでは無いことがある */
+  postfx?: PostFX;
+  camera?: THREE.PerspectiveCamera;
+  /** 場面の一番上（霧・空など、区画の外に置く物） */
+  scene?: THREE.Scene;
+  /** シミュレーションのイベントを受け取る（足音・扉・Cue など）。戻り値で受け取りをやめる */
+  onEvent?(f: (e: SimEvent) => void): () => void;
 }
 
 export interface EntityView {

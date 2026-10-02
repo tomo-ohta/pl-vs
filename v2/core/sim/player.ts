@@ -63,6 +63,9 @@ export function createPlayer(id: string, pos: Vec3, yaw: number): PlayerState {
     respawn: { pos: [pos[0], pos[1], pos[2]], yaw },
     lastGround: [pos[0], pos[1], pos[2]],
     interactedId: null,
+    flashlight: false,
+    dropPressed: false,
+    holding: null,
   };
 }
 

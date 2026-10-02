@@ -4,18 +4,22 @@
  * - 値を恒久的に変える: 下の TUNING_SPEC の default を書き換える
  * - 一時的に上書きする: URL `?tune=secrets.perFloorMean=2,secrets.visibilityCheck=false`（parseTuneParam）
  * - 項目を足す: TUNING_SPEC に 1 行足すだけ（型・既定値・範囲・説明）。使う側は tuning['キー'] で読む
+ *   段階 4 の担当ごとの項目は tuning/<担当>.ts に置き、下で TUNING_SPEC に重ねる（並行して書き換えてもぶつからないように）
  *
  * tuningVersion() は値の組から作る短い識別子。フロアの生成結果の保存に含め、値を変えても
  * 遊んでいる世界が勝手に作り変わらないようにする。
  */
 
-interface NumberSpec { readonly kind: 'number'; readonly default: number; readonly min: number; readonly max: number; readonly integer?: boolean; readonly note: string }
-interface BooleanSpec { readonly kind: 'boolean'; readonly default: boolean; readonly note: string }
-type Spec = NumberSpec | BooleanSpec;
-
-const num = (def: number, min: number, max: number, note: string, integer = false): NumberSpec =>
-  ({ kind: 'number', default: def, min, max, note, ...(integer ? { integer } : {}) });
-const bool = (def: boolean, note: string): BooleanSpec => ({ kind: 'boolean', default: def, note });
+import { bool, num, type BooleanSpec, type NumberSpec, type Spec } from './spec.ts';
+import { MOVE_TUNING } from './tuning/move.ts';
+import { GROUND_TUNING } from './tuning/ground.ts';
+import { SENSE_TUNING } from './tuning/sense.ts';
+import { ODDITY_TUNING } from './tuning/oddity.ts';
+import { CARRY_TUNING } from './tuning/carry.ts';
+import { WARP_TUNING } from './tuning/warp.ts';
+import { STRUCTURE_TUNING } from './tuning/structure.ts';
+import { ROOMS_TUNING } from './tuning/rooms.ts';
+import { MAP_TUNING } from './tuning/map.ts';
 
 export const TUNING_SPEC = {
   // ---- 隠し発見（v2-plan.md 4 章）----
@@ -185,6 +189,17 @@ export const TUNING_SPEC = {
   'physics.tickHz': num(60, 30, 120, 'シミュレーションの固定 tick', true),
   'physics.maxBodiesDesktop': num(400, 0, 4000, '同時に動かす剛体の上限（PC）', true),
   'physics.maxBodiesMobile': num(120, 0, 2000, '同時に動かす剛体の上限（スマホ）', true),
+
+  // ---- 段階 4 の担当ごとの調整値（tuning/*.ts）----
+  ...MOVE_TUNING,
+  ...GROUND_TUNING,
+  ...SENSE_TUNING,
+  ...ODDITY_TUNING,
+  ...CARRY_TUNING,
+  ...WARP_TUNING,
+  ...STRUCTURE_TUNING,
+  ...ROOMS_TUNING,
+  ...MAP_TUNING,
 } as const satisfies Record<string, Spec>;
 
 export type TuningKey = keyof typeof TUNING_SPEC;
