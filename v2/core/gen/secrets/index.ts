@@ -183,6 +183,13 @@ interface PlanCtx { n: 'x' | 'z'; sg: number; edge: number; at: number; y: numbe
 
 /** 計画の区画の矩形が、互いにも世界とも重ならない */
 function planFree(world: SecretWorld, rects: Rect[], y: number, ignore: readonly string[]): boolean {
+  // 外形で見ない区画（入口の区画・抜ける先の区画）も、足跡の矩形とは重ならないこと（接するのはよい）。
+  // 段階 4: 隣と壁 1 枚で接する部屋（くねる部屋の連なり・中庭）では、U 字の通路が入口の部屋へ戻って重なることがあった
+  for (const id of ignore) {
+    const g = world.cells.find((c) => c.cell.id === id);
+    if (!g || g.cell.bounds.max[1] <= y - 0.3 || g.cell.bounds.min[1] >= y + AREA_H + 0.3) continue;
+    if (rects.some((r) => g.cell.footprint.some((q) => r.x0 < q.x1 - 0.02 && r.x1 > q.x0 + 0.02 && r.z0 < q.z1 - 0.02 && r.z1 > q.z0 + 0.02))) return false;
+  }
   for (let i = 0; i < rects.length; i++) {
     if (blocker(world, rects[i]!, y - 0.3, y + AREA_H + 0.3, ignore)) return false;
     for (let j = 0; j < i; j++) {
@@ -265,6 +272,8 @@ function planArea(world: SecretWorld, host: GeoCell, dest: SecretDest, rare: Rar
   const roomPlan = (cells: PlanCell[], links: PlanLink[], face: number, faceN: 'x' | 'z', faceSg: number, faceAt: number, from: string | null): Plan | null => {
     for (const r of roomRects(rare, faceN, faceSg, face, faceAt, rng)) {
       if (!planFree(world, [...cells.map((c) => c.rect), r], y, ignoreHost)) continue;
+      // 段階 4（フロアの形）: 穴の部屋は、穴の下（6 m）に別の階の区画が無い所だけ（縦に積んだビルの上の階など）
+      if ((dest === 'floorLink' || dest === 'bFloor') && blocker(world, r, y - 6.3, y - 0.25, ignoreHost)) continue;
       const room: PlanCell = { id: `${id}r`, rect: r, role: 'room' };
       const l: PlanLink = from
         ? { a: from, b: room.id, n: faceN, coord: face, at: faceAt, width: DOOR_W, height: DOOR_H, dir: dirOf(faceN, faceSg), door: { mat: doorMat } }

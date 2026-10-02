@@ -127,7 +127,9 @@ defineAnomaly({
       const bb = bbOf(g.boxes);
       const r = rectOf(ctx, (bb.min[0] + bb.max[0]) / 2, (bb.min[2] + bb.max[2]) / 2);
       const ax = anchorOf(bb.min[0], bb.max[0], r.x0, r.x1), az = anchorOf(bb.min[2], bb.max[2], r.z0, r.z1);
-      for (const b of g.boxes) scaleBox(b, s, ax, fy, az);
+      // 段階 4（フロアの形の担当が直した）: 背の高い物（倉庫の棚）は膝より低くなるまで縮める
+      const k = Math.min(s, 0.7 / Math.max(1e-3, bb.max[1] - fy));
+      for (const b of g.boxes) scaleBox(b, k, ax, fy, az);
     }
     // 壁の根元の小さな扉（開口の前後と家具の陰を避ける）
     const solids = interiorSolids(cell);

@@ -28,6 +28,8 @@ function route(floor: FloorLayout, from: string, to: string): PortalSpec[] | nul
   for (let h = 0; h < q.length && !prev.has(to); h++) {
     for (const p of by.get(q[h]!) ?? []) {
       if (p.doorId && oneWay.has(p.doorId) && p.cells[1] === q[h]) continue;
+      // 段階 4（フロアの形）: 窓は通れない（見えるだけ）
+      if (p.kind === 'window') continue;
       const o = p.cells[0] === q[h] ? p.cells[1] : p.cells[0];
       if (prev.has(o)) continue;
       prev.set(o, { cell: q[h]!, portal: p });
@@ -62,9 +64,12 @@ function surfacesAt(sim: Sim, x: number, z: number, yTop: number, S: number): nu
   return [...new Set(out.map((v) => Math.round(v * 1000) / 1000))].sort((a, b) => a - b);
 }
 
+/** 道の幅の判定に使う体の半径（ふだんは R。道が見つからないときだけ、プレイヤーの当たり判定ちょうどで探し直す） */
+let bodyR = R;
+
 /** 体（足元 g から高さ h）が箱に当たるか */
 function bodyBlocked(sim: Sim, x: number, z: number, g: number, h: number): boolean {
-  for (const b of sim.colliders.query(x - R, g + 0.37, z - R, x + R, g + h, z + R)) {
+  for (const b of sim.colliders.query(x - bodyR, g + 0.37, z - bodyR, x + bodyR, g + h, z + bodyR)) {
     if (b.min[1] < g + h && b.max[1] > g + 0.37) return true;
   }
   return false;
@@ -95,6 +100,14 @@ function forceAt(zones: readonly Zone[], x: number, y: number, z: number): [numb
  * - 強い流れ（動く歩道）の上では流れの向きにしか進めない。流れの外から入るときも流れの向きに
  */
 export function pathInCell(sim: Sim, cell: CellLayout, from: [number, number, number], to: [number, number, number]): [number, number][] | null {
+  const p = pathInCellR(sim, cell, from, to);
+  if (p) return p;
+  // 段階 4（フロアの形の担当が足した）: 体の幅ぎりぎりの所（家具の塔のすき間など）は、当たり判定の半幅ちょうどで探し直す
+  bodyR = PLAYER.radius - 0.01;
+  try { return pathInCellR(sim, cell, from, to); } finally { bodyR = R; }
+}
+
+function pathInCellR(sim: Sim, cell: CellLayout, from: [number, number, number], to: [number, number, number]): [number, number][] | null {
   const b = cell.bounds;
   const nx = Math.ceil((b.max[0] - b.min[0]) / G) + 1, nz = Math.ceil((b.max[2] - b.min[2]) / G) + 1;
   if (nx * nz > 160000) return null;
@@ -107,12 +120,15 @@ export function pathInCell(sim: Sim, cell: CellLayout, from: [number, number, nu
   // 点ごとの面: 体の真ん中の下（±0.05 m。真ん中が面の上に無い道、つまり梁・床の縁を体の端だけで歩く道は選ばない。
   // 体の端だけで乗っていると、少しずれただけで落ちる）と、体の下全体（±0.35 m。実際に立つ高さ）
   const surf = new Map<number, [number[], number[]]>();
+  // 足跡の内側（壁の厚み 0.15 m を除く）。段階 4（フロアの形）: 複数の矩形の足跡（輪の部屋）は、矩形のつなぎ目を壁と見ない
+  const inFoot = (x: number, z: number): boolean => cell.footprint.some((r) => inRect(r, x, z));
+  const inside = (x: number, z: number): boolean => cell.footprint.length === 1 ? inRect(cell.footprint[0]!, x, z, 0.15) : inFoot(x, z) && inFoot(x - 0.15, z) && inFoot(x + 0.15, z) && inFoot(x, z - 0.15) && inFoot(x, z + 0.15);
   const surfAt = (i: number, k: number): [number[], number[]] => {
     const j = idx(i, k);
     let v = surf.get(j);
     if (!v) {
       const x = b.min[0] + i * G, z = b.min[2] + k * G;
-      v = cell.footprint.some((r) => inRect(r, x, z, 0.15)) ? [surfacesAt(sim, x, z, top, 0.05), surfacesAt(sim, x, z, top, PLAYER.radius)] : [[], []];
+      v = inside(x, z) ? [surfacesAt(sim, x, z, top, 0.05), surfacesAt(sim, x, z, top, PLAYER.radius)] : [[], []];
       surf.set(j, v);
     }
     return v;
@@ -212,9 +228,13 @@ function distToSegment(x: number, z: number, a: [number, number], b: [number, nu
 
 export function cellAtPos(floor: FloorLayout, p: [number, number, number]): CellLayout | null {
   let best: CellLayout | null = null;
+  // 段階 4（フロアの形）: 上下に重なる区画（階・天井裏）では、足元がその区画の床から天井の間にある区画を先に（床の高い方）
+  const stand = (c: CellLayout): boolean => p[1] >= c.floorY - 1.0 && p[1] <= c.floorY + c.height;
   for (const c of floor.cells) {
     const b = c.bounds;
     if (p[0] < b.min[0] || p[0] > b.max[0] || p[2] < b.min[2] || p[2] > b.max[2] || p[1] < b.min[1] - 3 || p[1] > b.max[1]) continue;
+    if (best && stand(best) !== stand(c)) { if (stand(c)) best = c; continue; }
+    if (best && stand(c) && Math.abs(c.floorY - best.floorY) > 0.5) { if (c.floorY > best.floorY) best = c; continue; }
     if (!best || (b.max[0] - b.min[0]) * (b.max[2] - b.min[2]) < (best.bounds.max[0] - best.bounds.min[0]) * (best.bounds.max[2] - best.bounds.min[2])) best = c;
   }
   return best;
@@ -234,6 +254,21 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     const [x, y, z] = center(p);
     const forward = p.cells[0] === cell ? 1 : -1;
     const d = [[0, 1], [1, 0], [0, -1], [-1, 0]][p.dir]!;
+    // 段階 4（フロアの形）: 天井の点検口（portal 'hole'。cells[0] が下の部屋、dir は梯子段を上る向き）。
+    // 上るときは梯子段のいちばん上へ行き、そのまま上の通路へ。下りるときは穴の手前から穴へ踏み出して、梯子段の上へ落ちる
+    if (p.kind === 'hole') {
+      const half = (p.dir % 2 === 0 ? p.aabb.max[2] - p.aabb.min[2] : p.aabb.max[0] - p.aabb.min[0]) / 2;
+      const yHigh = p.aabb.max[1];
+      if (forward > 0) {
+        legs.push({ x: x + d[0]! * (half - 0.15), y: yHigh, z: z + d[1]! * (half - 0.15), portal: p });
+        legs.push({ x: x + d[0]! * (half + 0.9), y: yHigh, z: z + d[1]! * (half + 0.9), via: true });
+      } else {
+        legs.push({ x: x + d[0]! * (half + 0.45), y: yHigh, z: z + d[1]! * (half + 0.45), portal: p });
+        legs.push({ x: x - d[0]! * 0.4, y: p.aabb.min[1], z: z - d[1]! * 0.4, via: true });
+      }
+      cell = p.cells[0] === cell ? p.cells[1] : p.cells[0];
+      continue;
+    }
     const prev = r[i - 1], next = r[i + 1];
     const gap = (q: PortalSpec | undefined): number => { if (!q) return Infinity; const [qx, , qz] = center(q); return Math.hypot(qx - x, qz - z) / 2; };
     const kb = Math.min(0.9, gap(prev)) * forward, ka = Math.min(0.9, gap(next)) * forward;

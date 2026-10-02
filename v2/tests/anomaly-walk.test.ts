@@ -60,6 +60,8 @@ test('異変の部屋の開口は、ジャンプせずに両向きに通れる�
     const sim = new Sim(floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
     for (const p of floor.portals) {
       if (!p.cells.some((c) => cells.has(c))) continue;
+      // 段階 4（フロアの形）: 窓と天井の点検口は、歩いて横切る開口ではない
+      if (p.kind === 'window' || p.kind === 'hole') continue;
       const axis = p.dir % 2 === 0 ? 2 : 0;
       const c = [(p.aabb.min[0] + p.aabb.max[0]) / 2, p.aabb.min[1], (p.aabb.min[2] + p.aabb.max[2]) / 2];
       for (const s of [1, -1]) {

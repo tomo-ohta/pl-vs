@@ -268,7 +268,7 @@ export function planAnomalies(p: FloorProfile, geo: FloorGeometry, gimmicks: Gim
   const active: Active[] = [];
   const byCell = new Map<string, Active>();
 
-  const rooms = geo.cells.filter((g) => ROOM_KINDS.has(g.kind) && !NOT_ROLES.has(g.cell.role) && g.openings.length > 0);
+  const rooms = geo.cells.filter((g) => ROOM_KINDS.has(g.kind) && !NOT_ROLES.has(g.cell.role) && g.openings.length > 0 && !geo.reserved?.has(g.cell.id));
   /** 入ってくる開口: 本道なら前の区画の側、そうでなければ扉のある開口（無ければ最初の開口） */
   const entranceOf = (g: GeoCell): WallOpening => {
     const i = mainIdx.get(g.cell.id);
