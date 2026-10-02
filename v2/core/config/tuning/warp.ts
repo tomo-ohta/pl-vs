@@ -19,6 +19,12 @@ export const WARP_TUNING = {
   'warp.loopHall.lapsBack': num(3, 1, 12, '閉じた輪の廊下（BX02）: 輪が閉じたあと、後ろへ何周すると後ろの輪がほどけて隠しの入口が現れるか', true),
   'warp.loopHall.giveUpSec': num(80, 20, 600, '閉じた輪の廊下: 抜けられなくてもこの秒数で前も後ろもほどける（閉じ込めない）'),
   'warp.loopHall.secretWeight': num(1.4, 0, 5, '閉じた輪の廊下（BX02）: 隠しの元の重み'),
+  // ---- 異変の廊下（anomalyHall: X01・BX01）
+  'warp.lapHall.weight': num(0.6, 0, 10, '異変の廊下: 出やすさ（相対）'),
+  'warp.lapHall.goal': num(5, 1, 12, '異変の廊下: 何回続けて正しく進む・引き返すと出口の周になるか', true),
+  'warp.lapHall.chance': num(0.55, 0, 1, '異変の廊下: 周に異変がある確率（間違えた次の周と最初の周は異変なし）'),
+  'warp.lapHall.secretRun': num(3, 1, 8, '異変の廊下（BX01）: 一度も引き返さずに、異変のある周を何回進むと、異変の部屋の扉が現れるか', true),
+  'warp.lapHall.secretWeight': num(1.6, 0, 5, '異変の廊下（BX01）: 隠しの元の重み'),
   // ---- 遠ざかる廊下（recedingHall: W05）
   'warp.recede.weight': num(0.45, 0, 10, '遠ざかる廊下: 出やすさ（相対）'),
   'warp.recede.periods': num(4, 2, 8, '遠ざかる廊下: 廊下の長さ（12 m のくり返しの数）', true),

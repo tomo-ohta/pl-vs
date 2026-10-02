@@ -7,3 +7,5 @@ import './anteroom.ts';
 import './swap.ts';
 import './treadmill.ts';
 import './recede.ts';
+import './lap.ts';
+import './sign.ts';

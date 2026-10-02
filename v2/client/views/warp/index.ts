@@ -4,3 +4,5 @@
  */
 import './basic.ts';
 import './recede.ts';
+import './sign.ts';
+import './lap.ts';

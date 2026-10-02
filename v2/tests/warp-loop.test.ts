@@ -173,7 +173,10 @@ test('閉じ込めない: 抜けられなくても giveUpSec 秒で前も後ろ�
   const sim = simIn(room, tt);
   assert.ok(walkTo(sim, `${room.cell.id}~hall`, undefined, 60).ok);
   const tread = `${room.id}.loop`;
-  for (let i = 0; i < 60 * 25; i++) stepWith(sim, 1, () => ({ moveY: 1 }));
+  // 廊下の前の向きに歩き続ける（輪の中を回り続ける）
+  const fwd = rotQ([0, 0, 1], (ent(room.floor, tread).params.fwd as number) as Dir);
+  const yaw = Math.atan2(-fwd[0], -fwd[2]);
+  for (let i = 0; i < 60 * 25; i++) stepWith(sim, 1, () => ({ yaw, moveY: 1 }));
   assert.equal(sim.outputOf(tread, 'out'), 1);
   assert.equal(sim.outputOf(tread, 'back'), 0, '時間でほどけても隠しは現れない');
 });
