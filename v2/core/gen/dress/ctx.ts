@@ -5,8 +5,9 @@
  * - 作業中の箱は区画の床からの高さ（床 = 0）で持つ。finish で floorY を足して cell.boxes に入れる
  * - 置く単位（Unit）は「1 回の placeUnit に渡した箱の組」。当たる箱（solid）は 1 つずつ、扉前・keepOut・足跡の外・
  *   先に置いた物との重なりを見てから入れる（v1 RoomGenerator.placeUnit と同じ考え方）
- * - 最後に reachOpenings で開口どうしが歩いてつながるかを見る。だめなら、後から置いた物から順に、つながりを壊した物を
- *   探して外す（二分探索。つながりは物を外すほど良くなる、と見なす）
+ * - 最後に reachOpenings で開口どうしが歩いてつながるかを見る。だめなら v1 と同じく置いた物を外して取り消す。
+ *   v1 は後から置いた物を順に外したが、ここでは置いた順に並べて「つながりを壊した最初の物」を二分探索で探して外し、
+ *   それより後の物を戻して確かめ直す（8 回まで。それでもだめなら残りを外す）。物を外すほどつながりは良くなる、と見なす
  * - 乱数は渡された r.rng だけ。区画の id・テーマ・種類・大きさ・density で違いを出す（部屋 ID の直書きはしない）
  */
 import type { AABB } from '../../math/aabb.ts';
@@ -14,7 +15,7 @@ import type { Rng } from '../../math/rng.ts';
 import { rectArea, unionBounds, type Rect } from '../../world/footprint.ts';
 import { WALL_T, type Box, type CellLayout, type WallOpening, type Zone } from '../../world/layout.ts';
 import { reachOpenings } from '../reach.ts';
-import { boxesOverlap, doorZones, hitsZone, innerFaces, innerRect, insideFootprint, insideRects, isFloorOpening, type Face } from './geom.ts';
+import { boxesOverlap, doorZones, hitsZone, innerFaces, innerRect, insideFootprint, insideRects, isFloorOpening, subtractIntervals, type Face } from './geom.ts';
 import type { DressKind, DressKit, DressRoom } from './types.ts';
 
 /** 家具を置かない扉前の奥行き（壁の室内面から。検査で見る 1.2 m より少し広く取り、扉の前に立てる余裕を残す） */
@@ -71,6 +72,8 @@ export interface DressCtx {
 
 /** 箱の高さを床からの値にする / フロア座標に戻す */
 const shiftY = (b: Box, dy: number): Box => ({ ...b, min: [b.min[0], b.min[1] + dy, b.min[2]], max: [b.max[0], b.max[1] + dy, b.max[2]] });
+/** フロア座標の範囲を床からの高さにする */
+const localAabb = (a: AABB, y0: number): AABB => ({ min: [a.min[0], a.min[1] - y0, a.min[2]], max: [a.max[0], a.max[1] - y0, a.max[2]] });
 
 export function makeCtx(r: DressRoom): DressCtx {
   const cell = r.cell;
@@ -78,7 +81,7 @@ export function makeCtx(r: DressRoom): DressCtx {
   const h = cell.height;
   const rects = cell.footprint.map((q) => ({ ...q }));
   const doors = doorZones(r.openings, y0, DOOR_CLEAR, DOOR_PAD);
-  const keepOut = r.keepOut.map((a): AABB => ({ min: [a.min[0], a.min[1] - y0, a.min[2]], max: [a.max[0], a.max[1] - y0, a.max[2]] }));
+  const keepOut = r.keepOut.map((a) => localAabb(a, y0));
   // 先に置かれていた当たる箱: 床板・天井板・外壁（矩形の内側に掛からない）を除いた物
   const insides = rects.map((q) => innerRect(q, WALL_T));
   const fixed: Box[] = [];
@@ -94,6 +97,15 @@ export function makeCtx(r: DressRoom): DressCtx {
     h, y0, rng: r.rng, density: Math.min(1, Math.max(0, r.density)), faces: innerFaces(rects), openings: r.openings.slice(),
     doors, keepOut, zones: [...doors, ...keepOut], fixed, units: [], zonesOut: [], boxCount: 0, standoff: 0.02,
   };
+}
+
+/**
+ * 当たる物を置かない範囲（v1 keepOutZones = 扉前 + 通り抜けの予約）: 開口の前（壁の室内面から depth）+ r.keepOut。
+ * 高さは区画の床から（床 = 0）。中身を置く作業（makeCtx）はこれに間仕切りの通り抜けなどを足していく
+ */
+export function keepOutZones(r: DressRoom, depth = DOOR_CLEAR, pad = DOOR_PAD): AABB[] {
+  const y0 = r.cell.floorY;
+  return [...doorZones(r.openings, y0, depth, pad), ...r.keepOut.map((a) => localAabb(a, y0))];
 }
 
 /** 中身を置けないほど小さい区画（v2 フロアの曲がり角・廊下の切れ端。フロアの検証も 2.4 m 未満は見ない） */
@@ -178,6 +190,40 @@ export function revert(c: DressCtx, m: number): void {
   while (c.units.length > m) c.boxCount -= c.units.pop()!.boxes.length;
 }
 
+/** 範囲 a（margin だけ広げる）に、もう置いた当たる物か先に置かれていた当たる物が掛かるか（壁の飾りを家具の陰に貼らない） */
+export function touchesSolid(c: DressCtx, a: AABB | Box, margin = 0): boolean {
+  for (const u of c.units) if (u.solid) for (const b of u.boxes) if (b.solid && boxesOverlap(a, b, margin)) return true;
+  return c.fixed.some((b) => boxesOverlap(a, b, margin));
+}
+
+/**
+ * 列（axis の向きに a0..a1、横の範囲 c0..c1）から、当たる物を置かない範囲（c.zones: 扉前・keepOut・予約）に掛かる所を
+ * pad だけ広げて除いた区間（minLen より短い切れ端は捨てる）。扉の前で列を切って通路にする
+ * （v1 は扉に近い区切りを丸ごと除いていた）
+ */
+export function splitByZones(c: DressCtx, axis: 'x' | 'z', a0: number, a1: number, c0: number, c1: number, pad = 0.3, minLen = 1.0, solids = true): [number, number][] {
+  const cuts: [number, number][] = [];
+  const cut = (z: AABB, p: number): void => {
+    const zc0 = axis === 'x' ? z.min[2] : z.min[0], zc1 = axis === 'x' ? z.max[2] : z.max[0];
+    if (zc1 <= c0 + 1e-4 || zc0 >= c1 - 1e-4 || z.max[1] <= 0.02) return;
+    const za0 = axis === 'x' ? z.min[0] : z.min[2], za1 = axis === 'x' ? z.max[0] : z.max[2];
+    cuts.push([za0 - p, za1 + p]);
+  };
+  for (const z of c.zones) cut(z, pad);
+  // 先に置いた当たる物（柱・受付・机）と、先に置かれていた物の所も切る（列が丸ごと置けなくなるのを防ぐ）
+  if (solids) {
+    for (const u of c.units) if (u.solid) for (const b of u.boxes) if (b.solid && b.max[1] > 0.36) cut(b, 0.1);
+    for (const b of c.fixed) if (b.max[1] > 0.36) cut(b, 0.1);
+  }
+  return subtractIntervals(a0, a1, cuts, minLen);
+}
+
+/** 面 f に沿った帯（辺に沿って a0..a1、室内面から d0..d1）を、置かない範囲で切った区間 */
+export function splitAlongFace(c: DressCtx, f: Face, a0: number, a1: number, d0: number, d1: number, pad = 0.3, minLen = 1.0): [number, number][] {
+  const n0 = f.face + f.inward * d0, n1 = f.face + f.inward * d1;
+  return splitByZones(c, f.horizontal ? 'x' : 'z', a0, a1, Math.min(n0, n1), Math.max(n0, n1), pad, minLen);
+}
+
 /** 当たる物を置かない範囲を足す（間仕切りの通り抜け・中央の通路など。床からの高さ） */
 export function reserve(c: DressCtx, a: AABB): void {
   c.zones.push(a);
@@ -204,7 +250,7 @@ export function placeNear(c: DressCtx, cx: number, cz: number, make: (B: Box[], 
 
 /**
  * 置いた物を区画に足す。床の高さの開口が 2 つ以上あれば reachOpenings で歩いてつながるかを見て、
- * 置く前よりつながりが悪くなっていたら、つながりを壊した物を後から置いた順に探して外す。
+ * 置く前よりつながりが悪くなっていたら、つながりを壊した物を外す（selectReachable）。高さは floorY を足してフロア座標に戻す
  */
 export function finish(c: DressCtx): void {
   const world = c.units.map((u) => u.boxes.map((b) => shiftY(b, c.y0)));

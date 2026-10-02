@@ -155,9 +155,7 @@ function furnishSecret(world: SecretWorld, cell: CellLayout, r: Rect, y: number,
       break;
     }
     default: {
-      // 隠し部屋: 台の上に光る物（図鑑の記録になる予定）
-      cell.boxes.push(box([cx - 0.45, y, cz - 0.45], [cx + 0.45, y + 0.95, cz + 0.45], 'marbleWhite'));
-      cell.boxes.push(box([cx - 0.12, y + 0.95, cz - 0.12], [cx + 0.12, y + 1.3, cz + 0.12], 'goldTrim', false));
+      // 隠し部屋: 中身（台座・椅子・祭壇など）は区画の中身（core/gen/dress の secret）が置く。ここでは温かい灯りだけ
       cell.lights.push({ pos: [cx, y + 1.9, cz], color: 0xffd8a0, intensity: 0.5, distance: 4 });
       break;
     }

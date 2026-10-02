@@ -71,13 +71,14 @@ test('生成したフロアを歩ける: 入口から出口の扉まで（扉を
   assert.equal(walked, 6);
 });
 
-test('歩く人が入口から出口の階段の下まで歩ける（扉・階段を含む）', async () => {
+test('歩く人が入口から出口の階段の下まで歩ける（扉・階段・家具を含む。表と裏）', async () => {
   const { walkTo } = await import('./helpers/bot.ts');
+  const { dressCell } = await import('../core/gen/dress/index.ts');
   const R = await loadRapier();
   let ok = 0, n = 0;
   const fails: string[] = [];
-  for (let w = 1; w <= 12; w++) {
-    const floor = generateFloorReport({ world: w, depth: 2, variant: 0 }, t).floor;
+  for (let w = 1; w <= 16; w++) {
+    const floor = generateFloorReport({ world: w, depth: 1 + (w % 6), variant: w % 4 === 0 ? 1 : 0 }, t, { dress: dressCell }).floor;
     const sim = new Sim(floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
     const ex = floor.exits[0]!;
     const goal: [number, number, number] = [(ex.aabb.min[0] + ex.aabb.max[0]) / 2, ex.aabb.min[1], (ex.aabb.min[2] + ex.aabb.max[2]) / 2];

@@ -69,13 +69,16 @@ export function subtractIntervals(a0: number, a1: number, cuts: readonly (readon
   return out.filter(([p, q]) => q - p > minLen);
 }
 
-/** 面 f 上で開口（同じ壁の開口 ± pad）を除いた区間 */
-export function freeRuns(f: Face, openings: readonly WallOpening[], pad = 1.0): [number, number][] {
+/**
+ * 面 f 上で開口（同じ壁の開口 ± pad）を除いた区間。両端は inset だけ縮める（既定 WALL_T: 面の区間は隣の壁の厚みまで
+ * 含むので、家具を隅に寄せても直交する壁にめり込まないように）。壁の帯は inset 0 で隅まで貼る
+ */
+export function freeRuns(f: Face, openings: readonly WallOpening[], pad = 1.0, inset = WALL_T): [number, number][] {
   const cuts = openingsOn(f, openings).map((s) => {
     const t = along(s.dir, s.pos[0], s.pos[2]);
     return [t - s.width / 2 - pad, t + s.width / 2 + pad] as [number, number];
   });
-  return subtractIntervals(f.a0, f.a1, cuts);
+  return subtractIntervals(f.a0 + inset, f.a1 - inset, cuts);
 }
 
 /** 面 f の室内面から d0..d1 離れ、辺に沿って at..at+len、高さ y0..y1 の箱 */

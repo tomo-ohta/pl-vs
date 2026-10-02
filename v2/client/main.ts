@@ -2,7 +2,7 @@
  * v2 の起動: 世界の seed と深さからフロアを作って遊ぶ（core/gen/floor）。
  * - URL: `?seed=` 世界の seed / `?depth=` 始める深さ / `?variant=1` 裏のフロアから始める / `?tune=キー=値,…` 調整表の上書き /
  *   `?nolock=1` Pointer Lock を使わない（自動テスト向け）
- * - `?lab=1` 段階 1 の実験場（core/lab/lab.ts）
+ * - `?lab=1` 段階 1 の実験場（core/lab/lab.ts） / `?nodress=1` 区画の中身（家具）を置かない
  * - `?showcase=1` / `?showcase=2` 見本のフロア: 仕掛けを全種 1 つずつ・隠しを全部付けたフロア（2 は隠しの型が逆）。
  *   G で次の仕掛けの入口へ移る（Shift+G で前へ）。`?dev=1` なら、ふつうのフロアでも G が使える
  * - 開発用: window.game（ClientGame）。ペインが隠れて rAF が止まるときは game.stepOnce() で 1 tick ずつ進める
@@ -10,6 +10,7 @@
 import './ui/style.css';
 import { makeTuning, parseTuneParam, tuningVersion } from '../core/config/tuning.ts';
 import { labFloor } from '../core/lab/lab.ts';
+import { dressCell } from '../core/gen/dress/index.ts';
 import { generateFloorReport, type GenReport } from '../core/gen/floor/index.ts';
 import type { TourStop } from '../core/gen/floor/gimmicks.ts';
 import { showcaseFloor } from '../core/gen/floor/showcase.ts';
@@ -58,8 +59,10 @@ let tour: { stop: TourStop; text: string }[] = [];
 let tourAt = -1;
 function makeFloor(d: number, v = 0): FloorLayout {
   if (useLab) return labFloor(seed, tuningVersion(tuning));
-  const r = showcase && d === 0 && v === 0 && !moved ? showcaseFloor(tuning, { flip: showcase === 2 }) : generateFloorReport({ world: seed, depth: d, variant: v }, tuning);
-  console.info(`[gen] ${r.floor.id} ${r.profile.rarity} ${r.profile.family.name}/${r.profile.pattern} ${r.profile.cols}×${r.profile.rows} 区画 ${r.floor.cells.length}${r.tone ? ` 裏の調子 ${r.tone}` : ''} 作り直し ${r.attempts - 1} ${r.ms} ms`, r.issues);
+  // 中身（家具）: ?nodress=1 で置かない（確認用）
+  const dress = params.has('nodress') ? undefined : dressCell;
+  const r = showcase && d === 0 && v === 0 && !moved ? showcaseFloor(tuning, { flip: showcase === 2, dress }) : generateFloorReport({ world: seed, depth: d, variant: v }, tuning, { dress });
+  console.info(`[gen] ${r.floor.id} ${r.profile.rarity} ${r.profile.family.name}/${r.profile.pattern} ${r.profile.cols}×${r.profile.rows} 区画 ${r.floor.cells.length} 箱 ${r.floor.cells.reduce((a, c) => a + c.boxes.length, 0)}${r.tone ? ` 裏の調子 ${r.tone}` : ''} 作り直し ${r.attempts - 1} ${r.ms} ms`, r.issues);
   tour = tourOf(r);
   tourAt = -1;
   if (devTour) console.table(tour.map((x) => ({ 場所: x.text, 区画: x.stop.cell })));

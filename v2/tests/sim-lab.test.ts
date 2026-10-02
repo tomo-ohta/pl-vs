@@ -65,8 +65,25 @@ test('立ち止まると奥の照明がつく', async () => {
 test('昇降台に乗ると持ち上がる', async () => {
   const sim = await makeSim();
   teleport(sim, 3, 0.3, -15);
-  run(sim, 4.5, cmd());
-  assert.ok(sim.players[0]!.pos[1] > 1.2, `持ち上がる: y=${sim.players[0]!.pos[1].toFixed(2)}`);
+  let top = 0;
+  for (let i = 0; i < Math.round(4.5 / sim.dt); i++) { sim.step([cmd()]); top = Math.max(top, sim.players[0]!.pos[1]); }
+  assert.ok(top > 1.2, `持ち上がる: 最高 y=${top.toFixed(2)}`);
+});
+
+test('昇降台で天井に押し付けられても横へ飛ばない', async () => {
+  // 天井（3.2 m）に頭が届くまで上がる昇降台
+  const floor = labFloor(7);
+  floor.entities.find((e) => e.id === 'lift1')!.params.points = [[0, 0, 0], [0, 1.7, 0]];
+  const sim = await makeSim(floor);
+  teleport(sim, 3, 0.3, -15);
+  let top = 0;
+  for (let i = 0; i < Math.round(4.5 / sim.dt); i++) {
+    sim.step([cmd()]);
+    const p = sim.players[0]!;
+    top = Math.max(top, p.pos[1]);
+    assert.ok(Math.hypot(p.pos[0] - 3, p.pos[2] + 15) < 0.2, `昇降台の上に留まる: (${p.pos[0].toFixed(2)}, ${p.pos[2].toFixed(2)})`);
+  }
+  assert.ok(top > 1.2, `持ち上がる: 最高 y=${top.toFixed(2)}`);
 });
 
 test('動く歩道で押し流される', async () => {

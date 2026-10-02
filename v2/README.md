@@ -14,16 +14,35 @@
 v2/
 ├─ core/       純 TypeScript（three.js・DOM 禁止。サーバーとクライアントで共有）
 │   ├─ config/tuning.ts   調整表（生成と仕掛けの数値はすべてここ。URL ?tune=キー=値,… で上書き）
-│   └─ physics/rapier.ts  Rapier（決定論版）の読み込み
-├─ client/     Vite + three.js（いまは起動確認の画面だけ）
-├─ tests/      node --test（*.test.ts を Node がそのまま実行）
+│   ├─ math/ world/       数学・世界の型（FloorLayout・区画・開口・箱）
+│   ├─ sim/               固定 tick のシミュレーション（移動・当たり判定・部品 parts/）
+│   ├─ physics/           Rapier（決定論版）の包み
+│   ├─ gen/floor/         フロアの生成（性質 → 骨組み → 形 → 仕掛け → 隠し → 中身 → 検証）・裏のフロア・見本のフロア
+│   ├─ gen/gimmicks/      仕掛けの定義（部品の配線）
+│   ├─ gen/secrets/       隠し部屋を付ける（存在型 / 出現型）
+│   ├─ gen/dress/         区画の中身（家具・設備。テーマ × 区画の種類）
+│   └─ lab/               段階 1 の実験場
+├─ client/     Vite + three.js（描画・音・入力・UI。シミュレーションの結果を見せるだけ）
+├─ tests/      node --test（*.test.ts を Node がそのまま実行。tests/helpers/bot.ts は歩く人）
 └─ tools/check-boundaries.mjs  core/ が three・client・vite を import していないかの確認
 ```
 
 ```bash
-npm run dev:v2      # 直下から。http://localhost:5174
+npm run dev:v2      # 直下から。http://localhost:5174/
 npm run verify:v2   # 型チェック（core は DOM なし / client）+ 境界の確認 + テスト
 ```
+
+URL の指定（開発用）:
+
+| 指定 | 内容 |
+|---|---|
+| `?seed=3&depth=2` | 世界の seed と始める深さ |
+| `?variant=1` | 裏のフロアから始める |
+| `?showcase=1` / `?showcase=2` | 見本のフロア（仕掛け全種・隠し全部。2 は隠しの型が逆）。G / Shift+G で仕掛けの入口へ移る |
+| `?dev=1` | ふつうのフロアでも G で仕掛けを見て回れる |
+| `?tune=キー=値,…` | 調整表の上書き（例: `?tune=secrets.perFloorMean=3`） |
+| `?nodress=1` | 区画の中身（家具）を置かない |
+| `?lab=1` | 段階 1 の実験場 |
 
 - import は拡張子 `.ts` まで書く（Vite と Node の両方でそのまま動かすため）。
 - 本番ビルドで `VITE_ASSET_BASE=/pl-vs/` を渡すと、素材を複写せず v1 と同じ素材を読む（`BASE_PATH=/pl-vs/v2/` と一緒に使う）。

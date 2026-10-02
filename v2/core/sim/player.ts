@@ -286,6 +286,12 @@ function depenetrate(p: PlayerState, near: AABB[]): void {
       if (up > 0 && up <= PLAYER.step) { p.pos[1] = c.max[1]; moved = true; continue; }
       const px = Math.min(maxX - c.min[0], c.max[0] - minX);
       const pz = Math.min(maxZ - c.min[2], c.max[2] - minZ);
+      // 横へ体の幅より大きく押し出すことになる箱（頭の上の天井・大きな床板）は横へは押さない。腰より上の箱なら下へ押す
+      // （昇降台で天井へ押し付けられたときに、天井の端まで何 m も飛ばない）
+      if (Math.min(px, pz) > 2 * r) {
+        if (c.min[1] > p.pos[1] + h * 0.5) { p.pos[1] = c.min[1] - h; moved = true; }
+        continue;
+      }
       if (px <= pz) p.pos[0] += maxX - c.min[0] < c.max[0] - minX ? -(maxX - c.min[0]) : c.max[0] - minX;
       else p.pos[2] += maxZ - c.min[2] < c.max[2] - minZ ? -(maxZ - c.min[2]) : c.max[2] - minZ;
       moved = true;
@@ -311,7 +317,10 @@ let landedOnRise = false;
 
 /**
  * 軸 axis に delta 動かし、重なった箱から押し出す。何かに当たれば true。
- * 上向きの移動でも、箱の上面が足元から段差（0.35 m）以内なら上へ押し上げる（下からせり上がる床に乗っている）
+ * 上向きの移動でも、箱の上面が足元から段差（0.35 m）以内なら上へ押し上げる（下からせり上がる床に乗っている）。
+ * 押し戻す面は「動く前にいた側」で決める。動く前からこの軸で重なっていた箱（別の軸の動きで角をかすめた・前からの重なり）は
+ * ここでは押さない（重なりは次の tick の depenetrate が最小の量で直す）。
+ * v1 は動いた向きで面を決めていたので、角をかすめると箱の反対側まで飛んで続く箱も突き抜け、下向きの移動では背の高い棚の上へ乗った
  */
 function moveAxis(p: PlayerState, axis: 0 | 1 | 2, delta: number, near: AABB[]): boolean {
   if (axis === 1) landedOnRise = false;
@@ -327,13 +336,22 @@ function moveAxis(p: PlayerState, axis: 0 | 1 | 2, delta: number, near: AABB[]):
     let maxX = q[0] + r, maxY = q[1] + h, maxZ = q[2] + r;
     for (const c of near) {
       if (minX < c.max[0] && maxX > c.min[0] && minY < c.max[1] && maxY > c.min[1] && minZ < c.max[2] && maxZ > c.min[2]) {
+        if (axis === 1) {
+          // 縦も動く前にいた側で決める: 上から降りた（足が上面から段差以内）なら上に乗る / せり上がる床に押し上げられる / 下から頭を打つ。
+          // 横から重なっていた箱（背の高い棚・机の天板の横）には乗らない（v1 は下向きの移動なら高さに関係なく上面へ乗せていた）
+          const pre = p.pos[1];
+          const rise = delta > 0 && c.max[1] - q[1] <= PLAYER.step && c.max[1] - pre <= PLAYER.step;
+          if (rise || (delta < 0 && pre >= c.max[1] - PLAYER.step)) { q[1] = c.max[1]; if (rise) landedOnRise = true; }
+          else if (delta > 0 && pre + h <= c.min[1] + 1e-6) q[1] = c.min[1] - h;
+          else continue;
+        } else {
+          const pre = p.pos[axis];
+          if (pre + r <= c.min[axis] + 1e-6) q[axis] = c.min[axis] - r;
+          else if (pre - r >= c.max[axis] - 1e-6) q[axis] = c.max[axis] + r;
+          else continue;
+        }
         any = true;
         hit = true;
-        if (axis === 1) {
-          const rise = delta > 0 && c.max[1] - q[1] <= PLAYER.step && c.max[1] - p.pos[1] <= PLAYER.step;
-          if (delta < 0 || rise) { q[1] = c.max[1]; if (rise) landedOnRise = true; }
-          else q[1] = c.min[1] - h;
-        } else q[axis] = delta < 0 ? c.max[axis] + r : c.min[axis] - r;
         minX = q[0] - r; minY = q[1]; minZ = q[2] - r;
         maxX = q[0] + r; maxY = q[1] + h; maxZ = q[2] + r;
       }

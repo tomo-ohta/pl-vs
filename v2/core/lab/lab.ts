@@ -92,7 +92,7 @@ export function labFloor(seed = 1, tuningVersion = 'default'): FloorLayout {
     { id: 'pad1', type: 'dwellSensor', cell: 'hallA', params: { aabb: aabbJson({ min: [pad.min[0], -0.1, pad.min[2]], max: [pad.max[0], 1.5, pad.max[2]] }), sec: 1.5, still: true } },
     { id: 'lampB', type: 'lamp', cell: 'hallB', params: { on: false, rate: 2.5 }, inputs: { on: 'pad1.done' } },
     // 昇降台（乗ると運ばれる）
-    { id: 'lift1', type: 'mover', cell: 'hallA', params: { box: aabbJson({ min: [2, 0, -16], max: [4, 0.15, -14] }), mat: 'metal', points: [[0, 0, 0], [0, 1.6, 0]], speed: 0.45, mode: 'pingpong' } },
+    { id: 'lift1', type: 'mover', cell: 'hallA', params: { box: aabbJson({ min: [2, 0, -16], max: [4, 0.15, -14] }), mat: 'metal', points: [[0, 0, 0], [0, 1.3, 0]], speed: 0.45, mode: 'pingpong' } },
     // 動く歩道
     { id: 'walk1', type: 'forceZone', cell: 'hallA', params: { aabb: aabbJson({ min: [belt.min[0], -0.1, belt.min[2]], max: [belt.max[0], 0.6, belt.max[2]] }), vector: [0, 0, -1], speed: 1.3, visual: 'belt' } },
     // 傾く床と箱

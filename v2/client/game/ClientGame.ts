@@ -168,7 +168,7 @@ export class ClientGame {
     const needsPhysics = floor.entities.some((e) => partDef(e.type)?.physics);
     const physics = needsPhysics ? new PhysicsWorld(await loadRapier(), 1 / this.tuning['physics.tickHz']) : null;
     this.sim = new Sim(floor, { tuning: this.tuning, physics });
-    this.built = new FloorBuilder(this.materials).build(floor);
+    this.built = new FloorBuilder(this.materials, { tier: this.tier.id }).build(floor);
     this.scene.add(this.built.root);
     this.visibility = new Visibility(floor);
     const ctx = { root: this.built.root, materials: this.materials, built: this.built, sim: this.sim, levelOf: this.lampLevel };

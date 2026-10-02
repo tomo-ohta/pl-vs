@@ -32,8 +32,10 @@ function route(floor: FloorLayout, from: string, to: string): PortalSpec[] | nul
 
 const center = (p: PortalSpec): [number, number, number] => [(p.aabb.min[0] + p.aabb.max[0]) / 2, p.aabb.min[1], (p.aabb.min[2] + p.aabb.max[2]) / 2];
 
-const G = 0.25;
-const R = 0.33;
+/** 道を探す格子の間隔。幅 0.9 m の通り道（座席の列の脇など）でも、体の幅 + 余裕の範囲に格子点が必ず入るように細かく */
+const G = 0.125;
+/** 道の幅の判定に使う体の半径: プレイヤーの当たり判定（半辺 PLAYER.radius = 0.35 の箱）より少し太く。細いと角すれすれの道を選んで引っかかる */
+const R = 0.36;
 
 /** 点 (x, z) の足元の高さ（y0 付近から下へ、当たり判定の箱の上面と面）。無ければ -Infinity */
 function groundAt(sim: Sim, x: number, z: number, yTop: number): number {
@@ -60,7 +62,7 @@ function bodyBlocked(sim: Sim, x: number, z: number, g: number, h: number): bool
 export function pathInCell(sim: Sim, cell: CellLayout, from: [number, number, number], to: [number, number, number]): [number, number][] | null {
   const b = cell.bounds;
   const nx = Math.ceil((b.max[0] - b.min[0]) / G) + 1, nz = Math.ceil((b.max[2] - b.min[2]) / G) + 1;
-  if (nx * nz > 40000) return null;
+  if (nx * nz > 160000) return null;
   const idx = (i: number, k: number): number => k * nx + i;
   const ground = new Float32Array(nx * nz).fill(NaN);
   // 足場として見る高さの上限: 床から 0.5 m（階段・踊り場のある区画はその上面まで）。壁・天井の上面を足場にしない
