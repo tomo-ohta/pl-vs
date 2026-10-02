@@ -9,3 +9,4 @@ import './mech.ts';
 import './ride.ts';
 import './water.ts';
 import './ball.ts';
+import './size.ts';

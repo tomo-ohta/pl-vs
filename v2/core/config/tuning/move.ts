@@ -149,4 +149,9 @@ export const MOVE_TUNING = {
   'move.ball.vmax': num(5, 2, 9, '球: 速さの上限（m/s）'),
   'move.ball.throwSpeed': num(2.6, 1, 6, '玉乗り: この速さより速く壁にぶつかると振り落とされる（m/s）'),
   'move.ball.paintSlow': num(0.3, 0.1, 0.8, '球に乗る部屋: 塗りたてのペンキの床を歩く速さの倍率'),
+
+  // ---- 身体の大きさが変わる部屋（sizeRoom）: 身体の大きさ [M07]・縮小して通る穴 [M45] ----
+  'move.size.small': num(0.34, 0.2, 0.6, '大きさの門「小」: 身体の大きさの倍率（ネズミの穴 0.7 m を立ったまま通れる）'),
+  'move.size.large': num(1.35, 1.1, 1.6, '大きさの門「大」: 身体の大きさの倍率（天井 2.6 m の部屋で立てる）'),
+  'move.size.underSec': num(1.0, 0.3, 5, '身体の大きさ（出現型の隠し）: 小さいまま戸棚の下にいる秒数'),
 } as const satisfies Record<string, Spec>;

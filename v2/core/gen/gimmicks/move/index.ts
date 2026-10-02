@@ -13,3 +13,4 @@ import './mech.ts';
 import './atrium.ts';
 import './water.ts';
 import './ball.ts';
+import './size.ts';

@@ -357,8 +357,8 @@ function stepUpright(p: PlayerState, cmd: InputCommand, world: PlayerWorld, dt: 
       p.pos[0] = afterFlat[0]; p.pos[1] = afterFlat[1]; p.pos[2] = afterFlat[2];
     }
   }
-  // 泳いでいて縁に当たった: 前へ押していれば、水面から move.swim.mantle までの縁へ這い上がる
-  if (blocked && p.swimming && my > 0.3) {
+  // 泳いでいて縁に当たった: 縁へ押していれば（前でも横でも）、水面から move.swim.mantle までの縁へ這い上がる
+  if (blocked && p.swimming && Math.hypot(ix, iz) > 0.3) {
     const top = ledgeTop(start, dx, dz, near, playerRadius(p), zi.swim! + tv(world, 'move.swim.mantle') - start[1]);
     if (top !== null && !overlapsAt(start[0], top, start[2], playerHeight(p), near, playerRadius(p))) {
       p.mantle = top;

@@ -38,6 +38,7 @@ export const VIEW_ROOMS: { def: string; w: number; d: number; height?: number; e
   { def: 'ballPool', w: 6.4, d: 9, entry: 2, exit: 0 },
   { def: 'ballRide', w: 5, d: 9, entry: 2, exit: 0, t: { 'move.ball.bubbleChance': 0 } },
   { def: 'ballRide', w: 5, d: 9, entry: 2, exit: 0, t: { 'move.ball.bubbleChance': 1 } },
+  { def: 'sizeRoom', w: 5, d: 9, entry: 2, exit: 0 },
 ];
 
 test('移動と身体の描画: 部品の描画を作って動かしても壊れない', async () => {
@@ -77,6 +78,6 @@ test('移動と身体の描画: 部品の描画を作って動かしても壊れ
     built.dispose();
     sim.physics?.dispose();
   }
-  for (const type of ['flowZone', 'trapTile', 'swayBridge', 'pendulum', 'dustCover', 'sinkTrap', 'ramp', 'turntable', 'revolvingDoor', 'pushBlock', 'tiltDeck', 'pathRide', 'cableCar', 'ballPit', 'rollBall']) assert.ok(made.has(type), `${type} の描画がある`);
+  for (const type of ['flowZone', 'trapTile', 'swayBridge', 'pendulum', 'dustCover', 'sinkTrap', 'ramp', 'turntable', 'revolvingDoor', 'pushBlock', 'tiltDeck', 'pathRide', 'cableCar', 'ballPit', 'rollBall', 'sizeGate']) assert.ok(made.has(type), `${type} の描画がある`);
   lib.dispose();
 });
