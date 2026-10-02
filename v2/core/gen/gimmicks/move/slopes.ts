@@ -103,7 +103,8 @@ defineGimmick({
     // エスカレーターは階段と反対の横の壁沿い
     const [eu0, eu1] = side.low ? [F.u1 - EW, F.u1] : [F.u0, F.u0 + EW];
     if (side.low ? eu0 < side.hi + 1.0 : eu1 > side.lo - 1.0) return;
-    const vb = landD + 0.3, vt = F.depth - landD;
+    // 下の端の前は穴の底を 1 m 空ける（底を歩いて下の端から乗る。入口の床の柱に近すぎると乗れない）
+    const vb = landD + 1.0, vt = F.depth - landD;
     const midW = t['move.escalator.landingM'];
     const f = (vt - vb - midW) / 2;
     // 坂は 40° より急にしない

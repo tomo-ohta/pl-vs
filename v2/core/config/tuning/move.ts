@@ -87,7 +87,7 @@ export const MOVE_TUNING = {
   'move.rise.updraftSpeed': num(3.2, 1.5, 6, '上昇気流: 吹き上がる速さ（m/s）'),
 
   // ---- 逆走エスカレーター [M09]・滑り台 [M14・M12] ----
-  'move.escalator.depthM': num(2.2, 1.6, 3.0, '逆走エスカレーター: 穴の深さ（m。エスカレーターで上る高さ）'),
+  'move.escalator.depthM': num(1.8, 1.4, 3.0, '逆走エスカレーター: 穴の深さ（m。エスカレーターで上る高さ）'),
   'move.escalator.speed': num(2.3, 1.0, 2.39, '逆走エスカレーター: 下りに動く速さ（m/s）。歩く 3.0 より少し遅く（歩くと少しずつ、走るとゆっくり上れる）'),
   'move.escalator.landingM': num(0.9, 0.7, 1.6, '逆走エスカレーター: 途中の踊り場の長さ（m）'),
   'move.escalator.stillSec': num(2.5, 0.5, 8, '逆走エスカレーター（出現型の隠し）: 踊り場で立ち止まる秒数'),
@@ -154,4 +154,11 @@ export const MOVE_TUNING = {
   'move.size.small': num(0.34, 0.2, 0.6, '大きさの門「小」: 身体の大きさの倍率（ネズミの穴 0.7 m を立ったまま通れる）'),
   'move.size.large': num(1.35, 1.1, 1.6, '大きさの門「大」: 身体の大きさの倍率（天井 2.6 m の部屋で立てる）'),
   'move.size.underSec': num(1.0, 0.3, 5, '身体の大きさ（出現型の隠し）: 小さいまま戸棚の下にいる秒数'),
+
+  // ---- 重力の向きが変わる部屋（gravityHall）: 重力の回廊 [W01・M08]・磁力の靴 [M33]・重力の迷路 [W02]・筒の通路 [M26] ----
+  'move.grav.w.loop': num(0.4, 0, 10, '重力の部屋: 床・壁・天井をひと回りする帯（回廊）の重み'),
+  'move.grav.w.maze': num(0.3, 0, 10, '重力の部屋: 床の迷路と天井の道（迷路）の重み'),
+  'move.grav.w.tube': num(0.3, 0, 10, '重力の部屋: 回る筒の通路の重み'),
+  'move.grav.mazeMinH': num(3.3, 3.0, 5, '重力の迷路: 天井の高さの下限（m。天井を歩く頭が床の仕切り 1.4 m に当たらない）'),
+  'move.grav.ceilingSec': num(2, 0.5, 8, '重力の回廊（出現型の隠し）: 天井の帯を歩く秒数'),
 } as const satisfies Record<string, Spec>;

@@ -3,11 +3,10 @@
  * 受け持つ案の番号は index.ts の OWNERS。書き方は types.ts。
  *
  * プレイヤーの動きの拡張（core/sim/player.ts）: はしご（climb ゾーン）・泳ぐ（swim ゾーン）・上昇気流（force の上向き）・
- * 乗り物（PlayerState.ride）・身体の大きさ（scale）・重力の向き（grav。90° 単位・区画の中だけ）・泥に沈む（sink）・重い部屋（gravity > 1）。
+ * 乗り物（PlayerState.ride）・身体の大きさ（scale）・重力の向き（grav。90° 単位。磁力の面 magnet ゾーン・筒の通路 twist ゾーン）・
+ * 泥に沈む（sink）・重い部屋（gravity > 1）・水槽の無い水（water の submerged）。
  */
 import type { CatalogEntry } from './types.ts';
-
-const WIP = '段階 4 で作成中';
 
 export const MOVE_CATALOG: CatalogEntry[] = [
   { idea: 'M01', name: '動く歩道', status: 'existing', impl: [{ kind: 'gimmick', id: 'beltMaze' }], note: '部屋まるごとの一方通行の歩道迷路（廊下の walkway は段階 3 で削除）' },
@@ -17,7 +16,7 @@ export const MOVE_CATALOG: CatalogEntry[] = [
   { idea: 'M05', name: '玉乗り', status: 'done', impl: [{ kind: 'gimmick', id: 'ballRide' }, { kind: 'part', id: 'rollBall' }], note: '球に乗る部屋（床一面が塗りたてのペンキで、歩くととても遅い。「ペンキ塗りたて」の札）の変種 ball: 入口の床の大きな球に調べて乗り、操作の向きへ転がす（止まりにくい）。速いまま壁にぶつかると振り落とされる。歩いても渡れる' },
   { idea: 'M06', name: 'バブル', status: 'merged', impl: [{ kind: 'gimmick', id: 'ballRide' }, { kind: 'part', id: 'rollBall' }], note: '球に乗る部屋の変種 bubble: 透明な大きな球の中に入って転がす（よく弾む。ハムスターボール）。玉乗りと同じ部品の mode in' },
   { idea: 'M07', name: '身体の大きさ', status: 'done', impl: [{ kind: 'gimmick', id: 'sizeRoom' }, { kind: 'part', id: 'sizeGate' }], note: 'プレイヤーの動きに身体の大きさ（scale。当たり判定・目の高さ・段差・跳ぶ高さ・速さが比例。大きくなるのは埋まらないときだけ）。身体の大きさが変わる部屋: 「小」（約 1/3）「大」（約 1.35 倍）の札の門をくぐると大きさが変わる。小さいと家具が見上げるほど大きく、大きいと通り口でかがむ。部屋の開口の前で元に戻る' },
-  { idea: 'M08', name: '重力の回廊 [WS]', status: 'deferred', impl: [], note: WIP },
+  { idea: 'M08', name: '重力の回廊 [WS]', status: 'merged', impl: [{ kind: 'gimmick', id: 'gravityHall' }], note: 'W01 と同じ（重力の向きが変わる部屋の変種 loop）' },
   { idea: 'M09', name: '逆走エスカレーター', status: 'done', impl: [{ kind: 'gimmick', id: 'escalator' }, { kind: 'part', id: 'ramp' }], note: '部屋の床が穴で、底から出口の床へは下りに動くエスカレーターだけ（入口の床から底へは階段）。歩くと少しずつ、走るとゆっくり上れる。立ち止まると下まで戻される。途中に流れない踊り場' },
   { idea: 'M10', name: '滑る床', status: 'merged', impl: [{ kind: 'gimmick', id: 'footingRoom' }], note: '足元の部屋の変種 wax: 磨いて濡れた床（氷より少し止まりやすい）。開いた床の点検口に落ちると入口から。「濡れた床」の看板' },
   { idea: 'M11', name: '回転する床', status: 'done', impl: [{ kind: 'gimmick', id: 'turntable' }, { kind: 'part', id: 'turntable' }], note: '部屋の真ん中の大きな円盤がゆっくり回る。上に立つと一緒に回され、円盤の上の腰の高さの柱も回って押してくる。回りに合わせて斜めに歩いて渡る' },
@@ -35,14 +34,14 @@ export const MOVE_CATALOG: CatalogEntry[] = [
   { idea: 'M23', name: '泳ぐ', status: 'done', impl: [{ kind: 'gimmick', id: 'poolRoom' }], note: 'プレイヤーの動きに swim ゾーン（浮いて泳ぐ・しゃがむで潜る・跳ぶで浮く・縁へ押すと這い上がる）。深いプールの部屋の変種 swim: 床ほぼ全体が深いプール（水面は床の 0.35 m 下）。入口の床から水の中の階段で入り、泳いで渡って出口の縁へ這い上がる。底のレーンの線と水面のロープ' },
   { idea: 'M24', name: 'ダクトを這う', status: 'done', impl: [{ kind: 'gimmick', id: 'crawlTunnel' }], note: '這う部屋の変種 duct: 部屋の中が金属のダクトで埋まり、開口の前から高さ 1.05 m のダクトが曲がりながら続く（自動でしゃがむ）' },
   { idea: 'M25', name: '跳び石', status: 'merged', impl: [{ kind: 'gimmick', id: 'poolRoom' }], note: '深いプールの部屋の変種 stones: 水面から少し出た石の柱が向こう岸までジグザグに並ぶ。走って跳べば次の石に届く。落ちても泳いで石・岸へ這い上がれる' },
-  { idea: 'M26', name: '筒の通路', status: 'deferred', impl: [], note: WIP },
+  { idea: 'M26', name: '筒の通路', status: 'merged', impl: [{ kind: 'gimmick', id: 'gravityHall' }], note: '重力の向きが変わる部屋の変種 tube: 部屋の真ん中を通る四角い筒。区切りごとに重力が筒の軸のまわりに 90° ずつ回り（twist ゾーン: 身体ごと真ん中の線のまわりに回して隣の面に立たせる）、前へ歩くだけで壁 → 天井 → 反対の壁 → 床と立つ面が一周する。四面に同じ照明、窓の外の部屋だけが傾いて見える' },
   { idea: 'M27', name: '縮むトンネル', status: 'done', impl: [{ kind: 'gimmick', id: 'crawlTunnel' }], note: '這う部屋の変種 shrink: 四角いトンネルの枠が奥へ少しずつ狭く低くなり、最後は這う高さ（自然にしゃがむ = crawl ゾーンで自動）。扉を開けると遠近法が狂ったように見える' },
   { idea: 'M28', name: '人の流れ', status: 'merged', impl: [{ kind: 'gimmick', id: 'windTunnel' }], note: '送風の通路の変種 crowd: 見えない群衆の流れが部屋を横切る（帯ごとに周期で強まる・向きは交互）。床の影と足音で見える。押されて横へ流されながら渡る' },
   { idea: 'M29', name: '台車に乗る', status: 'merged', impl: [{ kind: 'gimmick', id: 'atrium' }, { kind: 'part', id: 'pathRide' }], note: '吹き抜けを渡る部屋の変種 cart: 入口の床の縁の坂の上の台車。調べて乗ると坂で加速して底の線路を転がり、出口の階段の近くの車止めまで。台車はしばらくで坂の上へ戻る（坂は歩いても下りられる）' },
   { idea: 'M30', name: 'ゴンドラ・観覧車', status: 'merged', impl: [{ kind: 'gimmick', id: 'atrium' }, { kind: 'part', id: 'cableCar' }], note: '吹き抜けを渡る部屋の変種 gondola: 入口の床と出口の床の間を待つ・動くをくり返す丸い箱。動いている間は乗り口の柵が閉じ、床がゆっくり 1 回転する（乗っている人も回る = 景色が回る）。観覧車は縦に回す乗り物の当たり判定が箱で作れないので、回るゴンドラにまとめた' },
   { idea: 'M31', name: '泥と砂', status: 'merged', impl: [{ kind: 'gimmick', id: 'footingRoom' }, { kind: 'part', id: 'sinkTrap' }], note: '足元の部屋の変種 mud: 床一面のぬかるみ（遅い・足が沈んで目が下がる）。板の道の上は普通に歩ける。流砂で立ち止まると沈んで飲み込まれ入口から（歩き続ければ平気）。砂は泥と同じ仕組みなので泥だけにした' },
   { idea: 'M32', name: '氷', status: 'done', impl: [{ kind: 'gimmick', id: 'footingRoom' }], note: '足元の部屋の変種 ice: 床一面の氷（止まれない）。ざらざらの敷物の上だけ止まれる。入口から出口への線の上の割れ目（冷たい水）に落ちると入口から。隠し ice.corner（存在型）: 遠い壁の前の扉、手前に薄い氷' },
-  { idea: 'M33', name: '磁力の靴', status: 'deferred', impl: [], note: WIP },
+  { idea: 'M33', name: '磁力の靴', status: 'merged', impl: [{ kind: 'gimmick', id: 'gravityHall' }], note: 'プレイヤーの動きに magnet ゾーン（磁力の面へ向かって押し続けると、その面が床になる。面から離れると普通の重力に戻って落ちる）。重力の回廊・迷路の金属の帯の上だけ壁や天井を歩ける' },
   { idea: 'M34', name: '回転扉', status: 'done', impl: [{ kind: 'gimmick', id: 'revolvingDoor' }, { kind: 'part', id: 'revolvingDoor' }], note: '部屋を仕切る厚い壁の真ん中の 4 枚羽の回転扉。羽を押すと回り（走ると速い）、手を離しても勢いで回り続けて後ろの羽に押される。横の口は別の通路（入口の側へ戻る道・出口の側へ抜ける道）。羽は当たり判定の箱でなく、羽の間に体を収める制約' },
   { idea: 'M35', name: '押せる壁', status: 'done', impl: [{ kind: 'gimmick', id: 'pushWall' }, { kind: 'part', id: 'pushBlock' }], note: '部屋を仕切る壁に同じ形の板が並び、1 枚だけ押すとゆっくり動いて道が開く（床の擦り傷が目印）。反対の側からも押せる（どちらから来ても通れる）' },
   { idea: 'M36', name: 'ばね床の連続', status: 'done', impl: [{ kind: 'gimmick', id: 'riseHall' }, { kind: 'part', id: 'bouncePad' }], note: '高い所へ上がる部屋（天井の高い部屋の開口の無い壁に、だんだん高くなる棚）の変種 springs: 床と棚の上の弾む床で、一度の跳びでは届かない次の棚へ跳ね上がっていく。一番上に見つけた印。落ちても床へ戻るだけ' },
@@ -55,13 +54,13 @@ export const MOVE_CATALOG: CatalogEntry[] = [
   { idea: 'M43', name: 'ゆっくりでないと開く床', status: 'done', impl: [{ kind: 'gimmick', id: 'trapdoorFloor' }, { kind: 'part', id: 'trapTile' }], note: '床一面が穴の上の床板（普通の床と同じ材質で、継ぎ目と「走らないでください」の札だけが違う）。走るか跳んで着地すると蝶番で開いて落ちる（崩れる床の逆: 急ぐと落ちる）。隠し trap.fall（存在型）: 穴の底の扉' },
   { idea: 'M44', name: '空中に浮く足場', status: 'done', impl: [{ kind: 'gimmick', id: 'ghostBridge' }, { kind: 'part', id: 'dustCover' }], note: '深い溝の上の見えない足場（描かない当たり判定）が曲がりくねって向こう岸へ。足場の上にだけ埃が積もっている。行き止まりの枝もある。落ちたら溝の底の階段で入口から。隠し ghost.fall（存在型）' },
   { idea: 'M45', name: '縮小して通る穴', status: 'merged', impl: [{ kind: 'gimmick', id: 'sizeRoom' }], note: '身体の大きさが変わる部屋の仕切りの壁の、床すれすれのネズミの穴（高さ 0.7 m）。小さい身体だけ通れる近道（普通の通り口もある）' },
-  { idea: 'W01', name: '重力の回廊', status: 'deferred', impl: [], note: WIP },
-  { idea: 'W02', name: '重力の迷路', status: 'deferred', impl: [], note: WIP },
+  { idea: 'W01', name: '重力の回廊', status: 'done', impl: [{ kind: 'gimmick', id: 'gravityHall' }], note: '重力の向きが変わる部屋の変種 loop: 部屋を横切る金属の帯が床 → 横の壁 → 天井 → 反対の壁 → 床とひと回りする。壁へ向かって押すと壁が床になり（重力は 90° 単位・カメラは滑らかに回る）、天井を渡って反対の壁を下り、床へ戻る。歩いて渡るだけなら帯に乗らなくてよい' },
+  { idea: 'W02', name: '重力の迷路', status: 'merged', impl: [{ kind: 'gimmick', id: 'gravityHall' }], note: '重力の向きが変わる部屋の変種 maze: 床は腰より高い仕切りの迷路（歩いて抜けられる）。入口の近くの壁の帯から天井へ上がれば、天井一面が磁力の面で、迷路の上をまっすぐ渡り、出口の近くの壁の帯から下りられる（上にも下にも道がある）' },
   { idea: 'BM01', name: '動く歩道を逆走し切る → 始点の裏の点検口', status: 'existing', impl: [{ kind: 'gimmick', id: 'beltMaze' }], note: 'belt.deadEnd: 行き止まりの床へ流れ込む帯に逆らって歩き続けると扉（出現型）/ 最初からある（存在型）' },
   { idea: 'BM02', name: '逆走エスカレーターの途中の踊り場で止まる → 横の扉', status: 'done', impl: [{ kind: 'gimmick', id: 'escalator' }, { kind: 'part', id: 'stateSensor' }], note: 'escalator.landing: 踊り場の横の壁の扉（存在型 = 最初からある / 出現型 = 踊り場でしばらく立ち止まると開く）' },
   { idea: 'BM03', name: '弾む床で何度も跳び、天井の点検口に届く', status: 'done', impl: [{ kind: 'gimmick', id: 'riseHall' }], note: 'rise.top（存在型）: 棚を跳ね上がり続けて一番上の棚へ行くと、奥の壁の天井近くに通気口の扉（上り切った人だけが見つける）。はしご・上昇気流の変種でも同じ' },
   { idea: 'BM04', name: '低い天井の通路で、しゃがんだまま脇の隙間へ', status: 'done', impl: [{ kind: 'gimmick', id: 'crawlTunnel' }], note: 'duct.gap（存在型）: ダクトの途中の、さらに低く狭い脇の隙間の先に小部屋と扉（暖かい灯りが漏れる）' },
-  { idea: 'BM05', name: '重力の回廊で、天井を歩いている途中で横道へ', status: 'deferred', impl: [], note: WIP },
+  { idea: 'BM05', name: '重力の回廊で、天井を歩いている途中で横道へ', status: 'done', impl: [{ kind: 'gimmick', id: 'gravityHall' }, { kind: 'part', id: 'stateSensor' }], note: 'grav.ceiling（存在型 / 出現型）: 天井の帯から横の壁の上の方へ延びる枝の先に、天井近くの横道の扉（床からは届かない高さ。扉の中へ歩くと磁力が切れて横道の床へ落ちる）。出現型は天井をしばらく歩くと開く' },
   { idea: 'BM06', name: '身体が小さいまま家具の下へ → 壁の小さな穴', status: 'done', impl: [{ kind: 'gimmick', id: 'sizeRoom' }, { kind: 'part', id: 'stateSensor' }], note: 'size.under（出現型）: 横の壁際の脚の長い戸棚の下（床から 0.7 m）に小さいまま潜り込むと、戸棚の脇の壁に扉が開く。戸棚の下の壁に小さな穴が描いてある（扉そのものは普通の大きさで入れる。中で元の大きさに戻らないので閉じ込められない）' },
   { idea: 'BM07', name: '玉乗りの通路で、球に乗ったまま脇の坂を下る', status: 'done', impl: [{ kind: 'gimmick', id: 'ballRide' }], note: 'ball.slope（出現型）: 横の壁際の、手すりで囲った低い所へ下る坂を、球に乗ったまま下りると坂の下の壁に扉が開く（歩いて下りても開かない）' },
   { idea: 'BM08', name: 'バブルをまとったまま壁に何度もぶつかる → 薄い壁が割れる', status: 'done', impl: [{ kind: 'gimmick', id: 'ballRide' }], note: 'bubble.wall（出現型）: 横の壁の、ひびの入った薄い所へ、バブルのまま 3 回速くぶつかると割れて扉が開く' },

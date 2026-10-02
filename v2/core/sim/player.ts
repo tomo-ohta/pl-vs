@@ -190,9 +190,43 @@ export function bodyAabb(p: PlayerState): AABB {
 export function stepPlayer(p: PlayerState, cmd: InputCommand, world: PlayerWorld, dt: number, tick: number, events: SimEvent[]): void {
   // 部品が次の tick に読む操作
   p.input = { x: clamp(cmd.moveX, -1, 1), y: clamp(cmd.moveY, -1, 1), jump: !!cmd.jump, dash: !!cmd.dash, crouch: !!cmd.crouch };
+  const inTwist = !p.ride && twistStep(p, world, tick, events);
   if (p.grav) stepFramed(p, cmd, world, dt, tick, events);
   else stepUpright(p, cmd, world, dt, tick, events);
-  if (!p.ride) magnetStep(p, world, dt, tick, events);
+  if (!p.ride && !inTwist) magnetStep(p, world, dt, tick, events);
+}
+
+/**
+ * 筒の通路（twist ゾーン）: 区切りごとに重力の向きが決まっている（params.k: 筒の軸 params.axis のまわりの 90° の回数）。
+ * 違う向きの区切りへ入ると、筒の真ん中の線（params.center = 軸に垂直な横の座標と高さ）のまわりに身体ごと回す
+ * （四角い筒なので、回した先は隣の面の上）。twist ゾーンの中にいる間は磁力の面の判定をしない。戻り値は twist ゾーンの中か
+ */
+function twistStep(p: PlayerState, world: PlayerWorld, tick: number, events: SimEvent[]): boolean {
+  const b = bodyAabb(p);
+  const c: Vec3 = [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
+  for (const z of world.zones) {
+    if (z.kind !== 'twist') continue;
+    const a = z.aabb;
+    if (c[0] < a.min[0] || c[0] > a.max[0] || c[1] < a.min[1] || c[1] > a.max[1] || c[2] < a.min[2] || c[2] > a.max[2]) continue;
+    const axis: GravAxis = z.params?.axis === 'x' ? 'x' : 'z';
+    const k = ((Math.round(Number(z.params?.k ?? 0)) % 4) + 4) % 4;
+    const cur = p.grav ? (p.grav.axis === axis ? p.grav.k : -1) : 0;
+    if (cur < 0 || cur === k) return true;
+    const d = k - cur;
+    const cen = (z.params?.center as number[] | undefined) ?? [0, 0];
+    const o: Vec3 = axis === 'z' ? [p.pos[0] - cen[0]!, p.pos[1] - cen[1]!, 0] : [0, p.pos[1] - cen[1]!, p.pos[2] - cen[0]!];
+    const r = rotQuarter(o, axis, d);
+    p.pos = axis === 'z' ? [cen[0]! + r[0], cen[1]! + r[1], p.pos[2]] : [p.pos[0], cen[1]! + r[1], cen[0]! + r[2]];
+    p.vel = rotQuarter(p.vel, axis, d);
+    p.carry = rotQuarter(p.carry, axis, d);
+    p.grav = k === 0 ? null : { axis, k };
+    p.onGround = false;
+    p.surfaceId = null;
+    p.gravHold = 0; p.gravLeave = 0;
+    events.push({ type: 'player.gravity', tick, player: p.id, pos: [...p.pos], data: { up: gravUp(p.grav).join(','), twist: true } });
+    return true;
+  }
+  return false;
 }
 
 /**

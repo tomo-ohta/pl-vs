@@ -14,3 +14,4 @@ import './atrium.ts';
 import './water.ts';
 import './ball.ts';
 import './size.ts';
+import './gravity.ts';

@@ -364,6 +364,19 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     const L = legs[leg];
     if (!L) return { ok: true, reason: '', seconds: n * sim.dt, route: r.map((p) => p.id) };
     legT += sim.dt;
+    // 段階 4: 重力の向きが回っている（筒の通路）: 筒は軸のまわりに回るので、軸に沿ってまっすぐ進む（道は引き直さない）。
+    // 軸に沿う向きは回した座標でも同じ。向きの成分の大きい方の軸だけを使う
+    if (player.grav) {
+      const ax = player.grav.axis === 'x' ? 0 : 2;
+      const d = (ax === 0 ? L.x - player.pos[0] : L.z - player.pos[2]);
+      const yaw = ax === 0 ? Math.atan2(-Math.sign(d), 0) : Math.atan2(0, -Math.sign(d));
+      const before = player.pos[ax]!;
+      sim.step([{ ...IDLE_COMMAND, yaw, moveY: Math.abs(d) > 0.1 ? 1 : 0 }]);
+      if (Math.abs(player.pos[ax]! - before) > 0.002) stuck = 0; else stuck++;
+      if (stuck * sim.dt > 10) return { ok: false, reason: `止まった（重力の向きが回った中）: 位置 (${player.pos.map((v) => v.toFixed(2)).join(', ')})`, seconds: n * sim.dt, route: r.map((p) => p.id) };
+      path = [];
+      continue;
+    }
     // ボタンの前に着いた: ボタンを見て調べる（押す）
     if (L.press && Math.hypot(L.x - player.pos[0], L.z - player.pos[2]) < 0.45) {
       const bb = floor.entities.find((e) => e.id === L.press)!.params.box as { min: number[]; max: number[] };

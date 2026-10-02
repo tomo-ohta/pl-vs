@@ -110,9 +110,11 @@ export interface RenderOverrides {
  * magnet: 磁力の面（vector = 面の外向き = その面に立ったときの上。aabb は面から 1 m の厚み。向かって歩くと乗り移る）。
  * water / force のほかの params: sink（足が沈む深さ m）・drag（落ちる速さの上限 m/s）・air（force: 宙にいる間の倍率）。
  * force の vector の上向きの成分は、上昇気流（上へ向かう速さ）として効く。gravity の scale は 1 より大きくてもよい（重い部屋。
- * params.slow で歩きも遅く）。water の submerged: 水槽の無い水（dry と一緒に使い、水の足音にする。部屋ごと水の中）
+ * params.slow で歩きも遅く）。water の submerged: 水槽の無い水（dry と一緒に使い、水の足音にする。部屋ごと水の中）。
+ * twist: 筒の通路の区切り（params.k = 筒の軸 params.axis（'x' / 'z'）のまわりの重力の 90° の回数、params.center = 筒の真ん中の線の
+ * 軸に垂直な横の座標と高さ）。違う向きの区切りへ入ると、身体ごと真ん中の線のまわりに回って隣の面に立つ
  */
-export type ZoneKind = 'water' | 'friction' | 'force' | 'crawl' | 'hazard' | 'marker' | 'gravity' | 'climb' | 'swim' | 'magnet';
+export type ZoneKind = 'water' | 'friction' | 'force' | 'crawl' | 'hazard' | 'marker' | 'gravity' | 'climb' | 'swim' | 'magnet' | 'twist';
 export interface Zone {
   id?: string;
   kind: ZoneKind;
