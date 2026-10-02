@@ -16,6 +16,8 @@
  *   Esc で Pointer Lock が外れると menu が立つ（メニューを開く合図）。`?nolock=1` で Pointer Lock を使わない（埋め込みブラウザ・自動テスト）。
  * - InputState.crouch: PC は左 Ctrl または C を押している間 true。スマホはしゃがむボタンのタップでトグル（active クラスで点灯）。
  * - `resetCrouchToggle()` でスマホのトグルを解除できる（乗車開始や遷移で姿勢を戻したいとき）。
+ * - InputState.map: M キー / スマホの地図ボタン（押した瞬間）。drop / flashlight はスマホの「置く」「ライト」ボタンでも立つ（段階 4）。
+ *   map は menu と同じく、無効の間（メニュー中）も届く
  * - 視点感度は `sensitivityScale = settings.data.lookSensitivity`（Settings.onChange で追従させる）。
  * - PC で Ctrl+W / Ctrl+D 等のブラウザ既定動作は preventDefault できない（Pointer Lock 中も）。C キーを主、Ctrl を副として案内する。
  */
@@ -38,6 +40,8 @@ export interface InputState {
   /** Q キーの押下（そのフレームだけ true）。持っている物を置く・投げる */
   drop: boolean;
   menu: boolean;
+  /** M キー / 地図ボタンの押下（そのフレームだけ true）。地図を開く（メニューの地図のタブ）。無効の間も届く */
+  map: boolean;
   /** タップによるインタラクト（画面座標 NDC）。無ければ null */
   tap: { x: number; y: number } | null;
 }
@@ -55,6 +59,12 @@ export interface InputUi {
   menu: HTMLElement;
   /** しゃがみトグルボタン（省略可。無ければスマホのしゃがみは無効） */
   crouch?: HTMLElement;
+  /** 地図ボタン（省略可。押すと map） */
+  map?: HTMLElement;
+  /** 懐中電灯ボタン（省略可。押すと flashlight。R キーと同じ） */
+  flashlight?: HTMLElement;
+  /** 置く・投げるボタン（省略可。押すと drop。Q キーと同じ） */
+  drop?: HTMLElement;
 }
 
 export class InputController {
@@ -81,6 +91,7 @@ export class InputController {
   private flashlightEdge = false;
   private dropEdge = false;
   private menuEdge = false;
+  private mapEdge = false;
   private tap: { x: number; y: number } | null = null;
   private stick = { active: false, id: -1, x: 0, y: 0, cx: 0, cy: 0 };
   private lookPointer = { id: -1, x: 0, y: 0, moved: 0, t: 0, last: 0 };
@@ -123,6 +134,7 @@ export class InputController {
       if (e.code === 'KeyR' && !e.repeat) this.flashlightEdge = true;
       if (e.code === 'KeyQ' && !e.repeat) this.dropEdge = true;
       if (e.code === 'Escape') this.menuEdge = true;
+      if (e.code === 'KeyM') this.mapEdge = true;
       if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
       // しゃがみ中の Ctrl+移動キーがブラウザのショートカットになるのを可能な範囲で抑える（Ctrl+W 等は抑止不可）
       if (e.ctrlKey && ['KeyA', 'KeyS', 'KeyD', 'KeyE'].includes(e.code)) e.preventDefault();
@@ -169,7 +181,7 @@ export class InputController {
   // ---------------------------------------------------------------- Touch
   private bindTouch(): void {
     const { signal } = this.listeners;
-    const { stick, knob, jump, dash, menu, crouch } = this.ui;
+    const { stick, knob, jump, dash, menu, crouch, map, flashlight, drop } = this.ui;
     const R = 66;
     const setKnob = (dx: number, dy: number) => {
       knob.style.transform = `translate(${dx}px, ${dy}px)`;
@@ -239,6 +251,23 @@ export class InputController {
       this.menuEdge = true;
       e.preventDefault();
     }, { signal });
+    // 地図・懐中電灯・置く: 押した瞬間だけ（PC の M / R / Q と同じ）
+    const edge = (btn: HTMLElement | undefined, set: () => void): void => {
+      if (!btn) return;
+      btn.addEventListener('pointerdown', (e) => {
+        this.setMode('mobile');
+        btn.classList.add('active');
+        set();
+        e.preventDefault();
+      }, { signal });
+      const end = (): void => btn.classList.remove('active');
+      btn.addEventListener('pointerup', end, { signal });
+      btn.addEventListener('pointercancel', end, { signal });
+      btn.addEventListener('pointerleave', end, { signal });
+    };
+    edge(map, () => (this.mapEdge = true));
+    edge(flashlight, () => (this.flashlightEdge = true));
+    edge(drop, () => (this.dropEdge = true));
     // しゃがみはトグル（押している間だと親指が塞がるため）。active クラスで点灯
     if (crouch) {
       crouch.addEventListener('pointerdown', (e) => {
@@ -342,6 +371,7 @@ export class InputController {
       flashlight: this.flashlightEdge,
       drop: this.dropEdge,
       menu: this.menuEdge,
+      map: this.mapEdge,
       tap: this.tap,
     };
     this.lookDX = 0;
@@ -351,6 +381,7 @@ export class InputController {
     this.flashlightEdge = false;
     this.dropEdge = false;
     this.menuEdge = false;
+    this.mapEdge = false;
     this.tap = null;
     void this.touchJump;
     if (!this.enabled) {

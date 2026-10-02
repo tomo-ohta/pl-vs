@@ -64,6 +64,8 @@ export class ClientGame {
   paused = true;
   /** フロアの出口に入った（main がつぎのフロアを読む） */
   onFloorExit: ((exitId: string, kind: string, to: string | null) => void) | null = null;
+  /** 毎フレーム（入力を読んでシミュレーションを進めた後・描く前）。地図（client/map/MapController）が使う */
+  onFrame: ((input: InputState, dt: number) => void) | null = null;
 
   private readonly hemi = new THREE.HemisphereLight(0xe5e4d5, 0x6c665a, 0.1);
   private lightsPool: LightManager;
@@ -322,6 +324,7 @@ export class ClientGame {
       if (n === 8) this.acc = 0;
       this.handleEvents(sim.drainEvents());
     }
+    this.onFrame?.(input, dt);
     this.render(dt);
   }
 

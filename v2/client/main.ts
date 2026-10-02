@@ -6,6 +6,7 @@
  * - `?showcase=1` / `?showcase=2` 見本のフロア: 仕掛けを全種 1 つずつ・隠しを全部付けたフロア（2 は隠しの型が逆）。
  *   G で次の仕掛けの入口へ移る（Shift+G で前へ）。`?dev=1` なら、ふつうのフロアでも G が使える
  * - `?try=id,id` 指定した仕掛け・異変だけを置いた見本のフロア / `?group=<担当>` 担当（core/gen/catalog）の仕掛け・異変を全部置いた見本
+ * - 地図と図鑑（client/map/MapController）: M キー / 地図ボタンでメニューの地図のタブ。フロアを読むたびに setFloor
  * - 開発用: window.game（ClientGame）。ペインが隠れて rAF が止まるときは game.stepOnce() で 1 tick ずつ進める
  */
 import './ui/style.css';
@@ -19,6 +20,8 @@ import { RARE_DEFS } from '../core/gen/secrets/index.ts';
 import { CATALOG_BY_WS } from '../core/gen/catalog/index.ts';
 import type { FloorLayout } from '../core/world/layout.ts';
 import { ClientGame } from './game/ClientGame.ts';
+import { codexDefs } from './map/codexDefs.ts';
+import { MapController } from './map/MapController.ts';
 import { mountUi } from './ui/dom.ts';
 import { RecOverlay } from './ui/RecOverlay.ts';
 import { SettingsPanel } from './ui/SettingsPanel.ts';
@@ -46,6 +49,9 @@ new SettingsPanel(game.settings, { slot: ui.settingsSlot });
 const syncRec = (): void => rec.setVisible(game.settings.data.recOverlay && !game.paused);
 syncRec();
 game.settings.onChange(syncRec);
+// 地図と図鑑（小さな地図・メニューの地図と図鑑のタブ・調査率・壁の地図を写す）
+const maps = new MapController({ game, ui, tuning, defs: codexDefs() });
+game.onFrame = (input, dt) => maps.frame(input, dt);
 
 ui.pause.title.textContent = useLab ? 'LIMINAL v2 — 実験場' : showcase || tryIds.length ? 'LIMINAL v2 — 見本のフロア' : 'LIMINAL v2';
 if (devTour) {
@@ -65,7 +71,10 @@ ui.pause.resume.addEventListener('click', () => {
 let variant = Math.max(0, Number(params.get('variant') ?? 0) | 0);
 let tour: { stop: TourStop; text: string }[] = [];
 let tourAt = -1;
+/** 最後に作ったフロアの生成の報告（地図と図鑑が仕掛け・異変・隠しの場所を知るのに使う。実験場は null） */
+let lastReport: GenReport | null = null;
 function makeFloor(d: number, v = 0): FloorLayout {
+  lastReport = null;
   if (useLab) return labFloor(seed, tuningVersion(tuning));
   // 中身（家具）: ?nodress=1 で置かない（確認用）
   const dress = params.has('nodress') ? undefined : dressCell;
@@ -73,6 +82,7 @@ function makeFloor(d: number, v = 0): FloorLayout {
   const r = tryIds.length && first ? showcaseFloor(tuning, { ids: tryIds, flip: showcase === 2, dress })
     : showcase && first ? showcaseFloor(tuning, { flip: showcase === 2, dress }) : generateFloorReport({ world: seed, depth: d, variant: v }, tuning, { dress });
   console.info(`[gen] ${r.floor.id} ${r.profile.rarity} ${r.profile.family.name}/${r.profile.pattern} ${r.profile.cols}×${r.profile.rows} 区画 ${r.floor.cells.length} 箱 ${r.floor.cells.reduce((a, c) => a + c.boxes.length, 0)}${r.tone ? ` 裏の調子 ${r.tone}` : ''} 作り直し ${r.attempts - 1} ${r.ms} ms`, r.issues);
+  lastReport = r;
   tour = tourOf(r);
   tourAt = -1;
   if (devTour) console.table(tour.map((x) => ({ 場所: x.text, 区画: x.stop.cell })));
@@ -126,6 +136,7 @@ game.onFloorExit = (_exit, _kind, to): void => {
     moved = true;
     const t0 = performance.now();
     await game.loadFloor(makeFloor(depth, variant));
+    if (game.sim) maps.setFloor(game.sim.floor, lastReport, { world: seed, depth, variant });
     console.info(`[floor] B${depth + 1}F${variant ? `（裏 ${variant}）` : ''} 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
     fade.style.opacity = '0';
     moving = false;
@@ -134,6 +145,7 @@ game.onFloorExit = (_exit, _kind, to): void => {
 
 const t0 = performance.now();
 await game.loadFloor(makeFloor(depth, variant));
+if (game.sim) maps.setFloor(game.sim.floor, lastReport, { world: seed, depth, variant });
 console.info(`[floor] 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
 game.start();
 // REC の時刻（一時停止中は止める）
@@ -146,4 +158,5 @@ const tickRec = (now: number): void => {
 };
 requestAnimationFrame(tickRec);
 
-(window as unknown as { game: ClientGame }).game = game;
+(window as unknown as { game: ClientGame; maps: MapController }).game = game;
+(window as unknown as { maps: MapController }).maps = maps;
