@@ -10,3 +10,4 @@ import './chasm.ts';
 import './rise.ts';
 import './slopes.ts';
 import './mech.ts';
+import './atrium.ts';

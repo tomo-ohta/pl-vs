@@ -386,6 +386,8 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
       const pushed: [string, ReturnType<typeof pushBlockBox>][] = [];
       for (const e of floor.entities) {
         if (e.type === 'turntable') ((e.params.posts as unknown[] | undefined) ?? []).forEach((_, i) => sim.colliders.setDynamic(`${e.id}:post${i}`, null));
+        // ゴンドラの箱も見ない（行き来するので、乗らずに穴の底の階段を歩く）
+        if (e.type === 'cableCar') for (const k of ['floor', 'sideA', 'sideB', 'gateA', 'gateB']) sim.colliders.setDynamic(`${e.id}:${k}`, null);
         if (e.type === 'pushBlock' && sim.outputOf(e.id, 'done') < 0.5) { pushed.push([`${e.id}:block`, pushBlockBox(e, sim.outputOf(e.id, 'off'))]); sim.colliders.setDynamic(`${e.id}:block`, null); }
       }
       const c = cellAtPos(floor, player.pos);

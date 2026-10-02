@@ -110,4 +110,17 @@ export const MOVE_TUNING = {
   'move.tilt.maxDeg': num(12, 4, 20, '傾いていく部屋: 床の傾きの上限（度）'),
   'move.tilt.rate': num(1.1, 0.2, 5, '傾いていく部屋: 傾いていく速さ（度 / 秒。人がいなくなると半分の速さで戻る）'),
   'move.tilt.push': num(0.35, 0, 1, '傾いていく部屋: 傾きで低い側へ押す強さ（重さに対する割合）'),
+
+  // ---- 吹き抜けを渡る部屋（atrium）: ロープ渡り [M16]・ジップライン [M17]・台車 [M29]・ゴンドラ [M30] ----
+  'move.atrium.depthM': num(2.6, 1.8, 3.4, '吹き抜け: 穴の深さ（m）'),
+  'move.atrium.w.rope': num(0.3, 0, 10, '吹き抜け: ロープ渡りの重み'),
+  'move.atrium.w.zip': num(0.25, 0, 10, '吹き抜け: ジップラインの重み'),
+  'move.atrium.w.cart': num(0.2, 0, 10, '吹き抜け: 台車の重み'),
+  'move.atrium.w.gondola': num(0.25, 0, 10, '吹き抜け: ゴンドラの重み'),
+  'move.atrium.ropeSpeed': num(1.1, 0.4, 3, 'ロープ渡り: つかまって進む速さ（m/s）'),
+  'move.atrium.zipAccel': num(3, 0.5, 10, 'ジップライン: 加速（m/s²）'),
+  'move.atrium.zipMax': num(6, 2, 12, 'ジップライン: 速さの上限（m/s）'),
+  'move.atrium.cartDeg': num(28, 15, 40, '台車: 坂の傾き（度）'),
+  'move.atrium.cartMax': num(7, 2, 12, '台車: 速さの上限（m/s）'),
+  'move.atrium.carWait': num(3, 1, 10, 'ゴンドラ: 乗り場で待つ秒数'),
 } as const satisfies Record<string, Spec>;

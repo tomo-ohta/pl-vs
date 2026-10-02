@@ -31,6 +31,10 @@ export const VIEW_ROOMS: { def: string; w: number; d: number; height?: number; e
   { def: 'revolvingDoor', w: 6.4, d: 9, entry: 2, exit: 0 },
   { def: 'pushWall', w: 4.2, d: 8, entry: 2, exit: 0 },
   { def: 'slantRoom', w: 6.4, d: 9, entry: 2, exit: 0 },
+  { def: 'atrium', w: 5.6, d: 9.5, height: 3, entry: 2, exit: 0, t: { 'move.atrium.w.rope': 1, 'move.atrium.w.zip': 0, 'move.atrium.w.cart': 0, 'move.atrium.w.gondola': 0 } },
+  { def: 'atrium', w: 5.6, d: 9.5, height: 3, entry: 2, exit: 0, t: { 'move.atrium.w.rope': 0, 'move.atrium.w.zip': 1, 'move.atrium.w.cart': 0, 'move.atrium.w.gondola': 0 } },
+  { def: 'atrium', w: 8.6, d: 15, height: 3, kind: 'hall', entry: 2, exit: 0, t: { 'move.atrium.w.rope': 0, 'move.atrium.w.zip': 0, 'move.atrium.w.cart': 1, 'move.atrium.w.gondola': 0 } },
+  { def: 'atrium', w: 8.6, d: 15, height: 3, kind: 'hall', entry: 2, exit: 0, t: { 'move.atrium.w.rope': 0, 'move.atrium.w.zip': 0, 'move.atrium.w.cart': 0, 'move.atrium.w.gondola': 1 } },
 ];
 
 test('移動と身体の描画: 部品の描画を作って動かしても壊れない', async () => {
@@ -70,6 +74,6 @@ test('移動と身体の描画: 部品の描画を作って動かしても壊れ
     built.dispose();
     sim.physics?.dispose();
   }
-  for (const type of ['flowZone', 'trapTile', 'swayBridge', 'pendulum', 'dustCover', 'sinkTrap', 'ramp', 'turntable', 'revolvingDoor', 'pushBlock', 'tiltDeck']) assert.ok(made.has(type), `${type} の描画がある`);
+  for (const type of ['flowZone', 'trapTile', 'swayBridge', 'pendulum', 'dustCover', 'sinkTrap', 'ramp', 'turntable', 'revolvingDoor', 'pushBlock', 'tiltDeck', 'pathRide', 'cableCar']) assert.ok(made.has(type), `${type} の描画がある`);
   lib.dispose();
 });

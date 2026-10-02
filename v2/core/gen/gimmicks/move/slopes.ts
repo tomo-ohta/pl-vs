@@ -19,13 +19,13 @@ import { aabbJson, type WallFrame } from '../util.ts';
 const opposite = (s: { entrance: { dir: number } | null; exit: { dir: number } | null }): boolean => !!s.entrance && !!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4;
 
 /** 入口の壁の座標の向き（u / v の単位）を世界の向きへ */
-function dirOf(F: WallFrame, du: number, dv: number): Vec3 {
+export function dirOf(F: WallFrame, du: number, dv: number): Vec3 {
   const a = F.point(0, 0), b = F.point(du, dv);
   return [b[0] - a[0], 0, b[1] - a[1]];
 }
 
 /** 階段の列（plan.lane）の横の範囲と、低い側（u0 の壁沿い）か */
-function laneSide(plan: PitPlan): { lo: number; hi: number; low: boolean } {
+export function laneSide(plan: PitPlan): { lo: number; hi: number; low: boolean } {
   const F = plan.frame;
   const lu = [F.u(plan.lane.x0, plan.lane.z0), F.u(plan.lane.x1, plan.lane.z1)].sort((a, b) => a - b) as [number, number];
   return { lo: lu[0], hi: lu[1], low: lu[0] <= F.u0 + 0.01 };
@@ -35,7 +35,7 @@ function laneSide(plan: PitPlan): { lo: number; hi: number; low: boolean } {
  * 坂: u0..u1 × v0..v1 の、v の向きに高さ h0 → h1（床から）。坂の面（ramp 部品）と、面の下を埋める段の箱（当たる・見える）。
  * 返り値は坂の矩形
  */
-function slope(ctx: GimmickContext, F: WallFrame, name: string, u0: number, u1: number, v0: number, v1: number, h0: number, h1: number, bottom: number, mat: MatId, visual: string): Rect {
+export function slope(ctx: GimmickContext, F: WallFrame, name: string, u0: number, u1: number, v0: number, v1: number, h0: number, h1: number, bottom: number, mat: MatId, visual: string): Rect {
   const y = ctx.slot.cell.floorY;
   const r = F.rect(u0, v0, u1, v1);
   const alongX = Math.abs(F.point(0, 1)[0] - F.point(0, 0)[0]) > 0.5;
@@ -74,7 +74,7 @@ function slopeFlow(ctx: GimmickContext, F: WallFrame, name: string, a0: number, 
 }
 
 /** 坂の横の低い壁（u = u の線、v0..v1、坂の高さ h0 → h1 の上に wallH）。段ごとの箱 */
-function sideWall(ctx: GimmickContext, F: WallFrame, u: number, v0: number, v1: number, h0: number, h1: number, bottom: number, wallH: number, mat: MatId, skip?: [number, number]): void {
+export function sideWall(ctx: GimmickContext, F: WallFrame, u: number, v0: number, v1: number, h0: number, h1: number, bottom: number, wallH: number, mat: MatId, skip?: [number, number]): void {
   const y = ctx.slot.cell.floorY;
   const n = Math.max(1, Math.ceil(Math.abs(v1 - v0) / 0.3));
   for (let i = 0; i < n; i++) {
@@ -135,7 +135,7 @@ defineGimmick({
 });
 
 /** 入口の壁の座標で、u1 側（hi）/ u0 側の横の壁の外向き */
-function sideDirOf(F: WallFrame, hi: boolean): Dir {
+export function sideDirOf(F: WallFrame, hi: boolean): Dir {
   const v = dirOf(F, hi ? 1 : -1, 0);
   return Math.abs(v[0]) > 0.5 ? (v[0] > 0 ? 1 : 3) : v[2] > 0 ? 0 : 2;
 }
