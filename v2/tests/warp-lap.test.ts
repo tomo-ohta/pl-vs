@@ -115,7 +115,7 @@ function drive(room: GimmickRoom, sim: Sim): { forward(): boolean; back(): boole
 
 test('異変の廊下: 異変があれば引き返し・無ければ進むと数が増え、goal で出口の周（奥へ進める）・間違えると 0 に戻る・出口から元の部屋へ', () => {
   const kinds = new Set<string>();
-  for (const room of ROOMS.slice(0, 3)) {
+  for (const room of ROOMS) {
     const f = room.floor, ctrl = `${room.id}.lap`;
     const sim = new Sim(f, { tuning: t, physics: new PhysicsWorld(RAPIER, 1 / 60) });
     sim.teleport(0, [room.inside[0], room.cell.floorY + 0.02, room.inside[2]], faceTo(room.inside, aabbCenter(room.cell.bounds)));

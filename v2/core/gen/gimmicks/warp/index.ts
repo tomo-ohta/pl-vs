@@ -6,3 +6,5 @@ import './loopHall.ts';
 import './recedingHall.ts';
 import './anomalyHall.ts';
 import './endlessStairs.ts';
+import './lookBack.ts';
+import './fourRights.ts';

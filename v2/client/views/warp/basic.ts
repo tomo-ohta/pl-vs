@@ -29,7 +29,7 @@ export function swapView(spec: EntitySpec, ctx: ViewContext, slotsKey = 'slots')
   const slots = (spec.params[slotsKey] as unknown as { variants: PartBox[][] }[] | undefined) ?? [];
   const groups: { group: THREE.Group; dispose(): void }[][] = slots.map((slot) => slot.variants.map((boxes) => {
     const cell = cellOfBoxes(ctx.built, boxes, spec.cell);
-    const g = cellBoxes(ctx.materials, ctx.built, boxes, cell);
+    const g = cellBoxes(ctx.materials, ctx.built, boxes.filter((b) => b.mat !== 'colliderOnly'), cell);
     g.group.visible = false;
     ctx.root.add(g.group);
     return g;
@@ -42,9 +42,15 @@ export function swapView(spec: EntitySpec, ctx: ViewContext, slotsKey = 'slots')
 
 defineView('swapSet', (spec, ctx) => {
   const v = swapView(spec, ctx);
+  // 変わったとき、その場所で小さな物音（params.sound: 'none' で鳴らさない）。背後で何かが動いた気配
+  const sound = typeof spec.params.sound === 'string' ? spec.params.sound : 'thud';
+  const off = sound === 'none' ? undefined : ctx.onEvent?.((e) => {
+    if (e.type !== 'cue' || e.entity !== spec.id || e.data?.name !== 'swap.change') return;
+    ctx.audio?.play(sound, { pos: e.pos, gain: 0.18, lowpassHz: 900 });
+  });
   return {
     update(s) { v.update((s.cur as number[] | undefined) ?? []); },
-    dispose() { v.dispose(); },
+    dispose() { off?.(); v.dispose(); },
   };
 });
 

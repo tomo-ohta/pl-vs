@@ -6,11 +6,12 @@
  *   mode  … 'input'（入力 t<i> の値の組にする。配線が無ければ init のまま）/ 'random'（一度見られたあと、見ていない間に別の組へ）
  *   minUnseen … 見ていない時間がこれだけ続いたら差し替える（秒）
  *   chance … random のとき、差し替える機会ごとの確率
+ *   every … 見え方を調べる間隔（tick。既定 4）
  * outputs: changes（差し替えた回数）・v<i>（区画 i の今の組）
  *
  * 当たる箱（solid）は動く当たり判定に置く。差し替えた先の当たる箱にプレイヤーが重なるときは差し替えない
  */
-import type { AABB } from '../../../math/aabb.ts';
+import { aabbCenter, type AABB } from '../../../math/aabb.ts';
 import type { Json } from '../../../world/layout.ts';
 import { definePart, pNum, pStr, type PartContext } from '../../part.ts';
 import { readAabb, seenBy } from './util.ts';
@@ -35,13 +36,13 @@ function overlapsPlayer(ctx: PartContext, boxes: SwapBox[]): boolean {
   return ctx.players.some((p) => boxes.some((b) => b.solid && p.pos[0] + 0.4 > b.min[0]! && p.pos[0] - 0.4 < b.max[0]! && p.pos[2] + 0.4 > b.min[2]! && p.pos[2] - 0.4 < b.max[2]! && p.pos[1] + 1.8 > b.min[1]! && p.pos[1] < b.max[1]!));
 }
 
-definePart<{ cur: number[]; seen: number[]; unseen: number[]; changes: number }>({
+definePart<{ cur: number[]; seen: number[]; unseen: number[]; vis: number[]; changes: number }>({
   type: 'swapSet',
   init(ctx) {
     const slots = slotsOf(ctx.spec.params.slots);
     const cur = slots.map((s) => s.init);
     slots.forEach((s, i) => setVariant(ctx, i, s, cur[i]!, cur[i]!));
-    return { cur, seen: slots.map(() => 0), unseen: slots.map(() => 0), changes: 0 };
+    return { cur, seen: slots.map(() => 0), unseen: slots.map(() => 0), vis: slots.map(() => 1), changes: 0 };
   },
   step(s, ctx) {
     const slots = slotsOf(ctx.spec.params.slots);
@@ -49,9 +50,15 @@ definePart<{ cur: number[]; seen: number[]; unseen: number[]; changes: number }>
     const minUnseen = pNum(ctx.spec, 'minUnseen', 0.3);
     const chance = pNum(ctx.spec, 'chance', 1);
     const sight = ctx.sightClear?.bind(ctx);
+    // 見え方は every tick ごとに調べる（見通しの検査は重いので）。間の tick は前の結果
+    const every = Math.max(1, Math.round(pNum(ctx.spec, 'every', 4)));
+    const check = ctx.tick % every === 0;
+    s.vis ??= slots.map(() => 1);
     slots.forEach((slot, i) => {
-      const seen = ctx.players.some((p) => seenBy(p, slot.region, sight));
-      if (seen) { s.seen[i] = 1; s.unseen[i] = 0; } else s.unseen[i] = (s.unseen[i] ?? 0) + ctx.dt;
+      if (check) s.vis[i] = ctx.players.some((p) => seenBy(p, slot.region, sight)) ? 1 : 0;
+      const seen = !!s.vis[i];
+      // 見られた印は、実際に調べた tick だけ付ける（調べる前の既定の「見えている」では付けない。一度も見ていない物は変えない）
+      if (seen) { if (check) s.seen[i] = 1; s.unseen[i] = 0; } else s.unseen[i] = (s.unseen[i] ?? 0) + ctx.dt;
       const cur = s.cur[i] ?? 0;
       let want = cur;
       if (mode === 'random') {
@@ -60,10 +67,13 @@ definePart<{ cur: number[]; seen: number[]; unseen: number[]; changes: number }>
           if (ctx.random() < chance) want = (cur + 1 + Math.floor(ctx.random() * (slot.variants.length - 1))) % slot.variants.length;
         }
       } else if (ctx.wired(`t${i}`)) want = Math.max(0, Math.min(slot.variants.length - 1, Math.round(ctx.input(`t${i}`))));
-      if (want !== cur && !seen && (s.unseen[i] ?? 0) >= minUnseen && !overlapsPlayer(ctx, slot.variants[want] ?? [])) {
+      // 差し替える直前には見え方を調べ直す（間の tick に視野へ入っていたら差し替えない）
+      const fresh = (): boolean => check || !ctx.players.some((p) => seenBy(p, slot.region, sight));
+      if (want !== cur && !seen && (s.unseen[i] ?? 0) >= minUnseen && !overlapsPlayer(ctx, slot.variants[want] ?? []) && fresh()) {
         setVariant(ctx, i, slot, cur, want);
         s.cur[i] = want;
         s.changes++;
+        ctx.cue("swap.change", aabbCenter(slot.region), { slot: i, variant: want });
       }
       ctx.output(`v${i}`, s.cur[i] ?? 0);
     });

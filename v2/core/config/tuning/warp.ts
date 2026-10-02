@@ -36,4 +36,12 @@ export const WARP_TUNING = {
   'warp.recede.rate': num(0.5, 0, 3, '遠ざかる廊下: 1 m 歩くごとに残りの距離が伸びる量（m。v1 E13 と同じ 0.5）'),
   'warp.recede.widthM': num(2.4, 1.8, 3.2, '遠ざかる廊下: 廊下の幅（壁を含む）'),
   'warp.recede.heightM': num(2.7, 2.4, 3.2, '遠ざかる廊下: 天井の高さ'),
+  // ---- 振り返ると変わる（lookBack: O05）
+  'warp.lookBack.weight': num(0.6, 0, 10, '振り返ると変わる: 出やすさ（相対）'),
+  'warp.lookBack.booths': num(6, 3, 8, '振り返ると変わる: 壁沿いの小部屋の数（多くて）', true),
+  'warp.lookBack.unseenSec': num(0.6, 0.1, 5, '振り返ると変わる: 小部屋から目を離してこの秒数で別の場面に変わる'),
+  // ---- 4 回曲がっても戻らない（fourRights: W13）
+  'warp.fourRights.weight': num(0.5, 0, 10, '4 回曲がっても戻らない: 出やすさ（相対）'),
+  'warp.fourRights.ringM': num(1.5, 1.1, 2.2, '4 回曲がっても戻らない: 真ん中の塊のまわりの通路の幅（m）'),
+  'warp.fourRights.secretWeight': num(1.5, 0, 5, '4 回曲がっても戻らない: 隠しの元（1 周回ると現れる扉）の重み'),
 } as const satisfies Record<string, Spec>;

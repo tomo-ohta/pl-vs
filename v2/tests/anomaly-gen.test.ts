@@ -176,7 +176,8 @@ test('異変: それぞれ見て分かる形になっている（浸水の水・
           break;
         case 'upsideDown':
           assert.ok(c.boxes.some((b) => b.solid && b.propGroup && (b.min[1] + b.max[1]) / 2 > fy + c.height / 2), `${msg}: 天井の側に付いた家具`);
-          assert.ok(c.boxes.some((b) => b.mat === c.palette.light && !b.solid && b.max[1] < fy + 0.1), `${msg}: 床の照明`);
+          // 床の照明（天井の照明の無い暗い部屋では、逆さまにする照明が無い）
+          if (c.boxes.some((b) => b.mat === c.palette.light && !b.solid)) assert.ok(c.boxes.some((b) => b.mat === c.palette.light && !b.solid && b.max[1] < fy + 0.1), `${msg}: 床の照明`);
           break;
         case 'stack': {
           // 積まれた家具: 別の家具の上（8 cm 以内）に載った当たる箱があり、その底が床から 0.4 m より上
