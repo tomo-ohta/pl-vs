@@ -102,7 +102,10 @@ test('oddity: 触れられる異変の振る舞い（虚空・雪の足跡・波
     const r = showcase('sea')!;
     const a = r.anomalies.find((x) => x.def === 'sea')!;
     const w = r.floor.entities.find((e) => e.id === `${a.id}.waves`)!;
-    const zb = w.params.aabb as { min: number[]; max: number[] };
+    // 押す範囲（開口の前は押さないので、いちばん広い範囲）
+    type B = { min: number[]; max: number[] };
+    const area = (q: B): number => (q.max[0]! - q.min[0]!) * (q.max[2]! - q.min[2]!);
+    const zb = ((w.params.aabbs as B[] | undefined) ?? [w.params.aabb as B]).slice().sort((p, q) => area(q) - area(p))[0]!;
     const v = w.params.vector as number[];
     const s = sim(r);
     const cell = r.floor.cells.find((c) => c.id === a.cell)!;

@@ -12,7 +12,7 @@
  * - oddWaves: 寄せては返す波（E10）。period 秒ごとに surge 秒だけ、浜へ押し戻す外力（force ゾーン）を置く
  */
 import type { Vec3 } from '../../../math/vec.ts';
-import type { Json } from '../../../world/layout.ts';
+import type { EntitySpec, Json } from '../../../world/layout.ts';
 import type { AABB } from '../../../math/aabb.ts';
 import type { PlayerState } from '../../types.ts';
 import { definePart, pAabb, pNum, playerIn, type PartContext } from '../../part.ts';
@@ -135,7 +135,13 @@ definePart<{ touched: number }>({
   },
 });
 
-definePart<{ t: number; push: number }>({
+/** params[key] の i 番目の箱 */
+function pAabbAt(spec: EntitySpec, key: string, i: number): AABB {
+  const o = (spec.params[key] as { min: number[]; max: number[] }[])[i]!;
+  return { min: [o.min[0]!, o.min[1]!, o.min[2]!], max: [o.max[0]!, o.max[1]!, o.max[2]!] };
+}
+
+definePart<{ t: number; push: number; zones?: number }>({
   type: 'oddWaves',
   outputs: ['surge', 'push'],
   init: () => ({ t: 0, push: 0 }),
@@ -148,7 +154,14 @@ definePart<{ t: number; push: number }>({
     const push = s.t < surge ? 1 : 0;
     if (push !== s.push) {
       const v = ctx.spec.params.vector as number[] | undefined;
-      ctx.setZone('surge', push ? { kind: 'force', aabb: pAabb(ctx.spec, 'aabb'), vector: [v?.[0] ?? 0, 0, v?.[2] ?? 1], params: { speed: pNum(ctx.spec, 'speed', 1.4) } } : null);
+      // aabbs（開口の前を除いた押す範囲）があればそれを、無ければ aabb 1 つ
+      const list = Array.isArray(ctx.spec.params.aabbs) ? (ctx.spec.params.aabbs as Json[]).map((_, i) => pAabbAt(ctx.spec, 'aabbs', i)) : [pAabb(ctx.spec, 'aabb')];
+      const n = Math.max(list.length, s.zones ?? 0);
+      for (let i = 0; i < n; i++) {
+        const a = list[i];
+        ctx.setZone(i === 0 ? 'surge' : `surge${i}`, push && a ? { kind: 'force', aabb: a, vector: [v?.[0] ?? 0, 0, v?.[2] ?? 1], params: { speed: pNum(ctx.spec, 'speed', 1.4) } } : null);
+      }
+      s.zones = list.length;
       if (push) ctx.cue('odd.wave');
       s.push = push;
     }

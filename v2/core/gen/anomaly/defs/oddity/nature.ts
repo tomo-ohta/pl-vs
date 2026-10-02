@@ -5,6 +5,7 @@
 import type { Dir } from '../../../../math/vec.ts';
 import { along, type Rect } from '../../../../world/footprint.ts';
 import { box, type Box, type Json, type MatId } from '../../../../world/layout.ts';
+import { fillRects } from '../../../gimmicks/util.ts';
 import { defineAnomaly, type AnomalyContext } from '../../types.ts';
 import { bbOf, doorFronts, hitsAny, interiorSolids, isCeilingPanel, isFloorFixture, mainRect, mixColor, objectGroups } from '../../util.ts';
 import { addGroup, aabbJ, areaOf, blockedAt, ceilingSheet, depthFrame, entranceOnMain, facesOf, faceOfOpening, floorSheet, freeSpans, front, gridPoints, roomBox, roomFx, tops, wallSheet } from './common.ts';
@@ -265,12 +266,15 @@ defineAnomaly({
     skyCeiling(ctx, [wet]);
     ctx.addZone({ kind: 'water', aabb: { min: [shallowR.x0, fy - 0.1, shallowR.z0], max: [shallowR.x1, fy + 0.3, shallowR.z1] }, params: { slow: 0.8, depth: 0.15 } });
     ctx.addZone({ kind: 'water', aabb: { min: [seaR.x0, fy - 0.1, seaR.z0], max: [seaR.x1, fy + deep + 0.1, seaR.z1] }, params: { slow: t['anomaly.sea.slow'], depth: deep } });
-    // 波: 寄せる間だけ浜へ押し戻す（入口の向き）
+    // 波: 寄せる間だけ浜へ押し戻す（入口の向き）。開口の前は押さない（海の側の扉を出入りするときに、横へ流されて壁に寄せられない）
     const [ox, oz] = ent.dir === 0 ? [0, 1] : ent.dir === 1 ? [1, 0] : ent.dir === 2 ? [0, -1] : [-1, 0];
+    const calm = doorFronts(cell, ctx.geo.openings, 1.4, 0.4).map((a): Rect => ({ x0: a.min[0], z0: a.min[2], x1: a.max[0], z1: a.max[2] }));
+    const pushed = fillRects(wet, calm);
     ctx.addEntity('waves', {
       type: 'oddWaves',
       params: {
         aabb: aabbJ({ min: [wet.x0, fy - 0.1, wet.z0], max: [wet.x1, fy + 1.2, wet.z1] }), vector: [ox, 0, oz], speed: t['anomaly.sea.push'], period: t['anomaly.sea.period'], surge: 2.4,
+        aabbs: pushed.map((r) => aabbJ({ min: [r.x0, fy - 0.1, r.z0], max: [r.x1, fy + 1.2, r.z1] })),
         sea: { x0: shallowR.x0, z0: shallowR.z0, x1: shallowR.x1, z1: shallowR.z1 }, dir: [ox, 0, oz], reach: 0.9, y: fy + 0.16,
       },
     });

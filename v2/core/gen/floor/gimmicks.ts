@@ -13,7 +13,7 @@ import type { Box, EntitySpec, WallOpening, Zone } from '../../world/layout.ts';
 import { reachOpenings } from '../reach.ts';
 import { attachSecret, THROUGH_DESTS, type AttachOptions, type PlacedSecret, type RareKind, type SecretDest } from '../secrets/index.ts';
 import '../gimmicks/index.ts';
-import { gimmickDefs, type GimmickContext, type GimmickDef, type GimmickSlot, type SecretMode, type SecretOffer } from '../gimmicks/types.ts';
+import { gimmickDefs, type ClueCell, type GimmickContext, type GimmickDef, type GimmickSlot, type SecretMode, type SecretOffer } from '../gimmicks/types.ts';
 import { frontOf, inward } from '../gimmicks/util.ts';
 import type { Vec3 } from '../../math/vec.ts';
 import type { FloorGeometry, GeoCell } from './geometry.ts';
@@ -69,9 +69,13 @@ function openingTo(geo: FloorGeometry, g: GeoCell, other: string): WallOpening |
  * 見本のフロア（確認用）: 仕掛けを決めた順に 1 つずつ置き、差し出された隠しを全部付ける。
  * 型を選べる隠しは存在 / 出現を交互に（flip で逆から）。仕掛けとは別の隠し（暗がり）は 1 つだけ
  */
-export interface ShowcaseOptions { gimmicks: string[]; flip?: boolean }
-/** 部屋の形（core/gen/rooms）: 見本に置く形の id（か案の番号）。無ければ形を掛けない（段階 4・rooms が足した） */
-export interface ShowcaseOptions { rooms?: string[] }
+export interface ShowcaseOptions {
+  gimmicks: string[]; flip?: boolean;
+  /** 段階 4（carry）: 選んだ仕掛けだけを見る（?try / ?group）。区画に GimmickSlot.showcase を付ける（全種の見本では付けない） */
+  pick?: boolean;
+  /** 部屋の形（core/gen/rooms）: 見本に置く形の id（か案の番号）。無ければ形を掛けない（段階 4・rooms が足した） */
+  rooms?: string[];
+}
 /** 見本のフロアの隠しの行き先（付けた順。行き先ごとの見た目・つながりを全部見られるように） */
 const SHOWCASE_DESTS: SecretDest[] = ['bFloor', 'passageRare', 'loop', 'rareRoom', 'loop', 'floorLink'];
 const SHOWCASE_RARE: RareKind[] = ['white', 'theater', 'pool', 'gallery', 'library', 'chapel', 'machine', 'play', 'garden'];
@@ -143,7 +147,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
     const entrance = onMain && idx > 0 ? openingTo(geo, g, main[idx - 1]!) : g.openings[0] ?? null;
     const exit = onMain && idx >= 0 && idx < main.length - 1 ? openingTo(geo, g, main[idx + 1]!) : g.openings.find((o) => o !== entrance) ?? null;
     const rect = g.cell.footprint.reduce((a, x) => ((x.x1 - x.x0) * (x.z1 - x.z0) > (a.x1 - a.x0) * (a.z1 - a.z0) ? x : a));
-    const slot: GimmickSlot = { cell: g.cell, kind: g.kind, openings: g.openings, main: onMain, entrance, exit, rect };
+    const slot: GimmickSlot = { cell: g.cell, kind: g.kind, openings: g.openings, main: onMain, entrance, exit, rect, ...(showcase?.pick ? { showcase: true } : {}) };
     const w = rect.x1 - rect.x0, d = rect.z1 - rect.z0;
     const fit = defs.filter((def) =>
       def.kinds.includes(g.kind) &&
@@ -176,7 +180,9 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
     }
     let def = order[0]!;
     let built: Built | null = null;
-    for (const cand of order) { built = tryBuild(cand, slot, g, geo, r, t, p, depth); if (built) { def = cand; break; } }
+    // 段階 4（carry）: 手がかりを置ける別の区画（置く順が過ぎた区画など）
+    const clue = (): ClueCell[] => clueCellsFor(geo, g, slots.slice(0, slots.indexOf(g)), result.gimmicks);
+    for (const cand of order) { built = tryBuild(cand, slot, g, geo, r, t, p, depth, clue); if (built) { def = cand; break; } }
     if (!built) continue;
     // 隠しが無いと成り立たない仕掛けは、ここで隠しを付ける（付けられなければ仕掛けごと取り消す）
     const required = built.offers.filter((o) => o.required);
@@ -192,6 +198,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
     }
     if (!ok) { built.restore(); continue; }
     keepOut.set(g.cell.id, [...(keepOut.get(g.cell.id) ?? []), ...built.keepOut]);
+    for (const [c, a] of built.keepOutOther) keepOut.set(c, [...(keepOut.get(c) ?? []), a]);
     for (const o of built.offers) if (!o.required) offers.push({ offer: o, host: g, gimmick: built.id });
     const placed = built.id;
     if (def.physics) physicsUsed++;
@@ -235,7 +242,31 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   return result;
 }
 
-interface Built { id: string; offers: SecretOffer[]; keepOut: AABB[]; restore(): void }
+interface Built { id: string; offers: SecretOffer[]; keepOut: AABB[]; restore(): void; /** 段階 4（carry）: 別の区画の家具を置かない範囲 */ keepOutOther: [string, AABB][] }
+
+/**
+ * 段階 4（carry）: 手がかりを置ける区画。置く順が過ぎて仕掛けの無い区画（before）・仕掛けを置かない区画（入口と出口の部屋・曲がり角）。
+ * 後から仕掛けで作り変わらない所だけ。階段・隠し場所は除く。仕掛けの区画から開口をたどる数の少ない順
+ */
+function clueCellsFor(geo: FloorGeometry, host: GeoCell, before: readonly GeoCell[], placed: readonly PlacedGimmick[]): ClueCell[] {
+  const busy = new Set(placed.map((x) => x.cell));
+  const hops = new Map<string, number>([[host.cell.id, 0]]);
+  const q = [host.cell.id];
+  for (let h = 0; h < q.length; h++) for (const pt of geo.portals) {
+    if (!pt.cells.includes(q[h]!)) continue;
+    const o = pt.cells[0] === q[h] ? pt.cells[1] : pt.cells[0];
+    if (!hops.has(o)) { hops.set(o, hops.get(q[h]!)! + 1); q.push(o); }
+  }
+  const earlier = new Set(before.map((x) => x.cell.id));
+  const out: ClueCell[] = [];
+  for (const c of geo.cells) {
+    if (c === host || c.cell.role === 'secret' || c.kind === 'stairs' || c.kind === 'exit' || c.kind === 'secret' || busy.has(c.cell.id) || !hops.has(c.cell.id)) continue;
+    const fixed = c.kind === 'junction' || c.cell.role === 'entry' || c.cell.role === 'exit';
+    if (!fixed && !earlier.has(c.cell.id)) continue;
+    out.push({ cell: c.cell, kind: c.kind, openings: c.openings, hops: hops.get(c.cell.id)! });
+  }
+  return out.sort((a, b) => a.hops - b.hops);
+}
 
 /** 暗がりの入口の元: 開口の無い壁の、入口から遠い端 */
 function darkCornerOffer(g: GeoCell, rng: Rng): SecretOffer | null {
@@ -254,12 +285,15 @@ function darkCornerOffer(g: GeoCell, rng: Rng): SecretOffer | null {
 }
 
 /** 仕掛けを組む。区画の開口どうしが歩いてつながらなければ取り消して null */
-function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeometry, rng: Rng, t: Tuning, p: FloorProfile, depth: number): Built | null {
+function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeometry, rng: Rng, t: Tuning, p: FloorProfile, depth: number, clue?: () => ClueCell[]): Built | null {
   const id = `g:${def.id}:${g.cell.id}`;
   const snapshot = { boxes: g.cell.boxes.slice(), lights: g.cell.lights.map((l) => ({ ...l })), zones: g.cell.zones.slice(), entities: geo.entities.length, doors: JSON.stringify(geo.entities.filter((e) => e.type === 'door' && e.cell === g.cell.id)) };
   const myKeep: AABB[] = [];
   const myOffers: SecretOffer[] = [];
   const assist: Box[] = [];
+  // 段階 4（carry）: 別の区画に足した箱（取り消しのときに戻す）と、その区画の家具を置かない範囲
+  const touched = new Map<string, { g: GeoCell; boxes: Box[] }>();
+  const keepOther: [string, AABB][] = [];
   let added = 0;
   const ctx: GimmickContext = {
     slot, rng, tuning: t, id,
@@ -276,6 +310,18 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
     },
     removeBoxes(pred) { g.cell.boxes = g.cell.boxes.filter((b) => !pred(b)); },
     reachAssist(b) { assist.push(b); },
+    ...(clue ? {
+      clueCells: clue,
+      addToCell(cellId: string, b: Box): Box {
+        const o = geo.cells.find((x) => x.cell.id === cellId);
+        if (!o) throw new Error(`区画がありません: ${cellId}`);
+        if (!touched.has(cellId)) touched.set(cellId, { g: o, boxes: o.cell.boxes.slice() });
+        o.cell.boxes.push(b);
+        added++;
+        return b;
+      },
+      keepOutIn(cellId: string, a: AABB): void { keepOther.push([cellId, a]); },
+    } : {}),
   };
   def.build(ctx);
   const openingsBefore = g.openings.length;
@@ -293,6 +339,7 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
     geo.exits.length = exitsBefore;
     const doors = JSON.parse(snapshot.doors) as EntitySpec[];
     for (const d of doors) { const e = geo.entities.find((x) => x.id === d.id); if (e) { e.params = d.params; if (d.inputs) e.inputs = d.inputs; else delete e.inputs; } }
+    for (const x of touched.values()) x.g.cell.boxes = x.boxes;
   };
   if (!added) { restore(); return null; }
   // 閉じ込めない: 開口どうしが歩いてつながる（部品が作る床は reachAssist で足す）
@@ -300,5 +347,13 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
     const reach = reachOpenings({ footprint: g.cell.footprint, floorY: g.cell.floorY, boxes: assist.length ? [...g.cell.boxes, ...assist] : g.cell.boxes }, g.openings, 0.1);
     if (reach && reach.blocked.length) { restore(); return null; }
   }
-  return { id, offers: myOffers, keepOut: myKeep, restore };
+  // 段階 4（carry）: 手がかりを足した別の区画も、開口どうしが歩いてつながる（足す前より届かない開口が増えない）
+  for (const x of touched.values()) {
+    if (x.g.openings.length < 2) continue;
+    const after = reachOpenings(x.g.cell, x.g.openings, 0.1)?.blocked.length ?? 0;
+    if (!after) continue;
+    const before = reachOpenings({ ...x.g.cell, boxes: x.boxes }, x.g.openings, 0.1)?.blocked.length ?? 0;
+    if (after > before) { restore(); return null; }
+  }
+  return { id, offers: myOffers, keepOut: myKeep, restore, keepOutOther: keepOther };
 }

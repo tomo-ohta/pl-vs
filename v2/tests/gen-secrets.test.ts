@@ -76,7 +76,8 @@ test('隠し: 入口には扉がある・行き先がばらける・隠しが 2 
 test('謎のパズル: 手がかりの順にボタンを押すと扉が現れる（間違えると現れない）', async () => {
   const R = await loadRapier();
   let solved = 0;
-  for (let w = 1; w <= 60 && solved < 4; w++) {
+  // 段階 4（carry）: パズルの種類が増えて謎のパズルの出る割合が下がったので、探すフロアを 60 → 400 に
+  for (let w = 1; w <= 400 && solved < 4; w++) {
     const r = generateFloorReport({ world: w, depth: 2, variant: 0 }, t);
     const sec = r.gimmicks?.secrets.find((s) => s.hook === 'puzzle.sequence');
     if (!sec) continue;
@@ -121,6 +122,13 @@ test('細い道: 落ちた先の隠し部屋まで歩いて行ける（存在型
     if (!sec) continue;
     n++;
     const sim = new Sim(r.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
+    // 段階 4（carry）: スイッチで開く扉は開いたままにする（歩く人はスイッチを探さない。gen-walk の prepare と同じ）
+    const wired = r.floor.entities.filter((e) => e.type === 'door' && e.inputs?.open).map((e) => e.id);
+    const step = sim.step.bind(sim);
+    (sim as unknown as { step: typeof sim.step }).step = (c) => {
+      for (const id of wired) { const st = sim.stateOf(id) as { angle: number; target: number }; st.angle = 1; st.target = 1; }
+      step(c);
+    };
     const res = walkTo(sim, sec.cell);
     if (res.ok) ok++;
     else console.log(`  ${r.floor.id}: ${res.reason}`);

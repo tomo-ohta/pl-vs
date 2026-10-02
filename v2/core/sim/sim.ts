@@ -306,6 +306,7 @@ export class Sim implements PlayerWorld {
       setRespawn(player, at) {
         player.respawn = { pos: [...at.pos], yaw: at.yaw };
       },
+      colliders: this.colliders,
     };
   }
 

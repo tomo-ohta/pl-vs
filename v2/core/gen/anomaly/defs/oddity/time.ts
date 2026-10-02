@@ -64,6 +64,11 @@ defineAnomaly({
     // 夜の灯り: 天井の照明と点光源（夜に点く）。日の光: 窓の前の点光源（昼に明るい）
     for (const b of cell.boxes) if (isCeilingPanel(cell, b)) b.kind = `lamp:${night}`;
     for (const l of cell.lights) l.lampId = night;
+    // 点光源の無い部屋（天井の照明が焼き込みだけ）でも、夜に点く灯りを 1 つ置く（夜は焼き込みの照明も消えるので真っ暗になる）
+    if (!cell.lights.length) {
+      const m = mainRect(cell);
+      cell.lights.push({ pos: [(m.x0 + m.x1) / 2, fy + h - 0.3, (m.z0 + m.z1) / 2], color: cell.palette.lightColor, intensity: 0.8, distance: 9, lampId: night });
+    }
     for (const p of panes) {
       const cx = (p.min[0]! + p.max[0]!) / 2, cz = (p.min[2]! + p.max[2]!) / 2, f = p.f;
       const pos: [number, number, number] = p.dir < 0 ? [cx, fy + h - 0.8, cz] : [cx + (f.horizontal ? 0 : f.inward * 1.1), fy + 1.7, cz + (f.horizontal ? f.inward * 1.1 : 0)];

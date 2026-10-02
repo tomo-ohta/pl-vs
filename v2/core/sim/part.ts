@@ -15,6 +15,7 @@ import type { EntitySpec, FloorLayout, Json, SupportSurface, Zone } from '../wor
 import type { Tuning } from '../config/tuning.ts';
 import type { PhysicsWorld } from '../physics/world.ts';
 import type { PlayerState, SimEvent } from './types.ts';
+import type { ColliderIndex } from './collision.ts';
 
 /** 部品の状態（JSON にできる値の入れ物） */
 export type PartState = { [k: string]: Json | undefined };
@@ -66,6 +67,8 @@ export interface PartContext {
   warp(player: PlayerState, pos: Vec3, yaw?: number, seamless?: boolean): void;
   /** チェックポイントを変える */
   setRespawn(player: PlayerState, at: { pos: Vec3; yaw: number }): void;
+  /** 段階 4（carry）: 当たり判定（静的な箱と、部品が置いた動く箱。読むだけ）。置く物の支え・投げた物の当たりに使う */
+  readonly colliders: ColliderIndex;
 }
 
 export interface PartDef<S extends PartState = PartState> {

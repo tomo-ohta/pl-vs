@@ -3,7 +3,7 @@
  * - URL: `?seed=` 世界の seed / `?depth=` 始める深さ / `?variant=1` 裏のフロアから始める / `?tune=キー=値,…` 調整表の上書き /
  *   `?nolock=1` Pointer Lock を使わない（自動テスト向け）
  * - `?lab=1` 段階 1 の実験場（core/lab/lab.ts） / `?nodress=1` 区画の中身（家具）を置かない
- * - `?showcase=1` / `?showcase=2` 見本のフロア: 仕掛けを全種 1 つずつ・隠しを全部付けたフロア（2 は隠しの型が逆）。
+ * - `?showcase=1` / `?showcase=2` 見本のフロア: 段階 3 の仕掛け 14 種を 1 つずつ・隠しを全部付けたフロア（2 は隠しの型が逆）。
  *   G で次の仕掛けの入口へ移る（Shift+G で前へ）。`?dev=1` なら、ふつうのフロアでも G が使える
  * - `?try=id,id` 指定した仕掛け・異変だけを置いた見本のフロア / `?group=<担当>` 担当（core/gen/catalog）の仕掛け・異変を全部置いた見本
  * - 地図と図鑑（client/map/MapController）: M キー / 地図ボタンでメニューの地図のタブ。フロアを読むたびに setFloor

@@ -126,7 +126,10 @@ test('崩れる床: 乗り続けると揺れて落ち、穴の底へ落ちる。
   for (const room of ROOMS.crumbleFloor.slice(0, 6)) {
     const tiles = room.floor.entities.filter((e) => e.type === 'crumbleTile' && e.cell === room.cell.id);
     assert.ok(tiles.length >= 6, `${room.cell.id}: 床板 ${tiles.length}`);
-    const tile = tiles[Math.floor(tiles.length / 2)]!;
+    // 真ん中あたりの、大きさが揃った床板（部屋の端の細い切れ端に立つと、隣の崩れない床に乗ったままになる）
+    const area = (e: (typeof tiles)[number]): number => { const q = e.params.box as { min: number[]; max: number[] }; return (q.max[0]! - q.min[0]!) * (q.max[2]! - q.min[2]!); };
+    const full = tiles.filter((e) => area(e) > 0.6 * Math.max(...tiles.map(area)));
+    const tile = full[Math.floor(full.length / 2)]!;
     const b = tile.params.box as { min: number[]; max: number[] };
     const sim = await newSim(room);
     sim.teleport(0, [(b.min[0]! + b.max[0]!) / 2, room.cell.floorY + 0.02, (b.min[2]! + b.max[2]!) / 2], 0);
