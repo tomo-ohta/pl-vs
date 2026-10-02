@@ -49,11 +49,16 @@ defineGimmick({
     const R1 = ante.entry;
     const n = plan.pod.dir;
     const pod = R1.podOut.pos;
-    // P の長さ: S0 の真ん中（前へ Lp + w/2）が 3 m の刻みに乗る、4 m 以上 7 m 未満
+    // P の長さ: S0 の真ん中（前へ Lp + w/2）が 3 m の刻みに乗る、4.5 m 以上 7.5 m 未満
+    // （S の真ん中から P の奥は 3 m ほどしか見えない。P の終わりの 4 m が C0 の終わりの 4 m と同じになる長さ）
     const along = axisOf(n) === 'x' ? 0 : 2;
     const sgn = n === 0 || n === 1 ? 1 : -1;
-    let Lp = 4;
-    for (; Lp < 7; Lp += 0.05) { const c = pod[along]! + sgn * (Lp + W / 2); if (Math.abs(c / 3 - Math.round(c / 3)) < 1e-6) break; }
+    let Lp = 4.5;
+    for (let k = 0; k < 60; k++) {
+      const cand = 4.5 + k * 0.05;
+      const c = pod[along]! + sgn * (cand + W / 2);
+      if (Math.abs(c / 3 - Math.round(c / 3)) < 1e-6) { Lp = cand; break; }
+    }
     Lp = Math.round(Lp * 100) / 100;
     const f = makeFrame(pod, n);
     const y = R1.cell.floorY;

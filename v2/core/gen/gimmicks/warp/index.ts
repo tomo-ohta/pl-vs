@@ -8,3 +8,4 @@ import './anomalyHall.ts';
 import './endlessStairs.ts';
 import './lookBack.ts';
 import './fourRights.ts';
+import './cornerSwap.ts';

@@ -44,4 +44,9 @@ export const WARP_TUNING = {
   'warp.fourRights.weight': num(0.5, 0, 10, '4 回曲がっても戻らない: 出やすさ（相対）'),
   'warp.fourRights.ringM': num(1.5, 1.1, 2.2, '4 回曲がっても戻らない: 真ん中の塊のまわりの通路の幅（m）'),
   'warp.fourRights.secretWeight': num(1.5, 0, 5, '4 回曲がっても戻らない: 隠しの元（1 周回ると現れる扉）の重み'),
+  // ---- 曲がると変わる景色（cornerSwap: W07）
+  'warp.cornerSwap.weight': num(0.5, 0, 10, '曲がると変わる景色: 出やすさ（相対）'),
+  'warp.cornerSwap.passageM': num(1.7, 1.4, 2.4, '曲がると変わる景色: 扉の壁と仕切りの間の通路の幅（m）'),
+  'warp.cornerSwap.gapM': num(1.2, 1.0, 1.8, '曲がると変わる景色: 仕切りの端の切れ目の幅（m）'),
+  'warp.cornerSwap.unseenSec': num(0.5, 0.1, 5, '曲がると変わる景色: 通路と切れ目が見えなくなってこの秒数で次の部屋に変わる'),
 } as const satisfies Record<string, Spec>;
