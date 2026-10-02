@@ -4,6 +4,7 @@
  *   出力 level・full（level ≥ fullAt。latch なら入ったまま）
  * - sameValue: 配線した入力（a〜h）の値が全部同じ（四捨五入して）なら out。params.target があれば、その値でそろったときだけ
  * - valueIs: 入力 in の四捨五入が params.value なら out
+ * - carryChime: 入力 in が入った瞬間に Cue（params.name。既定 'carry.chime'）を出す（解けた・そろったの合図の音。報酬ではない）
  */
 import { definePart, pBool, pNum } from '../../part.ts';
 
@@ -49,5 +50,21 @@ definePart({
   init: () => ({}),
   step(_s, ctx) {
     ctx.output('out', Math.round(ctx.input('in')) === pNum(ctx.spec, 'value', 0) ? 1 : 0);
+  },
+});
+
+definePart<{ prev: number }>({
+  type: 'carryChime',
+  outputs: ['out'],
+  inputs: ['in'],
+  init: () => ({ prev: 0 }),
+  step(s, ctx) {
+    const v = ctx.input('in') > 0.5 ? 1 : 0;
+    if (v && !s.prev) {
+      const p = ctx.spec.params.pos;
+      ctx.cue(typeof ctx.spec.params.name === 'string' ? ctx.spec.params.name : 'carry.chime', Array.isArray(p) ? [p[0] as number, p[1] as number, p[2] as number] : undefined);
+    }
+    s.prev = v;
+    ctx.output('out', v);
   },
 });

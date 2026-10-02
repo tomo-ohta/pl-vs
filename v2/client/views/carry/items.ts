@@ -50,7 +50,8 @@ export function buildShape(P: Parts, kind: string, half: V3, mat: MatId, params:
     case 'chair': {
       const seatY = -hy + H * 0.48;
       P.box([W, 0.05, D], mat, [0, seatY, 0]);
-      P.box([W, H * 0.45, 0.05], mat, [0, seatY + H * 0.25, -hz + 0.025]);
+      // 背もたれは +z（物の前は -z: 置いた人と同じ向きを向く）
+      P.box([W, H * 0.45, 0.05], mat, [0, seatY + H * 0.25, hz - 0.025]);
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) P.box([0.035, H * 0.48, 0.035], 'metalDark', [sx * (hx - 0.03), -hy + H * 0.24, sz * (hz - 0.03)]);
       break;
     }

@@ -59,6 +59,10 @@ export interface ItemState extends PartState {
   spillT: number;
   /** 前の tick の中心（投げた物が的を通り抜けたかを、線分で見る） */
   prev: number[];
+  /** 受けの枠に置いてある（支えを見ない） */
+  slot: number;
+  /** 部品ごとのずらし（支えを見る tick を散らす） */
+  seed: number;
 }
 
 export interface CarryIndex {

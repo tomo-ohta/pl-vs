@@ -5,7 +5,8 @@
  *   置いてある物を数える。Q で置く・投げた物が枠の近くに落ちると、枠へ吸い付く（item.ts）。
  *   出力: count（合う物の数）・full（count ≥ need）・ok（全部の枠に、その枠の want に合う物）・any（何か置いてある数）・
  *   wrong（accept に合わない物の数）・weight（置いてある物の重さの和）・fill（置いた水の量の最大）・stage（運ぶと変わる物の段の最大）・
- *   aligned（合う物が need 個以上あり、全部が同じ向き。alignDeg 度以内）・place（合う物が増えた tick だけ 1）
+ *   aligned（合う物が need 個以上あり、全部が同じ向き。alignDeg 度以内）・place（合う物が増えた tick だけ 1）・
+ *   present（範囲の中の合う物の数。持っている・飛んでいる物も数える）
  * - carrySensor: 範囲（params.aabb）の中に、物を持って sec 秒いる。出力: match（want に合う物）・other（合わない物）・
  *   empty（何も持たずに）・holding（今持っているか）。latch（既定 true）なら入ったまま
  */
@@ -18,7 +19,7 @@ interface ReceiverState { occ: (string | null)[]; count: number; [k: string]: im
 
 definePart<ReceiverState>({
   type: 'carryReceiver',
-  outputs: ['count', 'full', 'ok', 'any', 'wrong', 'weight', 'fill', 'aligned', 'stage', 'place'],
+  outputs: ['count', 'full', 'ok', 'any', 'wrong', 'weight', 'fill', 'aligned', 'stage', 'place', 'present'],
   init: (ctx) => ({ occ: slotsOf(ctx.spec).map(() => null), count: 0 }),
   step(s, ctx) {
     const ix = carryIndex(ctx.floor);
@@ -30,10 +31,14 @@ definePart<ReceiverState>({
     const good: boolean[] = slots.map(() => false);
     let count = 0, wrong = 0, any = 0, weight = 0, fill = 0, stage = 0;
     const yaws: number[] = [];
+    let present = 0;
     for (const id of ix.items) {
       if (only && !only.includes(id)) continue;
       const st = ctx.stateOf(id) as ItemState | null;
-      if (!st || st.mode !== REST) continue;
+      if (!st) continue;
+      // present: 範囲の中の合う物（持っている・飛んでいる物も）
+      if (region && aabbContains(region, centerOf(st)) && tagMatch(itemCfg(ix.specs.get(id)!).tag, accept)) present++;
+      if (st.mode !== REST) continue;
       const cfg = itemCfg(ix.specs.get(id)!);
       const bx = st.poses[0]!, by = st.poses[1]! - cfg.half[1], bz = st.poses[2]!;
       let inside = false, ok = false;
@@ -67,6 +72,7 @@ definePart<ReceiverState>({
     ctx.output('fill', fill);
     ctx.output('stage', stage);
     ctx.output('aligned', aligned ? 1 : 0);
+    ctx.output('present', present);
   },
 });
 

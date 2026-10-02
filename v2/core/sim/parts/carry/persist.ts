@@ -16,7 +16,8 @@ export interface CarrySave {
   floor: string;
   gen: string;
   tune: string;
-  items: { [id: string]: [number, number, number, number] };
+  /** [x, 底の y, z, yaw]（受けの枠に置いた物は 5 つ目に 1） */
+  items: { [id: string]: number[] };
 }
 
 const r2 = (v: number): number => Math.round(v * 100) / 100;
@@ -30,7 +31,7 @@ export function carrySave(sim: Sim): CarrySave | null {
     const st = sim.stateOf(id) as ItemState | null;
     const cfg = itemCfg(ix.specs.get(id)!, sim.floor.cells);
     if (!st || !st.moved || st.mode !== REST || !cfg.persist) continue;
-    items[id] = [r2(st.poses[0]!), r2(st.poses[1]! - cfg.half[1]), r2(st.poses[2]!), r2(st.yaw)];
+    items[id] = [r2(st.poses[0]!), r2(st.poses[1]! - cfg.half[1]), r2(st.poses[2]!), r2(st.yaw), ...(st.slot ? [1] : [])];
     n++;
   }
   return n ? { v: 1, floor: sim.floor.id, gen: sim.floor.genVersion, tune: sim.floor.tuningVersion, items } : null;
@@ -45,11 +46,12 @@ export function carryRestore(sim: Sim, save: CarrySave | null | undefined): numb
     const spec = ix.specs.get(id);
     // 状態は読むだけの型で返るが、生成の直後に戻すときだけ書き換える
     const st = sim.stateOf(id) as ItemState | null;
-    if (!spec || !st || st.mode === HELD || !Array.isArray(p) || p.length !== 4 || !p.every(Number.isFinite)) continue;
+    if (!spec || !st || st.mode === HELD || !Array.isArray(p) || p.length < 4 || p.length > 5 || !p.every(Number.isFinite)) continue;
     const cfg = itemCfg(spec, sim.floor.cells);
     if (!cfg.persist) continue;
-    setRest(st, cfg, [p[0], p[1], p[2]], p[3]);
+    setRest(st, cfg, [p[0]!, p[1]!, p[2]!], p[3]!);
     st.moved = 1;
+    st.slot = p[4] ? 1 : 0;
     st.prev = [st.poses[0]!, st.poses[1]!, st.poses[2]!];
     if (st.handle >= 0 && sim.physics) sim.physics.placeBody(st.handle, [st.poses[0]!, st.poses[1]!, st.poses[2]!], [st.poses[3]!, st.poses[4]!, st.poses[5]!, st.poses[6]!]);
     n++;

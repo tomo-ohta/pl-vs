@@ -13,7 +13,7 @@ import '../core/sim/parts/index.ts';
 import { Sim } from '../core/sim/sim.ts';
 import type { SimEvent } from '../core/sim/types.ts';
 import { rooms, CARRY_CASES } from './carry-cases.ts';
-import { aimAt, center, cmd } from './carry-solvers.ts';
+import { aimAt, center, cmd, SOLVERS } from './carry-solvers.ts';
 
 const t = defaultTuning();
 
@@ -25,7 +25,7 @@ test('carry の描画: 全部の仕掛けの部品を描き、持つ・置く・
   const R = await loadRapier();
   const drawn = new Set<string>();
   for (const c of CARRY_CASES) {
-    const list = rooms(c.def, [c.exits[0]!], [1]).slice(0, 2);
+    const list = rooms(c.def, [c.exits[0]!], [1]).slice(0, 1);
     for (const { room } of list) {
       const physics = room.floor.entities.some((e) => partDef(e.type)?.physics) ? new PhysicsWorld(R, 1 / 60) : null;
       const sim = new Sim(room.floor, { tuning: t, physics });
@@ -62,6 +62,14 @@ test('carry の描画: 全部の仕掛けの部品を描き、持つ・置く・
         sim.step([cmd({ ...b, interact: b })]);
         sim.step([cmd({ ...b, pitch: 0.6, drop: true })]);
         for (let i = 0; i < 90; i++) { sim.step([cmd(b)]); frame(); }
+      }
+      // 決めた遊び方を、描画を毎 tick 更新しながら回す（解けた後の見た目も通る）
+      const solver = SOLVERS[c.def]?.[0];
+      if (solver) {
+        const step = sim.step.bind(sim);
+        (sim as unknown as { step: typeof sim.step }).step = (cs) => { step(cs); frame(); };
+        await solver(sim, room);
+        (sim as unknown as { step: typeof sim.step }).step = step;
       }
       for (const { v } of views) v?.dispose();
       built.dispose();

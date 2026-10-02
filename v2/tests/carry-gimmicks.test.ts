@@ -62,19 +62,26 @@ for (const c of CARRY_CASES) {
         idle.physics?.dispose();
       }
       const out = (sim: Sim, o: { revealOutput?: string }): number => { const i = o.revealOutput!.lastIndexOf('.'); return sim.outputOf(o.revealOutput!.slice(0, i), o.revealOutput!.slice(i + 1)); };
-      for (const solver of appear.length ? SOLVERS[c.def] ?? [] : []) {
+      for (const solver of SOLVERS[c.def] ?? []) {
         const sim = await newSim(room);
         const want = await solver(sim, room);
+        // 'group:<組>' は仕掛けが自分で現す物（床下収納の蓋など）
+        const groups = want.filter((h) => h.startsWith('group:')).map((h) => h.slice(6));
+        // 'out:<部品>.<出力>' は出力が入っていること
+        for (const h of want.filter((x) => x.startsWith('out:'))) { const k = h.lastIndexOf('.'); groups.length; if (sim.outputOf(h.slice(4, k), h.slice(k + 1)) < 0.5) want.push('（出力が入らない）'); }
         const hit = appear.filter((o) => want.includes(o.hook));
-        if (!want.some((h) => h.startsWith('（')) && !hit.length) { sim.physics?.dispose(); continue; }
-        if (!hit.length || !hit.every((o) => out(sim, o) > 0.5)) fails.push(`${tag}: 解いても現れない（${want.join(', ')}）`);
+        const outs = want.filter((h) => h.startsWith('out:'));
+        if (!want.some((h) => h.startsWith('（')) && !hit.length && !groups.length && !outs.length) { sim.physics?.dispose(); continue; }
+        if (want.some((h) => h.startsWith('（')) || (!hit.length && !groups.length && !outs.length) || !hit.every((o) => out(sim, o) > 0.5) || !groups.every((g) => sim.isRevealed(g))) fails.push(`${tag}: 解いても現れない（${want.join(', ')}）`);
         else solved++;
         sim.physics?.dispose();
       }
-      for (const anti of appear.length ? ANTI[c.def] ?? [] : []) {
+      for (const anti of ANTI[c.def] ?? []) {
         const sim = await newSim(room);
         const not = await anti(sim, room);
         for (const o of appear.filter((x) => not.includes(x.hook))) if (out(sim, o) > 0.5) fails.push(`${tag}: 普通の遊び方なのに現れる ${o.hook}`);
+        for (const g of not.filter((h) => h.startsWith('group:')).map((h) => h.slice(6))) if (sim.isRevealed(g)) fails.push(`${tag}: 普通の遊び方なのに現れる ${g}`);
+        for (const h of not.filter((x) => x.startsWith('out:'))) { const k = h.lastIndexOf('.'); if (sim.outputOf(h.slice(4, k), h.slice(k + 1)) > 0.5) fails.push(`${tag}: 普通の遊び方なのに入る ${h}`); }
         sim.physics?.dispose();
       }
     }

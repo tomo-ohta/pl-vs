@@ -24,25 +24,55 @@ export const CARRY_CATALOG: CatalogEntry[] = [
     idea: 'I03', name: '本を集める', status: 'done', impl: [{ kind: 'gimmick', id: 'bookCollect' }, { kind: 'part', id: 'collectSet' }],
     note: '書庫の床一面に本（6〜10 冊）。歩いて上を通ると拾う（操作は要らない。腕の中に積み上がる）。奥に返却台。全部そろうと台の灯りがつく（記録が埋まる感じ。報酬ではない）。拾う操作を E にしなかったのは、BI03 の「1 冊も拾わない」を遊びにするため',
   },
-  { idea: 'I04', name: '椅子を戻す', status: 'deferred', impl: [], note: WIP },
-  { idea: 'I05', name: '鍵ではない鍵', status: 'deferred', impl: [], note: WIP },
-  { idea: 'I06', name: '落とし物を届ける', status: 'deferred', impl: [], note: WIP },
-  { idea: 'I07', name: '電球を付け替える', status: 'deferred', impl: [], note: WIP },
-  { idea: 'I08', name: '物を置くと増える', status: 'deferred', impl: [], note: WIP },
+  {
+    idea: 'I04', name: '椅子を戻す', status: 'done', impl: [{ kind: 'gimmick', id: 'chairRoom' }],
+    note: '机の並んだ教室に椅子が散らばる（向きもばらばら）。机の後ろの床に椅子の印。拾って印に置くと吸い付いて机の方を向く。全部そろうとチャイム（片付いた合図。報酬ではない）。押すのではなく持ち上げて運ぶ形にした（スマホでも同じ操作）',
+  },
+  {
+    idea: 'I05', name: '鍵ではない鍵', status: 'done', impl: [{ kind: 'gimmick', id: 'keycardGate' }, { kind: 'part', id: 'carrySensor' }],
+    note: '壁際に改札（機械 2 台・赤い読み取り口）。同じフロアの別の部屋（clueCells）に社員証か切符が落ちている。持って改札の間に立つと読み取り口が緑になり、扉の板が消えて壁が開く（出現型・必ず付ける）。行き先が通り抜けなら近道になる。廊下にも置ける',
+  },
+  {
+    idea: 'I06', name: '落とし物を届ける', status: 'done', impl: [{ kind: 'gimmick', id: 'lostItem' }],
+    note: '机の上と壁に色の名札がある部屋（脇道の部屋）。同じ色の札の傘・鞄・人形が、別の部屋（2 つ以上先）に落ちている。机の上に置くと壁が開く（出現型・必ず付ける）。部屋は扉の向こうなので、名札の色を探して扉を開けて回る',
+  },
+  {
+    idea: 'I07', name: '電球を付け替える', status: 'done', impl: [{ kind: 'gimmick', id: 'bulbRoom' }],
+    note: '照明が全部消えた部屋（懐中電灯で進める）。真ん中の電気スタンドの受け口が空。別の部屋の電球を運んで差すと、部屋じゅうの照明がつく。隠し: 暗がりの壁の扉（存在型 = 暗くて見えない / 出現型 = 明るくなると現れる）',
+  },
+  {
+    idea: 'I08', name: '物を置くと増える', status: 'done', impl: [{ kind: 'gimmick', id: 'replicaRoom' }, { kind: 'part', id: 'replicaField' }],
+    note: '手前の部屋（隣の区画）の小さな台に何か置いてから扉を開けると、この部屋の床一面に同じ物がずらりと並ぶ（並ぶのは部屋に誰もいない間に）。並んだ列の間に扉が現れる（出現型）。台の脇に置けそうな物（コップ・花瓶 …）があるが、ほかの仕掛けの物（バケツ・椅子）を置けばそれで埋まる',
+  },
   {
     idea: 'I09', name: '置いた物が残る', status: 'done',
     impl: [{ kind: 'part', id: 'carryItem' }, { kind: 'part', id: 'carryBody' }, { kind: 'client', id: 'client/views/carry/persist.ts' }],
     note: '動かして置いた物の位置をフロアの id ごとに保存（localStorage。core/sim/parts/carry/persist.ts の carrySave / carryRestore）。次に同じフロアを作ったら、生成の後に部品の状態へ戻す（core は決定的なまま）。保存は {部品 id: [x, 底の y, z, yaw]} だけで小さい。フロアの id・生成器と調整表の版が違えば戻さない',
   },
-  { idea: 'I10', name: '重さで開く', status: 'deferred', impl: [], note: WIP },
-  { idea: 'I11', name: '運ぶと変わる物', status: 'deferred', impl: [], note: WIP },
+  {
+    idea: 'I10', name: '重さで開く', status: 'done', impl: [{ kind: 'gimmick', id: 'weightHatch' }],
+    note: '壁際の床に蓋、離れた所に金属の板。板に乗っている間だけ蓋が左右へずれて開く（降りると閉まり、走っても間に合わない）。重い木箱（か軽い箱 2 つ）を板に載せると開いたままになり、穴の階段の下の壁に扉（存在型）。穴の中に人がいる間は閉まらない',
+  },
+  {
+    idea: 'I11', name: '運ぶと変わる物', status: 'done', impl: [{ kind: 'gimmick', id: 'homeObject' }, { kind: 'part', id: 'carryItem' }],
+    note: '台の上のコップ。持って歩くと carry.home.stageM m ごとに形が変わる（コップ → 花瓶 → 鳥の置物 → 鍵。変わるたびに鈴の音）。鍵になってから元の台に戻すと台の横の壁が開く（出現型）。元の部屋の物（homeObject）の変種 morph',
+  },
   // ---- 4.7 裏の振る舞い: 物を運ぶ・置く ----
   { idea: 'BI01', name: '水を一滴もこぼさず満杯で運ぶ → 台が沈んで扉', status: 'done', impl: [{ kind: 'gimmick', id: 'carryWater' }], note: '満杯（一度もこぼさず）で注ぐと台が沈み、台の横に扉が現れる（出現型 carry.water.full）。こぼさずに運ぶにはしゃがみ歩き（スマホなら少しだけ倒した移動）でゆっくり。普通に歩くと少しこぼれるので現れない（試験で確かめる）' },
   { idea: 'BI02', name: '待つ扉で違う荷物を持って待つ → 別の扉', status: 'done', impl: [{ kind: 'gimmick', id: 'parcelGate' }], note: '違う色の荷物を持って枠で待つと、受け取り口ではなく別の壁の「返品口」が開く（出現型 carry.parcel.wrong。付けば）' },
   { idea: 'BI03', name: '本を 1 冊も集めない / 全部集める → それぞれ別の扉', status: 'done', impl: [{ kind: 'gimmick', id: 'bookCollect' }], note: '全部集めて返却台の前 → 台の横の扉（carry.books.all）/ 1 冊も拾わずに返却台まで行く → 別の壁の扉（carry.books.none）。本は返却台までの道に散らばり、拾わずに行ける細い道が必ず 1 本ある（生成で道を先に決め、本を道から離す）' },
-  { idea: 'BI04', name: '椅子を全部どかす → 床下収納', status: 'deferred', impl: [], note: WIP },
-  { idea: 'BI05', name: '物を全部同じ向きにそろえる → 壁の一部がずれる', status: 'deferred', impl: [], note: WIP },
-  { idea: 'BI06', name: '拾った物を元の部屋に戻す → 戻した部屋に新しい扉', status: 'deferred', impl: [], note: WIP },
+  {
+    idea: 'BI04', name: '椅子を全部どかす → 床下収納', status: 'done', impl: [{ kind: 'gimmick', id: 'chairRoom' }],
+    note: '椅子を全部、部屋の外へ運び出すと、壁際の床の蓋（継ぎ目の線が目印）が沈んで開き、階段の下の壁に扉（存在型）。片付けて印に戻すだけでは開かない（試験で確かめる）',
+  },
+  {
+    idea: 'BI05', name: '物を全部同じ向きにそろえる → 壁の一部がずれる', status: 'done', impl: [{ kind: 'gimmick', id: 'alignChairs' }],
+    note: '待合室の椅子の向きがばらばら。置くと持っていた人と同じ向き（90° 刻み）に置かれる。部屋の椅子を全部同じ向きにそろえると、壁の一部がずれて扉が現れる（出現型）',
+  },
+  {
+    idea: 'BI06', name: '拾った物を元の部屋に戻す → 戻した部屋に新しい扉', status: 'done', impl: [{ kind: 'gimmick', id: 'homeObject' }],
+    note: '台の上のオルゴール。部屋の外へ持ち出してから戻して置くと、戻した部屋に新しい扉（出現型。持てる物の出力 returned）。持ち出さずに置き直しても何も起きない。元の部屋の物（homeObject）の変種 return',
+  },
   // ---- 4.7 パズル（行き止まりの部屋。解くと隠し）----
   { idea: 'PZ01', name: '手がかりが別の部屋にある数字錠', status: 'deferred', impl: [], note: WIP },
   { idea: 'PZ02', name: '色の照明を混ぜて決まった色にする', status: 'deferred', impl: [], note: WIP },

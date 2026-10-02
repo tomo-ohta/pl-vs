@@ -147,6 +147,141 @@ SOLVERS.bookCollect = [
   },
 ];
 
+/** 部屋の外（試験だけの足場）へ出る。drop なら持っている物を置く */
+function goOut(sim: Sim, room: LabRoom, drop: boolean): void {
+  const r = room.slot.rect;
+  const p: Vec3 = [r.x1 + 3, room.cell.floorY, (r.z0 + r.z1) / 2];
+  if (!(sim as unknown as { _out?: boolean })._out) {
+    sim.colliders.addStatic({ min: [r.x1 + 1.5, room.cell.floorY - 0.2, r.z0], max: [r.x1 + 6, room.cell.floorY, r.z1] });
+    (sim as unknown as { _out?: boolean })._out = true;
+  }
+  sim.teleport(0, [p[0], p[1] + 0.02, p[2]], -Math.PI / 2);
+  run(sim, 0.4);
+  if (drop) sim.step([cmd({ yaw: -Math.PI / 2, drop: true })]);
+  run(sim, 0.2);
+}
+const carryOut = (sim: Sim, room: LabRoom): void => goOut(sim, room, true);
+
+/** 椅子を全部部屋の外へ（床下収納）/ 椅子を全部同じ向きに置き直す */
+SOLVERS.chairRoom = [async (sim, room) => {
+  for (const ch of ents(room, 'carryItem', (e) => e.params.kind === 'chair')) {
+    sim.teleport(0, room.inside, 0);
+    run(sim, 0.1);
+    if (!goPick(sim, room, ch.id)) return ['（拾えない）'];
+    carryOut(sim, room);
+  }
+  run(sim, 0.5);
+  return [`group:${room.floor.entities.find((e) => e.type === 'reveal')!.params.group}`];
+}];
+SOLVERS.alignChairs = [async (sim, room) => {
+  for (const ch of ents(room, 'carryItem', (e) => e.params.kind === 'chair')) {
+    const c = center(sim, ch.id);
+    if (!goPick(sim, room, ch.id)) return ['（拾えない）'];
+    // 元の所の 0.8 m 手前（+z）に立って -z を向いて置く（同じ所に、向き 0 で）
+    const at: Vec3 = [c[0], room.cell.floorY, c[2] + 0.8];
+    if (bodyFree(sim, at)) walkTo(sim, 'room', at, 30);
+    run(sim, 0.1, { yaw: 0 });
+    sim.step([cmd({ yaw: 0.1, drop: true })]);
+    run(sim, 0.1);
+  }
+  run(sim, 0.3);
+  return ['carry.chairs.aligned'];
+}];
+
+/** 重い木箱を板に載せて、開いた穴の階段を底まで下りる */
+SOLVERS.weightHatch = [async (sim, room) => {
+  const crate = ents(room, 'carryItem', (e) => e.params.tag === 'box.heavy')[0]!;
+  const plate = ents(room, 'carryReceiver')[0]!;
+  const reg = plate.params.region as { min: number[]; max: number[] };
+  const pc: Vec3 = [(reg.min[0]! + reg.max[0]!) / 2, room.cell.floorY, (reg.min[2]! + reg.max[2]!) / 2];
+  if (!goPick(sim, room, crate.id)) return ['（拾えない）'];
+  if (!goPlace(sim, room, pc, undefined, 1.05)) return ['（置けない）'];
+  run(sim, 2.5);
+  const open = room.floor.entities.find((e) => e.id.endsWith('.open'))!;
+  if (sim.outputOf(open.id, 'out') < 0.5) return ['（開かない）'];
+  const zone = ents(room, 'zoneSensor', (e) => e.id.endsWith('.inPit'))[0]!.params.aabb as { min: number[]; max: number[] };
+  // 底（扉の前）へ: 穴の中の、壁際の床
+  const bottom: Vec3 = [(zone.min[0]! + zone.max[0]!) / 2, zone.min[1]! + 0.2, (zone.min[2]! + zone.max[2]!) / 2];
+  walkTo(sim, 'room', bottom, 60);
+  run(sim, 2);
+  if (sim.players[0]!.pos[1] > room.cell.floorY - 1.5) return ['（底へ下りられない）'];
+  return [`out:${open.id}.out`];
+}];
+
+/** 社員証・切符を拾って改札の間に立つ */
+SOLVERS.keycardGate = [async (sim, room) => {
+  const key = ents(room, 'carryItem', (e) => e.id.endsWith('.key'))[0]!;
+  const gate = ents(room, 'carrySensor')[0]!;
+  if (!goPick(sim, room, key.id)) return ['（拾えない）'];
+  const c = frameCenter(gate);
+  if (!holdAt(sim, room, [c[0], room.cell.floorY, c[2]], 1)) return ['（改札へ行けない）'];
+  return ['carry.keycard'];
+}];
+/** 落とし物を拾って、名札の机に置く */
+SOLVERS.lostItem = [async (sim, room) => {
+  const item = ents(room, 'carryItem', (e) => e.id.endsWith('.lost'))[0]!;
+  const desk = ents(room, 'carryReceiver')[0]!;
+  if (!goPick(sim, room, item.id)) return ['（拾えない）'];
+  if (!goPlace(sim, room, slotPos(desk))) return ['（置けない）'];
+  run(sim, 0.3);
+  return ['carry.lost.returned'];
+}];
+/** 電球を拾って、電気スタンドの受け口に差す */
+SOLVERS.bulbRoom = [async (sim, room) => {
+  const bulb = ents(room, 'carryItem', (e) => e.params.kind === 'bulb')[0]!;
+  const socket = ents(room, 'carryReceiver')[0]!;
+  if (!goPick(sim, room, bulb.id)) return ['（拾えない）'];
+  if (!goPlace(sim, room, slotPos(socket))) return ['（差せない）'];
+  run(sim, 0.5);
+  const lit = room.floor.entities.find((e) => e.id.endsWith('.lit'))!;
+  return ['carry.bulb.lit', `out:${lit.id}.out`];
+}];
+
+/** 台に物を置いて、部屋の外へ出る（戻ると並んでいる） */
+SOLVERS.replicaRoom = [async (sim, room) => {
+  const thing = ents(room, 'carryItem', (e) => e.id.endsWith('.thing'))[0]!;
+  const ped = ents(room, 'carryReceiver')[0]!;
+  if (!goPick(sim, room, thing.id)) return ['（拾えない）'];
+  if (!goPlace(sim, room, slotPos(ped))) return ['（置けない）'];
+  run(sim, 0.3);
+  const field = ents(room, 'replicaField')[0]!;
+  if (sim.outputOf(field.id, 'shown') > 0.5) return ['（見ている間に並んだ）'];
+  goOut(sim, room, false);
+  return ['carry.replica'];
+}];
+/** 運ぶと変わる物を、鍵になるまで持って歩いて台に戻す / 部屋の外へ持ち出してから戻して置く */
+SOLVERS.homeObject = [async (sim, room) => {
+  const thing = ents(room, 'carryItem', (e) => e.id.endsWith('.thing'))[0]!;
+  const ped = ents(room, 'carryReceiver')[0]!;
+  if (!goPick(sim, room, thing.id)) return ['（拾えない）'];
+  if (thing.params.kind === 'morph') {
+    const a = room.inside, b = farPointOf(sim, room);
+    for (let k = 0; k < 40 && sim.outputOf(thing.id, 'stage') < 3; k++) walkTo(sim, 'room', k % 2 ? a : b, 30);
+    if (sim.outputOf(thing.id, 'stage') < 3) return ['（鍵にならない）'];
+    if (!goPlace(sim, room, slotPos(ped))) return ['（戻せない）'];
+    run(sim, 0.3);
+    return ['carry.home.morph'];
+  }
+  goOut(sim, room, false);
+  sim.teleport(0, room.inside, 0);
+  run(sim, 0.3);
+  if (!goPlace(sim, room, slotPos(ped))) return ['（戻せない）'];
+  run(sim, 0.3);
+  return ['carry.home.returned'];
+}];
+
+/** 部屋の奥（入口から遠い、体を置ける点） */
+function farPointOf(sim: Sim, room: LabRoom): Vec3 {
+  const r = room.slot.rect;
+  let best: Vec3 = room.inside, bd = -1;
+  for (let x = r.x0 + 0.6; x < r.x1 - 0.5; x += 0.5) for (let z = r.z0 + 0.6; z < r.z1 - 0.5; z += 0.5) {
+    const p: Vec3 = [x, room.cell.floorY, z];
+    const d = Math.hypot(x - room.inside[0], z - room.inside[2]);
+    if (d > bd && bodyFree(sim, p)) { bd = d; best = p; }
+  }
+  return best;
+}
+
 /** 普通の遊び方（隠しが現れてはいけない）: 戻り値は、現れてはいけない隠しの元 */
 export const ANTI: Record<string, Solver[]> = {
   // 普通に歩いて運ぶと少しこぼれる → 台は沈まない
@@ -161,6 +296,45 @@ export const ANTI: Record<string, Solver[]> = {
     goPlace(sim, room, slotPos(stand), undefined, 1.1);
     run(sim, 2);
     return ['carry.water.full'];
+  }],
+  // 椅子を全部、机の後ろの印へ戻す（片付ける）→ 床下収納は開かない
+  chairRoom: [async (sim, room) => {
+    const seats = ents(room, 'carryReceiver', (e) => Array.isArray(e.params.slots))[0]!;
+    const chairs = ents(room, 'carryItem', (e) => e.params.kind === 'chair');
+    for (let i = 0; i < chairs.length; i++) {
+      if (!goPick(sim, room, chairs[i]!.id)) return [];
+      goPlace(sim, room, slotPos(seats, i));
+    }
+    run(sim, 0.5);
+    if (sim.outputOf(seats.id, 'full') < 0.5) return ['（片付けられない）'];
+    return [`group:${room.floor.entities.find((e) => e.type === 'reveal')!.params.group}`];
+  }],
+  // 板に乗ってから蓋の前へ走っても、着く前に閉まる
+  weightHatch: [async (sim, room) => {
+    const plate = ents(room, 'carryReceiver')[0]!;
+    const reg = plate.params.region as { min: number[]; max: number[] };
+    holdAt(sim, room, [(reg.min[0]! + reg.max[0]!) / 2, room.cell.floorY, (reg.min[2]! + reg.max[2]!) / 2], 1.5);
+    const zone = ents(room, 'zoneSensor', (e) => e.id.endsWith('.inPit'))[0]!.params.aabb as { min: number[]; max: number[] };
+    const c: Vec3 = [(zone.min[0]! + zone.max[0]!) / 2, room.cell.floorY, (zone.min[2]! + zone.max[2]!) / 2];
+    const near = standNear(sim, c, room.cell.floorY, 1.9);
+    if (near) walkWith(sim, near, (x) => ({ ...x, dash: true }), 30);
+    const open = room.floor.entities.find((e) => e.id.endsWith('.open'))!;
+    return sim.players[0]!.pos[1] < room.cell.floorY - 0.5 ? [] : [`out:${open.id}.out`];
+  }],
+  // 何も持たずに改札の間に立つ
+  keycardGate: [async (sim, room) => {
+    const c = frameCenter(ents(room, 'carrySensor')[0]!);
+    holdAt(sim, room, [c[0], room.cell.floorY, c[2]], 2);
+    return ['carry.keycard'];
+  }],
+  // 部屋の中で拾って、台に置き直すだけ（持ち出さない・形が変わるほど運ばない）
+  homeObject: [async (sim, room) => {
+    const thing = ents(room, 'carryItem', (e) => e.id.endsWith('.thing'))[0]!;
+    const ped = ents(room, 'carryReceiver')[0]!;
+    if (!goPick(sim, room, thing.id)) return [];
+    goPlace(sim, room, slotPos(ped));
+    run(sim, 0.3);
+    return ['carry.home.morph', 'carry.home.returned'];
   }],
   // 何も持たずに枠で待つ
   parcelGate: [async (sim, room) => {

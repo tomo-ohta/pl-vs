@@ -52,6 +52,8 @@ export interface ItemCfg {
   scatterSlot: number;
   persist: boolean;
   ball: boolean;
+  /** 支えが無くても落ちない（宙の受け口に初めから入っている物） */
+  float: boolean;
 }
 
 const CFG = new WeakMap<EntitySpec, ItemCfg>();
@@ -90,6 +92,7 @@ export function itemCfg(spec: EntitySpec, floorCells?: { id: string; bounds: AAB
     scatterSlot: Math.round(pNum(spec, 'scatterSlot', 0)),
     persist: pBool(spec, 'persist', true),
     ball: pStr(spec, 'kind', '') === 'ball' || pBool(spec, 'ball', false),
+    float: pBool(spec, 'float', false),
   };
   CFG.set(spec, c);
   return c;
@@ -230,6 +233,7 @@ function dropFrom(ctx: PartContext, s: ItemState, cfg: ItemCfg, p: PlayerState):
   const spot = placeSpot(ctx, cfg, p);
   setRest(s, cfg, spot.bottom, spot.yaw);
   s.moved = 1;
+  s.slot = spot.receiver ? 1 : 0;
   syncBody(ctx, s);
   ctx.cue(spot.receiver ? 'carry.place' : 'carry.drop', centerOf(s), data(cfg, { player: p.id, receiver: spot.receiver }));
 }
@@ -244,11 +248,13 @@ function stepHeld(ctx: PartContext, s: ItemState, cfg: ItemCfg, p: PlayerState):
     if (other && Array.isArray(other.swap) && ctx.tick - other.swapTick <= 1) {
       const sw = other.swap;
       setRest(s, cfg, [sw[0]!, sw[1]!, sw[2]!], sw[3]!);
+      s.slot = sw[4] ?? 0;
       syncBody(ctx, s);
       ctx.cue('carry.place', centerOf(s), data(cfg, { player: p.id, swap: true }));
     } else {
       const spot = placeSpot(ctx, cfg, p);
       setRest(s, cfg, spot.bottom, spot.yaw);
+      s.slot = spot.receiver ? 1 : 0;
       syncBody(ctx, s);
       ctx.cue('carry.drop', centerOf(s), data(cfg, { player: p.id }));
     }
@@ -332,6 +338,7 @@ function stepFly(ctx: PartContext, s: ItemState, cfg: ItemCfg): void {
     const speed = Math.hypot(v[0]!, v[1]!, v[2]!);
     if (sl) {
       setRest(s, cfg, sl.slot.pos, sl.slot.yaw ?? s.yaw);
+      s.slot = 1;
       ctx.cue('carry.place', centerOf(s), data(cfg, { receiver: sl.receiver, speed }));
     } else {
       setRest(s, cfg, bottom, s.yaw);
@@ -345,8 +352,9 @@ function initItem(ctx: PartContext, body: boolean): ItemState {
   const s: ItemState = {
     poses: [], yaw: 0, held: null, mode: REST, vel: [0, 0, 0], handle: -1, moved: 0, carried: 0, stage: 0,
     fill: cfg.fluid ? clamp(pNum(ctx.spec, 'fill', 0), 0, 1) : 0, spilled: 0, away: 0, last: [0, 0, 0], air: 0, swap: null, swapTick: -9,
-    flyT: 0, prevReset: 0, prevScatter: 0, spillT: 0, prev: [0, 0, 0],
+    flyT: 0, prevReset: 0, prevScatter: 0, spillT: 0, prev: [0, 0, 0], slot: pBool(ctx.spec, 'float', false) ? 1 : 0, seed: 0,
   };
+  for (let i = 0; i < ctx.id.length; i++) s.seed = (s.seed * 31 + ctx.id.charCodeAt(i)) % 997;
   setRest(s, cfg, cfg.home, cfg.homeYaw);
   s.prev = centerOf(s);
   if (body) {
@@ -389,18 +397,26 @@ function stepItem(s: ItemState, ctx: PartContext, body: boolean): void {
       const swapWith = who.holding && who.holding !== ctx.id && ix.specs.has(who.holding) ? who.holding : null;
       if (who.holding === null || swapWith) {
         if (swapWith) {
-          s.swap = [s.poses[0]!, s.poses[1]! - cfg.half[1], s.poses[2]!, s.yaw];
+          s.swap = [s.poses[0]!, s.poses[1]! - cfg.half[1], s.poses[2]!, s.yaw, s.slot];
           s.swapTick = ctx.tick;
         }
         s.held = who.id;
         who.holding = ctx.id;
         s.mode = HELD;
+        s.slot = 0;
         s.moved = 1;
         s.last = [...who.pos];
         s.air = 0;
         if (body && ctx.physics) ctx.physics.setBodyEnabled(s.handle, false);
         ctx.cue(swapWith ? 'carry.swap' : 'carry.pick', centerOf(s), data(cfg, { player: who.id }));
       }
+    }
+    // 支えが無くなった（下の物を取った）置いてある物は落ちる（6 tick ごとに見る）
+    if (!body && s.mode === REST && !cfg.float && !s.slot && (ctx.tick + s.seed) % 6 === 0) {
+      const bottom = s.poses[1]! - cfg.half[1];
+      const h = yawHalf(cfg.half, s.yaw);
+      const sup = supportBelow(ctx.colliders, s.poses[0]!, s.poses[2]!, h[0] * 0.5, h[2] * 0.5, bottom + 0.05, bottom - 4);
+      if (sup === null || sup < bottom - 0.03) { s.mode = FLY; s.vel = [0, 0, 0]; s.flyT = 0; }
     }
     if (!body && s.mode === FLY) stepFly(ctx, s, cfg);
     if (!body && cfg.bounds && s.mode !== HELD && !aabbContains(cfg.bounds, centerOf(s), 0.3)) goHome(ctx, s, cfg);

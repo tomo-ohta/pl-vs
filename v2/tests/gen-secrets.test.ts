@@ -121,6 +121,13 @@ test('細い道: 落ちた先の隠し部屋まで歩いて行ける（存在型
     if (!sec) continue;
     n++;
     const sim = new Sim(r.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
+    // 段階 4（carry）: スイッチで開く扉は開いたままにする（歩く人はスイッチを探さない。gen-walk の prepare と同じ）
+    const wired = r.floor.entities.filter((e) => e.type === 'door' && e.inputs?.open).map((e) => e.id);
+    const step = sim.step.bind(sim);
+    (sim as unknown as { step: typeof sim.step }).step = (c) => {
+      for (const id of wired) { const st = sim.stateOf(id) as { angle: number; target: number }; st.angle = 1; st.target = 1; }
+      step(c);
+    };
     const res = walkTo(sim, sec.cell);
     if (res.ok) ok++;
     else console.log(`  ${r.floor.id}: ${res.reason}`);

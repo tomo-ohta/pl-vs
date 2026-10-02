@@ -5,3 +5,4 @@
 import './items.ts';
 import './water.ts';
 import './collect.ts';
+import './replica.ts';

@@ -5,3 +5,8 @@
 import './water.ts';
 import './parcels.ts';
 import './books.ts';
+import './chairs.ts';
+import './weight.ts';
+import './keys.ts';
+import './replica.ts';
+import './home.ts';
