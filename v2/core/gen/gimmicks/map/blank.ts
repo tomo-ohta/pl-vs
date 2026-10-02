@@ -15,7 +15,7 @@ import { defineGimmick } from '../types.ts';
 import { aabbJson, doorZone, freeWallSpan, innerRect } from '../util.ts';
 
 defineGimmick({
-  id: 'mapBlank', name: '地図の空白', axes: ['puzzle'], kinds: ['room'], minSize: [4.2, 4.6], minHeight: 2.3, weight: 0.08, intensity: 0,
+  id: 'mapBlank', name: '地図の空白', axes: ['puzzle'], kinds: ['room'], minSize: [4.2, 4.6], minHeight: 2.3, weight: 0.04, intensity: 0,
   offersSecret: true, requiresSecret: true, onMainPath: true,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning, cell = s.cell, y = cell.floorY;

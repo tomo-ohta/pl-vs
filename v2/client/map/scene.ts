@@ -89,6 +89,12 @@ export function sceneOfMap(map: FloorMap, o: MapSceneOptions = {}): DrawInput {
   const marks: DrawMark[] = [];
   for (const x of info.exits) if (x.cell && map.drawn(x.cell) && info.byId.get(x.cell)?.layer === layer) marks.push({ x: x.x, z: x.z, kind: 'exit' });
   for (const l of info.landmarks) if (map.drawn(l.cell)) marks.push({ x: l.x, z: l.z, kind: 'landmark', text: l.name });
+  // 区画の地図の名前（CellLayout.map.label）
+  for (const c of info.cells) {
+    if (!c.label || !map.drawn(c.id) || c.layer !== layer) continue;
+    const r = c.shape[0]!;
+    marks.push({ x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2, kind: 'note', text: c.label });
+  }
   const ghosts: DrawGhost[] = [];
   if (o.ghosts !== false) {
     for (const g of map.ghosts) {
