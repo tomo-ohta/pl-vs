@@ -315,7 +315,9 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     const segD = distToSegment(player.pos[0], player.pos[2], segFrom, tgt);
     if (player.pos[1] < planY - 0.8 || segD > 1.2) { botDebug.trace?.(`replan: y ${player.pos[1].toFixed(2)} planY ${planY.toFixed(2)} segD ${segD.toFixed(2)}`); replan(); continue; }
     const rem = remaining();
-    if (rem < bestD - 0.05 || waitDoor > 0) { bestD = Math.min(bestD, rem); stuck = 0; } else stuck++;
+    // 段階 4（移動と身体）: 向かい風・人の流れに押し戻されている間は、止まったと数えない（しゃがむと遅くなって渡れない）
+    const pushedBack = fl > PLAYER.walk * 0.9 && fz[0] * dx + fz[2] * dz < 0;
+    if (rem < bestD - 0.05 || waitDoor > 0 || pushedBack) { bestD = Math.min(bestD, rem); stuck = 0; } else stuck++;
     // 進めないとき: しゃがんでみる・跳んでみる → 道を引き直す
     if (stuck * sim.dt > 1.0 && crouch <= 0) { crouch = 3; path = []; }
     if (Math.round(stuck * sim.dt * 60) % 90 === 89) { sim.step([{ ...cmd, jump: true, crouch: false }]); }

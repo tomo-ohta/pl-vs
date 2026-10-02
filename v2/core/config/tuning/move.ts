@@ -18,4 +18,20 @@ export const MOVE_TUNING = {
   'move.grav.leaveSec': num(0.15, 0.05, 1, '重力の向き: 磁力の面から足が離れて、普通の重力に戻るまでの秒数'),
   'move.scale.rate': num(1.6, 0.2, 6, '身体の大きさ: 大きさが変わる速さ（倍率 / 秒）'),
   'move.updraft.accel': num(4, 0.5, 20, '上昇気流: 上向きの流れの速さへ近づく強さ（/ 秒）'),
+
+  // ---- 送風の通路（windTunnel）[M20]・人の流れ [M28] ----
+  'move.wind.gust': num(4.6, 3, 12, '送風の通路: 突風の速さ（m/s）。歩く（3）より強いので開けた所では押し戻され、立ち止まると入口まで飛ばされる。ダッシュ（5.5）なら少しずつ進める'),
+  'move.wind.breeze': num(0.6, 0, 3, '送風の通路: 突風の間の弱い風（m/s）'),
+  'move.wind.period': num(4.6, 2, 12, '送風の通路: 突風の周期（秒）'),
+  'move.wind.duty': num(0.4, 0.1, 0.8, '送風の通路: 周期のうち突風の割合'),
+  'move.wind.warn': num(0.9, 0, 3, '送風の通路: 突風の予告（送風機がうなる）の秒数'),
+  'move.wind.air': num(1.6, 1, 4, '送風の通路: 宙にいる間の風の倍率（跳ぶと飛ばされる）'),
+  'move.wind.landingM': num(1.4, 1.0, 2.5, '送風の通路: 入口の前の風の来ない奥行き（m）'),
+  'move.wind.pitchM': num(2.6, 1.8, 4, '送風の通路: 風よけの仕切りの間隔（m）'),
+  'move.wind.blownSec': num(0.45, 0.2, 3, '送風の通路（出現型の隠し）: 突風の中で宙にいる秒数'),
+  'move.crowd.chance': num(0.35, 0, 1, '送風の通路: 人の流れ（見えない群衆）の変種になる確率（幅 3 m 以上の部屋）'),
+  'move.crowd.speed': num(2.2, 0.5, 2.6, '人の流れ: 横切る流れの速さ（m/s）。歩く速さより弱く（流されながら渡れる）'),
+  'move.crowd.laneM': num(1.3, 0.8, 2.5, '人の流れ: 流れの帯の幅（m）'),
+  'move.crowd.period': num(3.4, 1.5, 10, '人の流れ: 流れが強まる周期（秒）'),
+  'move.crowd.duty': num(0.5, 0.1, 0.9, '人の流れ: 周期のうち流れのある割合'),
 } as const satisfies Record<string, Spec>;
