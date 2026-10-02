@@ -10,8 +10,6 @@
  */
 import type { CatalogEntry } from './types.ts';
 
-const TODO = '作成中（この段階の作業の途中。終わったら done にする）';
-
 export const WARP_CATALOG: CatalogEntry[] = [
   { idea: 'W06', name: '閉じた輪の廊下', status: 'done', impl: [{ kind: 'gimmick', id: 'loopHall' }, { kind: 'part', id: 'warpTreadmill' }, { kind: 'part', id: 'warpAnteroom' }],
     note: '控え室の 3 枚目の扉の先のまっすぐな廊下。同じ椅子・扉・照明が 12 m ごとにくり返し（霧で先は見えない）、前へ 4 周すると輪がほどけて奥の扉が現れ、開けると最初の部屋（の双子）に出る。まっすぐ進んだのに元の場所に戻る。80 秒でほどける' },
@@ -47,5 +45,6 @@ export const WARP_CATALOG: CatalogEntry[] = [
     note: '窓の前でじっと 18 秒立っていると、向こうの自分は真似をやめて振り返り、部屋の別の壁へ歩いて 3 回叩く（本当の部屋のその壁から音）。叩き終えると隠しの扉が現れる（出現型）。歩き回っていると起きない' },
   { idea: 'W11', name: '回転する部屋', status: 'done', impl: [{ kind: 'gimmick', id: 'turnRoom' }, { kind: 'part', id: 'warpTurnRoom' }, { kind: 'view', id: 'warpTurnRoom' }],
     note: '広い部屋の真ん中に、木の板張りの丸い部屋（筒・肘掛け椅子 4 脚と灯り・額・赤い床）が 1 回り 40 秒でゆっくり回る。筒の外の通路は 4 枚の仕切りで区切られ、向かいの扉へは筒の中を通るしかない（入口は向かい合う 2 か所。目の前に来たら乗り、行きたい扉の前に来たら降りる）。仕切りは入口と出口が別の区切りになる所に置き、隠しが付けば筒を通らないと行けない区切りの壁に壁の色の扉（存在型）。筒の中では床と一緒に回り（向きも回る）、真ん中から離れるほど外へ押される（真ん中にいれば立っていられる）。入口はどの区切りの前にも回ってくる（閉じ込めない）' },
-  { idea: 'F30', name: '前の階に戻る輪', status: 'deferred', impl: [], note: TODO },
+  { idea: 'F30', name: '前の階に戻る輪', status: 'done', impl: [{ kind: 'client', id: 'floorLoop' }],
+    note: '3 階目より深い階のおよそ 2 割で、ふつうの出口の階段を下りた先が 2〜3 階上の前に来た階になる。着くのは入口の階段ではなく、入口から遠い部屋の扉を入った所（前に歩いた部屋に、知らない側から入る）。同じ階からの輪は 1 回だけ（2 回目はふつうに次の階へ）。core/gen/gimmicks/warp/floorLoop.ts（floorLoopTarget・loopSpawn）と client/main.ts（v1 E01 の発展）' },
 ];

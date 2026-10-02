@@ -73,4 +73,7 @@ export const WARP_TUNING = {
   'warp.pastWindow.delaySec': num(4, 1, 15, '窓の向こうの自分: 窓の向こうの自分が、何秒前の自分か'),
   'warp.pastWindow.stillSec': num(18, 5, 120, '窓の向こうの自分（BX08）: 窓の前で何秒じっとしていると、向こうの自分が壁を叩きに行くか'),
   'warp.pastWindow.secretWeight': num(1.4, 0, 5, '窓の向こうの自分（BX08）: 隠しの元（向こうの自分が叩く壁）の重み'),
+  // ---- 前の階に戻る輪（floorLoop: F30）
+  'warp.floorLoop.chance': num(0.2, 0, 1, '前の階に戻る輪: ふつうの出口が前の階（2〜3 階上）へ戻る確率（深さごと。同じ階からは 1 回だけ）'),
+  'warp.floorLoop.minDepth': num(3, 2, 20, '前の階に戻る輪: この深さより浅い階では戻らない', true),
 } as const satisfies Record<string, Spec>;
