@@ -356,7 +356,7 @@ export function playArea(c: DressCtx): void {
     const B: Box[] = [];
     let k = 0;
     for (let x = ir.x0; x + 1.2 <= ir.x1 + 1e-6 && B.length < 60; x += 1.2) {
-      for (let z = ir.z0; z + 1.2 <= ir.z1 + 1e-6 && B.length < 60; z += 1.2) B.push({ min: [x + 0.01, 0.001, z + 0.01], max: [x + 1.19, 0.03, z + 1.19], mat: colors[(k++ + Math.floor(x)) % colors.length]!, solid: false });
+      for (let z = ir.z0; z + 1.2 <= ir.z1 + 1e-6 && B.length < 60; z += 1.2) B.push({ min: [x + 0.01, 0.001, z + 0.01], max: [x + 1.19, 0.03, z + 1.19], mat: colors[(((k++ + Math.floor(x)) % colors.length) + colors.length) % colors.length]!, solid: false });
     }
     if (B.length) addDecor(c, B);
   }

@@ -431,14 +431,29 @@ export class ClientGame {
     this.audio.ui('open');
   }
 
-  /** 懐中電灯の光が当たる面までの距離（当たり判定の箱を 0.2 m ずつたどる。照度を一定に保つのに使う。v1 と同じ役目） */
+  /**
+   * 懐中電灯の光が当たる面までの距離（視線の線と当たり判定の箱の交わり。照度を一定に保つのに使う。v1 と同じ役目）。
+   * 点を細かくたどると壁（厚み 0.15 m）を飛び越えるので、箱ごとに線との交わりを求める
+   */
   private flashlightHit(): number {
     const sim = this.sim;
     if (!sim || !this.flashlightOn) return Infinity;
     const d = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
     const o = this.camera.position;
-    for (let t = 0.3; t <= 12; t += 0.2) if (sim.colliders.pointBlocked(o.x + d.x * t, o.y + d.y * t, o.z + d.z * t)) return t;
-    return Infinity;
+    const L = 12;
+    const ex = o.x + d.x * L, ey = o.y + d.y * L, ez = o.z + d.z * L;
+    let best = Infinity;
+    for (const b of sim.colliders.query(Math.min(o.x, ex), Math.min(o.y, ey), Math.min(o.z, ez), Math.max(o.x, ex), Math.max(o.y, ey), Math.max(o.z, ez))) {
+      let t0 = 0, t1 = L;
+      const os = [o.x, o.y, o.z], ds = [d.x, d.y, d.z];
+      for (let k = 0; k < 3 && t0 <= t1; k++) {
+        if (Math.abs(ds[k]!) < 1e-9) { if (os[k]! < b.min[k]! || os[k]! > b.max[k]!) t0 = Infinity; continue; }
+        const a0 = (b.min[k]! - os[k]!) / ds[k]!, a1 = (b.max[k]! - os[k]!) / ds[k]!;
+        t0 = Math.max(t0, Math.min(a0, a1)); t1 = Math.min(t1, Math.max(a0, a1));
+      }
+      if (t0 <= t1 && t0 > 0.05 && t0 < best) best = t0;
+    }
+    return best;
   }
 
   /** 足元の床の材質（足音）。現在の区画の箱から、足の高さに上面がある箱を探す */
