@@ -313,6 +313,8 @@ export class ClientGame {
       while (this.acc >= step && n < 8) {
         this.prevPos = [...sim.players[0]!.pos];
         sim.step([this.command(input)]);
+        // tick ごとにイベントを受ける（継ぎ目の無い移動の補間の始点・向きを、次の tick の前に直すため。warp で足した）
+        this.handleEvents(sim.drainEvents());
         this.pendingJump = false;
         this.pendingDrop = false;
         this.pendingInteract = null;
@@ -374,6 +376,10 @@ export class ClientGame {
             this.prevPos = [this.prevPos[0] + Number(e.data.dx ?? 0), this.prevPos[1] + Number(e.data.dy ?? 0), this.prevPos[2] + Number(e.data.dz ?? 0)];
             this.yaw += Number(e.data.dYaw ?? 0);
             this.flashlight?.reset();
+            // 表示の視線の遅れと撮像の回転の速さも同じだけ回し、移った先の区画をすぐ今の区画にする（入室の演出を出さない）
+            this.rig.shiftYaw(Number(e.data.dYaw ?? 0));
+            this.prevCamYaw += Number(e.data.dYaw ?? 0);
+            this.enterCell(true);
             break;
           }
           this.rig.snap(this.subject(1)); this.prevPos = [...sim.players[0]!.pos]; this.yaw = sim.players[0]!.yaw; this.pitch = 0;

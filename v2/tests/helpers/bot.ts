@@ -40,6 +40,83 @@ function route(floor: FloorLayout, from: string, to: string): PortalSpec[] | nul
   return out;
 }
 
+/**
+ * 空間のゆがみの道（warp で足した）: 部品の params.warpLinks（{ from, to, at, interact? }）。区画 from の点 at へ行き、
+ * 部品 interact を調べる（無ければ立って待つ）と区画 to へ移される（控え室の 3 枚目の扉・双子の部屋の扉 …）
+ */
+export interface WarpLink { from: string; to: string; at: [number, number, number]; interact?: string }
+
+export function warpLinks(floor: FloorLayout): WarpLink[] {
+  const out: WarpLink[] = [];
+  for (const e of floor.entities) {
+    const ls = e.params.warpLinks;
+    if (!Array.isArray(ls)) continue;
+    for (const l of ls) {
+      const o = l as { from?: unknown; to?: unknown; at?: unknown; interact?: unknown };
+      if (typeof o.from !== 'string' || typeof o.to !== 'string' || !Array.isArray(o.at)) continue;
+      const link: WarpLink = { from: o.from, to: o.to, at: [Number(o.at[0]), Number(o.at[1]), Number(o.at[2])] };
+      if (typeof o.interact === 'string') link.interact = o.interact;
+      out.push(link);
+    }
+  }
+  return out;
+}
+
+type Step = { portal: PortalSpec; link?: undefined } | { link: WarpLink; portal?: undefined };
+
+/** 開口と空間のゆがみの道をたどる道順（幅優先）。見つからなければ null */
+function routeSteps(floor: FloorLayout, links: readonly WarpLink[], from: string, to: string): Step[] | null {
+  const by = new Map<string, Step[]>();
+  const oneWay = new Set(floor.entities.filter((e) => e.type === 'door' && typeof e.params.openSide === 'number').map((e) => e.id));
+  for (const p of floor.portals) for (const c of p.cells) {
+    if (p.doorId && oneWay.has(p.doorId) && p.cells[1] === c) continue;
+    by.set(c, [...(by.get(c) ?? []), { portal: p }]);
+  }
+  for (const l of links) by.set(l.from, [...(by.get(l.from) ?? []), { link: l }]);
+  const prev = new Map<string, { cell: string; step: Step } | null>([[from, null]]);
+  const q = [from];
+  for (let h = 0; h < q.length && !prev.has(to); h++) {
+    for (const st of by.get(q[h]!) ?? []) {
+      const o = st.portal ? (st.portal.cells[0] === q[h] ? st.portal.cells[1] : st.portal.cells[0]) : st.link!.to;
+      if (prev.has(o)) continue;
+      prev.set(o, { cell: q[h]!, step: st });
+      q.push(o);
+    }
+  }
+  if (!prev.has(to)) return null;
+  const out: Step[] = [];
+  for (let c = to; prev.get(c); c = prev.get(c)!.cell) out.unshift(prev.get(c)!.step);
+  return out;
+}
+
+type Leg = { x: number; y: number; z: number; portal?: PortalSpec; via?: boolean; link?: WarpLink };
+
+/** 区画 from から targetCell までの区間の目標（開口の手前 → 開口の先、空間のゆがみの道は調べる所） */
+function planLegs(floor: FloorLayout, from: string, targetCell: string, goal?: [number, number, number]): { legs: Leg[]; ids: string[] } | null {
+  const links = warpLinks(floor);
+  const plain = links.length ? null : route(floor, from, targetCell);
+  const steps: Step[] | null = plain ? plain.map((portal) => ({ portal })) : links.length ? routeSteps(floor, links, from, targetCell) : null;
+  if (!steps) return null;
+  const legs: Leg[] = [];
+  let cell = from;
+  for (let i = 0; i < steps.length; i++) {
+    const st = steps[i]!;
+    if (st.link) { legs.push({ x: st.link.at[0], y: st.link.at[1], z: st.link.at[2], link: st.link }); cell = st.link.to; continue; }
+    const p = st.portal;
+    const [x, y, z] = center(p);
+    const forward = p.cells[0] === cell ? 1 : -1;
+    const d = [[0, 1], [1, 0], [0, -1], [-1, 0]][p.dir]!;
+    const prevP = steps[i - 1]?.portal, nextP = steps[i + 1]?.portal;
+    const gap = (q: PortalSpec | undefined): number => { if (!q) return Infinity; const [qx, , qz] = center(q); return Math.hypot(qx - x, qz - z) / 2; };
+    const kb = Math.min(0.9, gap(prevP)) * forward, ka = Math.min(0.9, gap(nextP)) * forward;
+    legs.push({ x: x - d[0]! * kb, y, z: z - d[1]! * kb, portal: p });
+    legs.push({ x: x + d[0]! * ka, y, z: z + d[1]! * ka, via: true });
+    cell = p.cells[0] === cell ? p.cells[1] : p.cells[0];
+  }
+  if (goal) legs.push({ x: goal[0], y: goal[1], z: goal[2] });
+  return { legs, ids: steps.map((st) => st.portal ? st.portal.id : `warp:${st.link!.from}>${st.link!.to}`) };
+}
+
 const center = (p: PortalSpec): [number, number, number] => [(p.aabb.min[0] + p.aabb.max[0]) / 2, p.aabb.min[1], (p.aabb.min[2] + p.aabb.max[2]) / 2];
 
 /** 道を探す格子の間隔。幅 0.9 m の通り道（座席の列の脇など）でも、体の幅 + 余裕の範囲に格子点が必ず入るように細かく */
@@ -224,24 +301,13 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
   const floor = sim.floor;
   // 今いる区画から（初めは出てくる区画）
   const from = cellAtPos(floor, sim.players[0]!.pos)?.id ?? floor.spawn.cell;
-  const r = route(floor, from, targetCell);
-  if (!r) return { ok: false, reason: '道順がありません', seconds: 0, route: [] };
-  // 区間の目標: 開口の手前（扉なら調べる）→ 開口の先
-  const legs: { x: number; y: number; z: number; portal?: PortalSpec; via?: boolean }[] = [];
-  let cell = from;
-  for (let i = 0; i < r.length; i++) {
-    const p = r[i]!;
-    const [x, y, z] = center(p);
-    const forward = p.cells[0] === cell ? 1 : -1;
-    const d = [[0, 1], [1, 0], [0, -1], [-1, 0]][p.dir]!;
-    const prev = r[i - 1], next = r[i + 1];
-    const gap = (q: PortalSpec | undefined): number => { if (!q) return Infinity; const [qx, , qz] = center(q); return Math.hypot(qx - x, qz - z) / 2; };
-    const kb = Math.min(0.9, gap(prev)) * forward, ka = Math.min(0.9, gap(next)) * forward;
-    legs.push({ x: x - d[0]! * kb, y, z: z - d[1]! * kb, portal: p });
-    legs.push({ x: x + d[0]! * ka, y, z: z + d[1]! * ka, via: true });
-    cell = p.cells[0] === cell ? p.cells[1] : p.cells[0];
-  }
-  if (goal) legs.push({ x: goal[0], y: goal[1], z: goal[2] });
+  // 区間の目標: 開口の手前（扉なら調べる）→ 開口の先（空間のゆがみの道は、調べて移されるのを待つ。planLegs）
+  const planned = planLegs(floor, from, targetCell, goal);
+  if (!planned) return { ok: false, reason: '道順がありません', seconds: 0, route: [] };
+  let legs = planned.legs;
+  let routeIds = planned.ids;
+  const hasLinks = warpLinks(floor).length > 0;
+  let waitWarp = 0, lastCell = from;
   const player = sim.players[0]!;
   let leg = 0;
   let path: [number, number][] = [];
@@ -257,7 +323,7 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
   const ticks = Math.round(maxSec / sim.dt);
   for (let n = 0; n < ticks; n++) {
     const L = legs[leg];
-    if (!L) return { ok: true, reason: '', seconds: n * sim.dt, route: r.map((p) => p.id) };
+    if (!L) return { ok: true, reason: '', seconds: n * sim.dt, route: routeIds };
     legT += sim.dt;
     if (botDebug.trace && n % 60 === 0) botDebug.trace(`t=${(n * sim.dt).toFixed(0)} leg ${leg}/${legs.length} pos ${player.pos.map((v) => v.toFixed(2)).join(',')} path ${path.length} best ${bestD.toFixed(2)} stuck ${stuck}`);
     // 区画の中の道を引き直す（区間の始まり・止まったとき・流された・落ちたとき）
@@ -293,6 +359,21 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
       cmd.moveY = dist > 0.15 ? d[0]! * f[0]! + d[1]! * f[1]! : 0;
       cmd.moveX = dist > 0.15 ? d[0]! * rr[0]! + d[1]! * rr[1]! : 0;
     }
+    // 空間のゆがみの道: 着いたら調べて（調べる物が無ければ立って）移されるのを待つ
+    if (L.link && legD < 0.45 && path.length <= 1) {
+      cmd.moveY = 0; cmd.moveX = 0;
+      if (waitWarp <= 0 && L.link.interact) {
+        const ent = floor.entities.find((e) => e.id === L.link!.interact);
+        const pn = ent?.params.panel as { min: number[]; max: number[] } | undefined;
+        const c = pn ? [(pn.min[0]! + pn.max[0]!) / 2, pn.min[1]! + 1.0, (pn.min[2]! + pn.max[2]!) / 2] : [L.x, L.y + 1.0, L.z];
+        const ex = c[0]! - player.pos[0], ez = c[2]! - player.pos[2], ey = c[1]! - (player.pos[1] + player.eye);
+        cmd.yaw = Math.atan2(-ex, -ez);
+        cmd.pitch = Math.atan2(ey, Math.hypot(ex, ez));
+        cmd.interact = { yaw: cmd.yaw, pitch: cmd.pitch };
+        waitWarp = 1.5;
+      }
+    }
+    if (waitWarp > 0) waitWarp -= sim.dt;
     const door = L.portal?.doorId;
     if (door && legD < 0.7 && Math.abs(player.pos[1] - L.y) < 1.2 && sim.outputOf(door, 'open') < 0.5 && waitDoor <= 0) {
       waitDoor = 1.0;
@@ -304,22 +385,36 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
       cmd.moveY = 0;
     }
     // 扉が開くのを待つ間も、扉の手前の目標までは歩く（崩れる床・動く歩道の上で立ち止まらない）
+    const before: [number, number, number] = [player.pos[0], player.pos[1], player.pos[2]];
     sim.step([cmd]);
+    // 移された（継ぎ目の無い移動・戻された）: 区画が変わった・空間のゆがみのあるフロアなら、今の区画から道順を引き直す
+    if (Math.hypot(player.pos[0] - before[0], player.pos[1] - before[1], player.pos[2] - before[2]) > 1.5) {
+      const now = cellAtPos(floor, player.pos)?.id ?? lastCell;
+      if (hasLinks || now !== lastCell) {
+        const np = planLegs(floor, now, targetCell, goal);
+        if (np) { legs = np.legs; routeIds = np.ids; leg = 0; stuck = 0; legT = 0; waitWarp = 0; }
+        lastCell = now;
+        replan();
+        continue;
+      }
+    }
+    lastCell = cellAtPos(floor, player.pos)?.id ?? lastCell;
     // 目標の点に着いた（区間の終わりは高さも合っていること: 穴の底の扉の真上の床板の上では着いていない）
     if (dist < 0.3 && (path.length > 1 || Math.abs(player.pos[1] - L.y) < 1.2)) {
       segFrom = path.shift()!;
-      if (!path.length && !(door && sim.outputOf(door, 'open') < 0.5)) { leg++; stuck = 0; bestD = Infinity; legT = 0; }
+      if (!path.length && !(door && sim.outputOf(door, 'open') < 0.5) && !L.link) { leg++; stuck = 0; bestD = Infinity; legT = 0; }
+      if (!path.length && L.link) path = [[L.x, L.z]];
       continue;
     }
     // 落ちた（穴・溝）・道から 1.2 m 以上外れた（流された・押された）: 道を引き直す
     const segD = distToSegment(player.pos[0], player.pos[2], segFrom, tgt);
     if (player.pos[1] < planY - 0.8 || segD > 1.2) { botDebug.trace?.(`replan: y ${player.pos[1].toFixed(2)} planY ${planY.toFixed(2)} segD ${segD.toFixed(2)}`); replan(); continue; }
     const rem = remaining();
-    if (rem < bestD - 0.05 || waitDoor > 0) { bestD = Math.min(bestD, rem); stuck = 0; } else stuck++;
+    if (rem < bestD - 0.05 || waitDoor > 0 || (L.link && legD < 0.6)) { bestD = Math.min(bestD, rem); stuck = 0; } else stuck++;
     // 進めないとき: しゃがんでみる・跳んでみる → 道を引き直す
     if (stuck * sim.dt > 1.0 && crouch <= 0) { crouch = 3; path = []; }
     if (Math.round(stuck * sim.dt * 60) % 90 === 89) { sim.step([{ ...cmd, jump: true, crouch: false }]); }
-    if (stuck * sim.dt > 10 || legT > 150) return { ok: false, reason: `止まった: 区間 ${leg}/${legs.length}（${L.x.toFixed(2)}, ${L.z.toFixed(2)}）位置 (${player.pos.map((v) => v.toFixed(2)).join(', ')})${L.portal ? ` 開口 ${L.portal.id}` : ''}`, seconds: n * sim.dt, route: r.map((p) => p.id) };
+    if (stuck * sim.dt > 10 || legT > 150) return { ok: false, reason: `止まった: 区間 ${leg}/${legs.length}（${L.x.toFixed(2)}, ${L.z.toFixed(2)}）位置 (${player.pos.map((v) => v.toFixed(2)).join(', ')})${L.portal ? ` 開口 ${L.portal.id}` : ''}${L.link ? ` 移る道 ${L.link.from}>${L.link.to}` : ''}`, seconds: n * sim.dt, route: routeIds };
   }
-  return { ok: false, reason: '時間切れ', seconds: maxSec, route: r.map((p) => p.id) };
+  return { ok: false, reason: '時間切れ', seconds: maxSec, route: routeIds };
 }

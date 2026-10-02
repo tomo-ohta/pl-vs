@@ -95,6 +95,8 @@ export function generateFloorReport(key: FloorKey, t: Tuning, opts: GenOptions =
       const fixed = new Set(gimmicks?.secrets.flatMap((x) => x.fixed));
       for (const g of geo.cells) {
         if (fixed.has(g.cell.id) || anomalies?.noDress.has(g.cell.id)) continue;
+        // 仕掛けが中身を置かない区画（warp の双子の区画。見た目を揃えるため仕掛けが自分で置く）
+        if (gimmicks?.noDress.has(g.cell.id)) continue;
         dressedFrom.set(g.cell.id, g.cell.boxes.length);
         opts.dress({ cell: g.cell, kind: g.kind, openings: g.openings, keepOut: gimmicks?.keepOut.get(g.cell.id) ?? [], rng: new Rng(hashAll(content.seed, 'dress', g.cell.id)), density: 0.5 });
       }

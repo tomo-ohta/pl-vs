@@ -178,9 +178,14 @@ test('異変: それぞれ見て分かる形になっている（浸水の水・
           assert.ok(c.boxes.some((b) => b.solid && b.propGroup && (b.min[1] + b.max[1]) / 2 > fy + c.height / 2), `${msg}: 天井の側に付いた家具`);
           assert.ok(c.boxes.some((b) => b.mat === c.palette.light && !b.solid && b.max[1] < fy + 0.1), `${msg}: 床の照明`);
           break;
-        case 'stack':
-          assert.ok(c.boxes.some((b) => b.solid && b.propGroup && b.min[1] > fy + 0.9), `${msg}: 積まれた家具`);
+        case 'stack': {
+          // 積まれた家具: 別の家具の上（8 cm 以内）に載った当たる箱があり、その底が床から 0.4 m より上
+          // （warp で足した: 以前は「底が 0.9 m より上」だったが、低い冷蔵ケースの上に寝かせた棚を積んだ塔を見落とした）
+          const solid = c.boxes.filter((b) => b.solid && b.propGroup);
+          const onTop = solid.some((b) => b.min[1] > fy + 0.4 && solid.some((o) => o.propGroup !== b.propGroup && Math.abs(o.max[1] - b.min[1]) < 0.08 && o.min[0] < b.max[0] && o.max[0] > b.min[0] && o.min[2] < b.max[2] && o.max[2] > b.min[2]));
+          assert.ok(onTop || solid.some((b) => b.min[1] > fy + 0.9), `${msg}: 積まれた家具`);
           break;
+        }
         case 'scatter':
           assert.ok(c.boxes.some((b) => b.kind === 'scatteredPaper'), msg);
           break;

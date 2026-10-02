@@ -1,0 +1,259 @@
+/**
+ * 控え室（別の空間への入口）を組む。部品は core/sim/parts/warp/anteroom.ts（warpAnteroom）。
+ *
+ * 仕掛けの部屋 R（入口 A・出口 B。どちらも扉）の空いた壁に 3 枚目の扉 pod を付ける。R の中身（家具）はここで置き、
+ * R の真上の別の空間に双子の部屋 R' を写す（扉も同じ）。pod は「ほかの扉が全部閉じているときだけ」開き、
+ * 開けた瞬間に R' へ継ぎ目なく移る。R' の pod の向こうに、仕掛けが別の空間を作る（openPod の位置と向き）。
+ * 別の空間の終わりには addCopy でもう 1 つの双子の部屋 Q' を置ける（Q' の pod が別の空間の終わりの扉）。
+ * R'・Q' の A・B は、R の A・B へ戻す扉（来た扉からはいつでも出られる）。
+ *
+ * 使い方: planAnteroom → buildAnteroom（R・R' と pod）→ 別の空間を作る → addCopy（Q'）→ finish（部品を置いて扉を配線）
+ */
+import type { Dir, Vec3 } from '../../../math/vec.ts';
+import { opening } from '../../../world/build.ts';
+import { box, DOOR_H, DOOR_W, WALL_T, type Box, type CellLayout, type EntitySpec, type Json, type MatId, type WallOpening } from '../../../world/layout.ts';
+import { plant, sofa } from '../../dress/props.ts';
+import { reachOpenings } from '../../reach.ts';
+import { xBox, xJson, xPoint, xVec, type Xform } from '../../../sim/parts/warp/util.ts';
+import type { GimmickContext } from '../types.ts';
+import { doorZone, freeWallSpan, innerRect } from '../util.ts';
+import { addPocketCell, axisOf, canPocket, carveDoorway, copyCell, doorSpec, frontPoint, isBSide, joinCells, nextPocketRise, signOf, xOpening } from './pocket.ts';
+
+export interface AnteroomPlan {
+  host: CellLayout;
+  a: { o: WallOpening; door: EntitySpec };
+  b: { o: WallOpening; door: EntitySpec } | null;
+  /** 3 枚目の扉（R の壁の外面の床位置・外向き） */
+  pod: { pos: Vec3; dir: Dir };
+  rise: number;
+}
+
+export interface AnteroomOptions {
+  /** pod の壁に沿った位置をこの刻みの倍数にする（双子の模様を揃える。0 なら刻まない） */
+  snap?: number;
+  /** pod の外向きの位置に足す値（snap と合わせて、別の空間の座標を刻みに乗せる） */
+  snapOffset?: number;
+  /** pod の外向き（決めるなら） */
+  dir?: Dir;
+}
+
+/** 扉が付いていない開口があれば null（R の中が外から見えると、双子の部屋と見分けがつく） */
+export function planAnteroom(ctx: GimmickContext, o: AnteroomOptions = {}): AnteroomPlan | null {
+  if (!canPocket(ctx) || isBSide(ctx)) return null;
+  const s = ctx.slot;
+  if (s.kind !== 'room' || !s.entrance || s.cell.footprint.length !== 1) return null;
+  const doors = s.openings.map((op) => ({ o: op, door: ctx.doorAt(op) }));
+  if (doors.some((d) => !d.door) || doors.length > 2) return null;
+  const a = doors.find((d) => d.o === s.entrance)!;
+  const bRaw = doors.find((d) => d.o !== s.entrance) ?? null;
+  // pod: A から遠い壁（向かいの壁を先に）
+  const order: Dir[] = o.dir !== undefined ? [o.dir] : ([((s.entrance.dir + 2) % 4) as Dir, ((s.entrance.dir + 1) % 4) as Dir, ((s.entrance.dir + 3) % 4) as Dir, s.entrance.dir]);
+  const y = s.cell.floorY;
+  for (const d of order) {
+    const span = freeWallSpan(s, d, DOOR_W + 1.2, 0.9);
+    if (!span) continue;
+    const lo = span.a0 + DOOR_W / 2 + 0.6, hi = span.a1 - DOOR_W / 2 - 0.6;
+    if (hi < lo) continue;
+    let at = Math.round(((lo + hi) / 2) * 20) / 20;
+    if (o.snap) {
+      const off = o.snapOffset ?? 0;
+      const k0 = Math.ceil((lo - off) / o.snap), k1 = Math.floor((hi - off) / o.snap);
+      if (k1 < k0) continue;
+      at = (Math.round((k0 + k1) / 2) * o.snap) + off;
+    }
+    const r = s.rect;
+    const pos: Vec3 = d === 0 ? [at, y, r.z1] : d === 2 ? [at, y, r.z0] : d === 1 ? [r.x1, y, at] : [r.x0, y, at];
+    return { host: s.cell, a: { o: a.o, door: a.door! }, b: bRaw ? { o: bRaw.o, door: bRaw.door! } : null, pod: { pos, dir: d }, rise: nextPocketRise(ctx) };
+  }
+  return null;
+}
+
+/** 扉の部品の params を写す（板・蝶番の側・開く向きを、写した先でも同じ見た目になるように） */
+export function xDoorParams(x: Xform, p: EntitySpec['params']): EntitySpec['params'] {
+  const pn = p.panel as { min: number[]; max: number[] };
+  const panel = { min: [pn.min[0]!, pn.min[1]!, pn.min[2]!] as Vec3, max: [pn.max[0]!, pn.max[1]!, pn.max[2]!] as Vec3 };
+  const axis = p.axis === 'x' ? 'x' : 'z';
+  const hinge = p.hinge === 1 ? 1 : -1;
+  const swing = typeof p.swing === 'number' ? p.swing : 1;
+  const c: Vec3 = [(panel.min[0] + panel.max[0]) / 2, panel.min[1], (panel.min[2] + panel.max[2]) / 2];
+  // 蝶番の端（'z' の扉は x の端、'x' の扉は z の端）と、開く向き（'x' の扉は swing +1 で +x、'z' の扉は swing +1 で -z）
+  const hp: Vec3 = axis === 'z' ? [hinge > 0 ? panel.max[0] : panel.min[0], c[1], c[2]] : [c[0], c[1], hinge > 0 ? panel.max[2] : panel.min[2]];
+  const sw: Vec3 = axis === 'x' ? [swing, 0, 0] : [0, 0, -swing];
+  const np = xBox(x, panel);
+  const nc = xPoint(x, c), nh = xPoint(x, hp), ns = xVec(x, sw);
+  const nAxis = Math.abs(np.max[0] - np.min[0]) > Math.abs(np.max[2] - np.min[2]) ? 'z' : 'x';
+  const nHinge = nAxis === 'z' ? (nh[0] > nc[0] ? 1 : -1) : (nh[2] > nc[2] ? 1 : -1);
+  const nSwing = nAxis === 'x' ? Math.sign(ns[0]) || 1 : -(Math.sign(ns[2]) || 1);
+  return { ...p, panel: { min: [...np.min], max: [...np.max] }, axis: nAxis, hinge: nHinge, swing: nSwing };
+}
+
+export interface RoomCopy {
+  cell: CellLayout;
+  xform: Xform;
+  a: string;
+  b: string | null;
+  pod: string;
+  /** pod の開口（写した先の壁の外面・外向き） */
+  podOut: { pos: Vec3; dir: Dir };
+}
+
+export interface Anteroom {
+  plan: AnteroomPlan;
+  ctrl: string;
+  podDoor: string;
+  /** 入口の双子の部屋 R'（真上） */
+  entry: RoomCopy;
+  copies: RoomCopy[];
+  /** R から写し方 x で、もう 1 つの双子の部屋を置く（Q'。id の末尾 suffix） */
+  addCopy(x: Xform, suffix: string): RoomCopy;
+  /** 部品を置き、扉を配線する（最後に 1 回） */
+  finish(extra?: { warpLinks?: Json[] }): void;
+}
+
+/**
+ * 控え室の中身（待合室: 壁際の長椅子・隅の鉢植え・壁の額）。区画の中身の作り方（dress）は使わない
+ * （中身の有無で区画の形が変わらないように・双子の部屋へ写す前に決める）。扉の前は空け、置いたあと全部の扉へ歩けなければ外す
+ */
+function furnishAnteroom(ctx: GimmickContext, R: CellLayout, ops: WallOpening[]): void {
+  const s = ctx.slot;
+  const y = R.floorY;
+  const r = innerRect(s);
+  const zones = ops.map((o) => doorZone(o, y, 1.4, 0.45));
+  const clear = (x0: number, z0: number, x1: number, z1: number): boolean => !zones.some((z) => x0 < z.max[0] && x1 > z.min[0] && z0 < z.max[2] && z1 > z.min[2]) && x0 >= r.x0 - 1e-6 && z0 >= r.z0 - 1e-6 && x1 <= r.x1 + 1e-6 && z1 <= r.z1 + 1e-6;
+  const before = R.boxes.length;
+  const B: Box[] = [];
+  const lift = (from: number, group: string): void => {
+    for (let i = from; i < B.length; i++) { const b = B[i]!; b.min[1] += y; b.max[1] += y; b.propGroup = `${R.id}/${group}`; }
+  };
+  // 長椅子: 開口から離れた壁際（長い方の壁から）
+  const walls = ([0, 1, 2, 3] as Dir[]).sort((a, b) => ((b % 2 === 0) === ((r.x1 - r.x0) >= (r.z1 - r.z0)) ? 1 : 0) - ((a % 2 === 0) === ((r.x1 - r.x0) >= (r.z1 - r.z0)) ? 1 : 0));
+  for (const d of walls) {
+    const span = freeWallSpan(s, d, 2.0, 1.2);
+    if (!span) continue;
+    const len = Math.min(2.4, span.a1 - span.a0 - 0.2);
+    if (len < 1.4) continue;
+    const depth = 0.8;
+    const along = d === 0 || d === 2;
+    const wallC = d === 0 ? r.z1 : d === 2 ? r.z0 : d === 1 ? r.x1 : r.x0;
+    const sg = d === 0 || d === 1 ? -1 : 1;
+    const c = wallC + sg * (depth / 2 + 0.02);
+    const [cx, cz] = along ? [span.at, c] : [c, span.at];
+    const [x0, z0, x1, z1] = along ? [cx - len / 2, cz - depth / 2, cx + len / 2, cz + depth / 2] : [cx - depth / 2, cz - len / 2, cx + depth / 2, cz + len / 2];
+    if (!clear(x0, z0, x1, z1)) continue;
+    const from = B.length;
+    sofa(B, cx, cz, len, ((d + 2) % 4) as Dir, 'upholstery', depth);
+    lift(from, `sofa@${cx.toFixed(2)},${cz.toFixed(2)}`);
+    // 額（長椅子の上の壁）
+    const fy = y + 1.45;
+    const fr = along ? box([cx - 0.45, fy, Math.min(wallC, wallC + sg * 0.03)], [cx + 0.45, fy + 0.6, Math.max(wallC, wallC + sg * 0.03)], 'woodPanel', false)
+      : box([Math.min(wallC, wallC + sg * 0.03), fy, cz - 0.45], [Math.max(wallC, wallC + sg * 0.03), fy + 0.6, cz + 0.45], 'woodPanel', false);
+    const pic = along ? box([cx - 0.38, fy + 0.07, Math.min(wallC + sg * 0.03, wallC + sg * 0.035)], [cx + 0.38, fy + 0.53, Math.max(wallC + sg * 0.03, wallC + sg * 0.035)], 'skyOvercast', false)
+      : box([Math.min(wallC + sg * 0.03, wallC + sg * 0.035), fy + 0.07, cz - 0.38], [Math.max(wallC + sg * 0.03, wallC + sg * 0.035), fy + 0.53, cz + 0.38], 'skyOvercast', false);
+    B.push(fr, pic);
+    break;
+  }
+  // 鉢植え: 開口から最も遠い隅
+  const corners: [number, number][] = [[r.x0 + 0.4, r.z0 + 0.4], [r.x1 - 0.4, r.z0 + 0.4], [r.x0 + 0.4, r.z1 - 0.4], [r.x1 - 0.4, r.z1 - 0.4]];
+  const far = (p: [number, number]): number => Math.min(...ops.map((o) => Math.hypot(o.pos[0] - p[0], o.pos[2] - p[1])));
+  for (const [x, z] of corners.sort((a, b) => far(b) - far(a))) {
+    if (!clear(x - 0.3, z - 0.3, x + 0.3, z + 0.3) || B.some((b) => b.solid && b.min[0] < x + 0.35 && b.max[0] > x - 0.35 && b.min[2] < z + 0.35 && b.max[2] > z - 0.35)) continue;
+    const from = B.length;
+    plant(B, x, z, 0.5, 1.3);
+    lift(from, `plant@${x.toFixed(2)},${z.toFixed(2)}`);
+    break;
+  }
+  R.boxes.push(...B);
+  // 全部の扉（3 枚目を含む）へ歩けなければ外す
+  const reach = reachOpenings({ footprint: R.footprint, floorY: y, boxes: R.boxes }, ops, 0.1);
+  if (reach && reach.blocked.length) R.boxes.length = before;
+}
+
+/** pod の扉の開く向き（外へ開く） */
+const outwardSwing = (d: Dir): number => (axisOf(d) === 'x' ? signOf(d) : -signOf(d));
+
+export function buildAnteroom(ctx: GimmickContext, plan: AnteroomPlan): Anteroom {
+  const R = plan.host;
+  const y = R.floorY;
+  const ctrl = `${ctx.id}.ante`;
+  const doorMat = (plan.a.door.params.mat as MatId | undefined) ?? R.palette.door;
+  // 足した扉の入力（finish で控え室の部品の出力へ配線する。ctx.addEntity は浅く写すので、同じ物を後から書き換えられる）
+  const inputs = new Map<string, Record<string, Json>>();
+  const addDoor = (name: string, cell: string, params: EntitySpec['params']): string => {
+    const inp: Record<string, Json> = {};
+    const id = ctx.addEntity(name, { type: 'door', cell, params, inputs: inp as EntitySpec['inputs'] });
+    inputs.set(id, inp);
+    return id;
+  };
+  // pod の穴を開け、R の中身を置く（pod の前も空ける）
+  carveDoorway(R, plan.pod.pos, plan.pod.dir);
+  const podOp = opening(`${R.id}:pod`, [...plan.pod.pos], plan.pod.dir, DOOR_W, DOOR_H);
+  furnishAnteroom(ctx, R, [...ctx.slot.openings, podOp]);
+  ctx.noDress!();
+  const axis = axisOf(plan.pod.dir);
+  const coord = axis === 'x' ? plan.pod.pos[0] : plan.pod.pos[2];
+  const at = axis === 'x' ? plan.pod.pos[2] : plan.pod.pos[0];
+  const podParams = doorSpec(axis, coord, at, y, doorMat, { hinge: (plan.a.door.params.hinge as number) ?? 1, swing: outwardSwing(plan.pod.dir), autoCloseSec: 6 }).params;
+  const podDoor = addDoor('pod', R.id, podParams);
+  // 灯り（pod の上。入れるとき緑）
+  const lampAt = (pos: Vec3, dir: Dir, cell: string, wired: boolean, name: string): void => {
+    const f = frontPoint({ pos, dir }, WALL_T + 0.03);
+    ctx.addEntity(name, { type: 'warpIndicator', cell, params: { pos: [f[0], pos[1] + DOOR_H + 0.18, f[2]], dir }, ...(wired ? { inputs: { on: `${ctrl}.ready` } } : {}) });
+  };
+  lampAt(plan.pod.pos, plan.pod.dir, R.id, true, 'lamp0');
+
+  const copies: RoomCopy[] = [];
+  const makeCopy = (x: Xform, suffix: string): RoomCopy => {
+    const id = `${R.id}~${suffix}`;
+    const cell = copyCell(R, x, { id, pocket: ctx.id, name: R.name ?? '部屋' });
+    const ops = [...ctx.slot.openings.map((o, i) => xOpening(x, o, `${id}:o${i}`)), xOpening(x, podOp, `${id}:pod`)];
+    addPocketCell(ctx, cell, 'room', ops);
+    const a = addDoor(`${suffix}.a`, id, { ...xDoorParams(x, plan.a.door.params), autoCloseSec: 0 });
+    const b = plan.b ? addDoor(`${suffix}.b`, id, { ...xDoorParams(x, plan.b.door.params), autoCloseSec: 0 }) : null;
+    const pod = addDoor(`${suffix}.pod`, id, { ...xDoorParams(x, podParams), autoCloseSec: 6 });
+    const podOut = { pos: xPoint(x, plan.pod.pos), dir: ((plan.pod.dir + x.q) % 4) as Dir };
+    lampAt(podOut.pos, podOut.dir, id, false, `${suffix}.lamp`);
+    const c: RoomCopy = { cell, xform: x, a, b, pod, podOut };
+    copies.push(c);
+    return c;
+  };
+  const entry = makeCopy({ from: [0, 0, 0], to: [0, plan.rise, 0], q: 0 }, 'a1');
+
+  return {
+    plan, ctrl, podDoor, entry, copies,
+    addCopy: makeCopy,
+    finish(extra = {}) {
+      const A = plan.a.door, B = plan.b?.door ?? null;
+      // 足した扉（pod・双子の部屋の扉）はこの部品が開け閉めする（入力 open を d<i> へ）
+      const managed: string[] = [podDoor, ...copies.flatMap((c) => [c.a, ...(c.b ? [c.b] : []), c.pod])];
+      const auto: Record<string, Json> = {};
+      for (const id of managed) auto[id] = 6;
+      auto[podDoor] = 0;
+      for (const c of copies) { auto[c.a] = 0; if (c.b) auto[c.b] = 0; }
+      managed.forEach((id, i) => { const inp = inputs.get(id); if (inp) inp.open = `${ctrl}.d${i}`; });
+      // R の A・B はふつうの扉のまま。入力 lock をいつも 0 の出力につなぎ、この部品の後に動くようにする（双子の部屋から戻した tick に開くため）
+      for (const e of [A, ...(B ? [B] : [])]) e.inputs = { ...(e.inputs ?? {}), lock: `${ctrl}.free` };
+      const room = innerRect(ctx.slot, 0);
+      // 歩く人（試験）の道順: pod を調べると R'、双子の部屋の A を調べると R
+      const links: Json[] = [{ from: R.id, to: entry.cell.id, at: [...frontPoint(plan.pod, 0.75)], interact: podDoor }];
+      for (const c of copies) {
+        const ao = { pos: xPoint(c.xform, plan.a.o.pos), dir: ((plan.a.o.dir + c.xform.q) % 4) as Dir };
+        links.push({ from: c.cell.id, to: R.id, at: [...frontPoint(ao, 0.75)], interact: c.a });
+      }
+      ctx.addEntity('ante', {
+        type: 'warpAnteroom',
+        params: {
+          managed, auto,
+          room: { min: [room.x0, y - 0.3, room.z0], max: [room.x1, y + 2.5, room.z1] },
+          doors: { a: A.id, b: B?.id ?? null, pod: podDoor },
+          copies: copies.map((c) => ({ a: c.a, b: c.b, pod: c.pod, xform: xJson(c.xform) })),
+          warpLinks: [...links, ...(extra.warpLinks ?? [])],
+        },
+      });
+    },
+  };
+}
+
+/** 双子の部屋の pod と、別の空間の最初の区画をつなぐ（開口と portal。扉は pod） */
+export function attachToPod(ctx: GimmickContext, copy: RoomCopy, cell: string): void {
+  joinCells(ctx, copy.cell.id, cell, copy.podOut.pos, copy.podOut.dir, DOOR_W, DOOR_H, copy.pod);
+}

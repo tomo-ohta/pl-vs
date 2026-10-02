@@ -22,7 +22,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { AABB } from '../../core/math/aabb.ts';
 import { hashAll } from '../../core/math/rng.ts';
-import type { Box, CellLayout, FloorLayout, LightSpec, MatId } from '../../core/world/layout.ts';
+import type { Box, CellLayout, FloorLayout, LightSpec, MatId, UvFrame } from '../../core/world/layout.ts';
+import { rotQ, type Dir } from '../../core/math/vec.ts';
 import { allocateLightmapAtlas, createLightmapTexture, isLightmapTarget, LIGHTMAP_TIER, LightmapBaker, lightmapsSupported, startLightmapCrossfade, writeConstantUV1, writeLightmapUV, type LightmapJobHandle } from '../render/Lightmap.ts';
 import { L2_FLAGS, materialOverridesFor, SURFACES, type MaterialLibrary, type UploadHandle } from '../render/MaterialLibrary.ts';
 import type { QualityTierId } from '../render/quality.ts';
@@ -217,8 +218,10 @@ export class FloorBuilder {
             : [{ mat: b.mat, kind: 'static', grp: '' }];
       for (const v of variants) {
         const box: Box = v.mat === b.mat ? b : { ...b, mat: v.mat };
-        let g = boxGeometry(box);
-        if (WINDOW_ROOM_MATS.has(box.mat) || box.mat === OUTSIDE_VIEW_MAT) attachWindowRoom(g, box.min, box.max);
+        // 双子の箱（warp）: 模様の基準の位置で作ってから今の位置へ写す（傾けた箱は写さない）
+        const frame = b.slope ? undefined : (b.uvFrame ?? cell.uvFrame);
+        let g = frame ? framedGeometry(box, frame) : boxGeometry(box);
+        if (!frame && (WINDOW_ROOM_MATS.has(box.mat) || box.mat === OUTSIDE_VIEW_MAT)) attachWindowRoom(g, box.min, box.max);
         // uv1（ライトマップ）。結合する全ジオメトリが同じ属性を持つよう、対象外の箱にも黒テクセルの uv1 を付ける。範囲は toNonIndexed 後の頂点範囲
         let ranges: [number, number][] | null = null;
         if (atlas) {
@@ -315,6 +318,32 @@ export class FloorBuilder {
     }, (reason) => { info.failed = reason; info.job = null; });
     return info;
   }
+}
+
+/** 模様の基準の写し方の逆で戻した箱（1/4 回転なので軸に平行な箱のまま） */
+export function frameSource(b: Box, f: UvFrame): Box {
+  const pv = f.pivot ?? [0, 0, 0];
+  const back = (p: readonly number[]): [number, number, number] => {
+    const r = rotQ([p[0]! - f.offset[0] - pv[0], p[1]! - f.offset[1] - pv[1], p[2]! - f.offset[2] - pv[2]], ((4 - f.q) % 4) as Dir);
+    return [r[0] + pv[0], r[1] + pv[1], r[2] + pv[2]];
+  };
+  const a = back(b.min), c = back(b.max);
+  return { ...b, min: [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.min(a[2], c[2])], max: [Math.max(a[0], c[0]), Math.max(a[1], c[1]), Math.max(a[2], c[2])] };
+}
+
+/**
+ * 双子の箱（Box.uvFrame / CellLayout.uvFrame）: 模様の基準の位置（逆に戻した箱）でジオメトリと模様の座標を作り、
+ * pivot を中心に q だけ回して offset だけずらす（同じ形の所どうしで、床・壁の模様と水たまりの形が揃う）
+ */
+export function framedGeometry(b: Box, f: UvFrame): THREE.BufferGeometry {
+  const src = frameSource(b, f);
+  const g = boxGeometry(src);
+  if (WINDOW_ROOM_MATS.has(src.mat) || src.mat === OUTSIDE_VIEW_MAT) attachWindowRoom(g, src.min, src.max);
+  const pv = f.pivot ?? [0, 0, 0];
+  g.translate(-pv[0], -pv[1], -pv[2]);
+  if (f.q) g.rotateY((f.q * Math.PI) / 2);
+  g.translate(pv[0] + f.offset[0], pv[1] + f.offset[1], pv[2] + f.offset[2]);
+  return g;
 }
 
 function push<K, V>(m: Map<K, V[]>, k: K, v: V): void {
