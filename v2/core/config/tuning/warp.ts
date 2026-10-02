@@ -49,4 +49,10 @@ export const WARP_TUNING = {
   'warp.cornerSwap.passageM': num(1.7, 1.4, 2.4, '曲がると変わる景色: 扉の壁と仕切りの間の通路の幅（m）'),
   'warp.cornerSwap.gapM': num(1.2, 1.0, 1.8, '曲がると変わる景色: 仕切りの端の切れ目の幅（m）'),
   'warp.cornerSwap.unseenSec': num(0.5, 0.1, 5, '曲がると変わる景色: 通路と切れ目が見えなくなってこの秒数で次の部屋に変わる'),
+  // ---- 回転する部屋（turnRoom: W11）
+  'warp.turnRoom.weight': num(0.8, 0, 10, '回転する部屋: 出やすさ（相対。置ける部屋が広い部屋だけなので重め）'),
+  'warp.turnRoom.ringM': num(1.2, 1.0, 2.0, '回転する部屋: 筒の外の通路の幅（m）'),
+  'warp.turnRoom.gapM': num(1.1, 0.9, 1.6, '回転する部屋: 筒の入口の幅（m）'),
+  'warp.turnRoom.periodSec': num(40, 15, 120, '回転する部屋: 1 回りの秒数'),
+  'warp.turnRoom.drift': num(0.12, 0, 0.6, '回転する部屋: 外へ押す強さ（軸から 1 m 離れるごとの m/s）'),
 } as const satisfies Record<string, Spec>;

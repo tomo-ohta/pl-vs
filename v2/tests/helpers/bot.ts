@@ -322,19 +322,42 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     return d;
   };
   const replan = (): void => { path = []; bestD = Infinity; };
+  // 回転する部屋（warpTurnRoom）: 壁が動くので道を 1/3 秒ごとに引き直す。目標まで道が無ければ、筒の真ん中へ行って（行けなければその場で）待つ
+  let hold: [number, number][] | null = null;
   const ticks = Math.round(maxSec / sim.dt);
   for (let n = 0; n < ticks; n++) {
     const L = legs[leg];
     if (!L) return { ok: true, reason: '', seconds: n * sim.dt, route: routeIds };
     legT += sim.dt;
     if (botDebug.trace && n % 60 === 0) botDebug.trace(`t=${(n * sim.dt).toFixed(0)} leg ${leg}/${legs.length} pos ${player.pos.map((v) => v.toFixed(2)).join(',')} path ${path.length} best ${bestD.toFixed(2)} stuck ${stuck}`);
+    const tc = cellAtPos(floor, player.pos);
+    const turn = tc ? floor.entities.find((e) => e.type === 'warpTurnRoom' && e.cell === tc.id) : undefined;
+    if (turn && n % 20 === 0) { path = []; hold = null; }
+    if (!turn) hold = null;
     // 区画の中の道を引き直す（区間の始まり・止まったとき・流された・落ちたとき）
     if (!path.length) {
       const c = cellAtPos(floor, player.pos);
-      path = (c && !L.via ? pathInCell(sim, c, player.pos, [L.x, L.y, L.z]) : null) ?? [];
+      const direct = c && !L.via ? pathInCell(sim, c, player.pos, [L.x, L.y, L.z]) : null;
+      path = direct ?? [];
       path.push([L.x, L.z]);
       segFrom = [player.pos[0], player.pos[2]];
       planY = player.pos[1];
+      const inCell = !!c && L.x >= c.bounds.min[0] && L.x <= c.bounds.max[0] && L.z >= c.bounds.min[2] && L.z <= c.bounds.max[2];
+      if (turn && c && !direct && inCell && !L.via) {
+        const cc = turn.params.center as number[];
+        const inside = Math.hypot(player.pos[0] - cc[0]!, player.pos[2] - cc[1]!) < Number(turn.params.radius) - 0.3;
+        hold = inside ? [[cc[0]!, cc[1]!]] : (pathInCell(sim, c, player.pos, [cc[0]!, player.pos[1], cc[1]!]) ?? []);
+      }
+    }
+    if (hold) {
+      // 待つ: 筒の真ん中へ（道があれば）。着いたら立って待つ
+      while (hold.length && Math.hypot(hold[0]![0] - player.pos[0], hold[0]![1] - player.pos[2]) < 0.3) hold.shift();
+      const h = hold[0];
+      const hx = h ? h[0] - player.pos[0] : 0, hz = h ? h[1] - player.pos[2] : 0;
+      sim.step([{ ...IDLE_COMMAND, yaw: h ? Math.atan2(-hx, -hz) : player.yaw, pitch: 0, moveY: h ? 1 : 0 }]);
+      stuck = 0; bestD = Infinity; legT = Math.max(0, legT - sim.dt);
+      lastCell = cellAtPos(floor, player.pos)?.id ?? lastCell;
+      continue;
     }
     // 強い流れ（動く歩道）の上: 流れの後ろになった目標の点は飛ばす（逆らって戻ろうとしない）
     const fz = player.zoneForce;

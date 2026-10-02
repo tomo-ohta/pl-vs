@@ -9,3 +9,4 @@ import './endlessStairs.ts';
 import './lookBack.ts';
 import './fourRights.ts';
 import './cornerSwap.ts';
+import './turnRoom.ts';

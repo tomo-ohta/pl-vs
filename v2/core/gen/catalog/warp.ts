@@ -38,6 +38,7 @@ export const WARP_CATALOG: CatalogEntry[] = [
   { idea: 'BX03', name: '距離を飛び越える扉の、枠の裏側から入る', status: 'deferred', impl: [], note: TODO },
   { idea: 'W08', name: '窓の向こうの自分', status: 'deferred', impl: [], note: TODO },
   { idea: 'BX08', name: '窓の前で長く立ち止まる', status: 'deferred', impl: [], note: TODO },
-  { idea: 'W11', name: '回転する部屋', status: 'deferred', impl: [], note: TODO },
+  { idea: 'W11', name: '回転する部屋', status: 'done', impl: [{ kind: 'gimmick', id: 'turnRoom' }, { kind: 'part', id: 'warpTurnRoom' }, { kind: 'view', id: 'warpTurnRoom' }],
+    note: '広い部屋の真ん中に、木の板張りの丸い部屋（筒・肘掛け椅子 4 脚と灯り・額・赤い床）が 1 回り 40 秒でゆっくり回る。筒の外の通路は 4 枚の仕切りで区切られ、向かいの扉へは筒の中を通るしかない（入口は向かい合う 2 か所。目の前に来たら乗り、行きたい扉の前に来たら降りる）。筒の中では床と一緒に回り（向きも回る）、真ん中から離れるほど外へ押される（真ん中にいれば立っていられる）。入口はどの区切りの前にも回ってくる（閉じ込めない）' },
   { idea: 'F30', name: '前の階に戻る輪', status: 'deferred', impl: [], note: TODO },
 ];

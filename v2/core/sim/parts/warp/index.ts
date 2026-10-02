@@ -11,3 +11,4 @@ import './lap.ts';
 import './sign.ts';
 import './stairs.ts';
 import './ring.ts';
+import './turn.ts';

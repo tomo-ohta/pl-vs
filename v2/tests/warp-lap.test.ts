@@ -113,8 +113,10 @@ function drive(room: GimmickRoom, sim: Sim): { forward(): boolean; back(): boole
   };
 }
 
+/** 遊んだ周で見た異変の種類（次の 2 つの試験で集め、2 つ目の終わりに数える） */
+const kinds = new Set<string>();
+
 test('異変の廊下: 異変があれば引き返し・無ければ進むと数が増え、goal で出口の周（奥へ進める）・間違えると 0 に戻る・出口から元の部屋へ', () => {
-  const kinds = new Set<string>();
   for (const room of ROOMS) {
     const f = room.floor, ctrl = `${room.id}.lap`;
     const sim = new Sim(f, { tuning: t, physics: new PhysicsWorld(RAPIER, 1 / 60) });
@@ -144,8 +146,6 @@ test('異変の廊下: 異変があれば引き返し・無ければ進むと数
     assert.ok(walkTo(sim, room.cell.id, undefined, 60).ok, '元の部屋へ');
     // もう一度入って、わざと間違える（異変のある周で進む / 無い周で引き返す）と 0 に戻る
   }
-  console.log(`  見た異変 ${kinds.size} 種: ${[...kinds].join(', ')}`);
-  assert.ok(kinds.size >= 5, '異変が何種類も出る');
 });
 
 test('異変の廊下: 間違えると数が 0 に戻り、次の周は異変なし・BX01 引き返さずに異変のある周を 3 回進むと隠しの扉が現れる', () => {
@@ -161,6 +161,7 @@ test('異変の廊下: 間違えると数が 0 に戻り、次の周は異変な
     let run = 0, guard = 0;
     while (!sim.stateOf(ctrl)?.secret && guard++ < 60) {
       const a = d.look();
+      if (a >= 0) kinds.add(lapOf(room).anomalies[a]!.id);
       if (a >= 0) {
         // 異変があるのに進む（間違い）: 数は 0 に戻り、次の周は異変なし
         assert.ok(d.forward());
@@ -177,7 +178,8 @@ test('異変の廊下: 間違えると数が 0 に戻り、次の周は異変な
     const sec = room.r.gimmicks!.secrets.find((s) => s.host === `${room.cell.id}~xC0`);
     if (sec) { revealed++; assert.ok(sim.isRevealed(`${sec.id}.wall`), '異変の部屋の扉が現れる'); }
   }
-  console.log(`  異変の部屋 ${revealed}`);
+  console.log(`  異変の部屋 ${revealed}・見た異変 ${kinds.size} 種: ${[...kinds].join(', ')}`);
+  assert.ok(kinds.size >= 6, '異変が何種類も出る（周ごとに袋から引くので、続けて遊ぶとばらける）');
 });
 
 test('異変の廊下: 決定的', () => {
