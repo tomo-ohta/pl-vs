@@ -185,6 +185,11 @@ export interface CellLayout {
   pocket?: string;
   /** 描画の模様の基準（warp の双子の区画）。箱ごとの Box.uvFrame が優先 */
   uvFrame?: UvFrame;
+  /**
+   * 'group': uvFrame の元の位置（局所の座標）で区画を丸ごと作り、写し方を描画の入れ物の回転と平行移動にする
+   * （果てしない階の階段室。上下の階の写しが、模様・汚れ・焼き込みまで同じになる）
+   */
+  frame?: 'group';
 }
 
 /**

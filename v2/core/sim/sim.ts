@@ -209,6 +209,11 @@ export class Sim implements PlayerWorld {
     return this.regions.get(id)?.layout ?? null;
   }
 
+  /** 出口（入っている区域の。id で） */
+  exitById(id: string): FloorExit | null {
+    return this.exits.find((x) => x.id === id) ?? null;
+  }
+
   /** 部品の設定（書き換えると次の tick から効く。境目の扉の錠など、世界が持つ部品に使う） */
   entitySpec(id: string): EntitySpec | null {
     return this.entities.get(id)?.spec ?? null;

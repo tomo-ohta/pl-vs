@@ -135,21 +135,25 @@ function lightAt(ctx: ViewContext, at: [number, number, number]): [number, numbe
 
 // ---------------------------------------------------------------- 扉
 defineView('door', (spec, ctx) => {
-  const panel = aabbOf(spec.params.panel);
-  const axis = spec.params.axis === 'x' ? 'x' : 'z';
+  // 果てしない階の階段室の扉（params.frame・params.local）: 局所の座標で作って入れ物を回し・ずらす（上下の階の写しで同じ見た目）
+  const fr = spec.params.frame as { offset: number[]; q: number } | undefined;
+  const P = (fr ? spec.params.local : spec.params) as typeof spec.params;
+  const panel = aabbOf(P.panel);
+  const worldPanel = aabbOf(spec.params.panel);
+  const axis = P.axis === 'x' ? 'x' : 'z';
   const mat = (spec.params.mat as MatId | undefined) ?? 'doorWood';
   const size: [number, number, number] = [panel.max[0] - panel.min[0], panel.max[1] - panel.min[1], panel.max[2] - panel.min[2]];
   // 板は開口より 3 cm ずつ大きく（隙間から向こうが見えない。v1 と同じ）。厚さ 5 cm
   const W = (axis === 'z' ? size[0] : size[2]) + 0.06;
   const H = size[1] + 0.03;
   const T = 0.05;
-  const hingeSign = spec.params.hinge === 1 ? 1 : -1;
+  const hingeSign = P.hinge === 1 ? 1 : -1;
   // 蝶番: 'z' の扉（x に沿う板）は x の端、'x' の扉は z の端。板は蝶番から -hingeSign の向きへ伸びる
   const pivot = new THREE.Group();
   if (axis === 'z') pivot.position.set(hingeSign < 0 ? panel.min[0] - 0.03 : panel.max[0] + 0.03, panel.min[1], (panel.min[2] + panel.max[2]) / 2);
   else pivot.position.set((panel.min[0] + panel.max[0]) / 2, panel.min[1], hingeSign < 0 ? panel.min[2] - 0.03 : panel.max[2] + 0.03);
   const along = (d: number, up: number, out: number): [number, number, number] => (axis === 'z' ? [-hingeSign * d, up, out] : [out, up, -hingeSign * d]);
-  const light = lightAt(ctx, aabbCenter(panel));
+  const light = lightAt(ctx, aabbCenter(worldPanel));
   const geos: THREE.BufferGeometry[] = [];
   const g = boxGeometry(axis === 'z' ? [W, H, T] : [T, H, W], mat);
   setBaked(g, light);
@@ -179,8 +183,14 @@ defineView('door', (spec, ctx) => {
     lv.position.set(...along(knobD - 0.05, knobY, face * (T / 2 + 0.035)));
     pivot.add(lv);
   }
-  ctx.root.add(pivot);
-  const swing = typeof spec.params.swing === 'number' ? spec.params.swing : 1;
+  const holder = fr ? new THREE.Group() : null;
+  if (holder && fr) {
+    holder.position.set(fr.offset[0]!, fr.offset[1]!, fr.offset[2]!);
+    holder.rotation.y = (fr.q * Math.PI) / 2;
+    holder.add(pivot);
+    ctx.root.add(holder);
+  } else ctx.root.add(pivot);
+  const swing = typeof P.swing === 'number' ? P.swing : 1;
   return {
     update(s) {
       const a = typeof s.angle === 'number' ? s.angle : 0;
@@ -188,7 +198,7 @@ defineView('door', (spec, ctx) => {
       const e = a * a * (3 - 2 * a);
       pivot.rotation.y = -hingeSign * swing * e * (95 * Math.PI / 180);
     },
-    dispose() { pivot.removeFromParent(); for (const x of geos) x.dispose(); },
+    dispose() { (holder ?? pivot).removeFromParent(); for (const x of geos) x.dispose(); },
   };
 });
 

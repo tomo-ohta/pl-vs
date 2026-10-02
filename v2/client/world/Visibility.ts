@@ -3,10 +3,13 @@
  * カメラのいる区画から、開口（PortalSpec）をたどって見える区画を集める。開口がカメラの視野（視錐台）に入っていなければ、
  * その先はたどらない。閉じた扉・まだ消えていない隠しの壁（concealGroup）の開口もたどらない。
  * 視錐台を開口の形に狭める処理はしない（開口の箱が視野に入るかだけ）。その分、少し多めに描くが、判定は軽い。
+ *
+ * 果てしない階（docs/endless-world.md 5.3）: 区域ごとに区画と開口を足し・外す（addGroup / removeGroup）。
+ * 区域をまたぐ境目の扉の開口は setExtra で渡す。まだ作り終えていない区画（描けない区画）は ready で外す
  */
 import * as THREE from 'three';
 import type { Sim } from '../../core/sim/sim.ts';
-import type { FloorLayout, PortalSpec } from '../../core/world/layout.ts';
+import type { CellLayout, FloorLayout, PortalSpec } from '../../core/world/layout.ts';
 import { cellAt, type BuiltFloor } from './FloorBuilder.ts';
 
 export class Visibility {
@@ -16,20 +19,30 @@ export class Visibility {
   private readonly byCell = new Map<string, PortalSpec[]>();
   /** 開口を塞いでいる隠しの壁の組（現れたら通れる） */
   private readonly concealed = new Map<string, string>();
+  /** 組（区域）ごとの開口 */
+  private readonly groups = new Map<string, PortalSpec[]>();
+  private extra: PortalSpec[] = [];
   readonly visible = new Set<string>();
   /** たどる深さの上限 */
   maxDepth = 12;
+  /** 描ける区画か（無ければ全部描ける） */
+  ready: ((cellId: string) => boolean) | null = null;
 
-  constructor(floor: FloorLayout) {
-    for (const p of floor.portals) {
-      for (const c of p.cells) {
-        const l = this.byCell.get(c) ?? [];
-        l.push(p);
-        this.byCell.set(c, l);
-      }
+  constructor(floor?: FloorLayout) {
+    if (floor) this.addGroup('', floor.cells, floor.portals);
+  }
+
+  /** 区画と開口の組を足す（区域） */
+  addGroup(id: string, cells: readonly CellLayout[], portals: readonly PortalSpec[]): void {
+    this.removeGroup(id);
+    this.groups.set(id, [...portals]);
+    const byId = new Map(cells.map((c) => [c.id, c]));
+    for (const p of portals) {
+      this.link(p);
       // 開口の中に隠しの壁（concealGroup の箱）があれば、その組が現れるまで塞がっている
-      for (const cell of floor.cells) {
-        if (!p.cells.includes(cell.id)) continue;
+      for (const cid of p.cells) {
+        const cell = byId.get(cid);
+        if (!cell) continue;
         for (const b of cell.boxes) {
           if (!b.concealGroup) continue;
           const a = p.aabb;
@@ -39,10 +52,42 @@ export class Visibility {
     }
   }
 
+  removeGroup(id: string): void {
+    const old = this.groups.get(id);
+    if (!old) return;
+    for (const p of old) { this.unlink(p); this.concealed.delete(p.id); }
+    this.groups.delete(id);
+  }
+
+  /** 区域をまたぐ開口（境目の扉）を差し替える */
+  setExtra(portals: readonly PortalSpec[]): void {
+    for (const p of this.extra) this.unlink(p);
+    this.extra = [...portals];
+    for (const p of this.extra) this.link(p);
+  }
+
+  private link(p: PortalSpec): void {
+    for (const c of p.cells) {
+      const l = this.byCell.get(c) ?? [];
+      l.push(p);
+      this.byCell.set(c, l);
+    }
+  }
+
+  private unlink(p: PortalSpec): void {
+    for (const c of p.cells) {
+      const l = this.byCell.get(c);
+      if (!l) continue;
+      const i = l.indexOf(p);
+      if (i >= 0) l.splice(i, 1);
+      if (!l.length) this.byCell.delete(c);
+    }
+  }
+
   update(built: BuiltFloor, sim: Sim, camera: THREE.Camera): ReadonlySet<string> {
     camera.updateMatrixWorld();
     this.compute(built, sim, camera, this.visible);
-    for (const [id, c] of built.cells) c.group.visible = this.visible.has(id);
+    for (const [id, c] of built.cells) c.group.visible = this.visible.has(id) && (!this.ready || this.ready(id));
     return this.visible;
   }
 
@@ -57,8 +102,12 @@ export class Visibility {
     const start = cellAt(built, [pos.x, pos.y - 1.5, pos.z]) ?? cellAt(built, [pos.x, pos.y, pos.z]);
     out.clear();
     if (!start) {
-      // 区画の外（落下中など）: 全部
-      for (const id of built.cells.keys()) out.add(id);
+      // 区画の外（落下中など）: 近くの区画を全部（果てしない階では遠くの区域まで全部は描かない）
+      for (const [id, c] of built.cells) {
+        const b = c.bounds;
+        const d = Math.hypot(Math.max(b.min[0] - pos.x, 0, pos.x - b.max[0]), Math.max(b.min[2] - pos.z, 0, pos.z - b.max[2]));
+        if (d < 40) out.add(id);
+      }
     } else {
       out.add(start.id);
       const q: [string, number][] = [[start.id, 0]];

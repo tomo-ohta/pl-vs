@@ -31,12 +31,14 @@ import { mobileTier, QUALITY_TIERS, type QualityTier, type QualityTierId } from 
 import { Settings } from '../settings/Settings.ts';
 import type { UiRefs } from '../ui/dom.ts';
 import { PlayerFlashlight } from '../render/PlayerFlashlight.ts';
-import { createView, type EntityView } from '../views/index.ts';
+import type { ViewContext } from '../views/index.ts';
 import { PortalRenderer } from '../world/Portals.ts';
 import { applyLampLevels, cellAt, FloorBuilder, type BuiltFloor } from '../world/FloorBuilder.ts';
 import { LightManager } from '../world/LightManager.ts';
 import { restoreCarry, watchCarry } from './carryStore.ts';
-import { Visibility } from '../world/Visibility.ts';
+import { StoryView } from '../world/StoryView.ts';
+import type { StoryWorld } from '../../core/stream/story.ts';
+import type { StoryChange, WorldSession } from '../../core/stream/session.ts';
 
 const TONE_MAPPINGS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping } as const;
 /** 環境（霧・空の色）の補間時間 */
@@ -63,8 +65,19 @@ export class ClientGame {
   readonly postfx: PostFX;
   readonly tuning: Tuning;
   readonly ui: UiRefs;
-  sim: Sim | null = null;
-  built: BuiltFloor | null = null;
+  /** フロア（フロア単位の生成）の Sim。果てしない階では session の今の階の Sim */
+  private legacySim: Sim | null = null;
+  /** 果てしない階（docs/endless-world.md）。フロアを遊ぶときは null */
+  session: WorldSession | null = null;
+  /** 今の階（フロア）の描画 */
+  story: StoryView | null = null;
+  /** 階段室の向こうの階の描画（作っておく） */
+  private readonly beyondViews = new Map<StoryWorld, StoryView>();
+  private readonly builder: FloorBuilder;
+  /** 階を移った（main が地図・表示を替える） */
+  onStoryChange: ((c: StoryChange) => void) | null = null;
+  /** Sim のイベントを全部受け取る（main が置いた物の保存に使う） */
+  readonly eventTaps = new Set<(e: SimEvent) => void>();
   tier: QualityTier;
   paused = true;
   /** フロアの出口に入った（main がつぎのフロアを読む） */
@@ -74,10 +87,6 @@ export class ClientGame {
 
   private readonly hemi = new THREE.HemisphereLight(0xe5e4d5, 0x6c665a, 0.1);
   private lightsPool: LightManager;
-  private views = new Map<string, EntityView>();
-  /** 部品の描画の入れ物と、それが見えるべき区画（部品の区画。扉は扉の両側の区画） */
-  private viewRoots = new Map<string, { root: THREE.Group; cells: string[] }>();
-  private visibility: Visibility | null = null;
   /** 見える区画（cell and portal）。開発用に ?cull=off で全部描く */
   cull = typeof location === 'undefined' || new URLSearchParams(location.search).get('cull') !== 'off';
   private yaw = 0;
@@ -89,8 +98,6 @@ export class ClientGame {
   /** 懐中電灯（v1 と同じく最初は点いている。R で切り替え） */
   private flashlight: PlayerFlashlight | null = null;
   flashlightOn = true;
-  /** 部品の描画が受け取るシミュレーションのイベント（views の ctx.onEvent） */
-  private eventListeners = new Set<(e: SimEvent) => void>();
   /** 置いた物の保存をやめて書く（フロアを離れるとき） */
   private carryWatch: (() => void) | null = null;
   private pendingInteract: { yaw: number; pitch: number } | null = null;
@@ -108,6 +115,16 @@ export class ClientGame {
     return v === undefined ? 1 : v;
   };
 
+  /** 今の Sim（フロアか、果てしない階の今の階） */
+  get sim(): Sim | null {
+    return this.session ? this.session.active.sim : this.legacySim;
+  }
+
+  /** 今の階の区画（作った物） */
+  get built(): BuiltFloor | null {
+    return this.story?.built ?? null;
+  }
+
   constructor(o: GameOptions) {
     this.tuning = o.tuning;
     this.ui = o.ui;
@@ -119,6 +136,7 @@ export class ClientGame {
     this.tier = this.tierFor(this.settings.data.tier === 'auto' ? (IS_MOBILE ? 'mid' : 'high') : this.settings.data.tier);
     this.materials.configure(this.renderer);
     this.materials.setTier(this.tier);
+    this.builder = new FloorBuilder(this.materials, { tier: this.tier.id });
     setBevelQuality(this.tier.id);
     this.scene.fog = new THREE.Fog(0x0b0d14, 8, 46);
     this.scene.background = new THREE.Color(0x050608);
@@ -149,6 +167,7 @@ export class ClientGame {
   setTier(id: QualityTierId): void {
     this.tier = this.tierFor(id);
     this.materials.setTier(this.tier);
+    this.builder.tier = this.tier.id;
     setBevelQuality(this.tier.id);
     this.audio.setTier(this.tier);
     this.lightsPool.resize(this.tier.maxLights);
@@ -184,6 +203,15 @@ export class ClientGame {
   }
 
   // ---------------------------------------------------------------- フロア
+  /** 部品の描画の入れ物（root）から ViewContext を作る（StoryView が区域ごとに使う） */
+  private viewContext(root: THREE.Group, built: BuiltFloor, sim: Sim, onEvent: NonNullable<ViewContext['onEvent']>): ViewContext {
+    return { root, materials: this.materials, built, sim, levelOf: this.lampLevel, audio: this.audio, postfx: this.postfx, camera: this.camera, scene: this.scene, onEvent, quality: () => this.tier, portals: this.portals };
+  }
+
+  private storyView(world: StoryWorld | null, sim: () => Sim, name: string): StoryView {
+    return new StoryView({ builder: this.builder, renderer: this.renderer, scene: this.scene, camera: this.camera, viewContext: (r, b, s, f) => this.viewContext(r, b, s, f) }, world, sim, name);
+  }
+
   /**
    * フロアを読む。saveKey: 置いた物が残る（I09）の保存の鍵（世界の seed・フロア・調整表の版。見本・実験場では渡さない）
    */
@@ -191,59 +219,148 @@ export class ClientGame {
     this.unloadFloor();
     const needsPhysics = floor.entities.some((e) => partDef(e.type)?.physics);
     const physics = needsPhysics ? new PhysicsWorld(await loadRapier(), 1 / this.tuning['physics.tickHz']) : null;
-    this.sim = new Sim(floor, { tuning: this.tuning, physics });
+    const sim = new Sim(floor, { tuning: this.tuning, physics });
+    this.legacySim = sim;
     // 置いた物の保存を、最初の tick の前に戻す
-    if (opts.saveKey) restoreCarry(this.sim, opts.saveKey);
-    this.built = new FloorBuilder(this.materials, { tier: this.tier.id }).build(floor);
-    this.scene.add(this.built.root);
-    this.visibility = new Visibility(floor);
+    if (opts.saveKey) restoreCarry(sim, opts.saveKey);
     // 部品の描画は部品ごとの入れ物に入れ、区画と一緒に隠す（見えない区画の物が暗闇に浮いて見えないように。描く量も減る）
-    for (const e of floor.entities) {
-      const root = new THREE.Group();
-      root.name = `entity:${e.id}`;
-      this.built.root.add(root);
-      const v = createView(e, {
-        root, materials: this.materials, built: this.built, sim: this.sim, levelOf: this.lampLevel,
-        audio: this.audio, postfx: this.postfx, camera: this.camera, scene: this.scene,
-        onEvent: (f) => { this.eventListeners.add(f); return () => this.eventListeners.delete(f); },
-        quality: () => this.tier,
-        portals: this.portals,
-      });
-      if (!v) { root.removeFromParent(); continue; }
-      this.views.set(e.id, v);
-      const portal = e.type === 'door' ? floor.portals.find((p) => p.doorId === e.id) : undefined;
-      this.viewRoots.set(e.id, { root, cells: portal ? [...portal.cells] : e.cell ? [e.cell] : [] });
-    }
-    if (opts.saveKey) this.carryWatch = watchCarry(this.sim, opts.saveKey, (f) => { this.eventListeners.add(f); return () => this.eventListeners.delete(f); });
-    this.warmUp();
-    const p = this.sim.players[0]!;
+    const story = this.storyView(null, () => sim, floor.id);
+    story.addRegion('', floor);
+    story.buildAll();
+    this.story = story;
+    this.scene.add(story.root);
+    if (opts.saveKey) this.carryWatch = watchCarry(sim, opts.saveKey, (f) => { story.listeners.add(f); return () => story.listeners.delete(f); });
+    this.warmUp(story.root);
+    this.afterLoad(floor.fog);
+  }
+
+  /**
+   * 果てしない階を始める（docs/endless-world.md）。session は最初の区域を受け取った後のもの。最初の区域は今すぐ作り、ほかは毎フレーム少しずつ
+   */
+  startWorld(session: WorldSession): void {
+    this.unloadFloor();
+    this.session = session;
+    const w = session.active;
+    const story = this.storyView(w, () => w.sim, `${w.story.depth}.${w.story.variant}`);
+    w.ready = (id) => story.regionReady(id);
+    this.story = story;
+    this.scene.add(story.root);
+    this.syncStory(story, Infinity);
+    story.buildAll();
+    story.syncGates();
+    this.warmUp(story.root);
+    this.afterLoad(w.sim.floor.fog);
+  }
+
+  private afterLoad(fog: FloorLayout['fog']): void {
+    const p = this.sim!.players[0]!;
     this.yaw = p.yaw;
     this.pitch = p.pitch;
     this.prevPos = [...p.pos];
-    if (floor.fog) {
-      this.envTo.fog.setHex(floor.fog.color);
-      this.envTo.near = floor.fog.near;
-      this.envTo.far = floor.fog.far;
+    if (fog) {
+      this.envTo.fog.setHex(fog.color);
+      this.envTo.near = fog.near;
+      this.envTo.far = fog.far;
     }
+    this.currentCell = null;
     this.enterCell(true);
     this.rig.snap(this.subject(1));
   }
 
+  /** 階の区域の出し入れを描画に写し、時間 budget まで作る（今いる区域を先に） */
+  private syncStory(view: StoryView, budget: number): number {
+    const w = view.world;
+    if (!w) return 0;
+    for (const c of w.drainChanges()) {
+      if (c.type === 'add') { const L = w.regionLayout(c.id); if (L) view.addRegion(c.id, L); }
+      else view.removeRegion(c.id);
+    }
+    // 入ってすぐ（変わったことを取り出す前）の区域も足す
+    for (const r of w.regions) view.addRegion(r.plan.id, r.layout);
+    const p = w.sim.players[0];
+    const cur = p ? w.planAt(p.pos[0], p.pos[2]).id : undefined;
+    const used = budget > 0 ? view.pump(budget, cur) : 0;
+    view.syncGates();
+    return used;
+  }
+
+  /** 果てしない階の毎フレームの描画の用意: 今の階と、作ってある向こうの階 */
+  private syncWorld(): void {
+    const s = this.session;
+    if (!s || !this.story) return;
+    const budget = this.tuning['world.buildMs'] * (IS_MOBILE ? 0.6 : 1);
+    const used = this.syncStory(this.story, budget);
+    // 向こうの階: 作り始めた階に描画を付け、捨てた階の描画を捨てる。残りの時間で作る
+    const worlds = new Set(s.beyondWorlds());
+    for (const [w, v] of this.beyondViews) if (!worlds.has(w)) { v.dispose(); this.beyondViews.delete(w); }
+    let left = budget - used;
+    for (const w of worlds) {
+      let v = this.beyondViews.get(w);
+      if (!v) {
+        v = this.storyView(w, () => w.sim, `${w.story.depth}.${w.story.variant}`);
+        const view = v;
+        w.ready = (id) => view.regionReady(id);
+        this.beyondViews.set(w, v);
+      }
+      left -= this.syncStory(v, Math.max(1, left));
+    }
+  }
+
+  /** 向こうの階を見せられるか（区域を全部作り終えた。session の ready） */
+  storyReady(w: StoryWorld): boolean {
+    const v = this.beyondViews.get(w);
+    return !!v && v.allReady() && w.regions.every((r) => v.regionReady(r.plan.id));
+  }
+
+  /** 階を移った: 描画を入れ替え、カメラを同じだけずらす（同じ形の階段室の中なので見た目は変わらない） */
+  private swapStory(c: StoryChange): void {
+    const s = this.session;
+    if (!s || !this.story) return;
+    const next = this.beyondViews.get(s.active);
+    if (!next) return;
+    const prev = this.story;
+    this.beyondViews.delete(s.active);
+    const prevWorld = prev.world;
+    if (prevWorld) this.beyondViews.set(prevWorld, prev);
+    prev.root.removeFromParent();
+    this.scene.add(next.root);
+    this.story = next;
+    if (c.seamless) {
+      this.prevPos = [this.prevPos[0] + c.dx, this.prevPos[1] + c.dy, this.prevPos[2] + c.dz];
+      this.yaw += c.dYaw;
+      this.rig.shiftYaw(c.dYaw);
+      this.prevCamYaw += c.dYaw;
+    } else {
+      // 暗転して移った: 視点をそのまま新しい所へ
+      const p = s.active.sim.players[0]!;
+      this.prevPos = [...p.pos];
+      this.yaw = p.yaw;
+      this.pitch = 0;
+      this.rig.snap(this.subject(1));
+    }
+    this.flashlight?.reset();
+    this.currentCell = null;
+    this.enterCell(true);
+    // 照明の割り当ても、新しい階の同じ形の階段室の照明へすぐに（なめらかに替えると一瞬暗くなる）
+    const cam = new THREE.Vector3(this.camera.position.x + c.dx, this.camera.position.y + c.dy, this.camera.position.z + c.dz);
+    const cell = cellAt(next.built, [cam.x, cam.y - 1.5, cam.z]);
+    this.lightsPool.snap(next.built, cam, this.lampLevel, cell ? new Set([cell.id]) : null);
+    this.onStoryChange?.(c);
+  }
+
   /**
-   * 読み込みの最後に、フロアの全部を 1 度描いてシェーダを作り、テクスチャを GPU へ送っておく（画面は暗転か一時停止の画面の下）。
+   * 読み込みの最後に、全部を 1 度描いてシェーダを作り、テクスチャを GPU へ送っておく（画面は暗転か一時停止の画面の下）。
    * これをしないと、まだ見ていない区画が初めて見えたとき（扉を開けた瞬間など）にその場で作るので 0.3〜0.5 秒止まる
    */
-  private warmUp(): void {
-    const built = this.built;
-    if (!built) return;
+  private warmUp(root: THREE.Object3D): void {
     const saved: { o: THREE.Object3D; visible: boolean; culled: boolean }[] = [];
-    built.root.traverse((o) => {
+    root.traverse((o) => {
       saved.push({ o, visible: o.visible, culled: o.frustumCulled });
       o.visible = true;
       o.frustumCulled = false;
     });
     const textures = new Set<THREE.Texture>();
-    built.root.traverse((o) => {
+    root.traverse((o) => {
       const m = (o as THREE.Mesh).material;
       for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
         for (const v of Object.values(mat)) if (v instanceof THREE.Texture) textures.add(v);
@@ -260,15 +377,17 @@ export class ClientGame {
     // 置いた物を保存してから捨てる
     this.carryWatch?.();
     this.carryWatch = null;
-    for (const v of this.views.values()) v.dispose();
-    this.views.clear();
-    this.viewRoots.clear();
-    this.eventListeners.clear();
-    this.built?.dispose();
-    this.built = null;
-    this.visibility = null;
-    this.sim?.physics?.dispose();
-    this.sim = null;
+    this.story?.dispose();
+    this.story = null;
+    for (const v of this.beyondViews.values()) v.dispose();
+    this.beyondViews.clear();
+    this.legacySim?.physics?.dispose();
+    this.legacySim = null;
+    if (this.session) {
+      this.session.active.sim.physics?.dispose();
+      for (const w of this.session.beyondWorlds()) w.sim.physics?.dispose();
+      this.session = null;
+    }
     this.currentCell = null;
   }
 
@@ -300,17 +419,30 @@ export class ClientGame {
     this.handleEvents(this.sim.drainEvents());
   }
 
-  /** テスト用: 1 tick 進める（ペインが隠れて rAF が止まるときの確認用） */
+  /** テスト用: 1 tick 進める（ペインが隠れて rAF が止まるときの確認用）。果てしない階では区域の描画も少し作る */
   stepOnce(cmd: Partial<InputCommand> = {}): void {
     if (!this.sim) return;
     const p = this.sim.players[0]!;
-    this.sim.step([{ moveX: 0, moveY: 0, yaw: p.yaw, pitch: p.pitch, jump: false, dash: false, crouch: false, interact: null, flashlight: this.flashlightOn, ...cmd }]);
-    this.handleEvents(this.sim.drainEvents());
+    this.syncWorld();
+    this.tick([{ moveX: 0, moveY: 0, yaw: p.yaw, pitch: p.pitch, jump: false, dash: false, crouch: false, interact: null, flashlight: this.flashlightOn, ...cmd }]);
+  }
+
+  /** 1 tick 進め、イベントを受ける。果てしない階では階の入れ替えも */
+  private tick(cmds: InputCommand[]): void {
+    const s = this.session;
+    if (s) {
+      const before = s.active;
+      s.step(cmds);
+      this.handleEvents(before.sim.drainEvents());
+      for (const c of s.drainChanges()) this.swapStory(c);
+    } else this.legacySim?.step(cmds);
+    if (this.sim) this.handleEvents(this.sim.drainEvents());
   }
 
   private frame(now: number): void {
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
+    this.syncWorld();
     const sim = this.sim;
     const input = this.input.poll();
     // メニュー（Esc / 右上）: 開くだけ。閉じるのは一時停止の画面の「再開」（Pointer Lock はユーザー操作の中でしか取れない）
@@ -331,10 +463,9 @@ export class ClientGame {
       const step = sim.dt;
       let n = 0;
       while (this.acc >= step && n < 8) {
-        this.prevPos = [...sim.players[0]!.pos];
-        sim.step([this.command(input)]);
+        this.prevPos = [...this.sim!.players[0]!.pos];
         // tick ごとにイベントを受ける（継ぎ目の無い移動の補間の始点・向きを、次の tick の前に直すため。warp で足した）
-        this.handleEvents(sim.drainEvents());
+        this.tick([this.command(input)]);
         this.pendingJump = false;
         this.pendingDrop = false;
         this.pendingInteract = null;
@@ -342,7 +473,7 @@ export class ClientGame {
         n++;
       }
       if (n === 8) this.acc = 0;
-      this.handleEvents(sim.drainEvents());
+      if (this.sim) this.handleEvents(this.sim.drainEvents());
     }
     this.onFrame?.(input, dt);
     this.render(dt);
@@ -383,8 +514,10 @@ export class ClientGame {
   private handleEvents(events: SimEvent[]): void {
     const sim = this.sim;
     if (!sim || !this.built) return;
+    const listeners = this.story?.listeners;
     for (const e of events) {
-      for (const f of this.eventListeners) f(e);
+      if (listeners) for (const f of listeners) f(e);
+      for (const f of this.eventTaps) f(e);
       switch (e.type) {
         case 'player.stride': {
           const mat = e.data?.water ? 'waterShallow' : this.surfaceUnder();
@@ -426,7 +559,13 @@ export class ClientGame {
           break;
         }
         case 'reveal': this.onReveal(String(e.data?.group ?? ''), String(e.data?.style ?? 'fadeIn')); break;
-        case 'floor.exit': this.onFloorExit?.(String(e.data?.exit ?? ''), String(e.data?.kind ?? ''), sim.floor.exits.find((x) => x.id === e.data?.exit)?.to?.floor ?? null); break;
+        case 'floor.exit': {
+          const ex = sim.exitById(String(e.data?.exit ?? ''));
+          // 果てしない階の階段室は session が入れ替える（ここでは何もしない）
+          if (ex?.airlock) break;
+          this.onFloorExit?.(String(e.data?.exit ?? ''), String(e.data?.kind ?? ''), ex?.to?.floor ?? null);
+          break;
+        }
         default: break;
       }
     }
@@ -476,7 +615,7 @@ export class ClientGame {
     const p = sim.players[0]!;
     if (p.surfaceId) {
       const id = p.surfaceId.split(':')[0]!;
-      const mat = sim.floor.entities.find((e) => e.id === id)?.params.mat;
+      const mat = sim.entitySpec(id)?.params.mat;
       if (typeof mat === 'string') return mat as MatId;
     }
     const cell = cellAt(built, p.pos);
@@ -506,7 +645,9 @@ export class ClientGame {
     this.envTo = { fog: new THREE.Color(fog.color), near: fog.near, far: fog.far, sky, ground: sky.clone().multiplyScalar(0.7) };
     this.envT = immediate ? ENV_LERP_SEC : 0;
     // wet は床全体が濡れた区画だけ（一歩ごとの水は足音の材質 waterShallow で出す。v1 と同じ）
-    this.audio.setRoom({ audioPreset: L.audioPreset ?? '', layoutHints: [] }, L, this.tier, { roomId: L.id, hints: [], wet: !!(L.render?.wetness || L.render?.floorWetness) });
+    // 階段室（局所の座標で作る区画）は上下の階の写しで同じ部屋として扱う（移ったときに音が切り替わらない）
+    const roomId = L.frame === 'group' && L.materialKey ? L.materialKey : L.id;
+    this.audio.setRoom({ audioPreset: L.audioPreset ?? '', layoutHints: [] }, L, this.tier, { roomId, hints: [], wet: !!(L.render?.wetness || L.render?.floorWetness) });
     if (!immediate) this.postfx.notifyRoomEnter();
   }
 
@@ -537,17 +678,21 @@ export class ClientGame {
       this.rig.update(dt, subj);
       this.enterCell();
       this.updateEnvironment(dt);
-      const visible = this.cull && this.visibility ? this.visibility.update(built, sim, this.camera) : null;
-      this.mainVisible = visible ? new Set(visible) : null;
-      for (const [id, v] of this.views) {
-        const vr = this.viewRoots.get(id);
-        const shown = !visible || !vr || !vr.cells.length || vr.cells.some((c) => visible.has(c));
-        if (vr) vr.root.visible = shown;
-        if (!shown) continue;
+      const story = this.story!;
+      const raw = this.cull ? story.visibility.update(built, sim, this.camera) : null;
+      // まだ作り終えていない区域の区画は見えない扱い（照明も付けない）
+      const visible = raw ? new Set([...raw].filter((id) => story.cellReady(id))) : null;
+      if (!raw) for (const [id, c] of built.cells) c.group.visible = story.cellReady(id);
+      this.mainVisible = visible;
+      story.forEachView((id, v, vr) => {
+        const shown = !visible || !vr.cells.length || vr.cells.some((c) => visible.has(c));
+        vr.root.visible = shown;
+        if (!shown) return;
         const st = sim.stateOf(id);
         if (st) v.update(st, dt);
-      }
-      for (const c of built.cells.values()) if (c.lamps.length) applyLampLevels(c, this.lampLevel);
+      });
+      // 見えている区画だけ（頂点の焼き込みを毎フレーム書き直すので、見えない区画は飛ばす）
+      for (const c of built.cells.values()) if (c.lamps.length && c.group.visible) applyLampLevels(c, this.lampLevel);
       this.updateRevealAnim(dt);
       this.lightsPool.update(built, this.camera.position, this.lampLevel, visible, dt);
       if (this.flashlight) {
@@ -576,14 +721,15 @@ export class ClientGame {
   private renderPortals(): void {
     const sim = this.sim, built = this.built;
     if (!sim || !built || !this.portals.surfaces.size) return;
+    const story = this.story!;
     const apply = (cells: ReadonlySet<string> | null): void => {
       const vis = cells ?? this.mainVisible;
-      for (const [id, c] of built.cells) c.group.visible = !vis || vis.has(id);
-      for (const vr of this.viewRoots.values()) vr.root.visible = !vis || !vr.cells.length || vr.cells.some((c) => vis.has(c));
+      for (const [id, c] of built.cells) c.group.visible = (!vis || vis.has(id)) && story.cellReady(id);
+      for (const vr of story.viewRootsAll()) vr.root.visible = !vis || !vr.cells.length || vr.cells.some((c) => vis.has(c));
     };
     this.portals.render(this.renderer, this.scene, this.camera, {
       applyCells: apply,
-      visibleFrom: (cam) => (this.visibility ? this.visibility.compute(built, sim, cam) : new Set(built.cells.keys())),
+      visibleFrom: (cam) => story.visibility.compute(built, sim, cam),
     });
   }
 

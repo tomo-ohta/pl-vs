@@ -59,8 +59,9 @@ export function contentsOf(r: GenReport | null): FloorContents {
   return out;
 }
 
-export interface FloorMeta { world: number; depth: number; variant: number }
-export const floorLabel = (m: FloorMeta): string => `B${m.depth + 1}F${m.variant ? ' 裏' : ''}`;
+/** region: 果てしない階の区域（地図と調査率は区域ごと。docs/endless-world.md 5.4）。name: 区域の名前 */
+export interface FloorMeta { world: number; depth: number; variant: number; region?: string; name?: string }
+export const floorLabel = (m: FloorMeta): string => `B${m.depth + 1}F${m.variant ? ' 裏' : ''}${m.name ? ` ・ ${m.name}` : ''}`;
 
 export interface MapControllerOptions {
   game: GameLike;
@@ -114,7 +115,7 @@ export class MapController {
     this.codex.onChange(() => { if (this.ui?.pauseVisible && this.ui.tab === 'codex') this.codexPanel.render(this.codex, this.defs); });
   }
 
-  get floorKey(): string { return `${this.meta.world}:${this.meta.depth}.${this.meta.variant}`; }
+  get floorKey(): string { return `${this.meta.world}:${this.meta.depth}.${this.meta.variant}${this.meta.region ? `:${this.meta.region}` : ''}`; }
 
   /** フロアを読んだ（前のフロアの地図は保存する） */
   setFloor(floor: FloorLayout, report: GenReport | null, meta: FloorMeta): void {

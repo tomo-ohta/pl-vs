@@ -8,6 +8,7 @@
 import { carryRestore, carrySave } from '../../core/sim/parts/carry/index.ts';
 import type { Sim } from '../../core/sim/sim.ts';
 import type { SimEvent } from '../../core/sim/types.ts';
+import type { FloorLayout } from '../../core/world/layout.ts';
 import { STORAGE_PREFIX } from '../env.ts';
 
 const INDEX_KEY = `${STORAGE_PREFIX}carry.v1`;
@@ -59,4 +60,46 @@ export function watchCarry(sim: Sim, key: string, subscribe: (f: (e: SimEvent) =
     timer = setTimeout(() => { timer = null; write(sim, key); }, 600);
   });
   return () => { off(); if (timer) clearTimeout(timer); write(sim, key); };
+}
+
+// ---------------------------------------------------------------- 果てしない階（区域ごと。docs/endless-world.md 5.4）
+/** 区域の置いた物を戻す（区域を Sim に入れた直後） */
+export function restoreRegionCarry(sim: Sim, layout: FloorLayout, key: string): void {
+  const ls = storage();
+  if (!ls) return;
+  try {
+    dropOld(ls);
+    const raw = ls.getItem(floorKey(key));
+    if (raw) carryRestore(sim, JSON.parse(raw), layout);
+  } catch { /* 壊れた保存は使わない */ }
+}
+
+/** 区域の置いた物を書く（置いたとき・区域を外す直前） */
+export function saveRegionCarry(sim: Sim, layout: FloorLayout, key: string): void {
+  const ls = storage();
+  if (!ls) return;
+  try {
+    const save = carrySave(sim, layout);
+    if (save) ls.setItem(floorKey(key), JSON.stringify(save)); else ls.removeItem(floorKey(key));
+    const index = (JSON.parse(ls.getItem(INDEX_KEY) ?? '[]') as string[]).filter((k) => k !== key);
+    if (save) index.push(key);
+    while (index.length > MAX_FLOORS) ls.removeItem(floorKey(index.shift()!));
+    ls.setItem(INDEX_KEY, JSON.stringify(index));
+  } catch { /* 保存できなくても遊べる */ }
+}
+
+/** 置く・落ちる・戻るたびに、その物の区域を少し待ってから書く（cue の部品の区域） */
+export function watchRegionCarry(sim: () => Sim | null, keyOf: (layout: FloorLayout) => string, subscribe: (f: (e: SimEvent) => void) => () => void): () => void {
+  const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  const off = subscribe((e) => {
+    if (e.type !== 'cue' || !/^carry\.(drop|place|land|return|swap)$/.test(String(e.data?.name ?? ''))) return;
+    const s = sim();
+    const L = e.entity && s ? s.layoutOf(e.entity) : null;
+    if (!s || !L || !L.region) return;
+    const k = keyOf(L);
+    const old = timers.get(k);
+    if (old) clearTimeout(old);
+    timers.set(k, setTimeout(() => { timers.delete(k); const cur = sim(); const L2 = cur?.regionLayout(L.region!.id); if (cur && L2) saveRegionCarry(cur, L2, k); }, 600));
+  });
+  return () => { off(); for (const t of timers.values()) clearTimeout(t); timers.clear(); };
 }

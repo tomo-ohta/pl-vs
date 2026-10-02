@@ -53,6 +53,14 @@ export interface StoryOptions {
   physics: PhysicsWorld;
   planner?: WorldPlanner;
   playerIds?: string[];
+  /**
+   * 区域を見せられるか（描画が区画を作り終えたか）。境目の扉は、両側の区域が読まれていて、両方見せられるときだけ錠を外す。
+   * 無ければ読まれていればよい（試験・Node）
+   */
+  ready?: (regionId: string) => boolean;
+  /** 区域を入れた直後・外す直前（置いた物の保存を戻す・書く。描画が入れる） */
+  regionAdded?: (world: StoryWorld, id: string, layout: FloorLayout) => void;
+  regionRemoving?: (world: StoryWorld, id: string, layout: FloorLayout) => void;
 }
 
 /** 階を移る頼み（階段室の入れ替えの範囲に入り、扉が両方閉じた） */
@@ -78,6 +86,9 @@ export class StoryWorld {
   readonly planner: WorldPlanner;
   readonly t: Tuning;
   private readonly source: RegionSource;
+  private readonly hooks: Pick<StoryOptions, 'regionAdded' | 'regionRemoving'>;
+  /** 区域を見せられるか（StoryOptions.ready）。描画が後から入れてもよい */
+  ready: ((regionId: string) => boolean) | null;
   private readonly loaded = new Map<string, { plan: RegionPlan; layout: FloorLayout }>();
   private readonly gates = new Map<string, GateLink>();
   /** 区域の出し入れ（描画が受け取る。取り出したら空になる） */
@@ -99,6 +110,8 @@ export class StoryWorld {
     this.t = opts.tuning;
     this.source = opts.source;
     this.planner = opts.planner ?? new WorldPlanner(opts.tuning);
+    this.ready = opts.ready ?? null;
+    this.hooks = { ...(opts.regionAdded ? { regionAdded: opts.regionAdded } : {}), ...(opts.regionRemoving ? { regionRemoving: opts.regionRemoving } : {}) };
     const first = this.source.get(start);
     if (!first) throw new Error(`最初の区域を受け取れません: ${start.id}`);
     const sp = spawn ? { ...spawn, cell: '' } : first.spawn;
@@ -174,19 +187,29 @@ export class StoryWorld {
       const extra = [...this.loaded.keys()].filter((id) => !want.has(id)).sort((a, b) => far(b) - far(a));
       for (const id of extra.slice(0, this.loaded.size - t['world.maxRegions'])) this.remove(id);
     }
+    // 錠: 区域を見せられるようになった扉を開ける
+    if (this.ready) for (const g of this.gates.values()) if (g.sides.size >= 2 && this.sim.entitySpec(g.door)?.params.locked) this.refreshGate(g);
     this.checkAirlocks();
+  }
+
+  /** 境目の扉の部品（描画が扉を描く） */
+  gateDoors(): { id: string; cell: string }[] {
+    return [...this.gates.values()].map((g) => ({ id: g.door, cell: [...g.sides.values()][0]! }));
   }
 
   private add(plan: RegionPlan, layout: FloorLayout): void {
     this.sim.addRegion(layout);
     this.loaded.set(plan.id, { plan, layout });
+    this.hooks.regionAdded?.(this, plan.id, layout);
     this.changes.push({ type: 'add', id: plan.id });
     for (const g of layout.region!.gates) this.attachGate(plan, g.id, g.cell);
   }
 
   private remove(id: string): void {
     const r = this.loaded.get(id);
-    if (!r || !this.sim.removeRegion(id)) return;
+    if (!r) return;
+    this.hooks.regionRemoving?.(this, id, r.layout);
+    if (!this.sim.removeRegion(id)) return;
     this.loaded.delete(id);
     this.changes.push({ type: 'remove', id });
     for (const g of r.layout.region!.gates) this.detachGate(id, g.id);
@@ -218,7 +241,8 @@ export class StoryWorld {
     const spec = this.sim.entitySpec(link.door);
     if (!spec) return;
     const both = link.sides.size >= 2;
-    spec.params.locked = !both;
+    const shown = !this.ready || [...link.sides.keys()].every((id) => this.ready!(id));
+    spec.params.locked = !(both && shown);
     const cells = [...link.sides.entries()];
     spec.cell = cells[0]![1];
     if (both) {

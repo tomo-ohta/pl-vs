@@ -36,7 +36,16 @@ export class LightManager {
     }
   }
 
-  update(built: BuiltFloor, cam: THREE.Vector3, levelOf: (lampId: string) => number, visibleCells: ReadonlySet<string> | null, dt: number): void {
+  /**
+   * すぐに割り当て直す（なめらかに替えない）。果てしない階の階段室で階を移ったとき: 同じ形の階段室の照明へ、同じ明るさのまま付け替える
+   * （0 から上げ直すと、移った瞬間に暗くなる）
+   */
+  snap(built: BuiltFloor, cam: THREE.Vector3, levelOf: (lampId: string) => number, visibleCells: ReadonlySet<string> | null): void {
+    for (const s of this.slots) { s.spec = null; s.light.intensity = 0; s.light.position.set(0, -1000, 0); }
+    this.update(built, cam, levelOf, visibleCells, 0, true);
+  }
+
+  update(built: BuiltFloor, cam: THREE.Vector3, levelOf: (lampId: string) => number, visibleCells: ReadonlySet<string> | null, dt: number, instant = false): void {
     const assigned = new Set(this.slots.map((s) => s.spec).filter((s): s is ManagedLight => !!s));
     const scored: { l: ManagedLight; d: number }[] = [];
     for (const l of built.lights) {
@@ -49,7 +58,7 @@ export class LightManager {
     }
     scored.sort((a, b) => a.d - b.d);
     const desired = new Set(scored.slice(0, this.slots.length).map((e) => e.l));
-    const k = 1 - Math.exp(-FADE_RATE * Math.min(0.1, dt));
+    const k = instant ? 1 : 1 - Math.exp(-FADE_RATE * Math.min(0.1, dt));
     // 外れた照明は 0 へ。0 になったら空きにする
     for (const s of this.slots) {
       if (s.spec && !desired.has(s.spec)) {

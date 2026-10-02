@@ -13,7 +13,7 @@ import type { PhysicsWorld } from '../physics/world.ts';
 import type { PlayerState } from '../sim/types.ts';
 import type { RegionAirlockCell } from '../world/layout.ts';
 import { downSlot, parseAirlockId, storyId, WorldPlanner, type StoryKey } from '../gen/world/plan.ts';
-import { StoryWorld, type RegionSource, type TransferRequest } from './story.ts';
+import { StoryWorld, type RegionSource, type StoryOptions, type TransferRequest } from './story.ts';
 
 export interface SessionOptions {
   tuning: Tuning;
@@ -21,6 +21,13 @@ export interface SessionOptions {
   /** 階ごとの物理（階を作るたびに呼ぶ。捨てた階の物理は dispose する） */
   physics(): PhysicsWorld;
   playerIds?: string[];
+  /** 向こうの階を見せられるか（描画が作り終えたか）。無ければ作れていればよい */
+  ready?: (world: StoryWorld) => boolean;
+  /** 階を作ったとき（描画が区域の見せられるかを入れる） */
+  created?: (world: StoryWorld) => void;
+  /** 区域を入れた直後・外す直前（StoryOptions と同じ） */
+  regionAdded?: StoryOptions['regionAdded'];
+  regionRemoving?: StoryOptions['regionRemoving'];
 }
 
 export interface StoryChange {
@@ -87,10 +94,14 @@ export class WorldSession {
     const story: StoryKey = { world, depth, variant: 0 };
     const [cx, cz] = downSlot(world, depth - 1, 0, 0);
     this.active = new StoryWorld(story, this.planner.at(story, cx, cz), this.storyOpts());
+    opts.created?.(this.active);
   }
 
   private storyOpts(): ConstructorParameters<typeof StoryWorld>[2] {
-    return { tuning: this.t, source: this.opts.source, physics: this.opts.physics(), planner: this.planner, ...(this.opts.playerIds ? { playerIds: this.opts.playerIds } : {}) };
+    return {
+      tuning: this.t, source: this.opts.source, physics: this.opts.physics(), planner: this.planner, ...(this.opts.playerIds ? { playerIds: this.opts.playerIds } : {}),
+      ...(this.opts.regionAdded ? { regionAdded: this.opts.regionAdded } : {}), ...(this.opts.regionRemoving ? { regionRemoving: this.opts.regionRemoving } : {}),
+    };
   }
 
   /** 階を移ったこと（取り出したら空になる） */
@@ -103,6 +114,11 @@ export class WorldSession {
   /** 階段室の向こうの階（作ってあれば） */
   beyondOf(airlock: string): StoryWorld | null {
     return this.beyond.get(airlock) ?? null;
+  }
+
+  /** 作ってある向こうの階（全部。暗転して移る先も） */
+  beyondWorlds(): StoryWorld[] {
+    return [...this.beyond.values(), ...(this.gotoWorld ? [this.gotoWorld.w] : [])];
   }
 
   /** 1 tick: 今の階を進め、区域の出し入れ・向こうの階の用意・入れ替え */
@@ -143,6 +159,7 @@ export class WorldSession {
     try {
       const w = new StoryWorld(to, this.planner.at(to, cx, cz), this.storyOpts());
       this.beyond.set(a.id, w);
+      this.opts.created?.(w);
       return w;
     } catch {
       return null;
@@ -152,7 +169,7 @@ export class WorldSession {
   /** 階段室の入れ替え。向こうの階が用意できていなければ false（扉の中で少し待つ） */
   private transfer(r: TransferRequest): boolean {
     const dest = this.beyond.get(r.airlock) ?? null;
-    if (!dest) return false;
+    if (!dest || (this.opts.ready && !this.opts.ready(dest))) return false;
     const srcA = this.active.regionInfo(r.region)?.airlocks.find((x) => x.id === r.airlock);
     const dstA = dest.regions.flatMap((x) => x.layout.region!.airlocks).find((x) => x.id === r.airlock);
     if (!srcA || !dstA) return false;
@@ -168,6 +185,63 @@ export class WorldSession {
     this.beyond.set(r.airlock, prev);
     this.active = dest;
     this.changes.push({ from: prev.story, to: dest.story, airlock: r.airlock, seamless: true, player: r.player, dx: to.pos[0] - before[0], dy: to.pos[1] - before[1], dz: to.pos[2] - before[2], dYaw: to.yaw - yaw0 });
+    return true;
+  }
+
+  // ---------------------------------------------------------------- 暗転して移る（穴・エレベーターの仕掛け・縦穴・迷路フロアの別の出口）
+  private gotoWorld: { to: StoryKey; w: StoryWorld; land: { pos: Vec3; yaw: number } } | null = null;
+
+  /**
+   * 行き先の階 to の、点 (x, z) を持つ区域を作り始める（同期で作れなければ次に呼んだときにまた試す）。
+   * 着く所は、その区域の部屋（隠し・階段室・別の空間を除く）のうち (x, z) にいちばん近い部屋の真ん中。作れたら true
+   */
+  prepareGoto(to: StoryKey, x: number, z: number): boolean {
+    if (this.gotoWorld && storyId(this.gotoWorld.to) === storyId(to)) return true;
+    const plan = this.planner.atPos(to, x, z);
+    try {
+      const w = new StoryWorld(to, plan, this.storyOpts());
+      const L = w.regionLayout(plan.id)!;
+      const sealed = new Set(L.region?.airlocks.map((a) => a.cell));
+      const rooms = L.cells.filter((c) => c.role !== 'secret' && !c.pocket && !sealed.has(c.id) && c.role !== 'connector');
+      const pick = (rooms.length ? rooms : L.cells).map((c) => ({ c, d: Math.hypot((c.bounds.min[0] + c.bounds.max[0]) / 2 - x, (c.bounds.min[2] + c.bounds.max[2]) / 2 - z) })).sort((a, b) => a.d - b.d)[0]!.c;
+      // 部屋の床の空いた所（家具に埋まらない所）のうち、部屋の真ん中にいちばん近い所。そこへ上から少し落とす
+      const cx = (pick.bounds.min[0] + pick.bounds.max[0]) / 2, cz = (pick.bounds.min[2] + pick.bounds.max[2]) / 2, y = pick.floorY;
+      const spots: [number, number][] = [];
+      for (const f of pick.footprint) for (let px = f.x0 + 0.6; px <= f.x1 - 0.6; px += 0.5) for (let pz = f.z0 + 0.6; pz <= f.z1 - 0.6; pz += 0.5) spots.push([px, pz]);
+      spots.sort((a, b) => Math.hypot(a[0] - cx, a[1] - cz) - Math.hypot(b[0] - cx, b[1] - cz));
+      const clear = (px: number, pz: number): boolean => [0.3, 0.9, 1.5].every((h) => [[0, 0], [0.35, 0], [-0.35, 0], [0, 0.35], [0, -0.35]].every(([ox, oz]) => !w.sim.colliders.pointBlocked(px + ox!, y + h, pz + oz!)));
+      const at = spots.find(([px, pz]) => clear(px, pz)) ?? [cx, cz];
+      const land = { pos: [at[0], y + 0.4, at[1]] as Vec3, yaw: 0 };
+      w.sim.teleport(0, land.pos, land.yaw);
+      this.gotoWorld = { to, w, land };
+      this.opts.created?.(w);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** 暗転して移る先（作ってあれば） */
+  get gotoTarget(): StoryWorld | null {
+    return this.gotoWorld?.w ?? null;
+  }
+
+  /** 暗転の間に、作っておいた階へ移る（見せられなければ false）。前の階は捨てる */
+  commitGoto(): boolean {
+    const g = this.gotoWorld;
+    if (!g || (this.opts.ready && !this.opts.ready(g.w))) return false;
+    const prev = this.active;
+    const from = prev.sim.players[0]!, to = g.w.sim.players[0]!;
+    const keepPos = [...to.pos] as Vec3;
+    Object.assign(to, JSON.parse(JSON.stringify(from)) as PlayerState);
+    to.pos = keepPos; to.vel = [0, 0, 0]; to.yaw = g.land.yaw; to.pitch = 0; to.holding = null; to.ride = null; to.surfaceId = null; to.interactedId = null; to.grav = null;
+    to.respawn = { pos: [...keepPos], yaw: g.land.yaw }; to.lastGround = [...keepPos];
+    prev.sim.physics?.dispose();
+    for (const w of this.beyond.values()) w.sim.physics?.dispose();
+    this.beyond.clear();
+    this.active = g.w;
+    this.gotoWorld = null;
+    this.changes.push({ from: prev.story, to: g.w.story, airlock: '', seamless: false, player: 0, dx: 0, dy: 0, dz: 0, dYaw: 0 });
     return true;
   }
 

@@ -81,12 +81,21 @@ export interface BuiltCell {
   /** ライトマップ（mid / high で焼く区画だけ） */
   lightmap?: CellLightmap;
   triangles: number;
+  /** 局所の座標で作った区画（CellLayout.frame 'group'）の写し方。焼き込みは局所の座標なので、明るさを測るときは戻す */
+  frame?: UvFrame;
 }
 
 export interface BuiltFloor {
   floor: FloorLayout;
   root: THREE.Group;
   cells: Map<string, BuiltCell>;
+  lights: ManagedLight[];
+  dispose(): void;
+}
+
+/** 区画 1 つ分（果てしない階は区画ごとに作って捨てる。docs/endless-world.md 5.3） */
+export interface CellUnit {
+  built: BuiltCell;
   lights: ManagedLight[];
   dispose(): void;
 }
@@ -100,7 +109,10 @@ export interface FloorBuilderOptions {
 
 export class FloorBuilder {
   private readonly materials: MaterialLibrary;
-  private readonly tier: QualityTierId | undefined;
+  /** 画質の段階（変えたら次に作る区画から効く） */
+  tier: QualityTierId | undefined;
+  /** 素材の部屋ごとの写し（materialKey）を使っている区画の数。0 になったら releaseRoom（区域をまたいで同じ鍵を使う区画がある） */
+  private readonly roomRefs = new Map<string, number>();
 
   constructor(materials: MaterialLibrary, opts: FloorBuilderOptions = {}) {
     this.materials = materials;
@@ -112,21 +124,14 @@ export class FloorBuilder {
     root.name = `floor:${floor.id}`;
     const cells = new Map<string, BuiltCell>();
     const lights: ManagedLight[] = [];
-    const disposables: THREE.BufferGeometry[] = [];
-    // 広い開口（扉のない opening）でつながる隣の区画: その照明も焼き込みの光源にする（境目で明るさが切れないように）
-    const neighbors = new Map<string, CellLayout[]>();
-    for (const pt of floor.portals) {
-      if (pt.kind !== 'opening') continue;
-      const [a, b] = pt.cells.map((id) => floor.cells.find((c) => c.id === id));
-      if (!a || !b) continue;
-      neighbors.set(a.id, [...(neighbors.get(a.id) ?? []), b]);
-      neighbors.set(b.id, [...(neighbors.get(b.id) ?? []), a]);
-    }
+    const units: CellUnit[] = [];
+    const neighbors = openNeighbors(floor);
     for (const cell of floor.cells) {
-      const built = this.buildCell(floor, cell, disposables, neighbors.get(cell.id) ?? []);
-      cells.set(cell.id, built);
-      root.add(built.group);
-      for (const l of cell.lights) lights.push({ spec: l, cell: cell.id, base: l.intensity * DYNAMIC_LIGHT_SCALE });
+      const u = this.buildCellUnit(floor.seed, cell, neighbors.get(cell.id) ?? []);
+      units.push(u);
+      cells.set(cell.id, u.built);
+      root.add(u.built.group);
+      lights.push(...u.lights);
     }
     return {
       floor,
@@ -135,26 +140,56 @@ export class FloorBuilder {
       lights,
       dispose: () => {
         root.removeFromParent();
-        for (const g of disposables) g.dispose();
-        for (const c of cells.values()) {
-          const lm = c.lightmap;
-          if (!lm) continue;
-          lm.job?.cancel();
-          lm.upload?.cancel();
-          lm.texture.dispose();
-        }
-        for (const c of floor.cells) this.materials.releaseRoom(c.materialKey ?? c.id);
+        for (const u of units) u.dispose();
       },
     };
   }
 
-  private buildCell(floor: FloorLayout, cell: CellLayout, disposables: THREE.BufferGeometry[], neighbors: CellLayout[]): BuiltCell {
+  /**
+   * 区画 1 つを作る（seed はフロア・区域の seed。neighbors は扉の無い開口でつながる隣の区画: その照明も焼き込みの光源にする）。
+   * frame 'group' の区画（階段室）は、局所の座標で作って入れ物を回し・ずらす（上下の階の写しで同じ見た目）
+   */
+  buildCellUnit(seed: number, cell: CellLayout, neighbors: CellLayout[]): CellUnit {
+    const disposables: THREE.BufferGeometry[] = [];
+    let built: BuiltCell;
+    if (cell.frame === 'group' && cell.uvFrame) {
+      const f = cell.uvFrame;
+      const local = localCell(cell, f);
+      const inner = this.buildCell(0, local, disposables, []);
+      const outer = new THREE.Group();
+      outer.name = `cell:${cell.id}`;
+      outer.add(inner.group);
+      outer.position.set(f.offset[0], f.offset[1], f.offset[2]);
+      outer.rotation.y = (f.q * Math.PI) / 2;
+      outer.updateMatrixWorld(true);
+      built = { ...inner, id: cell.id, layout: cell, group: outer, bounds: cell.bounds, frame: f };
+    } else built = this.buildCell(seed, cell, disposables, neighbors);
+    const key = cell.materialKey ?? cell.id;
+    this.roomRefs.set(key, (this.roomRefs.get(key) ?? 0) + 1);
+    let done = false;
+    return {
+      built,
+      lights: cell.lights.map((l) => ({ spec: l, cell: cell.id, base: l.intensity * DYNAMIC_LIGHT_SCALE })),
+      dispose: () => {
+        if (done) return;
+        done = true;
+        built.group.removeFromParent();
+        for (const g of disposables) g.dispose();
+        const lm = built.lightmap;
+        if (lm) { lm.job?.cancel(); lm.upload?.cancel(); lm.texture.dispose(); }
+        const n = (this.roomRefs.get(key) ?? 1) - 1;
+        if (n <= 0) { this.roomRefs.delete(key); this.materials.releaseRoom(key); } else this.roomRefs.set(key, n);
+      },
+    };
+  }
+
+  private buildCell(seed: number, cell: CellLayout, disposables: THREE.BufferGeometry[], neighbors: CellLayout[]): BuiltCell {
     const group = new THREE.Group();
     group.name = `cell:${cell.id}`;
     const fy = cell.floorY;
     group.position.y = fy;
     const matKey = cell.materialKey ?? cell.id;
-    const cellSeed = hashAll(floor.seed, 'cell', matKey);
+    const cellSeed = hashAll(seed, 'cell', matKey);
     const drawn = cell.boxes.filter((b) => !SKIP_KINDS.has(b.kind ?? '') && b.max[0] - b.min[0] > 1e-4 && b.max[1] - b.min[1] > 1e-4 && b.max[2] - b.min[2] > 1e-4);
     // 隣の区画の照明器具（描かない。光源としてだけ焼き込みに入れる。遮蔽には使わない）
     const borrowed: Box[] = [];
@@ -229,7 +264,7 @@ export class FloorBuilder {
           if (ti !== undefined) ranges = writeLightmapUV(g, box, atlas.rects[ti]!, atlas);
           else writeConstantUV1(g, atlas.blackU, atlas.blackV);
         }
-        attachSurfaceAppearance(g, appearanceSeed(floor.seed, matKey, box.mat));
+        attachSurfaceAppearance(g, appearanceSeed(seed, matKey, box.mat));
         // 傾けた箱は、傾けた後の外接の箱を「自分の箱」として焼く（近くの器具・遮蔽物の絞り込みの中心と大きさ）
         const own = slopeBounds(box);
         bakeOn.bake(g, own);
@@ -320,6 +355,40 @@ export class FloorBuilder {
   }
 }
 
+/** 扉の無い開口でつながる隣の区画（区画 id → 隣の区画） */
+export function openNeighbors(floor: Pick<FloorLayout, 'cells' | 'portals'>): Map<string, CellLayout[]> {
+  const byId = new Map(floor.cells.map((c) => [c.id, c]));
+  const out = new Map<string, CellLayout[]>();
+  for (const pt of floor.portals) {
+    if (pt.kind !== 'opening') continue;
+    const a = byId.get(pt.cells[0]), b = byId.get(pt.cells[1]);
+    if (!a || !b) continue;
+    out.set(a.id, [...(out.get(a.id) ?? []), b]);
+    out.set(b.id, [...(out.get(b.id) ?? []), a]);
+  }
+  return out;
+}
+
+/** 区画を写し方 f の逆で局所の座標に戻した写し（箱・照明・足跡・外形。区画の uvFrame は外す） */
+function localCell(cell: CellLayout, f: UvFrame): CellLayout {
+  const back = (p: readonly number[]): [number, number, number] => {
+    const pv = f.pivot ?? [0, 0, 0];
+    const r = rotQ([p[0]! - f.offset[0] - pv[0], p[1]! - f.offset[1] - pv[1], p[2]! - f.offset[2] - pv[2]], ((4 - f.q) % 4) as Dir);
+    return [r[0] + pv[0], r[1] + pv[1], r[2] + pv[2]];
+  };
+  const aabb = (min: readonly number[], max: readonly number[]): AABB => { const a = back(min), c = back(max); return { min: [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.min(a[2], c[2])], max: [Math.max(a[0], c[0]), Math.max(a[1], c[1]), Math.max(a[2], c[2])] }; };
+  const { uvFrame: _u, frame: _f, ...rest } = cell;
+  const bounds = aabb(cell.bounds.min, cell.bounds.max);
+  return {
+    ...rest,
+    bounds,
+    floorY: cell.floorY - f.offset[1],
+    footprint: cell.footprint.map((r) => { const a = aabb([r.x0, 0, r.z0], [r.x1, 0, r.z1]); return { x0: a.min[0], x1: a.max[0], z0: a.min[2], z1: a.max[2] }; }),
+    boxes: cell.boxes.map((b) => ({ ...b, ...aabb(b.min, b.max) })),
+    lights: cell.lights.map((l) => ({ ...l, pos: back(l.pos) })),
+  };
+}
+
 /** 模様の基準の写し方の逆で戻した箱（1/4 回転なので軸に平行な箱のまま） */
 export function frameSource(b: Box, f: UvFrame): Box {
   const pv = f.pivot ?? [0, 0, 0];
@@ -376,7 +445,10 @@ export function applyLampLevels(cell: BuiltCell, levelOf: (lampId: string) => nu
 }
 
 /** 区画の焼き込み陰影の、点 at での明るさ（照明の入切を反映）。動く物の頂点の明るさに使う */
-export function sampleCellLight(cell: BuiltCell, at: [number, number, number], levelOf: (lampId: string) => number): [number, number, number] {
+export function sampleCellLight(cell: BuiltCell, at0: [number, number, number], levelOf: (lampId: string) => number): [number, number, number] {
+  // 局所の座標で焼いた区画（階段室）は、測る点も局所の座標へ戻す
+  const f = cell.frame;
+  const at: [number, number, number] = f ? (() => { const r = rotQ([at0[0] - f.offset[0], at0[1] - f.offset[1], at0[2] - f.offset[2]], ((4 - f.q) % 4) as Dir); return [r[0], r[1], r[2]] as [number, number, number]; })() : at0;
   const on = cell.lighting.on.sample(at);
   const out: [number, number, number] = [on[0], on[1], on[2]];
   for (const [id, off] of cell.lighting.offs) {

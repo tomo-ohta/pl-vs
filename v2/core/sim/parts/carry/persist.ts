@@ -8,6 +8,7 @@
  * 持っている物・飛んでいる物は保存しない。persist: false の物（ミニゲームの球など）も保存しない
  */
 import type { Sim } from '../../sim.ts';
+import type { FloorLayout } from '../../../world/layout.ts';
 import { carryIndex, HELD, REST, type ItemState } from './common.ts';
 import { itemCfg, setRest } from './item.ts';
 
@@ -22,32 +23,32 @@ export interface CarrySave {
 
 const r2 = (v: number): number => Math.round(v * 100) / 100;
 
-/** 置いた物の保存（動かして置いた物が無ければ null） */
-export function carrySave(sim: Sim): CarrySave | null {
-  const ix = carryIndex(sim.floor);
+/** 置いた物の保存（動かして置いた物が無ければ null）。果てしない階は区域ごと（layout = 区域の layout） */
+export function carrySave(sim: Sim, layout: FloorLayout = sim.floor): CarrySave | null {
+  const ix = carryIndex(layout);
   const items: CarrySave['items'] = {};
   let n = 0;
   for (const id of ix.items) {
     const st = sim.stateOf(id) as ItemState | null;
-    const cfg = itemCfg(ix.specs.get(id)!, sim.floor.cells);
+    const cfg = itemCfg(ix.specs.get(id)!, layout.cells);
     if (!st || !st.moved || st.mode !== REST || !cfg.persist) continue;
     items[id] = [r2(st.poses[0]!), r2(st.poses[1]! - cfg.half[1]), r2(st.poses[2]!), r2(st.yaw), ...(st.slot ? [1] : [])];
     n++;
   }
-  return n ? { v: 1, floor: sim.floor.id, gen: sim.floor.genVersion, tune: sim.floor.tuningVersion, items } : null;
+  return n ? { v: 1, floor: layout.id, gen: layout.genVersion, tune: layout.tuningVersion, items } : null;
 }
 
 /** 保存を部品の状態へ戻す（シミュレーションを作った直後に呼ぶ）。戻した物の数 */
-export function carryRestore(sim: Sim, save: CarrySave | null | undefined): number {
-  if (!save || save.v !== 1 || save.floor !== sim.floor.id || save.gen !== sim.floor.genVersion || save.tune !== sim.floor.tuningVersion) return 0;
-  const ix = carryIndex(sim.floor);
+export function carryRestore(sim: Sim, save: CarrySave | null | undefined, layout: FloorLayout = sim.floor): number {
+  if (!save || save.v !== 1 || save.floor !== layout.id || save.gen !== layout.genVersion || save.tune !== layout.tuningVersion) return 0;
+  const ix = carryIndex(layout);
   let n = 0;
   for (const [id, p] of Object.entries(save.items)) {
     const spec = ix.specs.get(id);
     // 状態は読むだけの型で返るが、生成の直後に戻すときだけ書き換える
     const st = sim.stateOf(id) as ItemState | null;
     if (!spec || !st || st.mode === HELD || !Array.isArray(p) || p.length < 4 || p.length > 5 || !p.every(Number.isFinite)) continue;
-    const cfg = itemCfg(spec, sim.floor.cells);
+    const cfg = itemCfg(spec, layout.cells);
     if (!cfg.persist) continue;
     setRest(st, cfg, [p[0]!, p[1]!, p[2]!], p[3]!);
     st.moved = 1;

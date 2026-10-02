@@ -10,6 +10,7 @@
  * - `?shape=<型>` フロアの形の型を決めて作る（どのフロアも。core/gen/floor/themes.ts の PatternId。例: spiral・tower・station）
  * - 駅の車両（F35）で次のフロアへ着いたときは、次のフロアの車両の中（trainRide の params.arrive）に出る
  * - 開発用: window.game（ClientGame）。ペインが隠れて rAF が止まるときは game.stepOnce() で 1 tick ずつ進める
+ * - 果てしない階（docs/endless-world.md）: ふつうに遊ぶときは、階が無限の平面（区域を流し込む）。見本・実験場・?shape=・?floor=1 は今までのフロア
  */
 import './ui/style.css';
 import { makeTuning, parseTuneParam, tuningVersion } from '../core/config/tuning.ts';
@@ -24,6 +25,12 @@ import { RARE_DEFS } from '../core/gen/secrets/index.ts';
 import { CATALOG_BY_WS } from '../core/gen/catalog/index.ts';
 import type { FloorLayout } from '../core/world/layout.ts';
 import { ClientGame } from './game/ClientGame.ts';
+import { loadRapier } from '../core/physics/rapier.ts';
+import { PhysicsWorld } from '../core/physics/world.ts';
+import { downSlot, WorldPlanner } from '../core/gen/world/plan.ts';
+import { WorldSession } from '../core/stream/session.ts';
+import { WorkerSource } from './world/WorkerSource.ts';
+import { restoreRegionCarry, saveRegionCarry, watchRegionCarry } from './game/carryStore.ts';
 import { codexDefs } from './map/codexDefs.ts';
 import { MapController } from './map/MapController.ts';
 import { mountUi } from './ui/dom.ts';
@@ -170,8 +177,70 @@ game.onFloorExit = (_exit, _kind, to): void => {
 };
 
 const t0 = performance.now();
-{ const first = makeFloor(depth, variant); await game.loadFloor(first, { saveKey: saveKeyOf(first) }); }
-if (game.sim) maps.setFloor(game.sim.floor, lastReport, { world: seed, depth, variant });
+// 果てしない階（ふつうに遊ぶとき）。見本・実験場・型を決めて作る・?floor=1 は今までのフロア
+const worldMode = !useLab && !showcase && !tryIds.length && !shapeParam && !params.has('floor');
+if (worldMode) {
+  const R = await loadRapier();
+  const source = new WorkerSource(tuning, { dress: !params.has('nodress') });
+  const planner = new WorldPlanner(tuning);
+  const story = { world: seed, depth, variant: 0 };
+  const [sx, sz] = downSlot(seed, depth - 1, 0, 0);
+  await source.prefetch(planner.at(story, sx, sz));
+  // 置いた物が残る（I09）: 区域ごとに保存する（区域を入れた直後に戻し、外す直前と置くたびに書く）
+  const carryKey = (story: { depth: number; variant: number }, rid: string): string => `${seed}:${story.depth}.${story.variant}:${rid}:${tuningVersion(tuning)}`;
+  const session = new WorldSession(seed, depth, {
+    tuning, source, physics: () => new PhysicsWorld(R, 1 / tuning['physics.tickHz']), ready: (w) => game.storyReady(w),
+    regionAdded: (w, id, L) => restoreRegionCarry(w.sim, L, carryKey(w.story, id)),
+    regionRemoving: (w, id, L) => saveRegionCarry(w.sim, L, carryKey(w.story, id)),
+  });
+  watchRegionCarry(() => game.sim, (L) => carryKey(game.session!.active.story, L.region!.id), (f) => { game.eventTaps.add(f); return () => game.eventTaps.delete(f); });
+  game.startWorld(session);
+  // 地図と調査率は区域ごと（区域 ≒ 今までのフロア）。区域が替わったら地図を替える
+  let regionAt = '';
+  const syncRegion = (): void => {
+    const sim = game.sim, s = game.session;
+    if (!sim || !s) return;
+    const p = sim.players[0]!;
+    const plan = s.active.planAt(p.pos[0], p.pos[2]);
+    const key = `${s.storyId}:${plan.id}`;
+    if (key === regionAt) return;
+    const L = s.active.regionLayout(plan.id);
+    if (!L) return;
+    regionAt = key;
+    depth = s.active.story.depth;
+    variant = s.active.story.variant;
+    maps.setFloor(L, null, { world: seed, depth, variant, region: plan.id, name: L.region?.name ?? '' });
+  };
+  syncRegion();
+  const frame0 = game.onFrame;
+  game.onFrame = (input, dt) => { syncRegion(); frame0?.(input, dt); };
+  game.onStoryChange = (c) => console.info(`[階] B${c.from.depth + 1}F → B${c.to.depth + 1}F（${c.seamless ? `階段室 ${c.airlock}` : '暗転'}）`);
+  // 階段室でない出口（隠しの穴・縦穴・エレベーターの仕掛け・迷路フロアの別の出口）: 暗転して、行き先の階の同じ位置に近い部屋へ
+  game.onFloorExit = (_exit, kind, to): void => {
+    if (moving) return;
+    moving = true;
+    void (async () => {
+      const s = game.session!, p = game.sim!.players[0]!;
+      const m = to ? /^(-?\d+)\.(\d+)$/.exec(to) : null;
+      const target = m ? { world: seed, depth: Number(m[1]), variant: Number(m[2]) } : { world: seed, depth: s.active.story.depth + 1, variant: 0 };
+      const x = p.pos[0], z = p.pos[2];
+      fade.style.opacity = '1';
+      const t1 = performance.now();
+      await sleep(450);
+      for (let i = 0; i < 400 && !s.prepareGoto(target, x, z); i++) await sleep(50);
+      for (let i = 0; i < 400 && !s.commitGoto(); i++) await sleep(30);
+      if (kind === 'elevator') game.audio.elevator('bell');
+      console.info(`[階] 暗転して B${target.depth + 1}F${target.variant ? '（裏）' : ''} へ ${(performance.now() - t1).toFixed(0)} ms`);
+      fade.style.opacity = '0';
+      moving = false;
+    })();
+  };
+  (window as unknown as { session: WorldSession }).session = session;
+} else {
+  const first = makeFloor(depth, variant);
+  await game.loadFloor(first, { saveKey: saveKeyOf(first) });
+  if (game.sim) maps.setFloor(game.sim.floor, lastReport, { world: seed, depth, variant });
+}
 console.info(`[floor] 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
 game.start();
 // REC の時刻（一時停止中は止める）

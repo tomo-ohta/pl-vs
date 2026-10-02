@@ -110,7 +110,7 @@ export function addSurfaceGrime(shader: GrimeShader, cls: GrimeClass, strength: 
   shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vGrimeNormal; varying float vGrimePhase;');
   shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
 vGrimeNormal = objectNormal;
-vGrimePhase = fract(sin(dot(floor(modelMatrix[3].xz * 0.25), vec2(12.9898, 78.233))) * 43758.5453);`);
+vGrimePhase = 0.0;`);
   shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${GRIME_PARS_GLSL}`);
   shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
 ${bodyGlsl(cls)}

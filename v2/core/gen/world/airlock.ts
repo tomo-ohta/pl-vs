@@ -118,6 +118,7 @@ export function placeAirlock(id: string, role: 'down' | 'up', cellId: string, ho
   });
   // 模様の基準（どちらの写しも同じ局所の座標で模様を作る）
   cell.uvFrame = { offset: [...anchor.offset], q: anchor.q, pivot: [0, 0, 0] };
+  cell.frame = 'group';
   const add = (min: Vec3, max: Vec3, mat: MatId, kind?: string, solid = true): void => {
     const a = boxWorld(anchor, min, max);
     const b: Box = box(a.min, a.max, mat, solid);
@@ -150,6 +151,11 @@ export function placeAirlock(id: string, role: 'down' | 'up', cellId: string, ho
     const hingeW = Math.sign(odd ? hv[2] : hv[0]) || 1;
     const panel = doorPanel(axis, odd ? pos[0] : pos[2], odd ? pos[2] : pos[0], DOOR_W, pos[1], DOOR_H);
     const params: { [k: string]: Json } = { panel: { min: [...panel.min], max: [...panel.max] }, axis, mat: s.door, hinge: hingeW, swing: (hingeL * swingL) / hingeW, autoCloseSec: closeSec };
+    // 描画は局所の座標で作る（どちらの写しも同じ向きの板・同じ模様）。局所: 扉は z = 0 か L の面、板は x に沿う
+    const lz = end === 'top' ? 0 : L;
+    const lp = doorPanel('z', lz, 0, DOOR_W, end === 'top' ? top : low, DOOR_H);
+    params.local = { panel: { min: [...lp.min], max: [...lp.max] }, axis: 'z', hinge: hingeL, swing: swingL };
+    params.frame = { offset: [...anchor.offset], q: anchor.q };
     if (!live) params.locked = true;
     return { id: `${cellId}:${end}`, type: 'door', cell: cellId, params };
   };
