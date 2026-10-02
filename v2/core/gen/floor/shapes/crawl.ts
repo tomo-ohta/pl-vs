@@ -28,14 +28,14 @@ export function buildCrawl(g: GeoBuild, sk: Skeleton, placed: Map<number, Placed
   // 背骨: フロアの真ん中の、区画の行の境
   const zs = snap(-Math.max(1, Math.floor(sk.rows / 2)) * e.S);
   const hatches: Hatch[] = [];
+  // 候補の部屋（並びは骨組みで混ぜてある）を順に試し、点検口を structure.crawl.hatches 個まで置く
   for (const id of sk.hatches ?? []) {
+    if (hatches.length >= t['structure.crawl.hatches']) break;
     const pl = placed.get(id);
     if (!pl || pl.kind !== 'room') continue;
-    const h = placeHatch(g, pl, yA, zs);
-    if (!h) continue;
-    // 枝が近すぎる（同じ列）ものは外す
-    if (hatches.some((o) => Math.abs(o.x - h.x) < W + 0.6)) continue;
-    hatches.push(h);
+    // 枝が近すぎる（同じ列）所には置かない
+    const h = placeHatch(g, pl, yA, zs, (x) => !hatches.some((o) => Math.abs(o.x - x) < W + 0.6));
+    if (h) hatches.push(h);
   }
   if (hatches.length < 2) return;
   hatches.sort((a, b) => a.x - b.x);
@@ -80,8 +80,8 @@ export function buildCrawl(g: GeoBuild, sk: Skeleton, placed: Map<number, Placed
   });
 }
 
-/** 部屋 pl の壁際（x の壁に沿う）に、背骨の向きへ上る梯子段と天井の穴を置く。開口の前を避ける。置けなければ null */
-function placeHatch(g: GeoBuild, pl: Placed, yA: number, zs: number): Hatch | null {
+/** 部屋 pl の壁際（x の壁に沿う）に、背骨の向きへ上る梯子段と天井の穴を置く。開口の前と okX が拒む列を避ける。置けなければ null（何も足さない） */
+function placeHatch(g: GeoBuild, pl: Placed, yA: number, zs: number, okX: (x: number) => boolean): Hatch | null {
   const r = pl.rect, y = pl.y;
   const rise = yA - y;
   const steps = Math.ceil(rise / RISER_C - 1e-9);
@@ -99,6 +99,7 @@ function placeHatch(g: GeoBuild, pl: Placed, yA: number, zs: number): Hatch | nu
   });
   for (const side of [-1, 1]) {
     const x = side < 0 ? r.x0 + WALL_T + 0.5 : r.x1 - WALL_T - 0.5;
+    if (!okX(x)) continue;
     // 段の下の端は、背骨と反対の壁から 0.6 m
     const zBottom = s > 0 ? r.z0 + WALL_T + 0.6 : r.z1 - WALL_T - 0.6;
     const zTop = zBottom + s * run;

@@ -8,7 +8,7 @@ import type { Tuning } from '../../../config/tuning.ts';
 import type { Rng } from '../../../math/rng.ts';
 import { opening } from '../../../world/build.ts';
 import type { Rect } from '../../../world/footprint.ts';
-import { DOOR_H, DOOR_W, type Box, type LightSpec } from '../../../world/layout.ts';
+import { DOOR_H, DOOR_W, type Box, type CellLayout, type LightSpec } from '../../../world/layout.ts';
 import { themePalette } from '../../../world/palettes.ts';
 import { reachOpenings } from '../../reach.ts';
 import type { FloorProfile } from '../profile.ts';
@@ -40,13 +40,15 @@ export function buildShrink(p: FloorProfile, rng: Rng, t: Tuning): FloorGeometry
   const rooms: Placed[] = [];
   // 部屋の奥の扉の、部屋の真ん中からのずれ（最初の部屋の幅に対する割合。どの組も同じ割合 = 同じ配置）
   const off = rng.float(-0.18, 0.18);
+  // 高さの縮み: 最後の部屋が structure.shrink.lastHeightM（しゃがまないと立てない高さ）まで下がるよう、天井の高い系統ほど速く縮む
+  const hRatio = Math.min(ratio, (t['structure.shrink.lastHeightM'] / H0) ** (1 / Math.max(1, count - 1)));
   for (let k = 0; k < count; k++) {
-    const s = ratio ** k;
+    const s = ratio ** k, hs = hRatio ** k;
     const w = snap(Math.max(3.2, W0 * s)), d = snap(Math.max(3.0, D0 * s));
-    const h = snap(Math.max(minH, H0 * s));
+    const h = snap(Math.max(minH, H0 * hs));
     const cl = snap(Math.max(1.6, C0 * s));
-    const cwk = snap(Math.max(1.15, cw * s)), hck = snap(Math.max(minH, Math.min(hc, H0) * s));
-    const dw = snap(Math.max(0.9, DOOR_W * s)), dh = snap(Math.max(minH - 0.05, Math.min(DOOR_H * s, h - 0.15)));
+    const cwk = snap(Math.max(1.15, cw * s)), hck = snap(Math.max(minH, Math.min(hc, H0) * hs));
+    const dw = snap(Math.max(0.9, DOOR_W * s)), dh = snap(Math.max(minH - 0.05, Math.min(DOOR_H * hs, h - 0.15)));
     // 廊下（前の部屋の奥の壁から、次の部屋まで）。扉はこの組の部屋の入口
     const nx = snap(k === 0 ? x : x + off * (prev.rect.x1 - prev.rect.x0));
     const cid = `kc${k}`;
@@ -66,16 +68,16 @@ export function buildShrink(p: FloorProfile, rng: Rng, t: Tuning): FloorGeometry
     g.addOpening(cid, opening(`${cid}:a0`, [nx, 0, z0], 2, dw, dh));
     g.addOpening(pl.cellId, opening(`${pl.cellId}:${cid}`, [nx, 0, z0], 0, dw, dh));
     g.join(cid, pl.cellId, 'z', z0, nx, 0, dw, dh, 2, { cell: pl.cellId, mat: pal.door, swing: 1 });
-    // 小さな組は仕掛け・異変を置かない（縮んだ家具をそのまま見せる）
-    if (k >= 2) g.reserved.add(pl.cellId);
+    // 最初の部屋（写す元）と小さな組は仕掛け・異変を置かない（縮んだ家具をそのまま見せる）。2 つ目の部屋だけは置ける
+    if (k !== 1) g.reserved.add(pl.cellId);
     prev = pl;
     x = nx;
     z = rect.z0;
   }
   // 出口: 最後の部屋の奥の、小さな扉の階段
   const last = rooms[rooms.length - 1]!;
-  const sL = ratio ** (count - 1);
-  exitStairs(g, last, 2, 0, Math.max(minH, hc * sL), { id: 'exitStairs', exitId: 'down', doorId: 'door:exit', at: snap(x + off * (last.rect.x1 - last.rect.x0)), doorW: snap(Math.max(0.9, DOOR_W * sL)), doorH: snap(Math.max(minH - 0.05, Math.min(DOOR_H * sL, last.height - 0.15))) });
+  const sL = ratio ** (count - 1), hL = hRatio ** (count - 1);
+  exitStairs(g, last, 2, 0, Math.max(minH, hc * hL), { id: 'exitStairs', exitId: 'down', doorId: 'door:exit', at: snap(x + off * (last.rect.x1 - last.rect.x0)), doorW: snap(Math.max(0.9, DOOR_W * sL)), doorH: snap(Math.max(minH - 0.05, Math.min(DOOR_H * hL, last.height - 0.15))) });
   // 家具: 最初の部屋の中身を、くり返しの部屋へ縮めて写す
   g.afterDress.push((env) => copyShrunk(g, rooms, ratio, env));
   return g.finish(null);
@@ -83,18 +85,21 @@ export function buildShrink(p: FloorProfile, rng: Rng, t: Tuning): FloorGeometry
 
 /** 最初の部屋（rooms[0]）の中身（家具の箱と照明）を、k 番目の部屋へ ratio^k 倍に縮めて写す（部屋の真ん中・床を基準に） */
 function copyShrunk(g: GeoBuild, rooms: Placed[], ratio: number, env: AfterDressEnv): void {
-  const src = g.geo(rooms[0]!.cellId)?.cell;
-  if (!src || env.busy.has(src.id) || !env.dressedFrom.has(src.id) || src.zones.length) return;
+  // 写す元: 最初の部屋（仕掛け・異変があれば次の部屋）。家具の無い部屋からは写さない
+  const ok = (c: CellLayout | undefined): c is CellLayout => !!c && !env.busy.has(c.id) && env.dressedFrom.has(c.id) && !c.zones.length;
+  const i0 = [0, 1].find((i) => { const c = g.geo(rooms[i]!.cellId)?.cell; return ok(c) && c.boxes.length > env.dressedFrom.get(c.id)!; });
+  if (i0 === undefined) return;
+  const src = g.geo(rooms[i0]!.cellId)!.cell;
   const from = env.dressedFrom.get(src.id)!;
-  const sr = rooms[0]!.rect;
+  const sr = rooms[i0]!.rect;
   const scx = (sr.x0 + sr.x1) / 2, scz = (sr.z0 + sr.z1) / 2;
   const furniture = src.boxes.slice(from);
   const lights = src.lights;
   rooms.forEach((pl, k) => {
-    if (k === 0) return;
+    if (k <= i0) return;
     const cell = g.geo(pl.cellId)?.cell;
-    if (!cell || env.busy.has(cell.id) || !env.dressedFrom.has(cell.id) || cell.zones.length) return;
-    const s = ratio ** k;
+    if (!ok(cell)) return;
+    const s = ratio ** (k - i0);
     const r = pl.rect;
     const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
     const sx = (r.x1 - r.x0) / (sr.x1 - sr.x0), sz = (r.z1 - r.z0) / (sr.z1 - sr.z0), sy = cell.height / src.height;

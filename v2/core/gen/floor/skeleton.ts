@@ -364,6 +364,11 @@ function assignLevels(sk: Skeleton, rng: Rng, chance: number): void {
       m.level = Math.max(-2, Math.min(2, m.level));
     }
   }
+  // 段階 4（フロアの形の担当が直した）: 広間の区画が、広間の外から先に別々の段で届いたとき、広間の中で段がばらばらになっていた
+  // （広間の床はいちばん低い段なので、高い段の区画の開口が床から浮いて上れない）。広間は、入口からいちばん先に届いた区画の段にそろえる
+  const hallLevel = new Map<number, number>();
+  for (const id of q) { const v = sk.nodes[id]!; if (v.hall >= 0 && !hallLevel.has(v.hall)) hallLevel.set(v.hall, v.level); }
+  for (const v of sk.nodes) { const l = v.hall >= 0 ? hallLevel.get(v.hall) : undefined; if (l !== undefined) v.level = l; }
 }
 
 /**

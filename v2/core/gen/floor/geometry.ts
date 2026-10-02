@@ -276,8 +276,12 @@ export function buildGeometry(p: FloorProfile, sk: Skeleton, rng: Rng, t: Tuning
   const LH = t['floor.levelHeightM'];
   const SH = t['structure.storyHeightM'];
   const fam = p.family;
-  const cw = snap(rng.float(fam.corridorWidth[0], fam.corridorWidth[1]));
-  const hc = snap(rng.float(fam.corridorHeight[0], fam.corridorHeight[1]));
+  const cw0 = snap(rng.float(fam.corridorWidth[0], fam.corridorWidth[1]));
+  const hc0 = snap(rng.float(fam.corridorHeight[0], fam.corridorHeight[1]));
+  // 地下街（F34）: どの系統でも、通路は広くて低い（真ん中に柱の列）
+  // 鏡写し（F19）: 幅を 0.1 m 刻みに（半分が 0.05 m の丸めの刻みに乗り、左右の廊下が丸めでずれない）
+  const cw = p.pattern === 'arcade' ? Math.max(cw0, t['structure.arcade.widthM']) : p.pattern === 'mirror' ? Math.round(cw0 * 10) / 10 : cw0;
+  const hc = p.pattern === 'arcade' ? Math.min(hc0, t['structure.arcade.heightM']) : hc0;
   // 階・棟ごとの系統の廊下の幅・天井の高さ（主の系統は上の値）
   const famCw = new Map<string, { cw: number; hc: number }>([[fam.id, { cw, hc }]]);
   for (const f of p.families ?? []) if (!famCw.has(f.id)) { const r = rng.fork(`fam:${f.id}`); famCw.set(f.id, { cw: snap(r.float(f.corridorWidth[0], f.corridorWidth[1])), hc: snap(r.float(f.corridorHeight[0], f.corridorHeight[1])) }); }
@@ -349,10 +353,30 @@ export function buildGeometry(p: FloorProfile, sk: Skeleton, rng: Rng, t: Tuning
     const jx = snap(nr.float(-1, 1) * Math.max(0, w / 2 - band)) * flip, jz = snap(nr.float(-1, 1) * Math.max(0, d / 2 - band));
     const theme = n.id === sk.entry ? f.corridor : nr.weighted(f.rooms, ([, wt]) => wt)[0];
     const rect: Rect = n.style === 'full' ? { x0: snap(x - S / 2), x1: snap(x + S / 2), z0: snap(z - S / 2), z1: snap(z + S / 2) } : { x0: snap(x + jx - w / 2), x1: snap(x + jx + w / 2), z0: snap(z + jz - d / 2), z1: snap(z + jz + d / 2) };
+    // 鏡写し: 真ん中の列の部屋は、鏡の線（x = 0）の左右に同じ幅
+    if (sk.mirror && n.col === (sk.cols - 1) / 2 && n.style !== 'full') { rect.x0 = snap(x - snap(w / 2)); rect.x1 = snap(x + snap(w / 2)); }
     const roomH = snap(nr.float(f.roomHeight[0], f.roomHeight[1]));
     // F25 緊張と解放: 狭い通路の間の部屋は、天井の高い広い空間
     const height = p.pattern === 'linear' && n.id !== sk.entry ? Math.max(roomH, t['structure.linear.wideHeightM']) : roomH;
     placed.set(n.id, { node: n, rect: nodeRect(n, rect, x, z, S, band, nr), y: yOf(n), height, theme, kind: 'room', cellId: `r${n.id}`, fam: f });
+  }
+  // 鏡写し: 右半分の区画の置き場所を、左の対の置き場所の反転そのものにする（0.05 m の丸めの向きで左右がずれないように）
+  if (sk.mirror) {
+    for (const n of used) {
+      if (n.col <= (sk.cols - 1) / 2) continue;
+      const m = used.find((o) => o.col === sk.cols - 1 - n.col && o.row === n.row && o.story === n.story);
+      const a = placed.get(n.id), b = m ? placed.get(m.id) : undefined;
+      if (!a || !b || a === b || a.kind !== b.kind || a.kind === 'hall' || a.node.style !== b.node.style) continue;
+      const flipR = (r: Rect): Rect => ({ x0: -r.x1, x1: -r.x0, z0: r.z0, z1: r.z1 });
+      a.rect = flipR(b.rect);
+      if (b.rects) a.rects = b.rects.map(flipR);
+    }
+    // 家具まで鏡に写す対（入口に近い順に structure.mirror.cleanPairs 組）は、仕掛け・異変を置かない（shapes/finish.ts）
+    const pairs = used.filter((n) => n.col < (sk.cols - 1) / 2 && n.kind === 'room' && n.id !== sk.entry && n.id !== sk.exit)
+      .map((n) => [n, used.find((o) => o.col === sk.cols - 1 - n.col && o.row === n.row && o.story === n.story)] as const)
+      .filter(([n, m]) => m && m.kind === 'room' && m.id !== sk.exit && placed.get(n.id) && placed.get(m.id))
+      .sort((x, y) => x[0].row - y[0].row || x[0].col - y[0].col);
+    for (const [n, m] of pairs.slice(0, t['structure.mirror.cleanPairs'])) { g.reserved.add(placed.get(n.id)!.cellId); g.reserved.add(placed.get(m!.id)!.cellId); }
   }
   // 上下に重なる型: 1 つの階の区画の天井は、上の階の床より下（区画が重ならない。階をまたぐ区画は除く）
   if (sk.stories > 1) {

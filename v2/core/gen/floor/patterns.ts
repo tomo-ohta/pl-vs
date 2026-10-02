@@ -452,7 +452,8 @@ const BUILDERS: Partial<Record<string, Builder>> = {
   crawl(sk, _p, rng, t, link) {
     gridLike(sk, rng, t, link);
     const rooms = sk.nodes.filter((n) => n.kind === 'room' && n.id !== sk.entry);
-    sk.hatches = rng.shuffle(rooms.map((n) => n.id)).slice(0, Math.min(rooms.length, t['structure.crawl.hatches']));
+    // 候補は部屋の全部（混ぜた順）。置ける部屋から structure.crawl.hatches 個まで（shapes/crawl.ts）
+    sk.hatches = rng.shuffle(rooms.map((n) => n.id));
     sk.noRandomHalls = true;
     sk.fixedLevels = true;
   },

@@ -48,6 +48,8 @@ const center = (p: PortalSpec): [number, number, number] => [(p.aabb.min[0] + p.
 const G = 0.125;
 /** 道の幅の判定に使う体の半径: プレイヤーの当たり判定（半辺 PLAYER.radius = 0.35 の箱）より少し太く。細いと角すれすれの道を選んで引っかかる */
 const R = 0.36;
+/** 余裕のある道の半幅（pathInCell が先に試す） */
+const R_WIDE = 0.42;
 
 /**
  * 点 (x, z) の半幅 S の正方形の下で立てる面の高さの一覧（当たり判定の箱の上面と面）。yTop + 0.36 より上は見ない。
@@ -100,7 +102,13 @@ function forceAt(zones: readonly Zone[], x: number, y: number, z: number): [numb
  * - 強い流れ（動く歩道）の上では流れの向きにしか進めない。流れの外から入るときも流れの向きに
  */
 export function pathInCell(sim: Sim, cell: CellLayout, from: [number, number, number], to: [number, number, number]): [number, number][] | null {
-  const p = pathInCellR(sim, cell, from, to);
+  // 段階 4（フロアの形の担当が足した）: まず家具の角から余裕を持った道（体の半幅 + 7 cm）。家具の角すれすれの道は、
+  // 曲がり角で少し内側を回っただけで角に体が掛かって止まる
+  bodyR = R_WIDE;
+  let p: [number, number][] | null;
+  try { p = pathInCellR(sim, cell, from, to); } finally { bodyR = R; }
+  if (p) return p;
+  p = pathInCellR(sim, cell, from, to);
   if (p) return p;
   // 段階 4（フロアの形の担当が足した）: 体の幅ぎりぎりの所（家具の塔のすき間など）は、当たり判定の半幅ちょうどで探し直す
   bodyR = PLAYER.radius - 0.01;
@@ -344,7 +352,7 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     // 扉が開くのを待つ間も、扉の手前の目標までは歩く（崩れる床・動く歩道の上で立ち止まらない）
     sim.step([cmd]);
     // 目標の点に着いた（区間の終わりは高さも合っていること: 穴の底の扉の真上の床板の上では着いていない）
-    if (dist < 0.3 && (path.length > 1 || Math.abs(player.pos[1] - L.y) < 1.2)) {
+    if (dist < (path.length > 1 ? 0.2 : 0.3) && (path.length > 1 || Math.abs(player.pos[1] - L.y) < 1.2)) {
       segFrom = path.shift()!;
       if (!path.length && !(door && sim.outputOf(door, 'open') < 0.5)) { leg++; stuck = 0; bestD = Infinity; legT = 0; }
       continue;
