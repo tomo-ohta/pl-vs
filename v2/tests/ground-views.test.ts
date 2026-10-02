@@ -40,7 +40,7 @@ test('ground の部品の描画: 作れて、動かしても壊れない', async
   }
   assert.ok(rooms >= 10, `部屋: ${rooms}`);
   // ground の部品のうち、見た目の要る物には描画がある
-  const NEED = ['collapseFloor', 'domino', 'crate', 'stillLift', 'hatch', 'chimeFloor', 'avoidFloor', 'visitOrder', 'stepTrail', 'footMarks', 'mirrorRoom', 'ceilingPress', 'turntable', 'slideTiles'];
+  const NEED = ['collapseFloor', 'domino', 'crate', 'stillLift', 'hatch', 'chimeFloor', 'avoidFloor', 'visitOrder', 'stepTrail', 'footMarks', 'mirrorRoom', 'ceilingPress', 'turntable', 'slideTiles', 'pushButton', 'liftCabin', 'vending', 'ticketGates', 'autoDoor', 'shutter'];
   for (const n of NEED) assert.ok(viewed.has(n), `${n} の描画`);
   lib.dispose();
 });

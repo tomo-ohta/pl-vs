@@ -12,3 +12,5 @@ import './tiles.ts';
 import './traces.ts';
 import './press.ts';
 import './moving.ts';
+import './machines.ts';
+import './station.ts';

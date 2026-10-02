@@ -78,4 +78,14 @@ export const GROUND_TUNING = {
   'ground.slide.holes': num(0.22, 0.1, 0.4, '動く床タイル: 空いた升目の割合'),
   'ground.slide.moveSec': num(1.2, 0.5, 4, '動く床タイル: 床板が隣の升目へ滑るのに掛かる秒'),
   'ground.slide.pauseSec': num(0.5, 0, 4, '動く床タイル: 滑り終えてから次の床板が滑り出すまで（秒）'),
+  // 自販機（vendingRoom）
+  'ground.vend.keyAfter': num(5, 3, 12, '自販機: 同じボタンを続けて何回押すと鍵が出てくるか', true),
+  // 自動扉（autoDoors）・シャッター（shutterHall）
+  'ground.auto.flaky': num(0.4, 0, 0.9, '自動扉: 調子の悪い扉が、近づいても開かない割合'),
+  'ground.auto.crouchSec': num(1.2, 0.3, 4, '自動扉: 故障中の扉の前でしゃがんで、開くまで（秒）'),
+  'ground.shutter.openSec': num(3.5, 1.5, 10, 'シャッター: 開いている間（秒）'),
+  'ground.shutter.downSec': num(3.5, 1, 10, 'シャッター: 下り切るまで（秒）'),
+  'ground.shutter.closedSec': num(1.5, 0, 6, 'シャッター: 閉まっている間（秒）'),
+  'ground.shutter.upSec': num(2.5, 1, 8, 'シャッター: 上がり切るまで（秒）'),
+  'ground.shutter.needSec': num(1.6, 0.8, 4, 'シャッター: 歩く人がくぐり始める、開いている残りの秒'),
 } as const satisfies Record<string, Spec>;

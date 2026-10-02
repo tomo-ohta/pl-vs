@@ -9,3 +9,5 @@ import './tiles.ts';
 import './traces.ts';
 import './press.ts';
 import './moving.ts';
+import './devices.ts';
+import './station.ts';
