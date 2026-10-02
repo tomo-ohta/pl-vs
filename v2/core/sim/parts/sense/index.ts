@@ -9,3 +9,4 @@ import './sight.ts';
 import './sound.ts';
 import './beam.ts';
 import './switch.ts';
+import './storm.ts';

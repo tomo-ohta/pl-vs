@@ -12,3 +12,4 @@ import './curtains.ts';
 import './sound.ts';
 import './beam.ts';
 import './power.ts';
+import './anomaly.ts';

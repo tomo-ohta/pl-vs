@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { CATALOG_BY_WS } from '../core/gen/catalog/index.ts';
 import { gimmickDef } from '../core/gen/gimmicks/types.ts';
 import { anomalyDef } from '../core/gen/anomaly/index.ts';
+import { dressCell } from '../core/gen/dress/index.ts';
 import { showcaseFloor } from '../core/gen/floor/showcase.ts';
 import { walkTo } from './helpers/bot.ts';
 import { regenerate } from './helpers/gimmick-rooms.ts';
@@ -40,7 +41,7 @@ test('担当 sense の仕掛け・異変: 見本のフロア（?try=）に置け
   const placed = new Set<string>();
   for (let i = 0; i < IDS.length; i += 6) {
     const ids = IDS.slice(i, i + 6);
-    const r = showcaseFloor(T, { ids });
+    const r = showcaseFloor(T, { ids, dress: dressCell });
     for (const g of r.gimmicks?.gimmicks ?? []) placed.add(g.def);
     for (const a of r.anomalies) placed.add(a.def);
   }

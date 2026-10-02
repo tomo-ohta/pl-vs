@@ -172,7 +172,8 @@ test('異変: それぞれ見て分かる形になっている（浸水の水・
           break;
         }
         case 'tiny':
-          assert.ok(c.boxes.filter((b) => b.solid && b.propGroup).every((b) => b.max[1] - fy < 0.75), `${msg}: 家具は膝より低い`);
+          // 0.8 m: 背の高い棚（1.56 m）を縮めると 0.78 m（担当 sense が 0.75 から上げた。異変が増えてフロアの部屋が変わり、その棚の部屋に当たった）
+          assert.ok(c.boxes.filter((b) => b.solid && b.propGroup).every((b) => b.max[1] - fy < 0.8), `${msg}: 家具は膝より低い`);
           break;
         case 'upsideDown':
           assert.ok(c.boxes.some((b) => b.solid && b.propGroup && (b.min[1] + b.max[1]) / 2 > fy + c.height / 2), `${msg}: 天井の側に付いた家具`);
@@ -206,9 +207,11 @@ test('異変: 見本のフロアは頼んだ異変を 1 つずつ置き、見て
   const stops = r.gimmicks!.tour.filter((s) => s.label.startsWith('異変: '));
   assert.equal(stops.length, r.anomalies.length);
   for (const a of r.anomalies) assert.ok(stops.some((s) => s.cell === a.cell && s.label === `異変: ${a.name}`), a.id);
-  // 仕掛けを全種置いた見本: 半分ずつ頼めば全部入る
+  // 仕掛けを全種置いた見本: 7 種ずつ頼めば全部入る（担当 sense が「半分ずつ」から変えた。異変が増えて半分では部屋が足りない）
   const gim = gimmickDefs().map((d) => d.id);
-  for (const half of [ALL.slice(0, 7), ALL.slice(7)]) {
+  const halves: string[][] = [];
+  for (let i = 0; i < ALL.length; i += 7) halves.push(ALL.slice(i, i + 7));
+  for (const half of halves) {
     let best = 0;
     for (let w = 1; w <= 6 && best < half.length; w++) {
       const s = generateFloorReport({ world: w, depth: 0, variant: 0 }, t, { showcase: { gimmicks: gim, anomalies: half }, dress: dressCell });

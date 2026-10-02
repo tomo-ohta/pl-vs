@@ -95,4 +95,16 @@ export const SENSE_TUNING = {
   'sense.switch.darkSec': num(1.0, 0.2, 4, '照明を消すと現れる扉: 照明を消してから扉が現れるまで（秒）'),
   'sense.sneak.speed': num(2.0, 1.2, 2.9, '人感センサーの灯りをつけずに進む: この速さ（m/s）より速く動くと灯りがつく（しゃがみ歩き 1.5・歩き 3.0）'),
   'sense.sneak.holdSec': num(5, 1, 15, '人感センサーの灯りをつけずに進む: ついた灯りが消えるまで（秒）'),
+
+  // ---- 部屋まるごとの異変（anomaly/defs/sense/）----
+  'sense.rgb.sec': num(4, 1.5, 12, '色の照明: 赤・緑・青の照明が 1 色ずつ点いている秒数'),
+  'sense.lightning.minSec': num(4, 1.5, 20, '雷: 稲光の間隔の下限（秒）'),
+  'sense.lightning.maxSec': num(10, 3, 40, '雷: 稲光の間隔の上限（秒）'),
+  'sense.shadow.speed': num(1.1, 0.4, 2.5, '影だけ動く: 影の歩く速さ（m/s）'),
+  'sense.late.delaySec': num(0.45, 0.15, 1.5, '足音が遅れて聞こえる: 足音と足跡の遅れ（秒）'),
+  'sense.edge.showDeg': num(34, 20, 50, '視界の端の人影: 視線からこれ以上（度）ずれた所にだけ現れる'),
+  'sense.edge.hideDeg': num(20, 8, 32, '視界の端の人影: 視線がこれより近づくと消える（度）'),
+  'sense.chairs.max': num(8, 3, 16, '見ていない間に動く家具: 動く椅子の数の上限', true),
+  'sense.slow.speed': num(0.5, 0.2, 0.9, '遅い部屋: 動く速さの倍率'),
+  'sense.slow.pitch': num(0.62, 0.3, 0.95, '遅い部屋: 足音の高さの倍率（低く・ゆっくり聞こえる）'),
 } as const satisfies Record<string, Spec>;
