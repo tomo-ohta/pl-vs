@@ -168,6 +168,21 @@ test('地図の空白: 出現型は空白の壁の前で立ち止まる・壁を
   assert.ok(appear >= 1 && present >= 1, `出現型 ${appear}・存在型 ${present}`);
 });
 
+test('地図の空白: 製図台があっても入口から出口の向こうまで歩ける・決定的', () => {
+  const rooms = findRooms('mapBlank', 4, { maxWorld: 200 });
+  assert.ok(rooms.length >= 3, `地図の空白の部屋 ${rooms.length}`);
+  for (const room of rooms) {
+    assert.ok(room.cell.boxes.some((b) => b.propGroup?.endsWith('mapBlank-table')), '製図台の地図');
+    assert.ok(room.cell.boxes.filter((b) => b.propGroup?.includes('mapBlank-sheet')).length >= 4, '壁の図面');
+    const sim = simOf(room.floor);
+    sim.teleport(0, [room.inside[0], room.inside[1] + 0.02, room.inside[2]], room.yaw);
+    const res = walkTo(sim, room.beyond ?? room.cell.id);
+    assert.ok(res.ok, `${room.floor.id} ${room.cell.id}: ${res.reason}`);
+  }
+  const again = regenerate(rooms[0]!);
+  assert.equal(JSON.stringify(again.entities.filter((e) => e.cell === rooms[0]!.cell.id)), JSON.stringify(rooms[0]!.floor.entities.filter((e) => e.cell === rooms[0]!.cell.id)));
+});
+
 test('見本のフロア（?try=fogTower,mapBlank）: 2 つとも置ける（地図の空白には隠しが付く）', () => {
   const r = showcaseFloor(t, { ids: ['fogTower', 'mapBlank'], dress: dressCell });
   const defs = new Set(r.gimmicks!.gimmicks.map((g) => g.def));
