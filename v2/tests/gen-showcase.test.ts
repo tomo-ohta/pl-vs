@@ -5,6 +5,7 @@ import { generateFloorReport } from '../core/gen/floor/index.ts';
 import { BSIDE_TONES } from '../core/gen/floor/bside.ts';
 import { showcaseFloor } from '../core/gen/floor/showcase.ts';
 import { gimmickDefs } from '../core/gen/gimmicks/types.ts';
+import { anomalyDefs } from '../core/gen/anomaly/index.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
 import '../core/sim/parts/index.ts';
@@ -13,6 +14,8 @@ import { IDLE_COMMAND } from '../core/sim/types.ts';
 import type { FloorLayout } from '../core/world/layout.ts';
 
 const t = defaultTuning();
+/** 段階 3 までの仕掛け（段階 4 の担当が足した仕掛けを、全種の見本の検査から外す） */
+const STAGE3_GIMMICKS = ['sensorLights', 'lowCeiling', 'soundGuide', 'switchDoor', 'mannequin', 'beltMaze', 'crumbleFloor', 'bouncePad', 'appearPath', 'tiltRoom', 'narrowPath', 'beamNetwork', 'guideLight', 'puzzleRoom'];
 const shape = (f: FloorLayout): string => f.cells.filter((c) => c.role !== 'secret').map((c) => `${c.id}:${c.bounds.min.join(',')}:${c.bounds.max.join(',')}`).join('|');
 
 test('裏のフロア: 表と同じ形・中身と調子は裏の seed で決まる（決定的）', () => {
@@ -36,10 +39,13 @@ test('裏のフロア: 表と同じ形・中身と調子は裏の seed で決ま
 
 test('見本のフロア: 仕掛けを全種置き、見て回る位置はどれも床の上', async () => {
   const R = await loadRapier();
-  const all = gimmickDefs().map((d) => d.id);
+  // 段階 3 までの仕掛け（段階 4 で種類が増え、全種は 1 つの見本のフロアに収まらない。段階 4 の仕掛けは ?try= / ?group= の見本で見る）
+  const all = gimmickDefs().map((d) => d.id).filter((id) => STAGE3_GIMMICKS.includes(id));
   const modesBy: string[][] = [];
   for (const flip of [false, true]) {
-    const r = showcaseFloor(t, { flip });
+    const anomalies = anomalyDefs().map((d) => d.id);
+    const half = Math.ceil(anomalies.length / 2);
+    const r = showcaseFloor(t, { flip, ids: [...all, ...(flip ? anomalies.slice(half) : anomalies.slice(0, half))] });
     const g = r.gimmicks!;
     assert.deepEqual(new Set(g.gimmicks.map((x) => x.def)), new Set(all), '全種');
     assert.equal(g.tour.length, g.gimmicks.length + g.secrets.filter((s) => s.hook === 'generic.darkCorner').length + r.anomalies.length);

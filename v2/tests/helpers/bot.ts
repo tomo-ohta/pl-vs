@@ -15,6 +15,38 @@ import type { CellLayout, FloorLayout, PortalSpec, Zone } from '../../core/world
 
 export interface WalkResult { ok: boolean; reason: string; seconds: number; route: string[] }
 
+/**
+ * 仕掛けの解き方（部品の params.bot。段階 4 の ground で足した）: 歩く人は、区画を出る前にこの手順をこなす
+ * （棚を押す・箱を押す・印の上で待つ・円盤がそろうのを待つ）。遊び手と同じ操作だけを使う（移動・調べる・しゃがむ・待つ）。
+ * - steps: 立つ所 at（足元）まで歩き、look があればそちらを調べ（E）、wait 秒と until（`部品.出力` が入るまで）待つ。crouch でしゃがんで待つ
+ * - enterAt: この開口（外面の床の位置 [x, z]）から入ったときだけ（入口の向きで手順が違う仕掛け。無ければいつでも）
+ * - only 'secret': 隠し場所（role 'secret' の区画）へ入るときだけ
+ * - doneIf: `部品.出力` が入っていれば手順を飛ばす（もう解けている）
+ * - replanSec: この区画では道をこの間隔で引き直す（動く床）
+ */
+export interface BotStep { at: [number, number, number]; look?: [number, number, number]; wait?: number; until?: string; crouch?: boolean }
+export interface BotHint { steps: BotStep[]; enterAt?: [number, number]; only?: 'secret'; doneIf?: string; replanSec?: number }
+
+const outputRef = (sim: Sim, ref: string): number => { const i = ref.lastIndexOf('.'); return sim.outputOf(ref.slice(0, i), ref.slice(i + 1)); };
+
+/** 区画 cell を開口 exit から出る前にこなす手順（入ってきた開口 prev。区画の中から歩き始めるなら start） */
+function hintSteps(floor: FloorLayout, cell: string, exit: PortalSpec, prev: PortalSpec | null, start: [number, number, number] | null): { step: BotStep; doneIf?: string }[] {
+  const out: { step: BotStep; doneIf?: string }[] = [];
+  const other = exit.cells[0] === cell ? exit.cells[1] : exit.cells[0];
+  const toSecret = floor.cells.find((c) => c.id === other)?.role === 'secret';
+  const hints = floor.entities.filter((e) => e.cell === cell && e.params.bot).map((e) => e.params.bot as unknown as BotHint).filter((h) => h.steps?.length && (h.only !== 'secret' || toSecret));
+  const directed = hints.filter((h) => h.enterAt);
+  let pickDirected: BotHint[] = [];
+  if (prev) {
+    const [px, , pz] = center(prev);
+    pickDirected = directed.filter((h) => Math.hypot(h.enterAt![0] - px, h.enterAt![1] - pz) < 1.2);
+  } else if (start && directed.length) {
+    pickDirected = [directed.slice().sort((a, b) => Math.hypot(a.enterAt![0] - start[0], a.enterAt![1] - start[2]) - Math.hypot(b.enterAt![0] - start[0], b.enterAt![1] - start[2]))[0]!];
+  }
+  for (const h of [...hints.filter((x) => !x.enterAt), ...pickDirected]) for (const s of h.steps) out.push(h.doneIf ? { step: s, doneIf: h.doneIf } : { step: s });
+  return out;
+}
+
 /** 調べる用: 1 秒ごとに呼ばれる（区間・位置・残りの道のり） */
 export const botDebug: { trace?: (msg: string) => void } = {};
 
@@ -227,10 +259,12 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
   const r = route(floor, from, targetCell);
   if (!r) return { ok: false, reason: '道順がありません', seconds: 0, route: [] };
   // 区間の目標: 開口の手前（扉なら調べる）→ 開口の先
-  const legs: { x: number; y: number; z: number; portal?: PortalSpec; via?: boolean }[] = [];
+  const legs: { x: number; y: number; z: number; portal?: PortalSpec; via?: boolean; hint?: BotStep; doneIf?: string }[] = [];
   let cell = from;
   for (let i = 0; i < r.length; i++) {
     const p = r[i]!;
+    // 仕掛けの解き方の手順（params.bot）を、区画を出る開口の前に挟む
+    for (const h of hintSteps(floor, cell, p, r[i - 1] ?? null, i === 0 ? sim.players[0]!.pos : null)) legs.push({ x: h.step.at[0], y: h.step.at[1], z: h.step.at[2], hint: h.step, ...(h.doneIf ? { doneIf: h.doneIf } : {}) });
     const [x, y, z] = center(p);
     const forward = p.cells[0] === cell ? 1 : -1;
     const d = [[0, 1], [1, 0], [0, -1], [-1, 0]][p.dir]!;
@@ -254,10 +288,33 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     return d;
   };
   const replan = (): void => { path = []; bestD = Infinity; };
+  // 仕掛けの解き方の手順: 立つ所に着いてからの秒数（-1 は歩いている）・調べたか。動く床の区画の道の引き直しの間隔
+  let hintT = -1, hintPressed = false, replanEvery = 0;
   const ticks = Math.round(maxSec / sim.dt);
   for (let n = 0; n < ticks; n++) {
     const L = legs[leg];
     if (!L) return { ok: true, reason: '', seconds: n * sim.dt, route: r.map((p) => p.id) };
+    if (L.hint && hintT < 0 && L.doneIf && outputRef(sim, L.doneIf) > 0.5) { leg++; path = []; continue; }
+    if (L.hint && hintT >= 0) {
+      const h = L.hint;
+      const hc: InputCommand = { ...IDLE_COMMAND, yaw: player.yaw, pitch: player.pitch, crouch: !!h.crouch };
+      if (h.look && !hintPressed) {
+        const ex = h.look[0] - player.pos[0], ez = h.look[2] - player.pos[2], ey = h.look[1] - (player.pos[1] + player.eye);
+        hc.yaw = Math.atan2(-ex, -ez);
+        hc.pitch = Math.atan2(ey, Math.hypot(ex, ez));
+        hc.interact = { yaw: hc.yaw, pitch: hc.pitch };
+        hintPressed = true;
+      }
+      sim.step([hc]);
+      hintT += sim.dt;
+      if ((hintT >= (h.wait ?? 0) && (!h.until || outputRef(sim, h.until) > 0.5)) || hintT > 60) { leg++; hintT = -1; hintPressed = false; stuck = 0; bestD = Infinity; legT = 0; path = []; }
+      continue;
+    }
+    if (n % 15 === 0) {
+      const c = cellAtPos(floor, player.pos);
+      replanEvery = c ? Math.max(0, ...floor.entities.filter((e) => e.cell === c.id && e.params.bot).map((e) => Number((e.params.bot as unknown as BotHint).replanSec ?? 0))) : 0;
+    }
+    if (replanEvery > 0 && n % Math.max(1, Math.round(replanEvery / sim.dt)) === 0) path = [];
     legT += sim.dt;
     if (botDebug.trace && n % 60 === 0) botDebug.trace(`t=${(n * sim.dt).toFixed(0)} leg ${leg}/${legs.length} pos ${player.pos.map((v) => v.toFixed(2)).join(',')} path ${path.length} best ${bestD.toFixed(2)} stuck ${stuck}`);
     // 区画の中の道を引き直す（区間の始まり・止まったとき・流された・落ちたとき）
@@ -305,6 +362,8 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     }
     // 扉が開くのを待つ間も、扉の手前の目標までは歩く（崩れる床・動く歩道の上で立ち止まらない）
     sim.step([cmd]);
+    // 仕掛けの解き方の手順の立つ所に着いた: 次の tick から調べる・待つ
+    if (L.hint && dist < 0.3 && path.length <= 1 && Math.abs(player.pos[1] - L.y) < 1.2) { hintT = 0; path = []; continue; }
     // 目標の点に着いた（区間の終わりは高さも合っていること: 穴の底の扉の真上の床板の上では着いていない）
     if (dist < 0.3 && (path.length > 1 || Math.abs(player.pos[1] - L.y) < 1.2)) {
       segFrom = path.shift()!;

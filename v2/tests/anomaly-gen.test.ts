@@ -179,7 +179,9 @@ test('異変: それぞれ見て分かる形になっている（浸水の水・
           assert.ok(c.boxes.some((b) => b.mat === c.palette.light && !b.solid && b.max[1] < fy + 0.1), `${msg}: 床の照明`);
           break;
         case 'stack':
-          assert.ok(c.boxes.some((b) => b.solid && b.propGroup && b.min[1] > fy + 0.9), `${msg}: 積まれた家具`);
+          // 積まれた家具: 何かの上に載った家具（当たる箱のいちばん下が床から 0.5 m より上の組）。段階 4 で仕掛けが増えて生成が変わり、
+          // 低い家具の 2 段の塔（0.73 m の上に棚）が出るようになったので、「0.9 m より上に当たる箱」から改めた
+          assert.ok([...groups].some((g) => { const sb = c.boxes.filter((b) => b.solid && b.propGroup === g); return sb.length > 0 && Math.min(...sb.map((b) => b.min[1])) > fy + 0.5; }), `${msg}: 積まれた家具`);
           break;
         case 'scatter':
           assert.ok(c.boxes.some((b) => b.kind === 'scatteredPaper'), msg);
@@ -206,7 +208,8 @@ test('異変: 見本のフロアは頼んだ異変を 1 つずつ置き、見て
   assert.equal(stops.length, r.anomalies.length);
   for (const a of r.anomalies) assert.ok(stops.some((s) => s.cell === a.cell && s.label === `異変: ${a.name}`), a.id);
   // 仕掛けを全種置いた見本: 半分ずつ頼めば全部入る
-  const gim = gimmickDefs().map((d) => d.id);
+  // 段階 3 までの仕掛け（段階 4 で種類が増え、全種と異変の半分は 1 つの見本のフロアに収まらない）
+  const gim = gimmickDefs().map((d) => d.id).filter((id) => ['sensorLights', 'lowCeiling', 'soundGuide', 'switchDoor', 'mannequin', 'beltMaze', 'crumbleFloor', 'bouncePad', 'appearPath', 'tiltRoom', 'narrowPath', 'beamNetwork', 'guideLight', 'puzzleRoom'].includes(id));
   for (const half of [ALL.slice(0, 7), ALL.slice(7)]) {
     let best = 0;
     for (let w = 1; w <= 6 && best < half.length; w++) {
