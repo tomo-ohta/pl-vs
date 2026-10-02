@@ -55,7 +55,7 @@ function planSideStairs(ctx: GimmickContext, land: Rect, d: Dir, depth: number, 
 }
 
 defineGimmick({
-  id: 'turntable', name: '回る円盤', axes: ['move', 'floor'], kinds: ['room', 'hall'], minSize: [6.4, 6.4], minHeight: 2.6, weight: 0.4, intensity: 2, offersSecret: true, onMainPath: true,
+  id: 'turntable', name: '回る円盤', axes: ['move', 'floor'], kinds: ['room', 'hall'], minSize: [6.4, 6.4], minHeight: 2.6, weight: 0.7, intensity: 2, offersSecret: true, onMainPath: true,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;
@@ -137,7 +137,7 @@ defineGimmick({
 });
 
 defineGimmick({
-  id: 'slideTiles', name: '動く床タイル', axes: ['move', 'floor'], kinds: ['room', 'hall'], minSize: [4.4, 6.8], minHeight: 2.4, weight: 0.4, intensity: 2, offersSecret: true, onMainPath: true,
+  id: 'slideTiles', name: '動く床タイル', axes: ['move', 'floor'], kinds: ['room', 'hall'], minSize: [4.4, 6.8], minHeight: 2.4, weight: 0.6, intensity: 2, offersSecret: true, onMainPath: true,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;

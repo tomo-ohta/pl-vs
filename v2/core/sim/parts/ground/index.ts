@@ -11,3 +11,4 @@ import './press.ts';
 import './moving.ts';
 import './devices.ts';
 import './station.ts';
+import './alarms.ts';

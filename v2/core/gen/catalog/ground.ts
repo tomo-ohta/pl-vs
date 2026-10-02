@@ -4,8 +4,6 @@
  */
 import type { CatalogEntry } from './types.ts';
 
-const WIP = '段階 4 で作っている途中';
-
 export const GROUND_CATALOG: CatalogEntry[] = [
   // ---------------------------------------------------------------- 2.4 床と足場
   { idea: 'G01', name: '床の素材', status: 'existing', impl: [{ kind: 'client', id: 'AudioEngine.footstep' }], note: '足元の箱の材質で足音が変わる（ClientGame.surfaceUnder → AudioEngine.footstep。v1 と同じ）' },
@@ -60,10 +58,14 @@ export const GROUND_CATALOG: CatalogEntry[] = [
     note: '部屋を横切るガラスの仕切りに自動扉が 2 つ。近づくと開くが、片方は 4 割ほど開かない（赤い灯り。入り直すか、もう片方へ回る）。横の壁の「故障中」の自動扉は立っていても開かず、前でしゃがんでいると開く（auto.crouch・出現型）' },
   { idea: 'D08', name: 'シャッター', status: 'done', impl: [{ kind: 'gimmick', id: 'shutterHall' }, { kind: 'part', id: 'shutter' }, { kind: 'view', id: 'shutter' }],
     note: '部屋を横切るシャッターが 2 枚、ずれた周期でゆっくり上下する（開いている間に通る・下りかけはしゃがんでくぐる）。人の上では止まる（挟まない）。横の壁に半分開いたまま止まった物置のシャッター。しゃがんでくぐると隠し（shutter.side・存在型）' },
-  { idea: 'D09', name: '回転灯と警報', status: 'deferred', impl: [], note: WIP },
-  { idea: 'D10', name: 'ブレーカー', status: 'deferred', impl: [], note: WIP },
-  { idea: 'D11', name: 'ダイヤル錠', status: 'deferred', impl: [], note: WIP },
-  { idea: 'D12', name: '呼び出しボタン', status: 'deferred', impl: [], note: WIP },
+  { idea: 'D09', name: '回転灯と警報', status: 'done', impl: [{ kind: 'gimmick', id: 'alarmRoom' }, { kind: 'part', id: 'alarm' }, { kind: 'part', id: 'securityDoor' }, { kind: 'view', id: 'alarm' }, { kind: 'view', id: 'securityDoor' }],
+    note: 'ガラスの蓋の赤いボタンを押すと警報が鳴り、回転灯が回って部屋が赤くなる。鳴っている間（15 秒）だけ、離れた壁の鋼鉄の扉が開く。扉の先が隠し（alarm.door・存在型・必ず付ける）。中からは近づけばいつでも開く（閉じ込めない）' },
+  { idea: 'D10', name: 'ブレーカー', status: 'done', impl: [{ kind: 'gimmick', id: 'breakerRoom' }, { kind: 'part', id: 'breaker' }, { kind: 'view', id: 'breaker' }],
+    note: '分電盤のレバーを下ろすと部屋の照明が全部消え、非常口の印と床の蓄光の矢印だけが光る。矢印の先の、非常口の印の下の壁が開く（breaker.exit・出現型・必ず付ける）。レバーを戻すと明かりが戻る（懐中電灯でも見える）' },
+  { idea: 'D11', name: 'ダイヤル錠', status: 'done', impl: [{ kind: 'gimmick', id: 'dialSafe' }, { kind: 'part', id: 'dialLock' }, { kind: 'part', id: 'pushButton' }, { kind: 'view', id: 'dialLock' }],
+    note: '壁の大きな丸い金庫の扉に赤・青・緑のダイヤル（調べるたびに 1 つ進む）。部屋の壁のあちこちに同じ色の大きな数字の張り紙。色の数字に合わせると扉が開き、中の小部屋へ（safe.open・出現型・必ず付ける）。「中は記録」は報酬を置かない決まりなので隠しの部屋にした。開けなくても先へ進める' },
+  { idea: 'D12', name: '呼び出しボタン', status: 'done', impl: [{ kind: 'gimmick', id: 'callBell' }, { kind: 'part', id: 'callBell' }, { kind: 'view', id: 'callBell' }],
+    note: '入口の近くのインターホンのボタン。押すと、しばらくして部屋の遠くでベルが 3 回鳴り（音の向きが分かる）、その方の壁に扉が開いて暖かい明かりが漏れる（bell.door・出現型・必ず付ける）。音を頼りに探すよう、家具の無い広い部屋' },
   // ---------------------------------------------------------------- 4.7 裏の振る舞い（床と足場）
   { idea: 'BG01', name: '崩れる床をわざと崩して落ちる', status: 'existing', impl: [{ kind: 'gimmick', id: 'crumbleFloor' }, { kind: 'secret', id: 'crumble.fall' }] },
   { idea: 'BG02', name: '崩れていく帰り道で帰らずに奥へ', status: 'merged', impl: [{ kind: 'gimmick', id: 'collapseRun' }, { kind: 'secret', id: 'collapse.deep' }],

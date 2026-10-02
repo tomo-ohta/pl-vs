@@ -28,7 +28,7 @@ function wallButton(ctx: GimmickContext, F: WallFrame, name: string, u: number, 
 const FAKES = ['B0', '13', 'R2', 'B44', 'M3', '0', 'B∞'];
 
 defineGimmick({
-  id: 'liftCabin', name: 'エレベーター', axes: ['puzzle', 'sound'], kinds: ['room', 'hall'], minSize: [4.0, 4.6], minHeight: 2.4, weight: 0.35, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'liftCabin', name: 'エレベーター', axes: ['puzzle', 'sound'], kinds: ['room', 'hall'], minSize: [4.0, 4.6], minHeight: 2.4, weight: 0.3, intensity: 1, offersSecret: true, onMainPath: true,
   build(ctx) {
     const s = ctx.slot;
     const y = s.cell.floorY, H = s.cell.height;
@@ -122,7 +122,7 @@ defineGimmick({
 });
 
 defineGimmick({
-  id: 'vendingRoom', name: '自販機', axes: ['light', 'puzzle'], kinds: ['room', 'hall'], minSize: [3.0, 3.4], minHeight: 2.3, weight: 0.45, intensity: 0, offersSecret: true, onMainPath: true,
+  id: 'vendingRoom', name: '自販機', axes: ['light', 'puzzle'], kinds: ['room', 'hall'], minSize: [3.0, 3.4], minHeight: 2.3, weight: 0.18, intensity: 0, offersSecret: true, onMainPath: true,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;

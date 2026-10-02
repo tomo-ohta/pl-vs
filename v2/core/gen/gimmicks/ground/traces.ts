@@ -160,7 +160,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- 足跡が残る床・逆回り
 defineGimmick({
-  id: 'footLoop', name: '足跡が残る床', axes: ['floor', 'sight'], kinds: ['room', 'hall'], minSize: [4.4, 4.4], weight: 0.6, intensity: 0, offersSecret: true, onMainPath: true,
+  id: 'footLoop', name: '足跡が残る床', axes: ['floor', 'sight'], kinds: ['room', 'hall'], minSize: [4.4, 4.4], weight: 0.25, intensity: 0, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance,
   build(ctx) {
     const s = ctx.slot;
@@ -194,7 +194,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- 他人の足跡
 defineGimmick({
-  id: 'strangerTrail', name: '他人の足跡', axes: ['sight'], kinds: ['room', 'hall'], minSize: [4.0, 4.4], weight: 0.6, intensity: 0, offersSecret: true, onMainPath: true,
+  id: 'strangerTrail', name: '他人の足跡', axes: ['sight'], kinds: ['room', 'hall'], minSize: [4.0, 4.4], weight: 0.15, intensity: 0, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance,
   build(ctx) {
     const s = ctx.slot;
@@ -227,7 +227,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- 水たまりの鏡
 defineGimmick({
-  id: 'mirrorPuddle', name: '水たまりの鏡', axes: ['sight', 'light'], kinds: ['room', 'hall'], minSize: [4.4, 5.0], weight: 0.6, intensity: 0, offersSecret: true, onMainPath: true,
+  id: 'mirrorPuddle', name: '水たまりの鏡', axes: ['sight', 'light'], kinds: ['room', 'hall'], minSize: [4.4, 5.0], weight: 0.4, intensity: 0, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance,
   build(ctx) {
     const s = ctx.slot;

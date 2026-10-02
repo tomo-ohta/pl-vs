@@ -128,7 +128,8 @@ test('ドミノの橋: 同じ seed で同じ部屋（決定的）', () => {
 });
 
 test('ドミノの橋: ふつうのフロアの本道に置かれても、歩く人が棚を押して出口まで抜けられる', async () => {
-  const floors = mainPathFloors('dominoBridge', 2, 900);
+  // ふつうのフロアの本道（出にくいので、見本のフロアの本道に置かれた物も）
+  const floors = [...mainPathFloors('dominoBridge', 2, 900), ...showcaseRooms('dominoBridge', [1, 2, 3, 4]).filter((r) => r.main)].slice(0, 3);
   assert.ok(floors.length >= 1, '本道のドミノの橋が出る');
   for (const f of floors) {
     const res = await walkFloorExit(f.floor);

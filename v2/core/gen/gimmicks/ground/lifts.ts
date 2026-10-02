@@ -42,7 +42,7 @@ function freeWall(ctx: GimmickContext, need: number, depthNeed: number): { d: Di
 }
 
 defineGimmick({
-  id: 'sinkFloor', name: '沈む床', axes: ['floor'], kinds: ['room', 'hall'], minSize: [4.6, 4.6], minHeight: 2.4, weight: 0.5, intensity: 0, onMainPath: true,
+  id: 'sinkFloor', name: '沈む床', axes: ['floor'], kinds: ['room', 'hall'], minSize: [4.6, 4.6], minHeight: 2.4, weight: 0.4, intensity: 0, onMainPath: true,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;
@@ -73,7 +73,7 @@ defineGimmick({
 });
 
 defineGimmick({
-  id: 'riseFloor', name: 'せり上がる床', axes: ['floor'], kinds: ['room', 'hall'], minSize: [4.0, 4.4], minHeight: 3.5, weight: 0.5, intensity: 0, offersSecret: true, requiresSecret: true, onMainPath: true,
+  id: 'riseFloor', name: 'せり上がる床', axes: ['floor'], kinds: ['room', 'hall'], minSize: [4.0, 4.4], minHeight: 3.5, weight: 0.7, intensity: 0, offersSecret: true, requiresSecret: true, onMainPath: true,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;

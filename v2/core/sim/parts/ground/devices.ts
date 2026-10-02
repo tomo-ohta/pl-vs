@@ -1,10 +1,12 @@
 /**
  * 装置の部品（エレベーター D04・自販機 D05 ほか）。
  *
- * - pushButton: 押しボタン（壁の小さな箱）。調べると押した tick だけ pressed、litSec 秒だけ lit（押したと分かる光）。トグルしない
- * - liftCabin: エレベーターのかご。入力 b0..bn（ボタン）。本当の階のボタンを押すと、引き戸が閉まり（戸の所に人がいれば閉めない）、
+ * - pushButton: 押しボタン（壁の小さな箱）。調べると押した tick だけ pressed、litSec 秒だけ lit（押したと分かる光）。トグルしない。
+ *     入力 disable が入っている間は調べられない
+ * - liftCabin: エレベーターのかご。入力 call（外の ▼）で arriveSec 秒後に来て戸が開く（中に人がいれば、呼ばなくても来て開く）。
+ *     入力 b0..bn（中のボタン）。本当の階のボタンを押すと、引き戸が閉まり（戸の所に人がいれば閉めない）、
  *     rideSec 秒動いて（Cue lift.ride。表示の数字が流れる）、Cue floor.goto でフロアを移る（行き先は buttons[i].to。無ければ 1 つ下）。
- *     かごに誰もいなければ動かない。移らなかった（試験・実験室）ときは、しばらくで戸が開く。
+ *     かごに誰もいなければ動かない。移らなかった（試験・実験室）ときは、しばらくで戸が開く。誰もいなければ idleSec 秒で閉まって行ってしまう。
  *     存在しない階のボタン（buttons[i].fake）を order の順に押すと secret（一度入ったら戻らない）。違う順は最初から（Cue lift.buzz）。
  *     出力 open（戸が開いている）・riding・secret・lit（かごの照明。動いている間は揺れる）・shown（表示の階の番号の位置 0..1）
  * - vending: 自販機。入力 b0..b2（色のボタン）・slot（取り出し口）。押すと缶が落ちる（Cue vend.drop。data.color）、部屋の照明がその色になる
@@ -17,16 +19,20 @@ import { definePart, pAabb, pNum, playerIn } from '../../part.ts';
 
 const ON = 0.5;
 
-definePart<{ lit: number; [k: string]: Json | undefined }>({
+definePart<{ lit: number; off: number; [k: string]: Json | undefined }>({
   type: 'pushButton',
   outputs: ['pressed', 'lit'],
+  inputs: ['disable'],
   init(ctx) {
     const b = pAabb(ctx.spec, 'box');
     ctx.setInteractable(b, pNum(ctx.spec, 'range', 2.2));
-    return { lit: 0 };
+    return { lit: 0, off: 0 };
   },
   step(s, ctx) {
-    const pressed = !!ctx.interactedBy();
+    // 使えなくなった（金庫が開いた後のダイヤル。後ろの扉を調べられるように）
+    const off = ctx.input('disable') > ON ? 1 : 0;
+    if (off !== s.off) { s.off = off; ctx.setInteractable(off ? null : pAabb(ctx.spec, 'box'), pNum(ctx.spec, 'range', 2.2)); }
+    const pressed = !s.off && !!ctx.interactedBy();
     if (pressed) { s.lit = pNum(ctx.spec, 'litSec', 0.6); ctx.cue('push.press', aabbCenter(pAabb(ctx.spec, 'box'))); }
     else s.lit = Math.max(0, s.lit - ctx.dt);
     ctx.output('pressed', pressed ? 1 : 0);

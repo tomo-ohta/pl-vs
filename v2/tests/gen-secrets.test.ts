@@ -76,7 +76,7 @@ test('隠し: 入口には扉がある・行き先がばらける・隠しが 2 
 test('謎のパズル: 手がかりの順にボタンを押すと扉が現れる（間違えると現れない）', async () => {
   const R = await loadRapier();
   let solved = 0;
-  for (let w = 1; w <= 60 && solved < 4; w++) {
+  for (let w = 1; w <= 160 && solved < 4; w++) {
     const r = generateFloorReport({ world: w, depth: 2, variant: 0 }, t);
     const sec = r.gimmicks?.secrets.find((s) => s.hook === 'puzzle.sequence');
     if (!sec) continue;

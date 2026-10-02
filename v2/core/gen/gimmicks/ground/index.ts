@@ -14,3 +14,4 @@ import './press.ts';
 import './moving.ts';
 import './machines.ts';
 import './station.ts';
+import './alarms.ts';

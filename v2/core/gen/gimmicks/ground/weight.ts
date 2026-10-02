@@ -13,7 +13,7 @@ import { aabbJson } from '../util.ts';
 import { botHint, buildTrench, enterAt, entranceFrame, onRectWall, planTrench, snap, soffit } from './common.ts';
 
 defineGimmick({
-  id: 'weightBridge', name: '重りの床', axes: ['floor', 'puzzle'], kinds: ['room', 'hall'], minSize: [5.0, 6.4], minHeight: 2.4, weight: 0.7, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'weightBridge', name: '重りの床', axes: ['floor', 'puzzle'], kinds: ['room', 'hall'], minSize: [5.0, 6.4], minHeight: 2.4, weight: 1.1, intensity: 1, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && (s.openings.length === 1 || (!!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4)),
   build(ctx) {
     const s = ctx.slot;

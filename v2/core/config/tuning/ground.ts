@@ -88,4 +88,7 @@ export const GROUND_TUNING = {
   'ground.shutter.closedSec': num(1.5, 0, 6, 'シャッター: 閉まっている間（秒）'),
   'ground.shutter.upSec': num(2.5, 1, 8, 'シャッター: 上がり切るまで（秒）'),
   'ground.shutter.needSec': num(1.6, 0.8, 4, 'シャッター: 歩く人がくぐり始める、開いている残りの秒'),
+  // 回転灯と警報（alarmRoom）・呼び出しボタン（callBell）
+  'ground.alarm.sec': num(15, 6, 40, '回転灯と警報: 警報が鳴っている間（秒。鋼鉄の扉が開いている間）'),
+  'ground.bell.delaySec': num(1.5, 0.3, 5, '呼び出しボタン: 押してから遠くでベルが鳴り始めるまで（秒）'),
 } as const satisfies Record<string, Spec>;

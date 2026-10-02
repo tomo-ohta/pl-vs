@@ -23,7 +23,7 @@ import { botHint, buildTrench, enterAt, entranceFrame, onRectWall, planTrench, r
 const sideDir = (d: Dir, side: -1 | 1): Dir => (d % 2 === 0 ? (side < 0 ? 3 : 1) : (side < 0 ? 2 : 0));
 
 defineGimmick({
-  id: 'dominoBridge', name: 'ドミノの橋', axes: ['floor', 'puzzle'], kinds: ['room', 'hall'], minSize: [4.6, 6.6], minHeight: 2.7, weight: 0.8, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'dominoBridge', name: 'ドミノの橋', axes: ['floor', 'puzzle'], kinds: ['room', 'hall'], minSize: [4.6, 6.6], minHeight: 2.7, weight: 1.2, intensity: 1, offersSecret: true, onMainPath: true,
   // 入口と出口が向かい合う部屋（溝を渡って出口へ）か、行き止まりの部屋（向こう岸に隠し）
   fits: (s) => !!s.entrance && (s.openings.length === 1 || (!!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4)),
   build(ctx) {

@@ -187,7 +187,7 @@ defineGimmick({
 });
 
 defineGimmick({
-  id: 'shutterHall', name: 'シャッター', axes: ['time', 'body'], kinds: ['room', 'hall'], minSize: [4.0, 7.6], minHeight: 2.4, weight: 0.45, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'shutterHall', name: 'シャッター', axes: ['time', 'body'], kinds: ['room', 'hall'], minSize: [4.0, 7.6], minHeight: 2.4, weight: 0.6, intensity: 1, offersSecret: true, onMainPath: true,
   build(ctx) {
     const s = ctx.slot;
     const t = ctx.tuning;
