@@ -268,7 +268,8 @@ defineAnomaly({
  * 「さっきの部屋に戻った？」と思わせて、扉の位置が違う
  */
 defineAnomaly({
-  id: 'carryover', name: '前の部屋の物', weight: 0.6, intensity: 0, kinds: ['room', 'hall'], minSize: [3.4, 4],
+  // 裏のフロアでは、前の部屋だけが裏の調子（照明・材質）に変わり「同じ色の部屋」に見えなくなるので、表のフロアだけ
+  id: 'carryover', name: '前の部屋の物', weight: 0.6, intensity: 0, kinds: ['room', 'hall'], minSize: [3.4, 4], frontOnly: true,
   fits: (g) => !MAZE_THEMES.has(g.cell.theme ?? ''),
   post(ctx) {
     const cell = ctx.cell, fy = cell.floorY;

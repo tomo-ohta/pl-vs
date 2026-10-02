@@ -192,7 +192,8 @@ test('oddity: どの異変も見本で置け、見て分かる形になってい
 test('oddity: ふつうのフロアに出る異変も、見て分かる形になっている（200 フロア）', () => {
   const fails: string[] = [];
   const seen = new Map<string, number>();
-  for (let w = 1; w <= 200; w++) {
+  // 200 フロア。ほかの担当の異変が増えて揃わなければ、揃うまで（400 フロアまで）
+  for (let w = 1; w <= 200 || (w <= 400 && MINE.some((id) => !seen.get(id))); w++) {
     const r = generateFloorReport({ world: w, depth: 1 + (w % 9), variant: w % 6 === 0 ? 1 : 0 }, t, { dress: dressCell });
     for (const a of r.anomalies) {
       if (!MINE.includes(a.def)) continue;
@@ -203,7 +204,7 @@ test('oddity: ふつうのフロアに出る異変も、見て分かる形にな
     }
   }
   console.log(`  ${MINE.map((id) => `${id} ${seen.get(id) ?? 0}`).join('・')}`);
-  for (const id of MINE) if (!seen.get(id)) fails.push(`${id}: 200 フロアに 1 度も出ない`);
+  for (const id of MINE) if (!seen.get(id)) fails.push(`${id}: 400 フロアに 1 度も出ない`);
   assert.deepEqual(fails, []);
 });
 

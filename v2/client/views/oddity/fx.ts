@@ -268,8 +268,10 @@ defineFx('steam', ({ p, ctx, seed }) => {
   const mesh = particles(ctx, geo, mat, at.length * per);
   const r = prng(seed);
   const wisps = at.flatMap((x) => Array.from({ length: per }, (_v, k) => ({ x: x[0]!, y: x[1]!, z: x[2]!, t: k / per + r() * 0.1, w: r() * 6.28 })));
+  let time = 0;
   return {
     update(dt) {
+      time += dt;
       if (ctx.camera) q.copy(ctx.camera.quaternion);
       wisps.forEach((w, i) => {
         w.t = (w.t + dt / 2.6) % 1;
@@ -281,7 +283,7 @@ defineFx('steam', ({ p, ctx, seed }) => {
       });
       mesh.instanceMatrix.needsUpdate = true;
       // 消えていく: 1 つの材質なので全体の濃さだけ揺らす
-      mat.opacity = 0.18 + 0.05 * Math.sin(performance.now() / 700);
+      mat.opacity = 0.18 + 0.05 * Math.sin(time / 0.7);
     },
     dispose() { mesh.removeFromParent(); geo.dispose(); mat.dispose(); },
   };

@@ -39,7 +39,7 @@ export const ODDITY_CATALOG: CatalogEntry[] = [
   { idea: 'X03', name: '数が合わない', status: 'done', impl: [A('miscount'), V('oddRoom')], note: '部屋でいちばん多い家具（椅子・机 …）の 1 つずつに大きな番号札。どこかで同じ番号が 2 回出て、数が 1 つ多い。壁の掲示は「この部屋の◯◯ N」（実際は N + 1）。家具の少ない部屋は壁一面の番号付きロッカー（同じ番号が 2 つ）' },
   { idea: 'X04', name: '案内の嘘', status: 'done', impl: [A('fakeSigns'), V('oddRoom')], note: '床の矢印と壁の「出口 →」が、開口の無い壁の偽の扉（非常口の灯り付き・開かない）を指す。本当の先の開口の上には「関係者以外立入禁止」。閉じ込めない（本物の開口は普通に通れる）' },
   { idea: 'X05', name: '自分の名前', status: 'done', impl: [A('nameplate'), V('oddRoom')], note: '向かいの壁に大きく「{name} さん　おかえりなさい」、家具の 1 つずつに名札、先の開口の上に「{name} 様　お呼び出しです」。名前は ?name= か保存の liminal2.playerName（名前の入力の画面は無いので、無ければ既定の呼び名「あなた」）' },
-  { idea: 'X06', name: '前の部屋の物', status: 'done', impl: [A('carryover')], note: 'さっき通った部屋（本道なら本道の前の部屋。AnomalyContext.prev）の大きな家具が、同じ並びでこの部屋にもある。床・壁・照明の色・環境音も前の部屋と同じ。「戻った？」と思わせて扉の位置が違う' },
+  { idea: 'X06', name: '前の部屋の物', status: 'done', impl: [A('carryover')], note: 'さっき通った部屋（本道なら本道の前の部屋。AnomalyContext.prev）の大きな家具が、同じ並びでこの部屋にもある。床・壁・照明の色・環境音も前の部屋と同じ。「戻った？」と思わせて扉の位置が違う。裏のフロアでは前の部屋だけ調子が変わるので表のフロアだけ（frontOnly）' },
   { idea: 'X07', name: '色が抜ける', status: 'done', impl: [A('missingColor'), V('oddRoom')], note: '赤・緑・青のどれか 1 色だけが部屋から消えている（赤いはずの消火器・緑の鉢植え・青いごみ箱が灰色）。中に入ると、目に映る物からもその色だけが抜ける（画面の色 hueKill）' },
   { idea: 'X08', name: '単色の部屋', status: 'done', impl: [A('mono'), A('tint'), V('oddRoom')], note: '黒一色（艶のある黒。照明の映り込みで形だけが見える）か、1 色だけの部屋（全部が 1 つの色の無地。画面もその色だけ）を足した。白一色は既存の色の異変（tint）' },
   { idea: 'X09', name: '壁と床が欠ける', status: 'done', impl: [A('void')], note: '開口の無い壁沿いの床が帯状に崩れ落ち、その上の壁と天井も消えて黒い虚空が覗く。床の真ん中にも穴。落ちると虚空の底で入口へ戻される（失敗の代償は位置と時間）。開口どうしを結ぶ床は必ず残す' },
