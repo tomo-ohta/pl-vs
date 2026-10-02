@@ -38,7 +38,11 @@ URL の指定（開発用）:
 |---|---|
 | `?seed=3&depth=2` | 世界の seed と始める深さ |
 | `?variant=1` | 裏のフロアから始める |
-| `?showcase=1` / `?showcase=2` | 見本のフロア（仕掛け全種・隠し全部。2 は隠しの型が逆）。G / Shift+G で仕掛けの入口へ移る |
+| `?showcase=1` / `?showcase=2` | 段階 3 の見本のフロア（仕掛け 14 種・異変 14 種・隠し全部。2 は隠しの型が逆）。G / Shift+G で仕掛けの入口へ移る |
+| `?try=id,id,…` | 指定した仕掛け・異変・部屋の形（id か案の番号。例 `?try=windTunnel,snow,S08`）だけを置いた見本のフロア。1 つのフロアに 8 種くらいまで |
+| `?group=<担当>` | 担当（move・ground・sense・oddity・carry・warp・structure・rooms・map）の仕掛け・異変を置ける分だけ置いた見本 |
+| `?shape=<型>` | フロアの形の型を決めて作る（spiral・tower・station・islands・rooftop・megahall …。`core/gen/floor/themes.ts`） |
+| `?name=…` | 名札・掲示に出す名前（異変「自分の名前」） |
 | `?dev=1` | ふつうのフロアでも G で仕掛けを見て回れる |
 | `?tune=キー=値,…` | 調整表の上書き（例: `?tune=secrets.perFloorMean=3`） |
 | `?nodress=1` | 区画の中身（家具）を置かない |

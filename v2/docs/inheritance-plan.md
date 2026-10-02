@@ -142,7 +142,8 @@ v2/
 | `audio/*`・`AudioEngine` | 移植済み | `client/audio/` | |
 | `RecOverlay`・`SettingsPanel`・`Settings`・`InputController` | 移植済み | `client/ui/`・`client/settings/`・`client/input/` | 保存名は `liminal2.*` |
 | `game/Game.ts` | 作り直し | `core/sim/sim.ts`（手元のサーバー）・`client/game/ClientGame.ts` | |
-| まだ移していない | — | — | `MenuUI`・地図（`MapPanel`・`Map3D`・`Minimap`）・`Hud`・`FloorCodex`・`SnapshotService`・`DoorLeak`・`PropCatalog`・`props/*`・`ObjectGeometry`・`DecalLayer`・`SignAtlas`・`wearEffects`・oddity・Modifier・monument・`data/index.ts`・`SaveManager`・`PlayerRide`・`PlayerProxy` |
+| `MenuUI`・`MapPanel`・`Minimap`・`FloorCodex` | 作り直し（段階 4・map） | `client/ui/`（MapPanel・Minimap・CodexPanel）・`client/map/` | 一時停止の画面のタブ（地図 / 図鑑 / 設定）。地図は見た区画だけ・調査率・足跡・上下の層。保存は `liminal2.codex.v1`・`liminal2.maps.v1:<鍵>`。`Map3D` は移さない（フロアごとに別の世界） |
+| まだ移していない | — | — | `Hud`・`SnapshotService`（図鑑の画像）・`DoorLeak`・`PropCatalog`・`props/*`・`ObjectGeometry`・`DecalLayer`・`SignAtlas`・`wearEffects`・oddity・Modifier・monument・`data/index.ts`・`SaveManager`・`PlayerRide`・`PlayerProxy` |
 
 ---
 
