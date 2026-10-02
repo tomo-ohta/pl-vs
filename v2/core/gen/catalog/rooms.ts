@@ -19,7 +19,7 @@ export const ROOMS_CATALOG: CatalogEntry[] = [
   { idea: 'S07', name: 'L 字・コの字・ロの字', status: 'done', impl: room('bentRoom'), note: '足跡の角を欠く（L。入口から出口が見えない角を選ぶ）・壁の真ん中を欠く（コ）・真ん中に天井までの塊（ロ。塊の面に開かない扉）。足跡ごと作り直すので家具は新しい壁にも付く' },
   { idea: 'S08', name: '段々の部屋', status: 'done', impl: room('terraces'), note: '講堂のすり鉢: 開口の側から舞台へ 0.33 m ずつ段が下がり、段ごとに座席の列（両端が通路）。底に低い舞台・幕・演台。上の縁に手すり。段で上り下りできる' },
   { idea: 'S09', name: '半円の劇場', status: 'done', impl: room('theater'), note: '舞台（0.7 m）・幕・足元の灯り・舞台を囲む半円の座席（舞台を向く）。舞台の奥の扉の向こうに楽屋（鏡と電球・衣装掛け。区画を足す。空きが無ければ開かない扉）' },
-  { idea: 'S10', name: '低すぎる天井', status: 'done', impl: room('lowCeiling'), note: '天井 1.6 m（体は 1.7 m）。扉の前だけ普通の高さで、中はしゃがんで進む（スマホはしゃがむボタン）。家具も低い物だけ' },
+  { idea: 'S10', name: '低すぎる天井', status: 'done', impl: room('lowRoom'), note: '天井 1.6 m（体は 1.7 m）。扉の前だけ普通の高さで、中はしゃがんで進む（スマホはしゃがむボタン）。家具も低い物だけ' },
   { idea: 'S11', name: '高すぎる天井', status: 'done', impl: room('highCeiling'), note: '天井 30 m（空きが無ければ低く）。照明は天井の蛍光灯 1 本だけで床は薄暗い。家具は普通の部屋のまま' },
   { idea: 'S12', name: 'うなぎの寝床', status: 'done', impl: room('eelBed'), note: '長い区画（広間）だけ。幅 1.2 m の帯の足跡に作り直し、ほかの開口へは細い枝。一定の間隔の鴨居・続く絨毯・額、奥に椅子が 1 脚こちらを向く' },
   { idea: 'S13', name: '二重壁', status: 'done', impl: room('doubleWall'), note: '開口の無い壁の内側にもう 1 枚の壁。割れ目（立って / しゃがんで）から幅 0.85 m の暗い隙間に入れ、奥に誰かの痕跡（椅子・正の字・紙・ラジオ）。普通でない振る舞いのご褒美' },

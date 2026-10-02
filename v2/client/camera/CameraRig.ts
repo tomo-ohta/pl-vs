@@ -61,7 +61,16 @@ export interface CameraSubject {
   strideCount: number;
   horizontalSpeed: number;
   stillSec: number;
+  /**
+   * 重力の向き（段階 4・移動と身体。PlayerState.grav）。軸 axis のまわりに k × 90° 回した向きが上。
+   * カメラは向きと目の位置（足元から上の向きへ eye）を回し、乗り移る瞬間は滑らかに回す
+   */
+  grav?: { axis: 'x' | 'z'; k: number } | null;
 }
+
+/** 重力の向きが変わったとき、カメラを回し切るまでの時間の目安（秒）と、位置を寄せる時定数 */
+const GRAV_TURN_SEC = 0.12;
+const GRAV_BLEND_SEC = 0.5;
 
 export class CameraRig {
   readonly camera: THREE.PerspectiveCamera;
@@ -86,6 +95,15 @@ export class CameraRig {
   // 位相の起点（見た目だけ。世界の生成と同期には関わらないので Math.random でよい）
   private readonly phase = [0, 1, 2, 3, 4].map(() => Math.random() * TAU);
   private readonly zoomPeriod = CAMERA_FEEL.zoomSecMin + Math.random() * (CAMERA_FEEL.zoomSecMax - CAMERA_FEEL.zoomSecMin);
+  // 重力の向き（段階 4）: 今の回し方（滑らかに追う）・目指す回し方・乗り移った後の位置の寄せ
+  private readonly gravQ = new THREE.Quaternion();
+  private readonly gravTarget = new THREE.Quaternion();
+  private gravKey = '';
+  private gravBlend = 0;
+  private readonly camPrev = new THREE.Vector3();
+  private readonly tmpQ = new THREE.Quaternion();
+  private readonly tmpV = new THREE.Vector3();
+  private readonly tmpP = new THREE.Vector3();
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -160,12 +178,43 @@ export class CameraRig {
     this.camera.position.set(s.pos[0], s.pos[1] + s.eye + (sup ? 0 : o.y), s.pos[2]);
     if (sup) this.camera.rotation.set(s.pitch, s.yaw, 0, 'YXZ');
     else this.camera.rotation.set(o.pitch, o.yaw, o.roll, 'YXZ');
+    this.applyGravity(dt, s, sup ? 0 : o.y);
     const f = sup ? 0 : o.fov;
     if (f !== this.fovNow) {
       this.fovNow = f;
       this.camera.fov = this.baseFov + f;
       this.camera.updateProjectionMatrix();
     }
+  }
+
+  /**
+   * 重力の向き（段階 4・移動と身体）: 上の向きが回っている間は、カメラの向き（重力の回し方 × 視線）と目の位置
+   * （足元 + 上の向き × eye）を回す。向きが変わった瞬間は、回し方を GRAV_TURN_SEC で追い、位置も GRAV_BLEND_SEC の間は寄せていく
+   * （足元は壁へ一気に移るので、そのままでは目が 1 m ほど飛ぶ）
+   */
+  private applyGravity(dt: number, s: CameraSubject, bobY: number): void {
+    const g = s.grav ?? null;
+    const key = g ? `${g.axis}${g.k}` : '';
+    if (key !== this.gravKey) {
+      this.gravKey = key;
+      if (g) this.gravTarget.setFromAxisAngle(this.tmpV.set(g.axis === 'x' ? 1 : 0, 0, g.axis === 'z' ? 1 : 0), (g.k * Math.PI) / 2);
+      else this.gravTarget.identity();
+      this.gravBlend = GRAV_BLEND_SEC;
+    }
+    const turning = this.gravBlend > 0 || this.gravQ.angleTo(this.gravTarget) > 1e-4;
+    if (!turning && !g) { this.camPrev.copy(this.camera.position); return; }
+    this.gravQ.slerp(this.gravTarget, 1 - Math.exp(-dt / GRAV_TURN_SEC));
+    if (this.gravQ.angleTo(this.gravTarget) < 1e-3) this.gravQ.copy(this.gravTarget);
+    // 向き: 重力の回し方 × 視線（YXZ の回転）
+    this.tmpQ.setFromEuler(this.camera.rotation);
+    this.camera.quaternion.copy(this.gravQ).multiply(this.tmpQ);
+    // 目の位置: 足元 + 回した上 × 目の高さ
+    this.tmpV.set(0, s.eye + bobY, 0).applyQuaternion(this.gravQ).add(this.tmpP.set(s.pos[0], s.pos[1], s.pos[2]));
+    if (this.gravBlend > 0) {
+      this.gravBlend = Math.max(0, this.gravBlend - dt);
+      this.camera.position.copy(this.camPrev).lerp(this.tmpV, 1 - Math.exp(-dt / 0.07));
+    } else this.camera.position.copy(this.tmpV);
+    this.camPrev.copy(this.camera.position);
   }
 }
 

@@ -18,6 +18,8 @@ import { aabbJson, innerRect, wallFrame } from '../util.ts';
 
 /** 違いの種類 */
 const DIFFS = ['chairColor', 'chairTurned', 'lamp', 'picture', 'extra'] as const;
+/** ブースの幅の下限: 机と椅子（左から 1.37 m）の右に、隠しの扉へ通る道（0.8 m）が残る幅 */
+const BOOTH_MIN = 2.25;
 type Diff = (typeof DIFFS)[number];
 
 /** 床から（作業座標 y = 0）作った箱をフロア座標へ */
@@ -40,7 +42,7 @@ defineGimmick({
     // ブースを並べる壁: 主の矩形の、開口の無い壁のうち長い物。横の壁の開口がブースの帯に掛からないこと
     const walls = ([0, 1, 2, 3] as const).filter((d) => !s.openings.some((o) => o.dir === d && Math.abs((d === 0 || d === 2 ? o.pos[2] : o.pos[0]) - (d === 0 ? s.rect.z1 : d === 2 ? s.rect.z0 : d === 1 ? s.rect.x1 : s.rect.x0)) < 0.05));
     const cands = walls.map((d) => ({ d, F: wallFrame(r, d) })).filter(({ d, F }) => {
-      if (F.depth < D + 2.0 || F.u1 - F.u0 < 3 * 2.1) return false;
+      if (F.depth < D + 2.0 || F.u1 - F.u0 < 3 * BOOTH_MIN) return false;
       return s.openings.every((o) => {
         const v = F.v(o.pos[0], o.pos[2]);
         // 横の壁の開口: 開口の前の空ける範囲（幅の半分 0.8 m 以上）がブースの奥行きより前
@@ -51,7 +53,7 @@ defineGimmick({
     if (!c) return;
     const { d, F } = c;
     const L = F.u1 - F.u0;
-    const n = Math.max(3, Math.min(5, Math.floor(L / t['anomaly.oneDifferent.boothM'])));
+    const n = Math.max(3, Math.min(5, Math.floor(L / Math.max(BOOTH_MIN, t['anomaly.oneDifferent.boothM']))));
     const w = L / n;
     const odd = ctx.rng.int(0, n - 1);
     const diff: Diff = ctx.rng.pick(DIFFS);
@@ -123,14 +125,19 @@ defineGimmick({
         const target = diff === 'chairColor' || diff === 'chairTurned' ? C : diff === 'lamp' ? Lm : diff === 'picture' ? P : extra;
         const bb = bbOf(target);
         const touchBox: AABB = { min: [bb.min[0] - 0.05, bb.min[1], bb.min[2] - 0.05], max: [bb.max[0] + 0.05, bb.max[1] + 0.05, bb.max[2] + 0.05] };
-        // 隠しの扉の前は空ける（右半分の奥）
-        const K = F.rect(uc + 0.05, 0, u1 - 0.1, 1.4);
-        ctx.keepOut({ min: [K.x0, fy, K.z0], max: [K.x1, fy + 2.2, K.z1] });
+        // 隠しの扉の前は空ける（右半分の奥）。扉は右の仕切りに寄せ、椅子の右から仕切りまでの通り道（体の幅 + 余裕）が無いブースには付けない
+        // （狭いブースで、椅子が扉の前を塞いで入れないことがあった）
+        const chairRight = deskU + 0.62 + 0.25;
+        const doorAt = Math.min(uc + w / 4, u1 - 0.62);
         ctx.addEntity('touch', { type: 'oddTouch', params: { box: aabbJson(touchBox), range: 2.6 } });
-        ctx.offerSecret({
-          hook: `oneDifferent.${diff}`, modes: ['present', 'appear'], weight: 1.2, revealOutput: `${ctx.id}.touch.touched`,
-          doorway: { dir: d, at: uc + w / 4, y: fy, width: 1.0, height: 2.0 }, tell: '1 つだけ違う家具',
-        });
+        if (u1 - 0.05 - chairRight >= 0.8) {
+          const K = F.rect(chairRight, 0, u1 - 0.1, 1.4);
+          ctx.keepOut({ min: [K.x0, fy, K.z0], max: [K.x1, fy + 2.2, K.z1] });
+          ctx.offerSecret({
+            hook: `oneDifferent.${diff}`, modes: ['present', 'appear'], weight: 1.2, revealOutput: `${ctx.id}.touch.touched`,
+            doorway: { dir: d, at: doorAt, y: fy, width: 1.0, height: 2.0 }, tell: '1 つだけ違う家具',
+          });
+        }
       }
     }
     // ブースの帯には区画の中身を置かない

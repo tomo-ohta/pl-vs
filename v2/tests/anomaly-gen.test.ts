@@ -177,8 +177,8 @@ test('異変: それぞれ見て分かる形になっている（浸水の水・
           break;
         }
         case 'tiny':
-          // 0.8 m: 背の高い棚（1.56 m）を縮めると 0.78 m（担当 sense が 0.75 から上げた。異変が増えてフロアの部屋が変わり、その棚の部屋に当たった）
-          assert.ok(c.boxes.filter((b) => b.solid && b.propGroup).every((b) => b.max[1] - fy < 0.8), `${msg}: 家具は膝より低い`);
+          // 0.8 m: 背の高い棚（1.56 m）を縮めると 0.78 m（担当 sense）。柱（広間の柱の飾り。人の背より高い）は縮めても膝より高いことがあるので除く（担当 move）
+          assert.ok(c.boxes.filter((b) => b.solid && b.propGroup && b.kind !== 'column').every((b) => b.max[1] - fy < 0.8), `${msg}: 家具は膝より低い`);
           break;
         case 'upsideDown':
           assert.ok(c.boxes.some((b) => b.solid && b.propGroup && (b.min[1] + b.max[1]) / 2 > fy + c.height / 2), `${msg}: 天井の側に付いた家具`);

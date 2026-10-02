@@ -355,6 +355,8 @@ export class ClientGame {
       strideCount: p.strideCount,
       horizontalSpeed: horizontalSpeed(p),
       stillSec: p.stillSec,
+      // 段階 4・移動と身体: 重力の向き（壁・天井を歩いている間、カメラを回す）
+      grav: p.grav,
     };
   }
 

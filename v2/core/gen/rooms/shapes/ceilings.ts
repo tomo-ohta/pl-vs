@@ -70,7 +70,7 @@ defineRoomShape({
  * 開口の前（扉を開けて立つ所）だけ普通の高さ。家具も低い物だけ（天井の下に収まる）
  */
 defineRoomShape({
-  id: 'lowCeiling', idea: 'S10', name: '低すぎる天井', kinds: ['room', 'hall'], minSize: [4.2, 4.8], minHeight: 2.4, weight: 0.7,
+  id: 'lowRoom', idea: 'S10', name: '低すぎる天井', kinds: ['room', 'hall'], minSize: [4.2, 4.8], minHeight: 2.4, weight: 0.7,
   fits: (g) => !MAZE_THEMES.has(g.cell.theme ?? ''),
   build(ctx) {
     const t = ctx.tuning, cell = ctx.cell, fy = ctx.fy, h = ctx.h, r = ctx.inner;

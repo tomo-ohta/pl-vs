@@ -62,7 +62,8 @@ export function findRooms(def: string, want: number, o: { maxWorld?: number; dre
       if (g.def !== def || out.length >= want) continue;
       const cell = r.floor.cells.find((c) => c.id === g.cell)!;
       const stop = r.gimmicks!.tour.find((s) => s.cell === g.cell)!;
-      const portals = r.floor.portals.filter((p) => p.cells.includes(g.cell) && !p.cells.some((c) => c.startsWith('secret')));
+      // 窓（段階 4 のフロアの形。見えるだけで通れない）は入口・出口にしない
+      const portals = r.floor.portals.filter((p) => p.cells.includes(g.cell) && !p.cells.some((c) => c.startsWith('secret')) && p.kind !== 'window');
       const d = (p: PortalSpec): number => { const c = portalCenter(p); return Math.hypot(c[0] - stop.pos[0], c[2] - stop.pos[2]); };
       const entry = portals.slice().sort((a, b) => d(a) - d(b))[0]!;
       const idx = main.indexOf(g.cell);

@@ -38,7 +38,7 @@ const CHECKS: Record<string, (c: CellLayout, fl: FloorLayout) => string | null> 
   grandHall: (c) => (c.height >= 4 && c.lights.some((l) => l.color === 0xffd9a0) ? null : '高い天井とシャンデリア'),
   tallHall: (c) => (c.height >= 7 ? null : `天井 ${c.height}`),
   ceilingWells: (c) => (c.bounds.max[1] > fyOf(c) + c.height + 3 && c.lights.length <= 9 ? null : '天井の上の井戸'),
-  lowCeiling: (c) => (boxesOf(c, (b) => b.kind === 'lowCeiling' && b.solid && Math.abs(b.min[1] - fyOf(c) - 1.6) < 0.01).length > 0 ? null : '1.6 m の低い天井'),
+  lowRoom: (c) => (boxesOf(c, (b) => b.kind === 'lowCeiling' && b.solid && Math.abs(b.min[1] - fyOf(c) - 1.6) < 0.01).length > 0 ? null : '1.6 m の低い天井'),
   highCeiling: (c) => (c.height >= 12 && c.lights.length === 1 ? null : `天井 ${c.height}・灯り ${c.lights.length}`),
   waveCeiling: (c) => (boxesOf(c, (b) => !!b.slope && !b.solid && b.mat === c.palette.ceiling).length >= 2 && boxesOf(c, (b) => b.kind === 'colliderOnly').length >= 3 ? null : '傾いた天井の板'),
   splitHall: (c) => (boxesOf(c, (b) => {

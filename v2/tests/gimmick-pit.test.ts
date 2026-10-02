@@ -17,10 +17,12 @@ import { walkTo } from './helpers/bot.ts';
 import { findRooms, regenerate, type GimmickRoom } from './helpers/gimmick-rooms.ts';
 
 const t = defaultTuning();
+// 段階 4 で仕掛けが 100 種を超えたので、穴の仕掛けを出やすくして集める（gimmick.w.<id>）
+const boost = (id: string, w: number) => ({ t: { ...t, [`gimmick.w.${id}`]: w } as typeof t });
 const ROOMS = {
-  crumbleFloor: findRooms('crumbleFloor', 16),
-  narrowPath: findRooms('narrowPath', 14, { maxWorld: 600 }),
-  beamNetwork: findRooms('beamNetwork', 8, { maxWorld: 1200 }),
+  crumbleFloor: findRooms('crumbleFloor', 16, { maxWorld: 600, ...boost('crumbleFloor', 8) }),
+  narrowPath: findRooms('narrowPath', 14, { maxWorld: 600, ...boost('narrowPath', 20) }),
+  beamNetwork: findRooms('beamNetwork', 8, { maxWorld: 1200, ...boost('beamNetwork', 20) }),
 };
 
 /** 穴の底の高さ（区画のいちばん低い当たり判定の箱の上面） */
@@ -103,7 +105,7 @@ for (const def of ['crumbleFloor', 'narrowPath', 'beamNetwork'] as const) {
 }
 
 test('立ち止まると見える道（appearPath）: 溝の底から、入口側の階段で入口へ戻れる（階段の下の端が溝の底に向いている）', async () => {
-  const rooms = findRooms('appearPath', 8, { maxWorld: 400 });
+  const rooms = findRooms('appearPath', 8, { maxWorld: 400, ...boost('appearPath', 10) });
   assert.ok(rooms.length >= 4, `部屋: ${rooms.length}`);
   const fails: string[] = [];
   for (const room of rooms) {
@@ -178,7 +180,13 @@ test('穴の底の隠し（crumble.fall・fall.below）: 底から隠し場所�
     const door = room.floor.portals.find((p) => p.cells[0] === room.cell.id && p.cells[1] === sec.cell)!;
     assert.ok(door.aabb.min[1] < room.cell.floorY - 1.5, `${sec.id}: 入口は穴の底`);
     const probe = await newSim(room);
-    const spot = fallSpots(probe, room, 1, 7)[0]!;
+    // 段階 4 で足した: 階段（底より高く床より低い段）から 1.2 m 以上離れた所に落ちる（階段の脇は床板の下で頭がつかえ、
+    // 歩く人が階段を上ってから脇へ下りようとして止まる。落ちた先から隠しへ歩けることは、階段から離れた所で確かめる）
+    const yb = bottomOf(room);
+    const steps = room.cell.boxes.filter((b) => b.solid && b.max[1] > yb + 0.1 && b.max[1] < room.cell.floorY - 0.1 && b.min[1] <= yb + 0.01);
+    const far = (p: [number, number, number]): boolean => !steps.some((b) => p[0] > b.min[0] - 1.2 && p[0] < b.max[0] + 1.2 && p[2] > b.min[2] - 1.2 && p[2] < b.max[2] + 1.2);
+    const cands = fallSpots(probe, room, 8, 7);
+    const spot = cands.find(far) ?? cands[0]!;
     probe.physics?.dispose();
     const sim = await newSim(room);
     sim.teleport(0, spot, 0);
@@ -191,8 +199,10 @@ test('穴の底の隠し（crumble.fall・fall.below）: 底から隠し場所�
 });
 
 test('穴・溝の部屋: 同じ key なら同じ形（決定的）', () => {
-  for (const room of [ROOMS.crumbleFloor[0]!, ROOMS.narrowPath[0]!, ROOMS.beamNetwork[0]!].filter(Boolean)) {
-    const again = regenerate(room);
+  for (const id of ['crumbleFloor', 'narrowPath', 'beamNetwork'] as const) {
+    const room = ROOMS[id][0];
+    if (!room) continue;
+    const again = regenerate(room, boost(id, id === 'crumbleFloor' ? 8 : 20));
     assert.equal(JSON.stringify(again.cells.find((c) => c.id === room.cell.id)!.boxes), JSON.stringify(room.cell.boxes));
     assert.equal(JSON.stringify(again.entities.filter((e) => e.cell === room.cell.id)), JSON.stringify(room.floor.entities.filter((e) => e.cell === room.cell.id)));
   }

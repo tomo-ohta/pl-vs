@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { defaultTuning } from '../core/config/tuning.ts';
 import { generateFloorReport } from '../core/gen/floor/index.ts';
 import { BSIDE_TONES } from '../core/gen/floor/bside.ts';
-import { showcaseFloor, STAGE3_GIMMICKS } from '../core/gen/floor/showcase.ts';
+import { showcaseFloor, STAGE3_ANOMALIES, STAGE3_GIMMICKS } from '../core/gen/floor/showcase.ts';
 import { anomalyDefs } from '../core/gen/anomaly/index.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
@@ -37,13 +37,12 @@ test('裏のフロア: 表と同じ形・中身と調子は裏の seed で決ま
 
 test('見本のフロア: 仕掛けを全種置き、見て回る位置はどれも床の上', async () => {
   const R = await loadRapier();
-  // 見本のフロア（?showcase=1 / 2）は段階 3 の仕掛け 14 種。段階 4 の仕掛けは ?try / ?group で見る
   const all = [...STAGE3_GIMMICKS];
+  const a3 = anomalyDefs().map((d) => d.id).filter((id) => STAGE3_ANOMALIES.includes(id));
   const modesBy: string[][] = [];
   for (const flip of [false, true]) {
-    const anomalies = anomalyDefs().map((d) => d.id);
-    const half = Math.ceil(anomalies.length / 2);
-    const r = showcaseFloor(t, { flip, ids: [...all, ...(flip ? anomalies.slice(half) : anomalies.slice(0, half))] });
+    const half = Math.ceil(a3.length / 2);
+    const r = showcaseFloor(t, { flip, ids: [...all, ...(flip ? a3.slice(half) : a3.slice(0, half))] });
     const g = r.gimmicks!;
     assert.deepEqual(new Set(g.gimmicks.map((x) => x.def)), new Set(all), '全種');
     assert.equal(g.tour.length, g.gimmicks.length + g.secrets.filter((s) => s.hook === 'generic.darkCorner').length + r.anomalies.length);

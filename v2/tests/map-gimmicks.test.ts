@@ -171,7 +171,7 @@ test('地図の空白: 出現型は空白の壁の前で立ち止まる・壁を
 });
 
 test('地図の空白: 製図台があっても入口から出口の向こうまで歩ける・決定的', () => {
-  const rooms = findRooms('mapBlank', 4, { maxWorld: 500 });
+  const rooms = findRooms('mapBlank', 4, { maxWorld: 500, t: { ...t, 'gimmick.w.mapBlank': 20 } as typeof t });
   assert.ok(rooms.length >= 3, `地図の空白の部屋 ${rooms.length}`);
   for (const room of rooms) {
     assert.ok(room.cell.boxes.some((b) => b.propGroup?.endsWith('mapBlank-table')), '製図台の地図');
@@ -181,7 +181,7 @@ test('地図の空白: 製図台があっても入口から出口の向こうま
     const res = walkTo(sim, room.beyond ?? room.cell.id);
     assert.ok(res.ok, `${room.floor.id} ${room.cell.id}: ${res.reason}`);
   }
-  const again = regenerate(rooms[0]!);
+  const again = regenerate(rooms[0]!, { t: { ...t, 'gimmick.w.mapBlank': 20 } as typeof t });
   assert.equal(JSON.stringify(again.entities.filter((e) => e.cell === rooms[0]!.cell.id)), JSON.stringify(rooms[0]!.floor.entities.filter((e) => e.cell === rooms[0]!.cell.id)));
 });
 

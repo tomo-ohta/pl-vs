@@ -168,5 +168,8 @@ defineGimmick({
     ctx.addEntity('reveal', { type: 'reveal', params: { group, pos: [axis === 'x' ? mid : cc, y, axis === 'x' ? cc : mid], style: 'fadeIn' }, inputs: { show: `${dwell}.done` } });
     ctx.keepOut({ min: [hole.x0 - 0.2, y - depth, hole.z0 - 0.2], max: [hole.x1 + 0.2, y + 3, hole.z1 + 0.2] });
     ctx.keepOut({ min: [px - 1, y, pz - 1], max: [px + 1, y + 3, pz + 1] });
+    // 段階 4 で足した: 階段の上の端から入口側の床へ上がる所（部屋の端の壁際）に物を置かない（壁付けの物で上り口が塞がれる）
+    const e0 = nearLo ? (axis === 'x' ? hole.x0 : hole.z0) - 1.0 : (axis === 'x' ? hole.x1 : hole.z1), e1 = e0 + 1.0;
+    ctx.keepOut(axis === 'x' ? { min: [e0, y, a0 - 0.2], max: [e1, y + 3, a0 + 2 * tread + 0.4] } : { min: [a0 - 0.2, y, e0], max: [a0 + 2 * tread + 0.4, y + 3, e1] });
   },
 });

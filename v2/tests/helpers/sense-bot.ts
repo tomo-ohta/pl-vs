@@ -362,12 +362,15 @@ function search(sim: Sim, e: EntitySpec, leg: V2): InputCommand | null {
   const next = spans.find((s) => s.d0 >= d);
   if (!next) return toward(sim, b);
   if (next.d0 - d > 0.35) return toward(sim, [a[0] + dirv[0] * (next.d0 - 0.15), a[1] + dirv[1] * (next.d0 - 0.15)]);
-  // 帯の手前: 渡り終えるまで（走って）光の円が道に近づかないなら渡る
-  const cross0: V2 = [a[0] + dirv[0] * (next.d0 + next.d1) / 2, a[1] + dirv[1] * (next.d0 + next.d1) / 2];
-  const T = (next.d1 - next.d0) / 5.2 + 0.35;
+  // 帯の手前: 走って渡る間の自分の位置（道に沿って毎秒 5 m）と光の円が、ずっと離れているなら渡る（人と同じく、光が向こうへ行く時を見て渡る。
+  // 帯が短い部屋では、帯の真ん中との距離で待つと渡る隙が無い）
+  const T = (next.d1 - d) / 5.0 + 0.3;
   for (let s = 0; s <= T; s += 0.05) {
     const sp = searchSpot(lanes[next.i]!, t + s);
-    if (dist2(cross0, sp) < R + 0.9) return still(sim);
+    const k = Math.min(next.d1, d + s * 5.0);
+    const at: V2 = [a[0] + dirv[0] * k, a[1] + dirv[1] * k];
+    // 光の円の縁から体の半分（0.35）と少しの余裕
+    if (dist2(at, sp) < R + 0.5) return still(sim);
   }
   return toward(sim, b, { dash: true });
 }

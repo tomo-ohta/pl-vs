@@ -21,7 +21,7 @@ export const ROOMS_TUNING = {
   'rooms.w.grandHall': num(3.0, 0, 10, 'S02 大広間（広間だけ）'),
   'rooms.w.tallHall': num(0.6, 0, 10, 'S03 縦長ホール'),
   'rooms.w.ceilingWells': num(0.9, 0, 10, 'S05 天井井戸'),
-  'rooms.w.lowCeiling': num(0.7, 0, 10, 'S10 低すぎる天井'),
+  'rooms.w.lowRoom': num(0.7, 0, 10, 'S10 低すぎる天井（形の id は lowRoom。仕掛けの lowCeiling と分ける）'),
   'rooms.w.highCeiling': num(0.6, 0, 10, 'S11 高すぎる天井'),
   'rooms.w.waveCeiling': num(0.8, 0, 10, 'S30 天井の高さが場所で変わる'),
   'rooms.w.splitHall': num(1.0, 0, 10, 'S06 分割ホール'),
