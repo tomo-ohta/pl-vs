@@ -404,7 +404,7 @@ function stepUpright(p: PlayerState, cmd: InputCommand, world: PlayerWorld, dt: 
     p.climbing = false;
   }
 
-  updateStride(p, start, tick, events);
+  updateStride(p, start, tick, events, Math.abs(mx) + Math.abs(my) > 0.05);
   const moving = p.moveRank !== 'still' || Math.abs(mx) + Math.abs(my) > 0.05;
   p.stillSec = moving || lookMoved || cmd.jump ? 0 : p.stillSec + dt;
 }
@@ -604,11 +604,12 @@ function revertGravity(p: PlayerState, world: PlayerWorld, tick: number, events:
   events.push({ type: 'player.gravity', tick, player: p.id, pos: [...p.pos], data: { up: '0,1,0' } });
 }
 
-function updateStride(p: PlayerState, start: Vec3, tick: number, events: SimEvent[]): void {
+/** 歩幅と足音。stepping: 歩く操作をしているか（段階 4: 操作が無いのに運ばれている間 = 動く歩道・縮む廊下は足音にしない） */
+function updateStride(p: PlayerState, start: Vec3, tick: number, events: SimEvent[], stepping = true): void {
   const hs = horizontalSpeed(p);
   const prev = p.moveRank;
   p.moveRank = hs < 0.3 ? 'still' : hs < (PLAYER.walk + PLAYER.dash) / 2 ? 'walk' : 'dash';
-  if (!p.onGround || p.moveRank === 'still') {
+  if (!p.onGround || p.moveRank === 'still' || !stepping) {
     if (p.moveRank === 'still' && prev !== 'still') p.strideAcc = 0;
     return;
   }

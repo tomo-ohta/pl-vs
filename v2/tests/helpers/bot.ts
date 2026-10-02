@@ -210,6 +210,16 @@ function distToSegment(x: number, z: number, a: [number, number], b: [number, nu
   return Math.hypot(a[0] + ex * k - x, a[1] + ez * k - z);
 }
 
+/** 段階 4（移動と身体）: 部品 type の範囲（params.aabb）に足元が入っているか */
+function moveRegion(floor: FloorLayout, type: string, p: readonly number[]): boolean {
+  for (const e of floor.entities) {
+    if (e.type !== type) continue;
+    const a = e.params.aabb as { min: number[]; max: number[] } | undefined;
+    if (a && p[0]! >= a.min[0]! && p[0]! <= a.max[0]! && p[1]! + 0.1 >= a.min[1]! && p[1]! + 0.1 <= a.max[1]! && p[2]! >= a.min[2]! && p[2]! <= a.max[2]!) return true;
+  }
+  return false;
+}
+
 export function cellAtPos(floor: FloorLayout, p: [number, number, number]): CellLayout | null {
   let best: CellLayout | null = null;
   for (const c of floor.cells) {
@@ -246,7 +256,7 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
   let leg = 0;
   let path: [number, number][] = [];
   // 進み具合は「残りの道のり」（道を引いた所から目標まで）で測る。迷路・帯の回り道で目標から離れても止まったとみなさない
-  let stuck = 0, bestD = Infinity, waitDoor = 0, crouch = 0, planY = player.pos[1], legT = 0;
+  let stuck = 0, bestD = Infinity, waitDoor = 0, crouch = 0, planY = player.pos[1], legT = 0, idle = 0;
   let segFrom: [number, number] = [player.pos[0], player.pos[2]];
   const remaining = (): number => {
     let d = Math.hypot(path[0]![0] - player.pos[0], path[0]![1] - player.pos[2]);
@@ -293,6 +303,10 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
       cmd.moveY = dist > 0.15 ? d[0]! * f[0]! + d[1]! * f[1]! : 0;
       cmd.moveX = dist > 0.15 ? d[0]! * rr[0]! + d[1]! * rr[1]! : 0;
     }
+    // 段階 4（移動と身体）: 前を向くと押し戻される通路（facingPush）では、後ろ向きに歩く（向きを反対にして、後ろへ進む操作）
+    if (moveRegion(floor, 'facingPush', player.pos)) { cmd.yaw += Math.PI; cmd.moveY = -cmd.moveY; cmd.moveX = -cmd.moveX; }
+    // 段階 4: 歩くと伸びる廊下（stretchWarp）で進めなくなったら、しばらく立ち止まる（立ち止まると前へ滑る）
+    if (idle > 0) { idle -= sim.dt; cmd.moveX = 0; cmd.moveY = 0; }
     const door = L.portal?.doorId;
     if (door && legD < 0.7 && Math.abs(player.pos[1] - L.y) < 1.2 && sim.outputOf(door, 'open') < 0.5 && waitDoor <= 0) {
       waitDoor = 1.0;
@@ -318,7 +332,8 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     // 段階 4（移動と身体）: 向かい風・人の流れに押し戻されている間は、止まったと数えない（しゃがむと遅くなって渡れない）
     const pushedBack = fl > PLAYER.walk * 0.9 && fz[0] * dx + fz[2] * dz < 0;
     if (rem < bestD - 0.05 || waitDoor > 0 || pushedBack) { bestD = Math.min(bestD, rem); stuck = 0; } else stuck++;
-    // 進めないとき: しゃがんでみる・跳んでみる → 道を引き直す
+    // 進めないとき: しゃがんでみる・跳んでみる → 道を引き直す（段階 4: 伸びる廊下では立ち止まってみる）
+    if (stuck * sim.dt > 1.0 && idle <= 0 && moveRegion(floor, 'stretchWarp', player.pos)) { idle = 3.2; stuck = 0; }
     if (stuck * sim.dt > 1.0 && crouch <= 0) { crouch = 3; path = []; }
     if (Math.round(stuck * sim.dt * 60) % 90 === 89) { sim.step([{ ...cmd, jump: true, crouch: false }]); }
     if (stuck * sim.dt > 10 || legT > 150) return { ok: false, reason: `止まった: 区間 ${leg}/${legs.length}（${L.x.toFixed(2)}, ${L.z.toFixed(2)}）位置 (${player.pos.map((v) => v.toFixed(2)).join(', ')})${L.portal ? ` 開口 ${L.portal.id}` : ''}`, seconds: n * sim.dt, route: r.map((p) => p.id) };

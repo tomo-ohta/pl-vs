@@ -5,6 +5,7 @@ import { generateFloorReport } from '../core/gen/floor/index.ts';
 import { BSIDE_TONES } from '../core/gen/floor/bside.ts';
 import { showcaseFloor } from '../core/gen/floor/showcase.ts';
 import { gimmickDefs } from '../core/gen/gimmicks/types.ts';
+import { anomalyDefs } from '../core/gen/anomaly/index.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
 import '../core/sim/parts/index.ts';
@@ -34,12 +35,21 @@ test('裏のフロア: 表と同じ形・中身と調子は裏の seed で決ま
   assert.ok(differ >= 30, `仕掛けは表と違う: ${differ}/40`);
 });
 
+/**
+ * 段階 3 の見本（?showcase=1 / 2）の仕掛けと異変。段階 4 で種類が増え、全種は 1 つのフロアに収まらないので、
+ * ここでは段階 3 の物で確かめる（段階 4 の担当の物は、担当ごとの見本 ?group= を各担当の試験で確かめる）
+ */
+const STAGE3_GIMMICKS = ['sensorLights', 'lowCeiling', 'soundGuide', 'switchDoor', 'mannequin', 'beltMaze', 'crumbleFloor', 'bouncePad', 'appearPath', 'tiltRoom', 'narrowPath', 'beamNetwork', 'guideLight', 'puzzleRoom'];
+const STAGE3_ANOMALIES = new Set(['flood', 'giant', 'tiny', 'multiply', 'upsideDown', 'stack', 'dark', 'fog', 'tint', 'doors', 'lowGravity', 'ballSea', 'scatter', 'clocks']);
+
 test('見本のフロア: 仕掛けを全種置き、見て回る位置はどれも床の上', async () => {
   const R = await loadRapier();
-  const all = gimmickDefs().map((d) => d.id);
+  const all = gimmickDefs().map((d) => d.id).filter((id) => STAGE3_GIMMICKS.includes(id));
+  const a3 = anomalyDefs().map((d) => d.id).filter((id) => STAGE3_ANOMALIES.has(id));
   const modesBy: string[][] = [];
   for (const flip of [false, true]) {
-    const r = showcaseFloor(t, { flip });
+    const half = Math.ceil(a3.length / 2);
+    const r = showcaseFloor(t, { flip, ids: [...all, ...(flip ? a3.slice(half) : a3.slice(0, half))] });
     const g = r.gimmicks!;
     assert.deepEqual(new Set(g.gimmicks.map((x) => x.def)), new Set(all), '全種');
     assert.equal(g.tour.length, g.gimmicks.length + g.secrets.filter((s) => s.hook === 'generic.darkCorner').length + r.anomalies.length);

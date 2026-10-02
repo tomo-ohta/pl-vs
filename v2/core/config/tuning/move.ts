@@ -34,4 +34,30 @@ export const MOVE_TUNING = {
   'move.crowd.laneM': num(1.3, 0.8, 2.5, '人の流れ: 流れの帯の幅（m）'),
   'move.crowd.period': num(3.4, 1.5, 10, '人の流れ: 流れが強まる周期（秒）'),
   'move.crowd.duty': num(0.5, 0.1, 0.9, '人の流れ: 周期のうち流れのある割合'),
+
+  // ---- 足元の部屋（footingRoom）: 氷 [M32]・滑る床 [M10]・泥 [M31] ----
+  'move.foot.w.ice': num(0.45, 0, 10, '足元の部屋: 氷の重み'),
+  'move.foot.w.wax': num(0.25, 0, 10, '足元の部屋: 磨いて濡れた床の重み'),
+  'move.foot.w.mud': num(0.3, 0, 10, '足元の部屋: 泥の重み'),
+  'move.foot.iceFriction': num(0.22, 0.05, 1, '氷: 足の効き（1 が普通。小さいほど止まれない）'),
+  'move.foot.waxFriction': num(0.35, 0.05, 1, '滑る床: 足の効き'),
+  'move.foot.holeDepthM': num(1.2, 0.6, 2.5, '氷・滑る床: 落ちると入口からの穴の深さ（m）'),
+  'move.foot.matM': num(0.95, 0.6, 1.6, '氷・滑る床: 止まれる敷物の大きさ（m）'),
+  'move.foot.mats': num(5, 1, 12, '氷・滑る床: 止まれる敷物の数の上限', true),
+  'move.foot.mudSlow': num(0.4, 0.15, 0.9, '泥: 歩く速さの倍率'),
+  'move.foot.mudSink': num(0.2, 0, 0.6, '泥: 足が沈む深さ（m。目が下がる）'),
+  'move.foot.quickM': num(1.4, 0.8, 2.5, '泥: 流砂の大きさ（m）'),
+  'move.foot.quickSec': num(1.8, 0.5, 6, '泥: 流砂で立ち止まって飲み込まれるまでの秒数'),
+
+  // ---- 這う部屋（crawlTunnel）: 縮むトンネル [M27]・ダクト [M24] ----
+  'move.crawl.shrinkChance': num(0.5, 0, 1, '這う部屋: 縮むトンネルになる確率（入口と出口が向かい合う細長い部屋。ほかはダクト）'),
+  'move.crawl.widthM': num(0.95, 0.8, 1.4, '這う部屋: 這う所の幅（m）'),
+  'move.crawl.heightM': num(1.0, 0.9, 1.3, '這う部屋: 這う所の高さ（m。しゃがみの高さ 0.85 m より高く）'),
+  'move.crawl.backwardSec': num(2.0, 0.5, 8, '縮むトンネル（出現型の隠し）: 立ったまま後ろ向きに歩き続ける秒数'),
+  // ---- 後ろ向きの通路（backwardHall）[M42]・伸びる廊下（stretchHall）[M41] ----
+  'move.backward.push': num(5.0, 3.2, 10, '後ろ向きの通路: 前を向いたときに押し戻す速さ（m/s。歩く 3 より強く）'),
+  'move.backward.coneDeg': num(65, 30, 89, '後ろ向きの通路: 前からこの角度の内を向いていると押される'),
+  'move.stretch.periodM': num(1.8, 1.2, 3, '伸びる廊下: 柱と照明の間隔（m）。歩いて境目を越えると、この長さだけ戻される'),
+  'move.stretch.stillSec': num(1.0, 0.3, 4, '伸びる廊下: 立ち止まってから前へ滑り始めるまでの秒数'),
+  'move.stretch.glide': num(1.3, 0.5, 3, '伸びる廊下: 立ち止まっている間に前へ滑る速さ（m/s）'),
 } as const satisfies Record<string, Spec>;
