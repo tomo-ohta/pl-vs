@@ -8,6 +8,7 @@
 import { lineAt, lineLength } from '../../core/sim/parts/sense/common.ts';
 import { bandPhase, spotCenter } from '../../core/sim/parts/sense/floor.ts';
 import { patternAt, searchSpot } from '../../core/sim/parts/sense/light.ts';
+import { floodLevel, floodParams } from '../../core/sim/parts/sense/time.ts';
 import type { Sim } from '../../core/sim/sim.ts';
 import { IDLE_COMMAND, type InputCommand } from '../../core/sim/types.ts';
 import type { CellLayout, EntitySpec, FloorLayout } from '../../core/world/layout.ts';
@@ -121,9 +122,11 @@ function beam(sim: Sim, e: EntitySpec, leg: V2, cell: CellLayout): InputCommand 
   return poke(sim, m, Number(e.params.y ?? 1));
 }
 
-/** 非常電源: 出口の扉へ向かうとき、電源が切れていればレバーへ歩いて引く（入っていれば手を出さない。走るのは senseAdjust） */
+/**
+ * 非常電源・巻き戻る部屋: 出口の扉へ向かうとき、レバーが戻っていればレバーへ歩いて引く（入っていれば手を出さない。走るのは senseAdjust）
+ */
 function lever(sim: Sim, e: EntitySpec, leg: V2, cell: CellLayout): InputCommand | null {
-  if (!e.params.power || sim.outputOf(e.id, 'on') > 0.5) return null;
+  if (!(e.params.power || e.params.rewind) || sim.outputOf(e.id, 'on') > 0.5) return null;
   if (sim.outputOf(String(e.params.door), 'open') > 0.5 || !headingTo(sim, e.params.door, leg)) return null;
   const p = e.params.pos as number[];
   const pl = sim.players[0]!;
@@ -144,10 +147,10 @@ function buttonDoors(floor: FloorLayout): Map<string, string> {
   m = new Map();
   const byId = new Map(floor.entities.map((e) => [e.id, e]));
   for (const d of floor.entities) {
-    if (d.type !== 'door' || !d.inputs?.open) continue;
+    if (d.type !== 'door' || typeof d.inputs?.open !== 'string') continue;
     const src = byId.get(d.inputs.open.slice(0, d.inputs.open.lastIndexOf('.')));
     const set = src?.type === 'latch' ? src.inputs?.set : undefined;
-    if (set?.endsWith('.pressed')) m.set(set.slice(0, -'.pressed'.length), d.id);
+    if (typeof set === 'string' && set.endsWith('.pressed')) m.set(set.slice(0, -'.pressed'.length), d.id);
   }
   BUTTON_DOORS.set(floor, m);
   return m;
@@ -166,6 +169,33 @@ function button(sim: Sim, e: EntitySpec, leg: V2, cell: CellLayout): InputComman
   const pl = sim.players[0]!;
   if (Math.hypot(pl.pos[0] - c[0], pl.pos[2] - c[1]) > 1.3) return goVia(sim, cell, [c[0] + n[0] * 0.9, c[1] + n[1] * 0.9]);
   return poke(sim, c, cy);
+}
+
+/**
+ * 増水: 向こう岸へ渡るとき、渡る列の手前の端で水が満ちるのを待ち、満ちている残りの間に渡りきれるなら浮いた木箱の上を渡る。
+ * 落ちたら（穴の底・水の中）階段から手前の端へ戻る
+ */
+function flood(sim: Sim, e: EntitySpec, leg3: readonly number[], cell: CellLayout): InputCommand | null {
+  const pl = sim.players[0]!;
+  const y = Number(e.params.y);
+  const cross = e.params.cross as number[][];
+  const a: V2 = [cross[0]![0]!, cross[0]![1]!], b: V2 = [cross[1]![0]!, cross[1]![1]!];
+  const leg: V2 = [leg3[0]!, leg3[2]!];
+  const fwd = Math.hypot(b[0] - leg[0], b[1] - leg[1]) <= Math.hypot(a[0] - leg[0], a[1] - leg[1]);
+  const near = fwd ? a : b, far = fwd ? b : a;
+  const me: V2 = [pl.pos[0], pl.pos[2]];
+  const ln = onLine(me, near, far), lt = onLine(leg, near, far);
+  // 区間の目標が向こう岸（列の向こうの端より先）のときだけ
+  if (lt.t < 0.9 || leg3[1]! < y - 0.5) return null;
+  if (pl.pos[1] < y - 0.4) return goVia(sim, cell, near);
+  if (ln.t > 1.0) return null;
+  if (ln.t < 0.15) {
+    const d = Math.hypot(me[0] - near[0], me[1] - near[1]);
+    const r = floodLevel(sim.tick * sim.dt, floodParams({ spec: e }));
+    if (d < 0.9 && r.stage === 'high' && r.left > ln.len / 3.0 + 0.8) return toward(sim, far);
+    return d > 0.35 ? goVia(sim, cell, near) : still(sim);
+  }
+  return toward(sim, far);
 }
 
 /**
@@ -384,7 +414,11 @@ export function senseDrive(sim: Sim, leg: readonly number[]): InputCommand | nul
     if (c) return c;
   }
   for (const e of partsIn(sim.floor, cell.id, 'darkHazard')) {
-    const c = e.params.kind === 'wave' ? darkWave(sim, e, leg2) : darkBlink(sim, e, leg2);
+    const c = e.params.kind === 'wave' ? darkWave(sim, e, leg2) : e.params.kind === 'blink' ? darkBlink(sim, e, leg2) : null;
+    if (c) return c;
+  }
+  for (const e of partsIn(sim.floor, cell.id, 'flood')) {
+    const c = flood(sim, e, leg, cell);
     if (c) return c;
   }
   for (const e of partsIn(sim.floor, cell.id, 'searchlight')) {
@@ -423,6 +457,7 @@ export function senseAdjust(sim: Sim, cmd: InputCommand): void {
   cmd.flashlight = senseBotOptions.flashlight;
   const cell = cellOf(sim.floor, sim.players[0]!.pos);
   if (!cell) return;
-  // 非常電源が入っている間は走る（電源が切れる前に出口へ）
-  if (partsIn(sim.floor, cell.id, 'lever').some((e) => e.params.power && sim.outputOf(e.id, 'on') > 0.5)) cmd.dash = true;
+  // 非常電源・巻き戻る部屋のレバーが入っている間・閉店の照明が消えていく間は走る
+  if (partsIn(sim.floor, cell.id, 'lever').some((e) => (e.params.power || e.params.rewind) && sim.outputOf(e.id, 'on') > 0.5)) cmd.dash = true;
+  if (partsIn(sim.floor, cell.id, 'closing').some((e) => sim.outputOf(e.id, 'on') > 0.5)) cmd.dash = true;
 }

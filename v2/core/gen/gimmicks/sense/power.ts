@@ -10,41 +10,10 @@
  */
 import type { Dir } from '../../../math/vec.ts';
 import { box } from '../../../world/layout.ts';
-import { defineGimmick, type GimmickContext } from '../types.ts';
-import { aabbJson, doorZone, freeWallSpan, frontOf, innerRect, mainAxis, rectD, rectW } from '../util.ts';
-import { darkenRoom, freeWalls, roomRegion, routeBetween, wallBox, wallCoord, wallPoint } from './util.ts';
+import { defineGimmick } from '../types.ts';
+import { doorZone, freeWallSpan, frontOf, innerRect, mainAxis, rectD, rectW } from '../util.ts';
+import { addLever, besideEntrance, darkenRoom, freeWalls, roomRegion, routeBetween, wallCoord, wallPoint } from './util.ts';
 import { lineAt, lineLength } from '../../../sim/parts/sense/common.ts';
-
-/** 入口の脇（広い側）の壁の位置。置けなければ null */
-function besideEntrance(ctx: GimmickContext, gap = 0.55): number | null {
-  const s = ctx.slot;
-  const e = s.entrance;
-  if (!e) return null;
-  const r = innerRect(s);
-  const alongX = e.dir === 0 || e.dir === 2;
-  const at = alongX ? e.pos[0] : e.pos[2];
-  const [a0, a1] = alongX ? [r.x0, r.x1] : [r.z0, r.z1];
-  const cands = [-1, 1].map((sg) => at + sg * (e.width / 2 + gap)).filter((a) => a > a0 + 0.35 && a < a1 - 0.35 &&
-    !s.openings.some((o) => o !== e && o.dir === e.dir && Math.abs((alongX ? o.pos[0] : o.pos[2]) - a) < o.width / 2 + 0.4));
-  if (!cands.length) return null;
-  // 部屋の真ん中に近い側
-  const mid = (a0 + a1) / 2;
-  return cands.sort((p, q) => Math.abs(p - mid) - Math.abs(q - mid))[0]!;
-}
-
-/** 壁 d の at に、レバー（style = 'lever' / 'switch'）を付ける。戻り値は lever の部品の id */
-function addLever(ctx: GimmickContext, name: string, d: Dir, at: number, style: 'lever' | 'switch', sec: number, extra: { [k: string]: unknown } = {}): string {
-  const y = ctx.slot.cell.floorY;
-  const y0 = style === 'lever' ? y + 0.95 : y + 1.12, y1 = style === 'lever' ? y + 1.55 : y + 1.32;
-  const half = style === 'lever' ? 0.2 : 0.07;
-  // 壁の板（描画は部品の描画が足す取っ手。板は箱）
-  ctx.addBox(wallBox(ctx, d, at, half, y0, y1, 0, style === 'lever' ? 0.1 : 0.015, style === 'lever' ? 'metalDark' : 'paintWhite'));
-  if (style === 'lever') ctx.addBox(wallBox(ctx, d, at, 0.16, y1 + 0.06, y1 + 0.18, 0, 0.012, 'signPlate'));
-  const hit = wallBox(ctx, d, at, half + 0.08, y0 - 0.05, y1 + 0.05, 0, style === 'lever' ? 0.3 : 0.12, 'metalDark');
-  const [px, pz] = wallPoint(ctx, d, at, style === 'lever' ? 0.1 : 0.015);
-  const { wall } = wallCoord(ctx, d);
-  return ctx.addEntity(name, { type: 'lever', params: { box: aabbJson(hit), sec, style, dir: d, wall, at, pos: [px, (y0 + y1) / 2, pz], ...extra } as never });
-}
 
 defineGimmick({
   id: 'emergencyPower', name: '非常電源', axes: ['light', 'time'], kinds: ['room', 'hall'], minSize: [4, 6], weight: 0.4, intensity: 2, onMainPath: true,

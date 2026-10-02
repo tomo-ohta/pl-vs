@@ -14,3 +14,4 @@ import './echo.ts';
 import './beam.ts';
 import './power.ts';
 import './beacons.ts';
+import './time.ts';

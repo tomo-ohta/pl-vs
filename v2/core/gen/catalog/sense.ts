@@ -7,8 +7,6 @@ import type { CatalogEntry } from './types.ts';
 const g = (id: string): { kind: 'gimmick'; id: string } => ({ kind: 'gimmick', id });
 const a = (id: string): { kind: 'anomaly'; id: string } => ({ kind: 'anomaly', id });
 const p = (id: string): { kind: 'part'; id: string } => ({ kind: 'part', id });
-/** 作っている途中（段階 4 の作業中だけ。終わりには無くす） */
-const wip = (idea: string, name: string): CatalogEntry => ({ idea, name, status: 'deferred', impl: [], note: '作成中（段階 4 の作業中）' });
 
 export const SENSE_CATALOG: CatalogEntry[] = [
   // ---------------------------------------------------------------- 2.6 光と闇
@@ -57,11 +55,11 @@ export const SENSE_CATALOG: CatalogEntry[] = [
   { idea: 'O12', name: '視界の端の人影', status: 'done', impl: [a('edgeFigure'), p('senseFx')], note: '異変: 視界の端（視線から 34〜50°）にだけ黒い人影が立つ。そちらを見ると（20° 以内）消えて、ささやきが聞こえる' },
   // ---------------------------------------------------------------- 2.9 時間
   { idea: 'T01', name: '止まる時間', status: 'existing', impl: [g('appearPath')], note: '立ち止まると見える道（段階 3）' },
-  wip('T03', '増水'),
-  wip('T05', '巻き戻る部屋'),
+  { idea: 'T03', name: '増水', status: 'done', impl: [g('floodRise'), p('flood')], note: '入口と出口の床の間の深い穴の水が、24 秒の周期で満ちて引く（引いている 5 秒・満ちる 7 秒・満ちている 7 秒・引く 5 秒）。一列の木箱が水に浮き、満ちると床の高さの道になる（上に立つと一緒に上がる）。泳げないので、頭まで浸かって 1.2 秒で入口へ戻る。満ちるのを待って渡る' },
+  { idea: 'T05', name: '巻き戻る部屋', status: 'done', impl: [g('rewindRoom'), p('rewind'), p('lever')], note: '壁の時計が一回りする（12〜28 秒。入口 → レバー → 出口を歩く時間の 1.6 倍）と部屋が巻き戻り、部屋の中の人は前に巻き戻ったとき（後から入った人は入ったとき）の場所へ戻り、レバーも戻る。出口の扉は奥の壁のレバーを引いている間だけ開く。床の紙は散っては戻る。物の位置の巻き戻し（剛体）は、担当の外の物理の仕掛けに触らないよう、プレイヤーと部品の状態だけにした' },
   { idea: 'T06', name: '遅い部屋', status: 'done', impl: [a('slowTime'), p('senseFx')], note: '異変: 部屋の中では動きが半分の速さになり（重さは変えない。軽い部屋と分ける）、足音が低くこもって聞こえ、塵がゆっくり舞う' },
-  wip('T07', '同じ 1 分のくり返し'),
-  wip('T10', '閉店のアナウンス'),
+  { idea: 'T07', name: '同じ 1 分のくり返し', status: 'done', impl: [g('loopMinute'), p('loopClock')], note: '壁の時計は 11:59 の 1 分（40 秒）をくり返す。8〜17 秒に電話が鳴り、27〜36 秒だけ出口の鍵が開く（扉の上が緑）。1 分の終わりに部屋の中にいると入口へ戻る。鳴っている電話に出ると、ささやきが聞こえ、隠しの扉が開く（出現型）' },
+  { idea: 'T10', name: '閉店のアナウンス', status: 'done', impl: [g('closingTime'), p('closing'), p('darkHazard'), p('threshold')], note: '細長い部屋の奥へ入ると閉店の放送（チャイムと声）。3.5 秒後、入口の側から照明が区間ごとに消えていく（2.2 m/s。歩きより遅い）。暗闇に 1 秒いると捕まって入口へ戻り、照明も戻る。出口の前は消えない灯り' },
   // ---------------------------------------------------------------- 4.7 裏の振る舞い（光と闇・音・視線と観測・移動と身体の BM11）
   { idea: 'BL01', name: '人感センサーの灯りをつけずに進む', status: 'done', impl: [g('sneakLights'), p('speedSensor')], note: '廊下の灯りは速く（2 m/s より速く）動いた区間だけつく。しゃがみ歩きで一度も灯りをつけずに奥まで進むと、暗がりに光る縁が浮かび壁が開く（出現型・必ず付ける）。廊下を出ると数え直す。L01（sensorLights）は段階 3 のまま変えず、裏の振る舞いのある廊下を別の仕掛けにした' },
   { idea: 'BL02', name: '消える照明の真っ暗な間に進む', status: 'done', impl: [g('blinkoutHall'), p('senseFx')], note: '真っ暗な間にだけ、遠い壁に扉の形の光る縁が浮かぶ（存在型 = 扉は最初からある・出現型 = 真っ暗な間にその壁の前に 0.5 秒いると壁が開く。闇に捕まる前に入る）' },
@@ -80,5 +78,5 @@ export const SENSE_CATALOG: CatalogEntry[] = [
   { idea: 'BO05', name: '出口の前で振り返る', status: 'done', impl: [g('lookBack'), p('lookSensor')], note: '廊下の出口の前で振り返って来た道を 1 秒見ると、来た道の横の壁に扉が現れる（出現型・必ず付ける）' },
   { idea: 'BO06', name: '写真にだけ写る扉', status: 'done', impl: [g('photoBooth')], note: '写真を撮ってから、写っていた扉の所へ行くと壁が開く（出現型。存在型 = 壁と同じ色の扉が最初からある）' },
   { idea: 'BO07', name: 'モニターで自分のいない部屋の扉を見る', status: 'done', impl: [g('cctvRoom')], note: 'モニターで開いている扉を 2 秒見つめると、その扉が本当に開く（出現型。存在型 = 扉は最初からあり、映像では開いて見える）。「自分のいない部屋」は同じ部屋の自分の見ていない側にした（仕掛けは 1 つの区画に組むので）' },
-  wip('BM11', '増水を待って天井近くの開口へ'),
+  { idea: 'BM11', name: '増水を待って天井近くの開口へ', status: 'done', impl: [g('floodRise')], note: '穴の横の壁の、床の高さの暗い口（穴の底から 2.4 m 上。水が引いていると届かない）。満ちたときだけ、口の前に浮く木箱から入れる（存在型）。天井近くの高さにすると跳び上がりが要るので、到達判定どおりに歩いて入れる床の高さにした' },
 ];
