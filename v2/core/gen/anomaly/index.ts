@@ -50,6 +50,11 @@ export interface AnomalyPlan {
   tour: TourStop[];
   /** 区画の中身を置いた後に呼ぶ。dressedFrom: 区画 id → 中身を置く前の cell.boxes.length */
   post(dressedFrom: ReadonlyMap<string, number>): void;
+  /**
+   * post で掛けられずに掛け替えるとき、その区画に掛けてよい異変か（部屋の形 core/gen/rooms が、形と重ねてよい異変だけに絞る）。
+   * 無ければどれでもよい
+   */
+  allow?(cellId: string, defId: string): boolean;
 }
 
 /** 見本のフロア: 異変を決めた順に 1 つずつ置く */
@@ -424,7 +429,7 @@ export function planAnomalies(p: FloorProfile, geo: FloorGeometry, gimmicks: Gim
       if (a.def.physics) physicsUsed--;
       const r = a.rng.fork('fallback');
       const pool = showcase ? defs.filter((d) => showcase.anomalies.includes(d.id) && !active.some((x) => x.def === d)) : defs;
-      const left = pool.filter((d) => d !== a.def && d.post && !d.pre && !d.needsFurniture && fitsCell(d, a.g, p, !!showcase || physicsUsed < physicsMax, floor));
+      const left = pool.filter((d) => d !== a.def && d.post && !d.pre && !d.needsFurniture && (plan.allow?.(a.g.cell.id, d.id) ?? true) && fitsCell(d, a.g, p, !!showcase || physicsUsed < physicsMax, floor));
       let swapped = false;
       if (left.length) {
         const def = r.weighted(left, (d) => anomalyWeight(d, t) * t['anomaly.repeatMul'] ** count(d.id));

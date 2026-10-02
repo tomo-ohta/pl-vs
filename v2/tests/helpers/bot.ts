@@ -112,7 +112,7 @@ export function pathInCell(sim: Sim, cell: CellLayout, from: [number, number, nu
     let v = surf.get(j);
     if (!v) {
       const x = b.min[0] + i * G, z = b.min[2] + k * G;
-      v = cell.footprint.some((r) => inRect(r, x, z, 0.15)) ? [surfacesAt(sim, x, z, top, 0.05), surfacesAt(sim, x, z, top, PLAYER.radius)] : [[], []];
+      v = inUnion(cell.footprint, x, z, 0.15) ? [surfacesAt(sim, x, z, top, 0.05), surfacesAt(sim, x, z, top, PLAYER.radius)] : [[], []];
       surf.set(j, v);
     }
     return v;
@@ -200,6 +200,15 @@ export function pathInCell(sim: Sim, cell: CellLayout, from: [number, number, nu
     if (!a || !n || Math.sign(p[0] - a[0]) !== Math.sign(n[0] - p[0]) || Math.sign(p[1] - a[1]) !== Math.sign(n[1] - p[1])) out.push(p);
   }
   return out;
+}
+
+/**
+ * 点 (x, z) の周り m の四角が足跡（矩形の和）に入るか（段階 4・rooms が足した: 矩形の境目は壁ではないので、
+ * 矩形ごとに m だけ縮めて見ると、L 字・細い枝のある部屋の矩形の境目を歩けなかった）
+ */
+function inUnion(rects: readonly { x0: number; z0: number; x1: number; z1: number }[], x: number, z: number, m: number): boolean {
+  const ins = (px: number, pz: number): boolean => rects.some((r) => px >= r.x0 && px <= r.x1 && pz >= r.z0 && pz <= r.z1);
+  return ins(x - m, z - m) && ins(x + m, z - m) && ins(x - m, z + m) && ins(x + m, z + m) && ins(x, z);
 }
 
 /** 点 (x, z) から線分 a-b までの距離 */

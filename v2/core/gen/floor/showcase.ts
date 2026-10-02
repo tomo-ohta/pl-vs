@@ -10,13 +10,17 @@ import type { Tuning } from '../../config/tuning.ts';
 import '../gimmicks/index.ts';
 import { gimmickDef, gimmickDefs } from '../gimmicks/types.ts';
 import { anomalyDef, anomalyDefs } from '../anomaly/index.ts';
+import { roomShapeByIdea, roomShapeDef } from '../rooms/index.ts';
 import { generateFloorReport, type GenOptions, type GenReport } from './index.ts';
 
 export function showcaseFloor(t: Tuning, opts: { flip?: boolean; from?: number; dress?: GenOptions['dress']; ids?: string[] } = {}): GenReport {
   let all: string[], anomalies: string[];
+  let rooms: string[] = [];
   if (opts.ids) {
     all = opts.ids.filter((id) => gimmickDef(id));
     anomalies = opts.ids.filter((id) => anomalyDef(id));
+    // 部屋の形（core/gen/rooms）: 形の id か案の番号（?try=S08）
+    rooms = opts.ids.filter((id) => roomShapeDef(id) || roomShapeByIdea(id));
   } else {
     all = gimmickDefs().map((d) => d.id);
     const ids = anomalyDefs().map((d) => d.id);
@@ -28,7 +32,7 @@ export function showcaseFloor(t: Tuning, opts: { flip?: boolean; from?: number; 
   let best: GenReport | null = null;
   const from = opts.from ?? 1;
   for (let w = from; w < from + 24; w++) {
-    const r = generateFloorReport({ world: w, depth: 0, variant: 0 }, t, { showcase: { gimmicks: all, flip: opts.flip, anomalies }, dress: opts.dress });
+    const r = generateFloorReport({ world: w, depth: 0, variant: 0 }, t, { showcase: { gimmicks: all, flip: opts.flip, anomalies, rooms }, dress: opts.dress });
     if (!best || placed(r) > placed(best)) best = r;
     if (placed(r) === all.length * 100 + anomalies.length) break;
   }

@@ -160,6 +160,8 @@ export interface CellLayout {
   materialKey?: string;
   /** 地図に出す情報（client/map が読む。無ければ足跡のとおりに描く） */
   map?: CellMapInfo;
+  /** 部屋の形（core/gen/rooms の形の id。柱林・段々の部屋 …）。地図・図鑑・試験が読む。無ければ普通の箱の部屋 */
+  shape?: string;
 }
 
 /**
@@ -168,7 +170,7 @@ export interface CellLayout {
  * - apparent: 地図での見かけの足跡（無ければ footprint）。地図と合わない部屋（W18 中が広い部屋など）に使う
  * - label: 地図に添える名前（無ければ描かない）
  * 部屋まるごとの異変・仕掛けが地図を変えるときは、取り消しで消える部品（mapFx・mapBoard）を使う（core/sim/parts/map）。
- * 異変・仕掛けの取り消しは区画のこの欄を戻さないので、ここに書くのは取り消されない所（フロアの形・区画の中身）から
+ * 仕掛けの取り消しは区画のこの欄を戻さない（異変の取り消しは戻す）。仕掛けが書くときは取り消されない所（フロアの形・区画の中身）から
  */
 export interface CellMapInfo {
   hidden?: boolean;
