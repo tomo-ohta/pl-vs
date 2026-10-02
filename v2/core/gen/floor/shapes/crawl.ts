@@ -26,7 +26,7 @@ export function buildCrawl(g: GeoBuild, sk: Skeleton, placed: Map<number, Placed
   const all = [...new Set(placed.values())];
   const yA = snap(Math.max(...all.map((p) => p.y + p.height)) + 0.45);
   // 背骨: フロアの真ん中の、区画の行の境
-  const zs = snap(-Math.max(1, Math.floor(sk.rows / 2)) * e.S);
+  const zs = snap(e.cz(Math.max(1, Math.floor(sk.rows / 2))) + e.S / 2);
   const hatches: Hatch[] = [];
   // 候補の部屋（並びは骨組みで混ぜてある）を順に試し、点検口を structure.crawl.hatches 個まで置く
   for (const id of sk.hatches ?? []) {

@@ -11,6 +11,8 @@
  */
 import type { Tuning } from '../../config/tuning.ts';
 import { hashAll, Rng } from '../../math/rng.ts';
+import type { Dir } from '../../math/vec.ts';
+import type { Rect } from '../../world/footprint.ts';
 import { FAMILIES, familyById, patternAllowed, type FloorFamily, type PatternId } from './themes.ts';
 
 export type Rarity = 'Common' | 'Uncommon' | 'Rare' | 'Epic' | 'Legendary' | 'Mythic';
@@ -41,6 +43,38 @@ export interface FloorProfile {
   stories?: number;
   /** 階・棟ごとの系統（[0] は family と同じ）。縦に積んだビル・エレベーターホール・分棟 */
   families?: FloorFamily[];
+  /** 区画の格子の原点（x と、入口の側の辺の z）。無ければ 0, 0（フロア）。果てしない階の区域は階の座標で直接作る */
+  origin?: [number, number];
+  /** 果てしない階の区域として作る（docs/endless-world.md 4 章）。無ければフロア（入口と出口の階段） */
+  region?: RegionContext;
+}
+
+/** 区域の境目の扉（区域から見た向き。core/gen/world/plan.ts の GateEnd と同じ形） */
+export interface RegionGate { id: string; side: Dir; line: number; at: number }
+/** 区域の階段室（core/gen/world/plan.ts の AirlockEnd。to は向こうの階 'depth.variant'、null は上の階が無い） */
+export interface RegionAirlock { id: string; role: 'down' | 'up'; slot: [number, number]; to: string | null }
+
+/** 区域として作るときの情報 */
+export interface RegionContext {
+  id: string;
+  kind: 'district' | 'patchwork';
+  /** 区域の矩形（階の座標） */
+  rect: Rect;
+  /** 縁の帯（境目の扉までの道を通す） */
+  margin: number;
+  slotM: number;
+  gates: RegionGate[];
+  airlocks: RegionAirlock[];
+}
+
+/** rollProfile の追加の指定（果てしない階の区域） */
+export interface ProfileOptions {
+  /** 系統を決めて引く（町の系統） */
+  family?: FloorFamily;
+  /** 使ってよい型（区域に置けない型を除く） */
+  allow?: (p: PatternId) => boolean;
+  /** 駅の線を見ない（区域の駅は区域の計画が決める） */
+  noStation?: boolean;
 }
 
 export function rollRarity(rng: Rng, depth: number, t: Tuning): Rarity {
@@ -77,21 +111,23 @@ export function stationContinues(world: number, depth: number, t: Tuning): boole
   return isStation(world, depth, t) && isStation(world, depth + 1, t);
 }
 
-export function rollProfile(key: FloorKey, t: Tuning, salt = 0, force?: PatternId): FloorProfile {
-  const seed = hashAll(floorSeed(key), 'profile', salt);
+export function rollProfile(key: FloorKey, t: Tuning, salt = 0, force?: PatternId, o: ProfileOptions = {}, seedBase = floorSeed(key)): FloorProfile {
+  const seed = hashAll(seedBase, 'profile', salt);
   const rng = new Rng(seed);
   // 最初の 2 階は落ち着いたフロア（はじめての人が仕組みに慣れる）
   const rarity = key.depth <= 0 ? 'Common' : rollRarity(rng.fork('rarity'), key.depth, t);
-  let fam = rng.fork('family').weighted(FAMILIES.filter((f) => !f.minRarity || rarityRank(rarity) >= rarityRank(f.minRarity)), (f) => f.weight);
+  const famPick = rng.fork('family').weighted(FAMILIES.filter((f) => !f.minRarity || rarityRank(rarity) >= rarityRank(f.minRarity)), (f) => f.weight);
+  let fam = o.family && (!o.family.minRarity || rarityRank(rarity) >= rarityRank(o.family.minRarity)) ? o.family : famPick;
   // 駅の線（F35）: 系統は駅の連絡通路
-  const station = force ? force === 'station' : isStation(key.world, key.depth, t);
+  const station = force ? force === 'station' : !o.noStation && isStation(key.world, key.depth, t);
   if (station) fam = familyById('transit');
   const mul = (p: PatternId): number => {
     const v = (t as unknown as Record<string, number | boolean | undefined>)[`structure.w.${p}`];
     return typeof v === 'number' ? v : 1;
   };
-  const choices = fam.patterns.filter(([p]) => p !== 'station' && patternAllowed(p, rarity, key.depth));
-  const pattern: PatternId = force ?? (station ? 'station' : rng.fork('pattern').weighted(choices, ([p, w]) => w * mul(p))[0]);
+  const allowed = fam.patterns.filter(([p]) => p !== 'station' && patternAllowed(p, rarity, key.depth));
+  const choices = o.allow ? allowed.filter(([p]) => o.allow!(p)) : allowed;
+  const pattern: PatternId = force ?? (station ? 'station' : rng.fork('pattern').weighted(choices.length ? choices : ([['grid', 1]] as [PatternId, number][]), ([p, w]) => w * mul(p))[0]);
   const sz = rng.fork('size');
   let cols = sz.int(t['floor.colsMin'], Math.max(t['floor.colsMin'], t['floor.colsMax']));
   let rows = sz.int(t['floor.rowsMin'], Math.max(t['floor.rowsMin'], t['floor.rowsMax']));

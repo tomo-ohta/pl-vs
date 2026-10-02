@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { defaultTuning } from '../core/config/tuning.ts';
 import { dressCell } from '../core/gen/dress/index.ts';
 import { generateFloorReport, type GenReport } from '../core/gen/floor/index.ts';
-import { PATTERN_INFO, type PatternId } from '../core/gen/floor/themes.ts';
+import { FLOOR_PATTERNS, PATTERN_INFO, type PatternId } from '../core/gen/floor/themes.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
 import '../core/sim/parts/index.ts';
@@ -17,7 +17,7 @@ import { Sim } from '../core/sim/sim.ts';
 import { walkTo } from './helpers/bot.ts';
 
 const t = defaultTuning();
-const ALL = Object.keys(PATTERN_INFO) as PatternId[];
+const ALL = FLOOR_PATTERNS;
 
 function exitWalk(r: GenReport, R: Awaited<ReturnType<typeof loadRapier>>): { ok: boolean; reason: string } {
   const floor = r.floor;

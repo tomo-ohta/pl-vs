@@ -23,7 +23,7 @@ import { hashAll, Rng } from '../../math/rng.ts';
 import type { Dir, Vec3 } from '../../math/vec.ts';
 import { doorPanel, lightPanel, makeCell, opening, portal, portalAabb, type CellOptions } from '../../world/build.ts';
 import type { Rect } from '../../world/footprint.ts';
-import { box, DOOR_H, DOOR_W, WALL_T, type Box, type CellLayout, type CellRole, type EntitySpec, type FloorExit, type Json, type LightingOverrides, type MatId, type Palette, type PortalSpec, type RenderOverrides, type WallOpening } from '../../world/layout.ts';
+import { box, DOOR_H, DOOR_W, WALL_T, type Box, type CellLayout, type CellRole, type EntitySpec, type FloorExit, type Json, type LightingOverrides, type MatId, type Palette, type PortalSpec, type RegionAirlockCell, type RegionGateCell, type RenderOverrides, type WallOpening } from '../../world/layout.ts';
 import { themePalette } from '../../world/palettes.ts';
 import type { DressKind, DressRoom } from '../dress/types.ts';
 import type { FloorProfile } from './profile.ts';
@@ -36,6 +36,9 @@ import { buildWell } from './shapes/well.ts';
 import { outdoorStraight, railingSides } from './shapes/outdoor.ts';
 import { buildCrawl } from './shapes/crawl.ts';
 import { mirrorFinish } from './shapes/finish.ts';
+import { regionPorts } from './ports.ts';
+import { FAMILIES } from './themes.ts';
+import { rarityRank } from './profile.ts';
 
 export class GenError extends Error {}
 
@@ -87,6 +90,12 @@ export interface FloorGeometry {
    * 仕掛け（穴・溝）は、これより深く掘る物を置かない（floor/gimmicks.ts）
    */
   belowFree?: Map<string, number>;
+  /** 果てしない階の区域: 境目の扉の開口と階段室（core/gen/floor/ports.ts） */
+  region?: { gates: RegionGateCell[]; airlocks: RegionAirlockCell[] };
+  /** 本道の終わりの区画（無ければ出口の階段 'exitStairs'） */
+  mainTo?: string;
+  /** 中身（家具）・仕掛け・異変・地図の看板・裏の調子を置かない区画（階段室。上下の階の写しで同じ見た目に保つ） */
+  sealed?: Set<string>;
 }
 
 /** 部屋・曲がり角・広間の置き場所 */
@@ -275,6 +284,14 @@ export class GeoBuild {
   placedOf?: (node: number) => Placed | undefined;
 }
 
+/** 区域の部屋の別の系統（world.wildcardRoomChance の確率。区域の珍しさで出られる系統から） */
+function wildcardFamily(p: FloorProfile, node: number, t: Tuning): FloorFamily | null {
+  const r = new Rng(hashAll(p.seed, 'wild', node));
+  if (!r.chance(t['world.wildcardRoomChance'])) return null;
+  const pool = FAMILIES.filter((f) => f.id !== p.family.id && (!f.minRarity || rarityRank(p.rarity) >= rarityRank(f.minRarity)));
+  return pool.length ? r.weighted(pool, (f) => f.weight) : null;
+}
+
 /** 区画の系統（profile.families の番号。無ければフロアの系統） */
 export function famOf(p: FloorProfile, n: SkelNode): FloorFamily {
   return (n.fam !== undefined ? p.families?.[n.fam] : undefined) ?? p.family;
@@ -287,6 +304,8 @@ export function buildGeometry(p: FloorProfile, sk: Skeleton, rng: Rng, t: Tuning
   const LH = t['floor.levelHeightM'];
   const SH = t['structure.storyHeightM'];
   const fam = p.family;
+  // 区域の原点（果てしない階の区域は階の座標で直接作る。docs/endless-world.md 4.1。フロアは 0, 0）
+  const [ox, oz] = p.origin ?? [0, 0];
   const cw0 = snap(rng.float(fam.corridorWidth[0], fam.corridorWidth[1]));
   const hc0 = snap(rng.float(fam.corridorHeight[0], fam.corridorHeight[1]));
   // 地下街（F34）: どの系統でも、通路は広くて低い（真ん中に柱の列）
@@ -298,8 +317,8 @@ export function buildGeometry(p: FloorProfile, sk: Skeleton, rng: Rng, t: Tuning
   for (const f of p.families ?? []) if (!famCw.has(f.id)) { const r = rng.fork(`fam:${f.id}`); famCw.set(f.id, { cw: snap(r.float(f.corridorWidth[0], f.corridorWidth[1])), hc: snap(r.float(f.corridorHeight[0], f.corridorHeight[1])) }); }
   const cwOf = (f: FloorFamily): number => famCw.get(f.id)?.cw ?? cw;
   const hcOf = (f: FloorFamily): number => famCw.get(f.id)?.hc ?? hc;
-  const cx = (c: number): number => (c - (sk.cols - 1) / 2) * S;
-  const cz = (r: number): number => -(r + 0.5) * S;
+  const cx = (c: number): number => ox + (c - (sk.cols - 1) / 2) * S;
+  const cz = (r: number): number => oz - (r + 0.5) * S;
   const yOf = (n: SkelNode): number => n.level * LH - n.story * SH;
   const adj = adjacency(sk);
   const g = new GeoBuild(p, t, rng.fork('doors'), cw);
@@ -362,14 +381,16 @@ export function buildGeometry(p: FloorProfile, sk: Skeleton, rng: Rng, t: Tuning
     const maxR = Math.max(minR, S - (p.pattern === 'skip' ? 6.2 : p.pattern === 'descent' ? 5.0 : 2.8));
     const w = snap(nr.float(minR, maxR)), d = snap(nr.float(minR, maxR));
     const jx = snap(nr.float(-1, 1) * Math.max(0, w / 2 - band)) * flip, jz = snap(nr.float(-1, 1) * Math.max(0, d / 2 - band));
-    const theme = n.id === sk.entry ? f.corridor : nr.weighted(f.rooms, ([, wt]) => wt)[0];
+    // 果てしない階の区域: 部屋が別の系統になることがある（docs/endless-world.md 4 章。扉を開けると急に別の施設）
+    const rf = p.region && n.id !== sk.entry ? wildcardFamily(p, n.id, t) ?? f : f;
+    const theme = n.id === sk.entry ? f.corridor : nr.weighted(rf.rooms, ([, wt]) => wt)[0];
     const rect: Rect = n.style === 'full' ? { x0: snap(x - S / 2), x1: snap(x + S / 2), z0: snap(z - S / 2), z1: snap(z + S / 2) } : { x0: snap(x + jx - w / 2), x1: snap(x + jx + w / 2), z0: snap(z + jz - d / 2), z1: snap(z + jz + d / 2) };
     // 鏡写し: 真ん中の列の部屋は、鏡の線（x = 0）の左右に同じ幅
     if (sk.mirror && n.col === (sk.cols - 1) / 2 && n.style !== 'full') { rect.x0 = snap(x - snap(w / 2)); rect.x1 = snap(x + snap(w / 2)); }
-    const roomH = snap(nr.float(f.roomHeight[0], f.roomHeight[1]));
+    const roomH = snap(nr.float(rf.roomHeight[0], rf.roomHeight[1]));
     // F25 緊張と解放: 狭い通路の間の部屋は、天井の高い広い空間
     const height = p.pattern === 'linear' && n.id !== sk.entry ? Math.max(roomH, t['structure.linear.wideHeightM']) : roomH;
-    placed.set(n.id, { node: n, rect: nodeRect(n, rect, x, z, S, band, nr), y: yOf(n), height, theme, kind: 'room', cellId: `r${n.id}`, fam: f });
+    placed.set(n.id, { node: n, rect: nodeRect(n, rect, x, z, S, band, nr), y: yOf(n), height, theme, kind: 'room', cellId: `r${n.id}`, fam: rf });
   }
   // 鏡写し: 右半分の区画の置き場所を、左の対の置き場所の反転そのものにする（0.05 m の丸めの向きで左右がずれないように）
   if (sk.mirror) {
@@ -378,7 +399,7 @@ export function buildGeometry(p: FloorProfile, sk: Skeleton, rng: Rng, t: Tuning
       const m = used.find((o) => o.col === sk.cols - 1 - n.col && o.row === n.row && o.story === n.story);
       const a = placed.get(n.id), b = m ? placed.get(m.id) : undefined;
       if (!a || !b || a === b || a.kind !== b.kind || a.kind === 'hall' || a.node.style !== b.node.style) continue;
-      const flipR = (r: Rect): Rect => ({ x0: -r.x1, x1: -r.x0, z0: r.z0, z1: r.z1 });
+      const flipR = (r: Rect): Rect => ({ x0: 2 * ox - r.x1, x1: 2 * ox - r.x0, z0: r.z0, z1: r.z1 });
       a.rect = flipR(b.rect);
       if (b.rects) a.rects = b.rects.map(flipR);
     }
@@ -537,6 +558,15 @@ export function buildGeometry(p: FloorProfile, sk: Skeleton, rng: Rng, t: Tuning
     const A = placed.get(w.a), B = placed.get(w.b);
     if (!A || !B || A === B) continue;
     windowJoin(g, A, B, yOf(sk.nodes[w.a]!), rng.fork(`win${w.a}-${w.b}`));
+  }
+
+  // ---------------------------------------------------------------- 果てしない階の区域: 入口と出口の階段の代わりに、境目の扉までの廊下と階段室（ports.ts）
+  if (p.region) {
+    regionPorts(g, sk, placed, { hc, doorRng });
+    for (const pl of new Set(placed.values())) g.cell(pl);
+    if (sk.hatches?.length) buildCrawl(g, sk, placed, { S, cx, cz });
+    if (sk.mirror) g.afterDress.push((env) => mirrorFinish(g, sk, placed, env));
+    return g.finish(sk);
   }
 
   // ---------------------------------------------------------------- 入口の階段（降りてきた階段。上は閉ざされた扉）

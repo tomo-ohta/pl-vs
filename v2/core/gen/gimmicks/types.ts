@@ -41,7 +41,8 @@ export interface GimmickContext {
   readonly slot: GimmickSlot;
   readonly rng: Rng;
   readonly tuning: Tuning;
-  readonly floor: { id: string; seed: number; depth: number; rarity: Rarity; family: string };
+  /** variant: 裏のフロア（1 以上）。果てしない階の区域は id が区域の id なので、裏かどうかはこれで見る */
+  readonly floor: { id: string; seed: number; depth: number; rarity: Rarity; family: string; variant?: number };
   /** この仕掛けの id（部品の id の頭に付ける） */
   readonly id: string;
   /** 箱を区画に足す */

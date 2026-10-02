@@ -95,8 +95,9 @@ export function forwardOpening(ctx: AnomalyContext): WallOpening | null {
   const others = ctx.geo.openings.filter((o) => o !== ctx.entrance);
   if (!others.length) return null;
   const w = ctx.world;
-  const dist = new Map<string, number>([['exitStairs', 0]]);
-  const q = ['exitStairs'];
+  const goal = w.mainTo ?? 'exitStairs';
+  const dist = new Map<string, number>([[goal, 0]]);
+  const q = [goal];
   for (let h = 0; h < q.length; h++) for (const p of w.portals) {
     if (!p.cells.includes(q[h]!)) continue;
     const o = p.cells[0] === q[h] ? p.cells[1] : p.cells[0];

@@ -20,6 +20,7 @@ import { WARP_TUNING } from './tuning/warp.ts';
 import { STRUCTURE_TUNING } from './tuning/structure.ts';
 import { ROOMS_TUNING } from './tuning/rooms.ts';
 import { MAP_TUNING } from './tuning/map.ts';
+import { WORLD_TUNING } from './tuning/world.ts';
 
 export const TUNING_SPEC = {
   // ---- 隠し発見（v2-plan.md 4 章）----
@@ -200,6 +201,8 @@ export const TUNING_SPEC = {
   ...STRUCTURE_TUNING,
   ...ROOMS_TUNING,
   ...MAP_TUNING,
+  // 果てしない階（docs/endless-world.md）
+  ...WORLD_TUNING,
 } as const satisfies Record<string, Spec>;
 
 export type TuningKey = keyof typeof TUNING_SPEC;

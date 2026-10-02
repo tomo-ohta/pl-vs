@@ -8,10 +8,10 @@ import { defaultTuning } from '../core/config/tuning.ts';
 import { STRUCTURE_CATALOG } from '../core/gen/catalog/structure.ts';
 import { generateFloorReport, validateFloor } from '../core/gen/floor/index.ts';
 import { isStation, rarityRank, rollProfile } from '../core/gen/floor/profile.ts';
-import { PATTERN_INFO, type PatternId } from '../core/gen/floor/themes.ts';
+import { FLOOR_PATTERNS, PATTERN_INFO, type PatternId } from '../core/gen/floor/themes.ts';
 
 const t = defaultTuning();
-const ALL = Object.keys(PATTERN_INFO) as PatternId[];
+const ALL = FLOOR_PATTERNS;
 // 天井の高さ（外形の上の端）は見ない: 部屋の異変（中が広い部屋 vast など）は裏の seed で掛け直すので、裏だけ天井が高いことがある
 const shape = (f: { cells: { id: string; role: string; bounds: { min: number[]; max: number[] } }[] }): string => f.cells.filter((c) => c.role !== 'secret').map((c) => `${c.id}:${c.bounds.min.join(',')}:${c.bounds.max[0]},${c.bounds.max[2]}`).join('|');
 

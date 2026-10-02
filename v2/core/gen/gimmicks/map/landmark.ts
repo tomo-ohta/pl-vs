@@ -25,7 +25,7 @@ defineGimmick({
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning, cell = s.cell, y = cell.floorY;
     // 裏のフロア（id が '深さ.1' など）は霧が調子で上書きされるので置かない
-    if (!ctx.floor.id.endsWith('.0') && ctx.floor.id !== 'lab') return;
+    if (ctx.floor.id !== 'lab' && (ctx.floor.variant !== undefined ? ctx.floor.variant > 0 : !ctx.floor.id.endsWith('.0'))) return;
     const r = innerRect(s);
     const ex = s.exit!, en = s.entrance!;
     // 塔: 出口の前 2.6 m、横に 1.3 m ずらす（出口への道を塞がない）

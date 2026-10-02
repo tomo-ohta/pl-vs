@@ -10,6 +10,7 @@ import type { PatternId } from '../themes.ts';
 import { buildRooftop } from './rooftop.ts';
 import { buildShrink } from './shrink.ts';
 import { buildSpiral } from './spiral.ts';
+import { buildPatchwork } from './patchwork.ts';
 
 export type ShapeBuilder = (p: FloorProfile, rng: Rng, t: Tuning) => FloorGeometry;
 
@@ -17,4 +18,6 @@ export const SHAPES: Partial<Record<PatternId, ShapeBuilder>> = {
   spiral: buildSpiral,
   shrink: buildShrink,
   rooftop: buildRooftop,
+  // 果てしない階の区域の寄せ集め（v1 風。docs/endless-world.md 4 章）
+  patchwork: buildPatchwork,
 };

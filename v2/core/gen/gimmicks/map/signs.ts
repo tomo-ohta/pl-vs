@@ -125,11 +125,14 @@ export function placeMapSigns(p: FloorProfile, geo: FloorGeometry, gimmicks: Gim
   const res: MapSignsResult = { guide: null, here: [], note: null, lie: null };
   const byId = new Map(geo.cells.map((g) => [g.cell.id, g]));
   // 仕掛け・異変の区画と、継ぎ目の無い移動の別の空間・双子の区画（warp: 写した区画と同じ見た目でないと移したのが分かる）には置かない
-  const busy = new Set([...gimmicks.gimmicks.map((x) => x.cell), ...anomalies.map((a) => a.cell), ...(gimmicks.noDress ?? []), ...geo.cells.filter((g) => g.cell.pocket).map((g) => g.cell.id)]);
+  // 果てしない階の階段室（geo.sealed。上下の階の写しで同じ見た目に保つ）にも置かない
+  const busy = new Set([...gimmicks.gimmicks.map((x) => x.cell), ...anomalies.map((a) => a.cell), ...(gimmicks.noDress ?? []), ...geo.cells.filter((g) => g.cell.pocket).map((g) => g.cell.id), ...(geo.sealed ?? [])]);
   const secretCells = new Set(geo.cells.filter((g) => g.cell.role === 'secret').map((g) => g.cell.id));
   const exit = geo.exits.find((x) => x.id === 'down') ?? geo.exits[0];
   const exitXZ: [number, number] | null = exit ? [r2((exit.aabb.min[0] + exit.aabb.max[0]) / 2), r2((exit.aabb.min[2] + exit.aabb.max[2]) / 2)] : null;
-  const spawn = byId.get(geo.spawn.cell);
+  // 出てくる区画が階段室なら、階段室の扉の向こうの区画（案内図はそこの壁に）
+  const spawnId = geo.sealed?.has(geo.spawn.cell) ? geo.portals.find((pt) => pt.cells.includes(geo.spawn.cell))?.cells.find((c) => c !== geo.spawn.cell) ?? geo.spawn.cell : geo.spawn.cell;
+  const spawn = geo.sealed?.has(spawnId) ? undefined : byId.get(spawnId);
   const push = (e: EntitySpec): string => { geo.entities.push(e); return e.id; };
 
   // ---------------------------------------------------------------- N09 誰かの地図（先に置く: 現在地の看板が指す先）

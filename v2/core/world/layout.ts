@@ -244,6 +244,8 @@ export interface FloorExit {
   kind: 'stairs' | 'elevator' | 'hole' | 'door' | 'slide' | 'secret';
   /** 行き先のフロアの座標（未定なら生成時に決める） */
   to?: { floor: string; exitId?: string };
+  /** 果てしない階の階段室（core/gen/world/airlock.ts）: 入れ替えの範囲。扉が両方閉じているときだけ移る */
+  airlock?: string;
 }
 
 export interface FloorLayout {
@@ -263,6 +265,38 @@ export interface FloorLayout {
   exits: FloorExit[];
   /** 環境音・霧など、フロア全体の既定 */
   fog?: { color: number; near: number; far: number };
+  /** 果てしない階の区域（docs/endless-world.md）: 区域の情報。無ければフロア */
+  region?: RegionInfo;
+}
+
+/** 区域の境目の扉の、この区域の側の区画と開口（境目の線の上・外向き） */
+export interface RegionGateCell { id: string; cell: string; opening: WallOpening }
+
+/** 区域の階段室（core/gen/world/airlock.ts）: 局所の形 → 階の座標の写し方と、扉 */
+export interface RegionAirlockCell {
+  id: string;
+  role: 'down' | 'up';
+  cell: string;
+  anchor: { offset: Vec3; q: Dir };
+  /** 区域につながる扉 / 開かない扉 */
+  live: string;
+  sealed: string;
+  /** 向こうの階（'depth.variant'）。null は上に階が無い */
+  to: string | null;
+}
+
+export interface RegionInfo {
+  id: string;
+  kind: 'district' | 'patchwork';
+  /** 区域の矩形（階の座標） */
+  rect: Rect;
+  gates: RegionGateCell[];
+  airlocks: RegionAirlockCell[];
+  /** 表示の名前（系統の名前。寄せ集めは「入り組んだ区画」） */
+  name: string;
+  family: string;
+  pattern: string;
+  rarity: string;
 }
 
 // ---------------------------------------------------------------- 寸法と作るための補助（v1 と同じ値）

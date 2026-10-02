@@ -29,6 +29,7 @@ export function canPocket(ctx: GimmickContext): boolean {
 
 /** 裏のフロア（variant ≥ 1）か。裏のフロアは区画ごとに照明が消えるので、双子の部屋が揃わない */
 export function isBSide(ctx: GimmickContext): boolean {
+  if (ctx.floor.variant !== undefined) return ctx.floor.variant > 0;
   const m = /\.(\d+)$/.exec(ctx.floor.id);
   return !!m && Number(m[1]) > 0;
 }

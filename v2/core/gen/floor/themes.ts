@@ -12,7 +12,9 @@ export type PatternId = 'grid' | 'maze' | 'comb' | 'ring' | 'hub' | 'linear'
   // 段階 4（フロアの形の担当）で足した型。中身は skeleton.ts / patterns.ts と geometry.ts / shapes/*.ts
   | 'chain' | 'courtyard' | 'shortcut' | 'loops' | 'concentric' | 'spiral' | 'skip' | 'gallery' | 'crossing' | 'islands'
   | 'nest' | 'megahall' | 'mirror' | 'shrink' | 'staff' | 'crawl' | 'tower' | 'elevator' | 'descent' | 'shaft' | 'rooftop'
-  | 'arcade' | 'wings' | 'station';
+  | 'arcade' | 'wings' | 'station'
+  // 果てしない階の区域の寄せ集め（v1 風。shapes/patchwork.ts。系統の重みでは引かない）
+  | 'patchwork';
 
 /**
  * 型の性質: 案の番号・名前・出る珍しさと深さ・区画の間隔（調整表のキー）。
@@ -58,7 +60,14 @@ export const PATTERN_INFO: Record<PatternId, PatternInfo> = {
   wings: { id: 'wings', idea: 'F02', name: '分棟', minDepth: 1 },
   // 駅は系統の重みでは引かない（profile.ts の駅の線が決める）
   station: { id: 'station', idea: 'F35', name: '鉄道の駅と車両', minDepth: 1 },
+  // 区域の寄せ集め（docs/endless-world.md 4 章。区域の計画が決める）
+  patchwork: { id: 'patchwork', idea: 'V2-12', name: '入り組んだ区画' },
 };
+
+/** 果てしない階の区域だけで作る型（フロアとしては作らない） */
+export const REGION_ONLY_PATTERNS: ReadonlySet<PatternId> = new Set<PatternId>(['patchwork']);
+/** フロアとして作れる型（見本・試験・?shape= が使う） */
+export const FLOOR_PATTERNS: readonly PatternId[] = (Object.keys(PATTERN_INFO) as PatternId[]).filter((p) => !REGION_ONLY_PATTERNS.has(p));
 
 /** 型が、この珍しさ・深さのフロアに出られるか */
 export function patternAllowed(id: PatternId, rarity: Rarity, depth: number): boolean {

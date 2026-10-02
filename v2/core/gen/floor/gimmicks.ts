@@ -49,13 +49,15 @@ const SLOT_KINDS = new Set(['room', 'hall', 'corridor']);
 
 /** 入口から出口の階段までの区画の並び（開口のつながりで） */
 function mainCells(geo: FloorGeometry): string[] {
+  // 本道の終わり（フロアは出口の階段。果てしない階の区域は下りの階段室か、いちばん遠い境目の扉の区画）
+  const goal = geo.mainTo ?? 'exitStairs';
   const by = new Map<string, string[]>();
   for (const p of geo.portals) { by.set(p.cells[0], [...(by.get(p.cells[0]) ?? []), p.cells[1]]); by.set(p.cells[1], [...(by.get(p.cells[1]) ?? []), p.cells[0]]); }
   const prev = new Map<string, string | null>([[geo.spawn.cell, null]]);
   const q = [geo.spawn.cell];
-  for (let h = 0; h < q.length && !prev.has('exitStairs'); h++) for (const m of by.get(q[h]!) ?? []) if (!prev.has(m)) { prev.set(m, q[h]!); q.push(m); }
+  for (let h = 0; h < q.length && !prev.has(goal); h++) for (const m of by.get(q[h]!) ?? []) if (!prev.has(m)) { prev.set(m, q[h]!); q.push(m); }
   const out: string[] = [];
-  for (let c: string | null | undefined = 'exitStairs'; c; c = prev.get(c)) out.unshift(c);
+  for (let c: string | null | undefined = goal; c; c = prev.get(c)) out.unshift(c);
   return out;
 }
 
@@ -106,7 +108,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   let alternate = showcase?.flip ? 1 : 0;
   // 通り抜けの出口にしない区画: 仕掛けのある区画（置くたびに足す）
   const avoid = new Set<string>(geo.reserved ?? []);
-  const world = { cells: geo.cells, portals: geo.portals, entities: geo.entities, exits: geo.exits, depth, avoid };
+  const world = { cells: geo.cells, portals: geo.portals, entities: geo.entities, exits: geo.exits, depth, avoid, ...(p.region ? { bound: p.region.rect } : {}) };
   // 行き止まりでない隠し（通り抜け・穴）の数。隠しが 2 つ以上になるフロアでは secrets.throughMin 以上にする
   let through = 0;
   /**
@@ -311,7 +313,7 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
   let added = 0;
   const ctx: GimmickContext = {
     slot, rng, tuning: t, id,
-    floor: { id: p.id, seed: p.seed, depth, rarity: p.rarity, family: p.family.id },
+    floor: { id: p.id, seed: p.seed, depth, rarity: p.rarity, family: p.family.id, variant: p.key.variant },
     addBox(b) { g.cell.boxes.push(b); added++; return b; },
     addEntity(name, e) { const eid = `${id}.${name}`; geo.entities.push({ ...e, id: eid, cell: e.cell ?? g.cell.id } as EntitySpec); added++; return eid; },
     addZone(z: Zone) { g.cell.zones.push(z); },

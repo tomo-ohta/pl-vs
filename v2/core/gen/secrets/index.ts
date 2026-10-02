@@ -68,7 +68,12 @@ export interface SecretWorld {
   depth: number;
   /** 通り抜けの出口にしない区画（仕掛けのある区画など） */
   avoid?: ReadonlySet<string>;
+  /** 隠し場所を置いてよい範囲（果てしない階の区域の矩形。無ければどこでも） */
+  bound?: Rect;
 }
+
+/** 範囲 bound の外に掛かるか */
+const outOf = (bound: Rect | undefined, r: Rect): boolean => !!bound && (r.x0 < bound.x0 - 1e-6 || r.x1 > bound.x1 + 1e-6 || r.z0 < bound.z0 - 1e-6 || r.z1 > bound.z1 + 1e-6);
 
 export interface PlacedSecret {
   id: string;
@@ -191,7 +196,7 @@ function planFree(world: SecretWorld, rects: Rect[], y: number, ignore: readonly
     if (rects.some((r) => g.cell.footprint.some((q) => r.x0 < q.x1 - 0.02 && r.x1 > q.x0 + 0.02 && r.z0 < q.z1 - 0.02 && r.z1 > q.z0 + 0.02))) return false;
   }
   for (let i = 0; i < rects.length; i++) {
-    if (blocker(world, rects[i]!, y - 0.3, y + AREA_H + 0.3, ignore)) return false;
+    if (outOf(world.bound, rects[i]!) || blocker(world, rects[i]!, y - 0.3, y + AREA_H + 0.3, ignore)) return false;
     for (let j = 0; j < i; j++) {
       const a = rects[i]!, b = rects[j]!;
       if (a.x0 < b.x1 - 0.02 && a.x1 > b.x0 + 0.02 && a.z0 < b.z1 - 0.02 && a.z1 > b.z0 + 0.02) return false;
@@ -204,6 +209,7 @@ function planFree(world: SecretWorld, rects: Rect[], y: number, ignore: readonly
 function march(world: SecretWorld, n: 'x' | 'z', sg: number, from: number, c: number, hw: number, y: number, maxLen: number, ignore: readonly string[]): { len: number; hit: GeoCell | null } {
   let len = 0;
   for (let l = 0.5; l <= maxLen + 1e-6; l += 0.25) {
+    if (outOf(world.bound, segRect(n, from, from + sg * l, c, hw))) return { len, hit: null };
     const hit = blocker(world, segRect(n, from, from + sg * l, c, hw), y - 0.3, y + PASSAGE_H + 0.3, ignore);
     if (hit) return { len, hit };
     len = l;

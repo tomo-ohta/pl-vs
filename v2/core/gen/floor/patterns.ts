@@ -58,6 +58,8 @@ const BUILDERS: Partial<Record<string, Builder>> = {
   spiral: whole,
   shrink: whole,
   rooftop: whole,
+  // 区域の寄せ集め（shapes/patchwork.ts）
+  patchwork: whole,
 
   /**
    * F03 くねる部屋の連なり: 廊下が無い。区画いっぱいの部屋が壁 1 枚の扉で直接つながり、深さ優先の木なのでくねくねと続く。

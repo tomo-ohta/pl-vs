@@ -53,14 +53,16 @@ const NOT_ROLES = new Set(['entry', 'exit', 'secret']);
 
 /** 入口から出口の階段までの区画の並び（開口のつながりで。floor/gimmicks.ts の mainCells と同じ） */
 function mainCells(geo: FloorGeometry): string[] {
+  // 本道の終わり（フロアは出口の階段。果てしない階の区域は下りの階段室か、いちばん遠い境目の扉の区画）
+  const goal = geo.mainTo ?? 'exitStairs';
   const by = new Map<string, string[]>();
   for (const p of geo.portals) { by.set(p.cells[0], [...(by.get(p.cells[0]) ?? []), p.cells[1]]); by.set(p.cells[1], [...(by.get(p.cells[1]) ?? []), p.cells[0]]); }
   const prev = new Map<string, string | null>([[geo.spawn.cell, null]]);
   const q = [geo.spawn.cell];
-  for (let h = 0; h < q.length && !prev.has('exitStairs'); h++) for (const m of by.get(q[h]!) ?? []) if (!prev.has(m)) { prev.set(m, q[h]!); q.push(m); }
-  if (!prev.has('exitStairs')) return [];
+  for (let h = 0; h < q.length && !prev.has(goal); h++) for (const m of by.get(q[h]!) ?? []) if (!prev.has(m)) { prev.set(m, q[h]!); q.push(m); }
+  if (!prev.has(goal)) return [];
   const out: string[] = [];
-  for (let c: string | null | undefined = 'exitStairs'; c; c = prev.get(c)) out.unshift(c);
+  for (let c: string | null | undefined = goal; c; c = prev.get(c)) out.unshift(c);
   return out;
 }
 
