@@ -504,10 +504,11 @@ defineRoomShape({
       stairs(ctx, { x: sx, z: sz, dir: opp, width: sw, y0: fy, y1: fy + 2.2, riseMax, tread, mat: cell.palette.floor, rails: 'both', railMat: 'metal' });
       break;
     }
-    // 天井に逆さの階段・壁を横に走る階段（描画だけ）
+    // 天井に逆さの階段・壁を横に走る階段（描画だけ。逆さの階段に重なる天井の照明は外す）
     const Hc = cell.height;
     const [cx, cz] = [(r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2];
     const ax: 'x' | 'z' = d === 0 || d === 2 ? 'x' : 'z';
+    clearCeilingLights(cell, (x, z) => (ax === 'x' ? Math.abs(x - (cx + 0.0)) < 1.9 && Math.abs(z - cz) < 1.1 : Math.abs(z - cz) < 1.9 && Math.abs(x - cx) < 1.1));
     for (let i = 0; i < 8; i++) {
       const a = -1.2 + i * 0.3;
       const y1 = fy + Hc, y0 = y1 - 0.2 * (i + 1);

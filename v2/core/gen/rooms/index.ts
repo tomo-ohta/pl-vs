@@ -17,7 +17,7 @@
  * - 決定的: 部屋を選ぶ乱数は (profile.seed, 'rooms', 区画 id)、形を組む乱数は (profile.seed, 'rooms', 区画 id, 形の id)
  * - 裏のフロア（variant ≥ 1。front に表のフロアを渡す）: 表のフロアと同じ形を、同じ部屋に同じ乱数で組む（同じ建物の照明・材質違い）。
  *   裏で仕掛けの置かれた部屋などには組まない。区画の外形は表と同じにする決まり（tests/gen-showcase）なので、最後に表の外形を写す
- * - 見本のフロア（showcase）: 頼んだ形を頼んだ順に 1 つずつ、置ける部屋から置く（確率は見ない）
+ * - 見本のフロア（showcase）: 頼んだ形を 1 つずつ、置ける部屋から置く（確率は見ない。置ける部屋の少ない形から）
  * - 掛けた区画は cell.shape に形の id を書く（地図・図鑑・試験が読む）。見て回る順（gimmicks.tour）に足す
  */
 import type { Tuning } from '../../config/tuning.ts';
@@ -277,10 +277,12 @@ export function shapeRooms(p: FloorProfile, geo: FloorGeometry, gimmicks: Gimmic
   };
 
   if (showcase) {
-    // 見本: 頼んだ形を頼んだ順に、置ける部屋から（形の id か案の番号）
+    // 見本: 頼んだ形を、置ける部屋から（形の id か案の番号）。置ける部屋の少ない形から先に（全部が 1 つのフロアに入りやすいように）
     const want = showcase.map((s) => roomShapeDef(s) ?? roomShapeByIdea(s)).filter((d): d is RoomShapeDef => !!d);
+    const room = (def: RoomShapeDef): number => cands.filter((g) => { const an = anomalyOf.get(g.cell.id) ?? null; return anomalyOk(an) && fitsCell(def, g, an); }).length;
+    const order = want.map((d, i) => ({ d, i, n: room(d) })).sort((a, b) => a.n - b.n || a.i - b.i).map((x) => x.d);
     const used = new Set<string>();
-    for (const def of want) {
+    for (const def of order) {
       for (const g of cands) {
         if (used.has(g.cell.id)) continue;
         const an = anomalyOf.get(g.cell.id) ?? null;
