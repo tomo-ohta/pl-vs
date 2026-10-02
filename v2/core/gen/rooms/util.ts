@@ -5,10 +5,10 @@
  */
 import type { AABB } from '../../math/aabb.ts';
 import type { Dir } from '../../math/vec.ts';
-import { lightGrid } from '../../world/build.ts';
 import { along, buildShell, footprintAABB, spanForOpening, wallSpans, type Rect } from '../../world/footprint.ts';
 import { box, WALL_T, type Box, type CellLayout, type LightSpec, type MatId, type WallOpening } from '../../world/layout.ts';
 import { doorFronts } from '../anomaly/util.ts';
+import { unreachableSpot } from '../gimmicks/util.ts';
 import { insideFootprint } from '../dress/geom.ts';
 import { dressCell } from '../dress/index.ts';
 import type { DressKind } from '../dress/types.ts';
@@ -113,8 +113,9 @@ export function reshell(ctx: RoomShapeContext, rects: Rect[], spacing = 2.6): bo
   const shell: Box[] = [];
   buildShell(shell, rects, h, ctx.geo.openings, { floor: cell.palette.floor, wall: cell.palette.wall, ceiling: cell.palette.ceiling, yBase: fy });
   cell.boxes = [...shell, ...old.filter((b) => insideFootprint(rects, b))];
-  lightGrid(cell.boxes, cell.lights, rects, fy + h, spacing, cell.palette);
   cell.footprint = rects.map((r) => ({ ...r }));
+  // 照明（lightGrid と同じ並べ方。細い矩形ではパネルを矩形の中に収める）
+  lightGridAt(ctx, rects.map((q) => shrink(q, WALL_T)), fy + h, spacing);
   const fb = footprintAABB(rects, h, fy);
   cell.bounds = { min: [fb.min[0], Math.min(cell.bounds.min[1], fb.min[1]), fb.min[2]], max: [fb.max[0], Math.max(cell.bounds.max[1], fb.max[1]), fb.max[2]] };
   return true;
@@ -236,7 +237,7 @@ export function stepCount(rise: number, riseMax: number): number {
 }
 
 /**
- * まっすぐな段（kind 'stairStep'）。段は下の床から積んだ箱（thin なら宙に浮いた薄い板）。最後の段の上面が y1。
+ * まっすぐな段（kind 'roomStep'。廊下の階段の区画の 'stairStep' とは分ける: 上の台は 'landing' にして歩く人が上の面として見る）。段は下の床から積んだ箱（thin なら宙に浮いた薄い板）。最後の段の上面が y1。
  * 手すりは段鼻の線に沿った傾いた棒（描画だけ）と、段の外側の当たる柵（落ちない）
  */
 export function stairs(ctx: RoomShapeContext, o: StairOpts): Stair {
@@ -247,7 +248,7 @@ export function stairs(ctx: RoomShapeContext, o: StairOpts): Stair {
     const r = stairRect(o, i * o.tread, (i + 1) * o.tread);
     const top = o.y0 + rs * (i + 1);
     const b = rbox(r, o.thin ? top - o.thin : o.y0, top, o.mat);
-    b.kind = 'stairStep';
+    b.kind = 'roomStep';
     ctx.addBox(b);
   }
   const run = n * o.tread;
@@ -288,6 +289,58 @@ export function stairs(ctx: RoomShapeContext, o: StairOpts): Stair {
 }
 
 /**
+ * 穴の底（歩ける範囲 P・底の高さ yb）から縁（高さ yt）へ上がる段: 穴の壁沿いに 1 本、穴の角の方へ上る（上の段から横へ縁に出られる）。
+ * 段の下の端の先は 0.9 m 空ける。sides: 段を沿わせてよい穴の壁（その向こうが縁の床の壁）。置けなければ null
+ */
+export function pitStair(ctx: RoomShapeContext, P: Rect, yb: number, yt: number, sides: readonly Dir[], o: { width?: number; mat?: MatId; riseMax?: number; tread?: number } = {}): (Stair & { side: Dir; dir: Dir; foot: Rect }) | null {
+  const w = o.width ?? 0.9, riseMax = o.riseMax ?? 0.24, tread = o.tread ?? 0.3;
+  const n = stepCount(yt - yb, riseMax);
+  const run = n * tread;
+  const cands: { side: Dir; dir: Dir; x: number; z: number; foot: Rect }[] = [];
+  for (const side of sides) {
+    const alongX = side === 0 || side === 2;
+    const len = alongX ? rectW(P) : rectD(P);
+    if (run + 0.9 > len) continue;
+    const c = side === 2 ? P.z0 + w / 2 : side === 0 ? P.z1 - w / 2 : side === 3 ? P.x0 + w / 2 : P.x1 - w / 2;
+    if (alongX) {
+      cands.push({ side, dir: 1, x: P.x1 - run, z: c, foot: { x0: P.x1 - run - 0.9, x1: P.x1 - run, z0: c - w / 2, z1: c + w / 2 } });
+      cands.push({ side, dir: 3, x: P.x0 + run, z: c, foot: { x0: P.x0 + run, x1: P.x0 + run + 0.9, z0: c - w / 2, z1: c + w / 2 } });
+    } else {
+      cands.push({ side, dir: 0, x: c, z: P.z1 - run, foot: { x0: c - w / 2, x1: c + w / 2, z0: P.z1 - run - 0.9, z1: P.z1 - run } });
+      cands.push({ side, dir: 2, x: c, z: P.z0 + run, foot: { x0: c - w / 2, x1: c + w / 2, z0: P.z0 + run, z1: P.z0 + run + 0.9 } });
+    }
+  }
+  if (!cands.length) return null;
+  const k = ctx.rng.pick(cands);
+  const st = stairs(ctx, { x: k.x, z: k.z, dir: k.dir, width: w, y0: yb, y1: yt, riseMax, tread, mat: o.mat ?? ctx.cell.palette.floor, rails: 'both', railMat: 'metal' });
+  return { ...st, side: k.side, dir: k.dir, foot: k.foot };
+}
+
+/**
+ * 下の床（穴の底・水の底）の、どこからでも段の足元 from へ歩いて行けるか（閉じ込めない）。blocks: 底で体を塞ぐ物の足跡。
+ * 家具 furniture（当たる箱）のうち底の上で体に掛かる物も塞ぐ物として見て、行けない所があれば家具を外して確かめ直す
+ * （外した家具の箱を返す。家具を全部外しても行けなければ null）
+ */
+export function clearBottom(area: Rect, yb: number, blocks: readonly Rect[], from: [number, number], furniture: Box[]): Box[] | null {
+  const solid = (b: Box): boolean => b.solid && b.min[1] < yb + 1.6 && b.max[1] > yb + 0.3;
+  const groupKey = (b: Box): Box | string => b.propGroup ?? b;
+  let fb = furniture.filter(solid);
+  const removed: Box[] = [];
+  for (let round = 0; round < 6; round++) {
+    const spot = unreachableSpot(area, [...blocks, ...fb.map(footOf)], from);
+    if (spot === null) return removed;
+    if (spot === 'start') return null;
+    if (!fb.length) return null;
+    // 行けない所にいちばん近い家具の物（組）を外す。3 回目からは全部
+    const near = round >= 2 ? fb : [fb.slice().sort((a, b) => Math.hypot((a.min[0] + a.max[0]) / 2 - spot[0], (a.min[2] + a.max[2]) / 2 - spot[1]) - Math.hypot((b.min[0] + b.max[0]) / 2 - spot[0], (b.min[2] + b.max[2]) / 2 - spot[1]))[0]!];
+    const keys = new Set(near.map(groupKey));
+    for (const b of furniture) if (keys.has(groupKey(b))) removed.push(b);
+    fb = fb.filter((b) => !keys.has(groupKey(b)));
+  }
+  return unreachableSpot(area, [...blocks, ...fb.map(footOf)], from) === null ? removed : null;
+}
+
+/**
  * 当たる柵（手すり）: 線分（軸に平行）x0,z0 → x1,z1 の上に、床 y から高さ h。当たり判定は描かない箱 1 つ（跳んでも越えない高さ）、
  * 見た目は上の棒・中の棒・支柱
  */
@@ -313,8 +366,11 @@ export function railing(ctx: RoomShapeContext, x0: number, z0: number, x1: numbe
   }
 }
 
-/** 台（床板 + 下の支え）。top は上面、thick は板の厚み。supports: 支柱の間隔（0 なら下まで詰めた箱） */
-export function platform(ctx: RoomShapeContext, r: Rect, top: number, o: { thick?: number; mat?: MatId; under?: MatId; supports?: number; base?: number } = {}): void {
+/**
+ * 台（床板 + 下の支え）。top は上面、thick は板の厚み。supports: 支柱の間隔（0 なら下まで詰めた箱）。
+ * postsSolid: 支柱を当たる物にするか（既定 true。水の中の板の道は当たらない細い支柱にして、下の水を歩いて回れるようにする）
+ */
+export function platform(ctx: RoomShapeContext, r: Rect, top: number, o: { thick?: number; mat?: MatId; under?: MatId; supports?: number; base?: number; postsSolid?: boolean } = {}): void {
   const thick = o.thick ?? 0.15;
   const base = o.base ?? ctx.cell.floorY;
   const mat = o.mat ?? ctx.cell.palette.floor;
@@ -329,7 +385,7 @@ export function platform(ctx: RoomShapeContext, r: Rect, top: number, o: { thick
   for (let i = 0; i <= nx; i++) for (let k = 0; k <= nz; k++) {
     if (i > 0 && i < nx && k > 0 && k < nz) continue;
     const x = Math.min(r.x1 - 0.06, Math.max(r.x0 + 0.06, r.x0 + (rectW(r) * i) / nx)), z = Math.min(r.z1 - 0.06, Math.max(r.z0 + 0.06, r.z0 + (rectD(r) * k) / nz));
-    ctx.addBox(box([x - 0.05, base, z - 0.05], [x + 0.05, top - thick, z + 0.05], o.under ?? 'metalDark'));
+    ctx.addBox(box([x - 0.05, base, z - 0.05], [x + 0.05, top - thick, z + 0.05], o.under ?? 'metalDark', o.postsSolid ?? true));
   }
 }
 
@@ -389,6 +445,17 @@ export function mainAxisOf(ctx: RoomShapeContext): 'x' | 'z' {
   if (a.dir === 1 || a.dir === 3) return 'x';
   if (a.dir === 0 || a.dir === 2) return rectD(ctx.inner) >= rectW(ctx.inner) * 0.6 ? 'z' : 'x';
   return rectW(ctx.inner) >= rectD(ctx.inner) ? 'x' : 'z';
+}
+
+/**
+ * 到達の目印: 壁 d（主の矩形の壁）の位置 at に、穴の無い開口を足す（段の足元・上り口）。区画の中身は開口の前を空け、
+ * 開口どうしが歩いてつながるように置くので、目印の前（壁から 0.9 m）まで床から歩いて行けるようになる。壁は切らない
+ */
+export function reachMark(ctx: RoomShapeContext, d: Dir, at: number): void {
+  const R = ctx.rect;
+  const pos: [number, number, number] = d === 0 ? [at, ctx.fy, R.z1] : d === 2 ? [at, ctx.fy, R.z0] : d === 1 ? [R.x1, ctx.fy, at] : [R.x0, ctx.fy, at];
+  const n = ctx.geo.openings.filter((o) => o.id.startsWith(`${ctx.id}.reach`)).length;
+  ctx.geo.openings.push({ id: `${ctx.id}.reach${n}`, pos, dir: d, width: 0.9, height: 2.0 });
 }
 
 /** 開口の無い壁の向き（主の矩形の 4 辺のうち） */

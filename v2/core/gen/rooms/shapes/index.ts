@@ -4,3 +4,8 @@
 import './halls.ts';
 import './ceilings.ts';
 import './walls.ts';
+import './objects.ts';
+import './footprints.ts';
+import './floors.ts';
+import './levels.ts';
+import './tilt.ts';

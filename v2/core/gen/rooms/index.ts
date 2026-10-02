@@ -39,6 +39,9 @@ export * from './types.ts';
 
 export interface PlacedShape { id: string; def: string; idea: string; name: string; cell: string }
 
+/** 調べる用: 形を組めなかったとき（形の id・区画・理由 build / reach / doors / floor / boxes / lights） */
+export const roomsDebug: { fail?: (def: string, cell: string, why: string) => void } = {};
+
 /** 形の重み（調整表 rooms.w.<id> があればそちら） */
 export function shapeWeight(def: RoomShapeDef, t: Tuning): number {
   const v = (t as unknown as Record<string, number | boolean | undefined>)[`rooms.w.${def.id}`];
@@ -151,14 +154,21 @@ function restore(g: GeoCell, geo: FloorGeometry, gim: GimmickResult, an: Anomaly
 }
 
 /** 開口の前の床が残っているか（床の高さの当たる面が開口の前 0.3〜1.1 m にある） */
-function doorFloorsOk(g: GeoCell): boolean {
+function doorFloorsOk(g: GeoCell, geo: FloorGeometry): boolean {
   const cell = g.cell, fy = cell.floorY;
+  // 部屋の形の面（傾いた床。roomSurface 部品）も床として見る
+  const surfaces = geo.entities.filter((e) => e.type === 'roomSurface' && e.cell === cell.id).map((e) => {
+    const r = e.params.rect as unknown as { x0: number; z0: number; x1: number; z1: number };
+    const o = e.params.origin as number[], n = e.params.normal as number[];
+    return { r, at: (x: number, z: number): number => o[1]! - (n[0]! * (x - o[0]!) + n[2]! * (z - o[2]!)) / n[1]! };
+  });
   for (const o of g.openings) {
     if (Math.abs(o.pos[1] - fy) > 0.05) continue;
     const [ix, iz] = o.dir === 0 ? [0, -1] : o.dir === 1 ? [-1, 0] : o.dir === 2 ? [0, 1] : [1, 0];
     for (const d of [0.3, 0.7, 1.1]) {
       const x = o.pos[0] + ix * d, z = o.pos[2] + iz * d;
-      const ok = cell.boxes.some((b) => b.solid && b.kind !== 'emitOnly' && Math.abs(b.max[1] - fy) < 0.02 && x >= b.min[0] - 1e-6 && x <= b.max[0] + 1e-6 && z >= b.min[2] - 1e-6 && z <= b.max[2] + 1e-6);
+      const ok = cell.boxes.some((b) => b.solid && b.kind !== 'emitOnly' && Math.abs(b.max[1] - fy) < 0.02 && x >= b.min[0] - 1e-6 && x <= b.max[0] + 1e-6 && z >= b.min[2] - 1e-6 && z <= b.max[2] + 1e-6)
+        || surfaces.some((sf) => x >= sf.r.x0 && x <= sf.r.x1 && z >= sf.r.z0 && z <= sf.r.z1 && Math.abs(sf.at(x, z) - fy) < 0.15);
       if (!ok) return false;
     }
   }
@@ -167,10 +177,15 @@ function doorFloorsOk(g: GeoCell): boolean {
 
 /** 足した・書き換えた当たる箱が、開口の前（壁の内側 1.2 m）に掛からないか（床の高さより上に出る物。作り直した外壁は除く） */
 function doorsClear(g: GeoCell, s: Snap): boolean {
-  const zones = doorFronts(g.cell, g.openings, 1.2, 0.3);
-  const fy = g.cell.floorY;
+  // 開口ごとの範囲（下端は開口の下端: 床より高い開口（舞台の奥の扉）は、その前の台の上だけを見る）
+  // 到達の目印（util.reachMark。段の足元）は家具のための物なので、形の箱（段）は見ない
+  const ops = g.openings.filter((o) => !o.id.includes('.reach'));
+  const zones = doorFronts(g.cell, ops, 1.2, 0.3).map((z, i) => {
+    const o = ops[i]!;
+    return { min: [z.min[0], o.pos[1] + (o.sill ?? 0) + 0.02, z.min[2]] as [number, number, number], max: z.max };
+  });
   for (const b of g.cell.boxes) {
-    if (!b.solid || s.boxes.has(b) || b.max[1] <= fy + 0.02 || isWallBox(g.cell, b)) continue;
+    if (!b.solid || s.boxes.has(b) || isWallBox(g.cell, b)) continue;
     if (hitsAny(zones, b)) return false;
   }
   return true;
@@ -238,7 +253,7 @@ export function shapeRooms(p: FloorProfile, geo: FloorGeometry, gimmicks: Gimmic
       addZone(z) { cell.zones.push(z); },
       addLight(l) { cell.lights.push(l); },
       keepOut(a: AABB) { gimmicks.keepOut.set(cell.id, [...(gimmicks.keepOut.get(cell.id) ?? []), a]); },
-      skipDress() { anomalies.noDress.add(cell.id); },
+      skipDress(cellId) { anomalies.noDress.add(cellId ?? cell.id); },
       claim(y0, y1, r = rect) {
         for (const o of geo.cells) {
           if (o === g) continue;
@@ -252,9 +267,9 @@ export function shapeRooms(p: FloorProfile, geo: FloorGeometry, gimmicks: Gimmic
       },
       reachOk: () => reachNotWorse(g, base, !!an),
     };
-    const ok = def.build(ctx) !== false && reachNotWorse(g, base, !!an) && doorsClear(g, snap) && doorFloorsOk(g) &&
-      cell.boxes.length - snap.boxes.size <= t['rooms.maxBoxes'] && cell.lights.length <= Math.max(lights0, t['rooms.maxLights']);
-    if (!ok) { restore(g, geo, gimmicks, anomalies, snap); return false; }
+    const why = def.build(ctx) === false ? 'build' : !reachNotWorse(g, base, !!an) ? 'reach' : !doorsClear(g, snap) ? 'doors' : !doorFloorsOk(g, geo) ? 'floor'
+      : cell.boxes.length - snap.boxes.size > t['rooms.maxBoxes'] ? 'boxes' : cell.lights.length > Math.max(lights0, t['rooms.maxLights']) ? 'lights' : '';
+    if (why) { roomsDebug.fail?.(def.id, cell.id, why); restore(g, geo, gimmicks, anomalies, snap); return false; }
     cell.shape = def.id;
     out.push({ id, def: def.id, idea: def.idea, name: def.name, cell: cell.id });
     gimmicks.tour.push({ label: `部屋の形: ${def.name}`, cell: cell.id, ...standAt(entrance) });

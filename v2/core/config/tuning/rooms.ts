@@ -30,6 +30,59 @@ export const ROOMS_TUNING = {
   'rooms.w.halfBasement': num(0.8, 0, 10, 'S16 半地下'),
   'rooms.w.slantWalls': num(0.9, 0, 10, 'S17 斜めの壁'),
   'rooms.w.windows': num(0.9, 0, 10, 'S23 窓だらけ'),
+  'rooms.w.hut': num(1.0, 0, 10, 'S21 部屋の中の小屋'),
+  'rooms.w.eelBed': num(1.6, 0, 10, 'S12 うなぎの寝床（長い区画だけ）'),
+  'rooms.w.endless': num(1.0, 0, 10, 'S26 果てしない通路（表のフロアだけ）'),
+  'rooms.w.roundRoom': num(1.0, 0, 10, 'S18 円形の部屋（開口が区画の中心線の上にあるとき）'),
+
+  'rooms.w.centerHole': num(1.0, 0, 10, 'S15 中央の穴'),
+  'rooms.w.pitGallery': num(1.0, 0, 10, 'S04 穴の回廊'),
+  'rooms.w.grating': num(0.9, 0, 10, 'S14 全面グレーチングの床'),
+  'rooms.w.sunkenWater': num(0.9, 0, 10, 'S28 水没した下半分'),
+  'rooms.w.terraces': num(1.0, 0, 10, 'S08 段々の部屋'),
+
+  'rooms.w.theater': num(1.0, 0, 10, 'S09 半円の劇場'),
+  'rooms.w.loft': num(1.0, 0, 10, 'S20 ロフト付き'),
+  'rooms.w.scaffold': num(0.9, 0, 10, 'S22 足場の部屋'),
+  'rooms.w.layers': num(0.9, 0, 10, 'S27 一つの部屋が何層も'),
+  'rooms.w.stairsOnly': num(0.9, 0, 10, 'S29 階段だけの部屋'),
+  'rooms.w.atticStair': num(0.9, 0, 10, 'S19 天井から下がる階段'),
+  'rooms.w.tilted': num(0.9, 0, 10, 'S25 傾いた部屋（開口が 1 本の線の上にあるとき）'),
+
+  // ---- S25 傾いた部屋 ----
+  'rooms.tilt.deg': num(6, 2, 12, '傾いた部屋: 傾き（度）'),
+
+  // ---- S09 半円の劇場 ----
+  'rooms.theater.stageD': num(2.0, 1.4, 3.5, '半円の劇場: 舞台の奥行き（m）'),
+  'rooms.theater.stageH': num(0.7, 0.35, 1.0, '半円の劇場: 舞台の高さ（m。前の段 2 段で上がる）'),
+
+  // ---- S15 中央の穴 ----
+  'rooms.hole.rimM': num(1.25, 1.1, 2.5, '中央の穴: 縁の幅の下限（m。開口のある壁の側は扉の前を空ける広さ）'),
+  'rooms.hole.depthM': num(2.2, 1.0, 3.0, '中央の穴: 穴の深さ（m。落ちたら壁沿いの段で戻る）'),
+  // ---- S04 穴の回廊 ----
+  'rooms.gallery.widthM': num(1.3, 1.1, 2.5, '穴の回廊: 回廊の幅（m）'),
+  'rooms.gallery.depthM': num(2.6, 2.0, 3.05, '穴の回廊: 吹き抜けの深さ（m。下の部屋の高さ。3.1 m 以上は隣の区画の下に入り込みやすい）'),
+  // ---- S14 全面グレーチング ----
+  'rooms.grating.depthM': num(2.4, 1.2, 3.05, '全面グレーチング: 格子の下の空間の深さ（m）'),
+  'rooms.grating.pitchM': num(0.12, 0.06, 0.4, '全面グレーチング: 格子の棒の間隔（m）'),
+  // ---- S28 水没した下半分 ----
+  'rooms.sunken.depthM': num(1.4, 0.8, 2.2, '水没した下半分: 床が下がる深さ（m。水は板の道の 0.15 m 下まで）'),
+  'rooms.sunken.walkM': num(1.0, 0.8, 1.6, '水没した下半分: 板の道の幅（m）'),
+  'rooms.sunken.slow': num(0.45, 0.2, 1, '水没した下半分: 水の中の歩く速さの倍率'),
+  // ---- S08 段々の部屋 ----
+  'rooms.terrace.riseM': num(0.33, 0.2, 0.35, '段々の部屋: 1 段の高さ（m。歩いて上れる 0.35 m 以下）'),
+  'rooms.terrace.treadM': num(0.85, 0.7, 1.2, '段々の部屋: 1 段の奥行き（m。座席の列が載る）'),
+  'rooms.terrace.max': num(6, 2, 10, '段々の部屋: 段の数の上限', true),
+
+  // ---- S12 うなぎの寝床 ----
+  'rooms.eel.widthM': num(1.2, 0.9, 1.8, 'うなぎの寝床: 帯の幅（m。壁の内側）'),
+  // ---- S26 果てしない通路 ----
+  'rooms.endless.widthMin': num(1.9, 1.4, 3, '果てしない通路: 通路の幅の下限（m）'),
+  'rooms.endless.widthMax': num(2.4, 1.4, 3.5, '果てしない通路: 通路の幅の上限（m）'),
+  'rooms.endless.fogMinM': num(4.5, 2, 20, '果てしない通路: 霧で何も見えなくなる距離の下限（m）'),
+  'rooms.endless.fogMaxM': num(13, 4, 40, '果てしない通路: 霧で何も見えなくなる距離の上限（m。通路の長さの 6 割まで）'),
+  // ---- S18 円形の部屋 ----
+  'rooms.round.minR': num(2.4, 1.8, 6, '円形の部屋: 丸の半径の下限（m）'),
 
   // ---- S13 二重壁 ----
   'rooms.double.gapM': num(0.85, 0.75, 1.4, '二重壁: 壁と壁の間の幅（m。体の幅 0.7 m より少し広い）'),
@@ -37,7 +90,7 @@ export const ROOMS_TUNING = {
   // ---- S01 柱林 ----
   'rooms.pillars.sizeMin': num(0.45, 0.3, 1.2, '柱林: 柱の太さの下限（m）'),
   'rooms.pillars.sizeMax': num(0.75, 0.3, 1.2, '柱林: 柱の太さの上限（m）'),
-  'rooms.pillars.gapM': num(1.25, 1.0, 3, '柱林: 柱と柱の間（m。体の幅 0.7 m より広く）'),
+  'rooms.pillars.gapM': num(1.15, 1.0, 3, '柱林: 柱と柱の間（m。体の幅 0.7 m より広く）'),
 
   // ---- S02 大広間 ----
   'rooms.grand.heightMul': num(1.8, 1.2, 3, '大広間: 天井の高さの倍率'),

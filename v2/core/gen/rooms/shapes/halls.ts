@@ -34,15 +34,22 @@ defineRoomShape({
   fits: (g) => !MAZE_THEMES.has(g.cell.theme ?? ''),
   build(ctx) {
     const t = ctx.tuning, cell = ctx.cell, fy = ctx.fy, h = ctx.h, r = ctx.inner;
-    const size = snap(ctx.rng.float(t['rooms.pillars.sizeMin'], Math.max(t['rooms.pillars.sizeMin'], t['rooms.pillars.sizeMax'])));
-    const gap = t['rooms.pillars.gapM'] + ctx.rng.float(0, 0.6);
+    // 太さと間（広い部屋ほど太く、間も揺らす）。柱が 4 本以上並ばなければ細く・詰めてもう一度
+    let size = snap(ctx.rng.float(t['rooms.pillars.sizeMin'], Math.max(t['rooms.pillars.sizeMin'], t['rooms.pillars.sizeMax'])));
+    let gap = t['rooms.pillars.gapM'] + ctx.rng.float(0, 0.6);
     const along = (len: number): number[] => {
       const n = Math.floor((len - gap) / (size + gap));
       if (n < 1) return [];
       const g = (len - n * size) / (n + 1);
       return [...Array(n).keys()].map((i) => g * (i + 1) + size * (i + 0.5));
     };
-    const xs = along(rectW(r)).map((v) => r.x0 + v), zs = along(rectD(r)).map((v) => r.z0 + v);
+    let xs = along(rectW(r)).map((v) => r.x0 + v), zs = along(rectD(r)).map((v) => r.z0 + v);
+    if (xs.length * zs.length < 4) {
+      size = t['rooms.pillars.sizeMin'];
+      gap = t['rooms.pillars.gapM'];
+      xs = along(rectW(r)).map((v) => r.x0 + v);
+      zs = along(rectD(r)).map((v) => r.z0 + v);
+    }
     if (xs.length * zs.length < 4) return false;
     const mat = columnMat(ctx);
     const cap: MatId = mat === 'marbleWhite' ? 'goldTrim' : mat === 'floorTile' ? 'trim' : mat;

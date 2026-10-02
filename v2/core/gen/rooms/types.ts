@@ -53,8 +53,8 @@ export interface RoomShapeContext {
   addLight(l: LightSpec): void;
   /** 区画の中身の家具を置かない範囲（フロア座標） */
   keepOut(a: AABB): void;
-  /** 区画の中身を置かない（この形が部屋を自分で埋める） */
-  skipDress(): void;
+  /** 区画の中身を置かない（この形が部屋を自分で埋める）。cellId: この形が足した別の区画（楽屋）に置かない */
+  skipDress(cellId?: string): void;
   /**
    * 区画の外形を上下に広げる（床を下げる・天井を上げる・屋根裏）。範囲 r（既定は主の矩形）の y0..y1 に、ほかの区画が無ければ
    * cell.bounds を広げて true。あれば false（その形は掛けない）

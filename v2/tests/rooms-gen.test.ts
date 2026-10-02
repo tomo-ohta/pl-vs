@@ -49,10 +49,9 @@ export function shapeIssues(floor: FloorLayout, cell: CellLayout, t0: Tuning = t
     const r = reachOpenings(cell, ops, 0.1);
     if (r?.blocked.length) out.push(`${at}: 届かない開口 ${r.blocked.join(',')}`);
   }
-  // 開口の前（壁の内側 0.95 m）に、床より上に出る当たる物が無い（壁の厚みの中の物・床板は除く）
-  const zones = doorFronts(cell, ops, 0.95, 0.25);
-  const fy = cell.floorY;
-  const hit = cell.boxes.find((b) => b.solid && b.max[1] > fy + 0.03 && b.min[1] < fy + 2.0 && hitsAny(zones, b) && !(b.max[0] - b.min[0] <= WALL_T + 1e-3 || b.max[2] - b.min[2] <= WALL_T + 1e-3));
+  // 開口の前（壁の内側 0.95 m）に、開口の下端より上に出る当たる物が無い（壁の厚みの中の物・床板は除く。舞台の奥の扉は舞台の上を見る）
+  const zones = doorFronts(cell, ops, 0.95, 0.25).map((z, i) => ({ min: [z.min[0], ops[i]!.pos[1] + 0.03, z.min[2]] as [number, number, number], max: [z.max[0], Math.min(z.max[1], ops[i]!.pos[1] + 2.0), z.max[2]] as [number, number, number] }));
+  const hit = cell.boxes.find((b) => b.solid && hitsAny(zones, b) && !(b.max[0] - b.min[0] <= WALL_T + 1e-3 || b.max[2] - b.min[2] <= WALL_T + 1e-3));
   if (hit) out.push(`${at}: 開口の前に当たる物 ${hit.mat}/${hit.kind ?? ''} ${JSON.stringify([hit.min, hit.max])}`);
   if (cell.lights.length > t0['rooms.maxLights']) out.push(`${at}: 灯りが多い ${cell.lights.length}`);
   if (cell.boxes.length > 3200) out.push(`${at}: 箱が多い ${cell.boxes.length}`);
@@ -92,7 +91,8 @@ test('部屋の形: 形ごとに 1 つだけ出やすくしても、検証に通
   const made = new Map<string, number>();
   for (const def of roomShapeDefs()) {
     const tt = only(def.id);
-    for (let w = 1; w <= 24; w++) {
+    // 出にくい形（大きな部屋・広間だけの形）は、3 つ見つかるまで多くの世界を見る
+    for (let w = 1; w <= 24 || ((made.get(def.id) ?? 0) < 3 && w <= 160); w++) {
       const r = gen(w * 7 + 3, 1 + (w % 9), 0, tt);
       const issues = validateFloor(r.floor);
       if (issues.length) fails.push(`${def.id} w${w}: ${issues.join(' / ')}`);
@@ -104,7 +104,7 @@ test('部屋の形: 形ごとに 1 つだけ出やすくしても、検証に通
     }
   }
   console.log(`  ${[...made].map(([k, v]) => `${k} ${v}`).join('・')}`);
-  for (const def of roomShapeDefs()) assert.ok((made.get(def.id) ?? 0) >= 2, `${def.id} が組める: ${made.get(def.id) ?? 0}`);
+  for (const def of roomShapeDefs()) assert.ok((made.get(def.id) ?? 0) >= 3, `${def.id} が組める: ${made.get(def.id) ?? 0}`);
   assert.deepEqual(fails, []);
 });
 
