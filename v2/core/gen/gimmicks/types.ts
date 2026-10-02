@@ -59,6 +59,25 @@ export interface GimmickContext {
   removeBoxes(pred: (b: Box) => boolean): void;
   /** 到達判定のときだけ床として扱う箱（部品が作る傾く床・動く床の代わり。描画・当たり判定には入らない） */
   reachAssist(b: Box): void;
+  /**
+   * 段階 4（carry）: 同じフロアの別の区画で、手がかり・運ぶ物を置ける所（v2-plan.md 4.7 の最後。フロア単位の生成の利点）。
+   * 置く順がもう過ぎて仕掛けの無い区画・入口と出口の部屋・曲がり角だけ（後から仕掛けで作り変わらない）。近い順。
+   * 無い（実験室）ときは undefined。使う側は自分の区画に置いて済ませる
+   */
+  clueCells?(): ClueCell[];
+  /** 段階 4（carry）: 別の区画に箱を足す（手がかり）。取り消しのときは一緒に戻る */
+  addToCell?(cell: string, b: Box): Box;
+  /** 段階 4（carry）: 別の区画の、中身の家具を置かない範囲 */
+  keepOutIn?(cell: string, a: AABB): void;
+}
+
+/** 段階 4（carry）: 手がかりを置ける区画 */
+export interface ClueCell {
+  cell: CellLayout;
+  kind: DressKind;
+  openings: WallOpening[];
+  /** 仕掛けの区画から開口をいくつたどるか */
+  hops: number;
 }
 
 export interface GimmickDef {

@@ -102,6 +102,32 @@ export class PhysicsWorld {
     return this.bodies.get(handle)?.isSleeping() ?? true;
   }
 
+  /** 段階 4（carry）: 剛体を外す・戻す（手に持っている間は外す。外している間は当たらず、動かない） */
+  setBodyEnabled(handle: number, on: boolean): void {
+    const b = this.bodies.get(handle);
+    if (!b || b.isEnabled() === on) return;
+    b.setEnabled(on);
+    if (on) b.wakeUp();
+  }
+
+  /** 段階 4（carry）: 剛体を置き直す（位置・向き・速度。持ち物を置く・投げる・元に戻す） */
+  placeBody(handle: number, pos: Vec3, rot: Quat, linvel: Vec3 = [0, 0, 0], angvel: Vec3 = [0, 0, 0]): void {
+    const b = this.bodies.get(handle);
+    if (!b) return;
+    b.setTranslation({ x: pos[0], y: pos[1], z: pos[2] }, true);
+    b.setRotation({ x: rot[0], y: rot[1], z: rot[2], w: rot[3] }, true);
+    b.setLinvel({ x: linvel[0], y: linvel[1], z: linvel[2] }, true);
+    b.setAngvel({ x: angvel[0], y: angvel[1], z: angvel[2] }, true);
+  }
+
+  /** 段階 4（carry）: 剛体の速度 */
+  velocity(handle: number): Vec3 | null {
+    const b = this.bodies.get(handle);
+    if (!b) return null;
+    const v = b.linvel();
+    return [v.x, v.y, v.z];
+  }
+
   /** プレイヤーの箱（キネマティック）を合わせる */
   setPlayer(feet: Vec3, radius: number, height: number): void {
     const R = this.R;
