@@ -175,7 +175,13 @@ test('穴の底の隠し（crumble.fall・fall.below）: 底から隠し場所�
     const door = room.floor.portals.find((p) => p.cells[0] === room.cell.id && p.cells[1] === sec.cell)!;
     assert.ok(door.aabb.min[1] < room.cell.floorY - 1.5, `${sec.id}: 入口は穴の底`);
     const probe = await newSim(room);
-    const spot = fallSpots(probe, room, 1, 7)[0]!;
+    // 段階 4 で足した: 階段（底より高く床より低い段）から 1.2 m 以上離れた所に落ちる（階段の脇は床板の下で頭がつかえ、
+    // 歩く人が階段を上ってから脇へ下りようとして止まる。落ちた先から隠しへ歩けることは、階段から離れた所で確かめる）
+    const yb = bottomOf(room);
+    const steps = room.cell.boxes.filter((b) => b.solid && b.max[1] > yb + 0.1 && b.max[1] < room.cell.floorY - 0.1 && b.min[1] <= yb + 0.01);
+    const far = (p: [number, number, number]): boolean => !steps.some((b) => p[0] > b.min[0] - 1.2 && p[0] < b.max[0] + 1.2 && p[2] > b.min[2] - 1.2 && p[2] < b.max[2] + 1.2);
+    const cands = fallSpots(probe, room, 8, 7);
+    const spot = cands.find(far) ?? cands[0]!;
     probe.physics?.dispose();
     const sim = await newSim(room);
     sim.teleport(0, spot, 0);

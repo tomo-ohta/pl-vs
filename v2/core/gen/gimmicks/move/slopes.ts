@@ -87,7 +87,7 @@ export function sideWall(ctx: GimmickContext, F: WallFrame, u: number, v0: numbe
 }
 
 defineGimmick({
-  id: 'escalator', name: '逆走エスカレーター', axes: ['move'], kinds: ['room', 'hall'], minSize: [4.2, 7.0], minHeight: 2.4, weight: 1.6, intensity: 2, offersSecret: true, onMainPath: true,
+  id: 'escalator', name: '逆走エスカレーター', axes: ['move'], kinds: ['room', 'hall'], minSize: [4.2, 7.0], minHeight: 2.4, weight: 1.1, intensity: 2, offersSecret: true, onMainPath: true,
   fits: stripsFits,
   build(ctx) {
     const s = ctx.slot;
@@ -142,7 +142,7 @@ export function sideDirOf(F: WallFrame, hi: boolean): Dir {
 }
 
 defineGimmick({
-  id: 'slideRoom', name: '滑り台の部屋', axes: ['move', 'floor'], kinds: ['room', 'hall'], minSize: [5.2, 7.2], minHeight: 2.4, weight: 1.6, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'slideRoom', name: '滑り台の部屋', axes: ['move', 'floor'], kinds: ['room', 'hall'], minSize: [5.2, 7.2], minHeight: 2.4, weight: 1.0, intensity: 1, offersSecret: true, onMainPath: true,
   fits: stripsFits,
   build(ctx) {
     const s = ctx.slot;

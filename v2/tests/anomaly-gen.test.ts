@@ -172,7 +172,8 @@ test('異変: それぞれ見て分かる形になっている（浸水の水・
           break;
         }
         case 'tiny':
-          assert.ok(c.boxes.filter((b) => b.solid && b.propGroup).every((b) => b.max[1] - fy < 0.75), `${msg}: 家具は膝より低い`);
+          // 段階 4 で足した: 柱（広間の柱の飾り。人の背より高い）は縮めても膝より高いことがあるので除く
+        assert.ok(c.boxes.filter((b) => b.solid && b.propGroup && b.kind !== 'column').every((b) => b.max[1] - fy < 0.75), `${msg}: 家具は膝より低い`);
           break;
         case 'upsideDown':
           assert.ok(c.boxes.some((b) => b.solid && b.propGroup && (b.min[1] + b.max[1]) / 2 > fy + c.height / 2), `${msg}: 天井の側に付いた家具`);

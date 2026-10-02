@@ -12,20 +12,19 @@ import { defineGimmick } from '../types.ts';
 import { aabbJson, doorZone, fillRects } from '../util.ts';
 import { hallAabb, hallBox, hallOf, hallPoint, sideDir, wallAt } from './common.ts';
 
-const opposite = (s: { entrance: { dir: number } | null; exit: { dir: number } | null }): boolean => !!s.entrance && !!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4;
 
 defineGimmick({
-  id: 'sizeRoom', name: '身体の大きさが変わる部屋', axes: ['body', 'sight'], kinds: ['room', 'hall'], minSize: [4.4, 7.0], minHeight: 2.6, weight: 1.0, intensity: 1, offersSecret: true, onMainPath: true,
-  fits: opposite,
+  id: 'sizeRoom', name: '身体の大きさが変わる部屋', axes: ['body', 'sight'], kinds: ['room', 'hall'], minSize: [4.4, 7.0], minHeight: 2.6, weight: 0.6, intensity: 1, offersSecret: true, onMainPath: true,
+  fits: (s) => !!s.entrance && !!s.exit,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning;
-    const H = hallOf(s);
+    const H = hallOf(s, false);
     if (!H || H.W < 4.4 || H.L < 7) return;
     const y = H.y;
     const T = 0.3;
     const vp = Math.round(H.L * 0.55 * 10) / 10;
     // 仕切りの範囲に横の開口があれば置かない
-    if (s.openings.some((o) => o !== s.entrance && o !== s.exit && Math.abs(H.F.v(o.pos[0], o.pos[2]) - vp) < o.width / 2 + 0.6)) return;
+    if (s.openings.some((o) => o !== s.entrance && Math.abs(H.F.v(o.pos[0], o.pos[2]) - vp) < o.width / 2 + 0.6)) return;
     // 仕切り: 普通の通り口（出口の側の横の壁寄り）と、真ん中のネズミの穴
     const exitU = H.exitU ?? H.entU;
     const gw = 1.1;

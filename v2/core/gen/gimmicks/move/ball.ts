@@ -13,14 +13,13 @@ import { pitShell } from '../pit.ts';
 import { hallAabb, hallBox, hallOf, hallPoint, sideDir, wallAt } from './common.ts';
 import { slope } from './slopes.ts';
 
-const opposite = (s: { entrance: { dir: number } | null; exit: { dir: number } | null }): boolean => !!s.entrance && !!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4;
 
 defineGimmick({
-  id: 'ballRide', name: '球に乗る部屋', axes: ['move', 'body'], kinds: ['room', 'hall'], minSize: [4.4, 7.0], minHeight: 2.6, weight: 1.4, intensity: 1, offersSecret: true, onMainPath: true,
-  fits: opposite,
+  id: 'ballRide', name: '球に乗る部屋', axes: ['move', 'body'], kinds: ['room', 'hall'], minSize: [4.4, 7.0], minHeight: 2.6, weight: 0.6, intensity: 1, offersSecret: true, onMainPath: true,
+  fits: (s) => !!s.entrance && !!s.exit,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning;
-    const H = hallOf(s);
+    const H = hallOf(s, false);
     if (!H || H.W < 4.4 || H.L < 7) return;
     const bubble = ctx.rng.chance(t['move.ball.bubbleChance']);
     const R = bubble ? 0.85 : 0.55;

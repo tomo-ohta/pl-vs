@@ -56,11 +56,11 @@ defineGimmick({
 
 // ---------------------------------------------------------------- 回転扉
 defineGimmick({
-  id: 'revolvingDoor', name: '回転扉', axes: ['move'], kinds: ['room', 'hall'], minSize: [4.0, 7.0], minHeight: 2.4, weight: 1.4, intensity: 1, onMainPath: true,
-  fits: opposite,
+  id: 'revolvingDoor', name: '回転扉', axes: ['move'], kinds: ['room', 'hall'], minSize: [4.0, 7.0], minHeight: 2.4, weight: 0.6, intensity: 1, onMainPath: true,
+  fits: (s) => !!s.entrance && !!s.exit,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning;
-    const H = hallOf(s);
+    const H = hallOf(s, false);
     if (!H) return;
     const Rd = t['move.revolve.radiusM'];
     if (H.W < 2 * Rd + 0.3 || H.L < 2 * Rd + 3.0) return;
@@ -68,7 +68,7 @@ defineGimmick({
     const cu = Math.min(H.F.u1 - Rd, Math.max(H.F.u0 + Rd, (H.entU + (H.exitU ?? H.entU)) / 2));
     const bv0 = vc - Rd, bv1 = vc + Rd;
     // 仕切りの帯の範囲に横の開口があれば置かない
-    if (s.openings.some((o) => o !== s.entrance && o !== s.exit && (() => { const v = H.F.v(o.pos[0], o.pos[2]); return v > bv0 - o.width / 2 - 0.8 && v < bv1 + o.width / 2 + 0.8; })())) return;
+    if (s.openings.some((o) => o !== s.entrance && (() => { const v = H.F.v(o.pos[0], o.pos[2]); return v > bv0 - o.width / 2 - 0.8 && v < bv1 + o.width / 2 + 0.8; })())) return;
     const wallMat: MatId = s.cell.palette.wall;
     const h = H.h;
     const CW = 1.1, cv0 = vc - 0.55, cv1 = vc + 0.55;
@@ -108,18 +108,18 @@ defineGimmick({
 
 // ---------------------------------------------------------------- 押せる壁
 defineGimmick({
-  id: 'pushWall', name: '押せる壁', axes: ['move', 'sight'], kinds: ['room', 'hall'], minSize: [3.0, 7.0], weight: 1.2, intensity: 1, onMainPath: true,
-  fits: opposite,
+  id: 'pushWall', name: '押せる壁', axes: ['move', 'sight'], kinds: ['room', 'hall'], minSize: [3.0, 7.0], weight: 0.5, intensity: 1, onMainPath: true,
+  fits: (s) => !!s.entrance && !!s.exit,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning;
-    const H = hallOf(s);
+    const H = hallOf(s, false);
     if (!H) return;
     const T = 0.3, PW = 1.1;
     const travel = t['move.push.travelM'];
     const vp = Math.min(H.L - travel - T - 1.6, Math.max(travel + 0.9, H.L * 0.45));
     if (vp < travel + 0.9 - 1e-6 || vp + T + travel + 1.4 > H.L) return;
     // 仕切りの範囲に横の開口があれば置かない（仕切りで開口が塞がる）
-    if (s.openings.some((o) => o !== s.entrance && o !== s.exit && Math.abs(H.F.v(o.pos[0], o.pos[2]) - (vp + T / 2)) < o.width / 2 + 0.4)) return;
+    if (s.openings.some((o) => o !== s.entrance && Math.abs(H.F.v(o.pos[0], o.pos[2]) - (vp + T / 2)) < o.width / 2 + 0.4)) return;
     // 板の並び: 壁に沿って PW の板を等間隔に。押せるのは 1 枚（入口と出口の間のどこか）
     const n = Math.floor((H.W - 0.2) / (PW + 0.25));
     if (n < 1) return;
@@ -159,7 +159,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- 傾いていく部屋
 defineGimmick({
-  id: 'slantRoom', name: '傾いていく部屋', axes: ['move', 'sight'], kinds: ['room', 'hall'], minSize: [4.2, 6.0], minHeight: 2.6, weight: 1.4, intensity: 2, onMainPath: true,
+  id: 'slantRoom', name: '傾いていく部屋', axes: ['move', 'sight'], kinds: ['room', 'hall'], minSize: [4.2, 6.0], minHeight: 2.6, weight: 1.0, intensity: 2, onMainPath: true,
   fits: (s) => opposite(s) && s.openings.length === 2,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning;

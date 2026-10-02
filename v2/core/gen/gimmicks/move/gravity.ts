@@ -47,17 +47,18 @@ function magnet(ctx: GimmickContext, H: Hall, face: 'lo' | 'hi' | 'ceil' | 'floo
 }
 
 defineGimmick({
-  id: 'gravityHall', name: '重力の向きが変わる部屋', axes: ['move', 'body'], kinds: ['room', 'hall'], minSize: [3.2, 7.0], minHeight: 2.7, weight: 1.2, intensity: 2, offersSecret: true, onMainPath: true,
-  fits: opposite,
+  id: 'gravityHall', name: '重力の向きが変わる部屋', axes: ['move', 'body'], kinds: ['room', 'hall'], minSize: [3.2, 7.0], minHeight: 2.7, weight: 0.6, intensity: 2, offersSecret: true, onMainPath: true,
+  fits: (s) => !!s.entrance && !!s.exit,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning;
-    const H = hallOf(s);
+    const H = hallOf(s, false);
     if (!H) return;
     const ok: Variant[] = [];
     const exU = H.exitU ?? H.entU;
     if (H.h >= 3.0 && H.W >= 3.6) ok.push('loop');
-    if (H.h >= t['move.grav.mazeMinH'] && H.W >= 4.2 && H.L >= 9) ok.push('maze');
-    if (Math.abs(H.entU - exU) < 0.45 && H.W >= 3.2 && H.L >= 7.5) ok.push('tube');
+    // 迷路・筒は入口と出口が向かい合う部屋だけ（回廊の帯は、出口がどこでも通り道を塞がない）
+    if (opposite(s) && H.h >= t['move.grav.mazeMinH'] && H.W >= 4.2 && H.L >= 9) ok.push('maze');
+    if (opposite(s) && Math.abs(H.entU - exU) < 0.45 && H.W >= 3.2 && H.L >= 7.5) ok.push('tube');
     if (!ok.length) return;
     const v = ctx.rng.weighted(ok, (k) => t[`move.grav.w.${k}`] + 1e-6);
     const sideOpen = (hi: boolean, v0: number, v1: number): boolean => s.openings.some((o) => o.dir === sideDir(H, hi) && (() => { const ov = H.F.v(o.pos[0], o.pos[2]); return ov > v0 - o.width / 2 - 0.4 && ov < v1 + o.width / 2 + 0.4; })());

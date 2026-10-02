@@ -48,7 +48,8 @@ function railAround(ctx: GimmickContext, r: Rect, solid: Rect[], hole: Rect): vo
     const along = i < 2 ? 'x' : 'z';
     let segs: [number, number][] = [along === 'x' ? [g.x0, g.x1] : [g.z0, g.z1]];
     for (const q of touching) {
-      const [a, b] = along === 'x' ? [q.x0 - 0.05, q.x1 + 0.05] : [q.z0 - 0.05, q.z1 + 0.05];
+      // 固い床の角から 0.45 m は開ける（角すれすれを回る道で、手すりの端に体が掛からない）
+      const [a, b] = along === 'x' ? [q.x0 - 0.45, q.x1 + 0.45] : [q.z0 - 0.45, q.z1 + 0.45];
       segs = segs.flatMap(([p, s]) => (b <= p || a >= s ? [[p, s] as [number, number]] : [[p, Math.max(p, a)], [Math.min(s, b), s]] as [number, number][])).filter(([p, s]) => s - p > 0.1);
     }
     for (const [p, s] of segs) {
@@ -105,7 +106,7 @@ defineGimmick({
 });
 
 defineGimmick({
-  id: 'ghostBridge', name: '見えない足場', axes: ['floor', 'sight'], kinds: ['room', 'hall'], minSize: [4.8, 6.4], minHeight: 2.4, weight: 1.6, intensity: 2, offersSecret: true, onMainPath: true,
+  id: 'ghostBridge', name: '見えない足場', axes: ['floor', 'sight'], kinds: ['room', 'hall'], minSize: [4.8, 6.4], minHeight: 2.4, weight: 1.1, intensity: 2, offersSecret: true, onMainPath: true,
   fits: stripsFits,
   build(ctx) {
     const s = ctx.slot;
@@ -158,7 +159,7 @@ defineGimmick({
 });
 
 defineGimmick({
-  id: 'swayBridge', name: '吊り橋', axes: ['floor', 'body'], kinds: ['room', 'hall'], minSize: [4.2, 6.4], minHeight: 2.4, weight: 1.6, intensity: 2, offersSecret: true, onMainPath: true,
+  id: 'swayBridge', name: '吊り橋', axes: ['floor', 'body'], kinds: ['room', 'hall'], minSize: [4.2, 6.4], minHeight: 2.4, weight: 1.1, intensity: 2, offersSecret: true, onMainPath: true,
   fits: stripsFits,
   build(ctx) {
     const s = ctx.slot;
@@ -189,7 +190,7 @@ defineGimmick({
 });
 
 defineGimmick({
-  id: 'pendulumHall', name: '振り子の通路', axes: ['floor', 'move'], kinds: ['room', 'hall'], minSize: [5.3, 6.6], minHeight: 2.6, weight: 1.6, intensity: 2, offersSecret: true, onMainPath: true,
+  id: 'pendulumHall', name: '振り子の通路', axes: ['floor', 'move'], kinds: ['room', 'hall'], minSize: [5.3, 6.6], minHeight: 2.6, weight: 1.2, intensity: 2, offersSecret: true, onMainPath: true,
   fits: stripsFits,
   build(ctx) {
     const s = ctx.slot;
