@@ -65,7 +65,8 @@ test('隠し場所の奥まで歩いて行ける・通り抜けは出口の部�
   const R = await loadRapier();
   const fails: string[] = [];
   let n = 0, loops = 0;
-  for (let w = 1; w <= 30; w++) {
+  // 30 フロア（通り抜けが 3 つに満たなければ 60 フロアまで。段階 4 で仕掛けが増えて、隠しの行き先の出方が変わった）
+  for (let w = 1; w <= 30 || (w <= 60 && loops < 3); w++) {
     const r = generateFloorReport({ world: w, depth: 1 + (w % 7), variant: w % 5 === 0 ? 1 : 0 }, t, { dress: dressCell });
     for (const s of r.gimmicks?.secrets ?? []) {
       n++;

@@ -10,3 +10,5 @@ import './still.ts';
 import './lifts.ts';
 import './tiles.ts';
 import './traces.ts';
+import './press.ts';
+import './moving.ts';

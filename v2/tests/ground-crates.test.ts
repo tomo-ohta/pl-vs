@@ -118,7 +118,7 @@ test('箱の橋: 向こう岸のボタンで板が伸び、手前へ戻れる（
 
 test('箱の橋: 見本のフロア・本道で、歩く人が箱を押して抜けられる・隠しの奥まで行ける', async () => {
   let n = 0;
-  for (const flip of [false, true]) for (const room of showcaseRooms('crateBridge', [1, 2, 3], { flip })) {
+  for (const flip of [false, true]) for (const room of showcaseRooms('crateBridge', [1, 2, 3, 4, 5, 6], { flip })) {
     for (const sec of room.r.gimmicks!.secrets.filter((x) => x.host === room.cell.id)) {
       const sim = await newSim(room.floor);
       const res = walkTo(sim, sec.cells[sec.cells.length - 1]!, undefined, 300);

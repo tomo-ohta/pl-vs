@@ -58,4 +58,24 @@ export const GROUND_TUNING = {
   'ground.loop.corridorM': num(1.5, 1.2, 2.5, '足跡が残る床: 真ん中の塊のまわりの通路の幅（m）'),
   'ground.loop.prints': num(320, 40, 800, '足跡が残る床: 残る足跡の数の上限（古い物から消える）', true),
   'ground.mirror.gazeSec': num(1.2, 0.3, 5, '水たまりの鏡: 水面に映った扉を見続けて、本当の扉が現れるまで（秒）'),
+  // 落ちてくる天井（ceilingPress）
+  'ground.press.bandM': num(1.2, 0.8, 2.0, '落ちてくる天井: 落ちる天井の帯の奥行き（m）'),
+  'ground.press.stripeM': num(1.0, 0.9, 2.0, '落ちてくる天井: 帯と帯の間の、落ちてこない床の幅（m。黄色の線の間）'),
+  'ground.press.upSec': num(2.6, 1.6, 8, '落ちてくる天井: 上がっている間（秒）'),
+  'ground.press.warnSec': num(1.0, 0.5, 3, '落ちてくる天井: 影と粉で予告する間（秒）'),
+  'ground.press.fallSec': num(0.25, 0.1, 1, '落ちてくる天井: 落ち切るまで（秒）'),
+  'ground.press.holdSec': num(0.9, 0.3, 3, '落ちてくる天井: 下りている間（秒）'),
+  'ground.press.riseSec': num(1.4, 0.5, 4, '落ちてくる天井: 上がり切るまで（秒）'),
+  'ground.press.safeSec': num(1.2, 0.8, 3, '落ちてくる天井: 歩く人が渡り始める、落ちてくるまでの残りの秒（予告の前）'),
+  // 回る円盤（turntable）
+  'ground.turn.depthM': num(2.0, 1.6, 3.05, '回る円盤: 穴の深さ（m）'),
+  'ground.turn.pauseSec': num(4.5, 2.5, 10, '回る円盤: 橋が止まっている間（秒）'),
+  'ground.turn.turnSec': num(5, 2, 12, '回る円盤: 橋が 90° 回るのに掛かる秒'),
+  'ground.turn.needSec': num(2.6, 1.5, 5, '回る円盤: 歩く人が乗り降りを始める、止まっている残りの秒'),
+  // 動く床タイル（slideTiles）
+  'ground.slide.tileM': num(1.2, 1.0, 1.8, '動く床タイル: 床板の升目の大きさ（m）'),
+  'ground.slide.depthM': num(2.4, 1.8, 3.05, '動く床タイル: 床板の下の溝の深さ（m）'),
+  'ground.slide.holes': num(0.22, 0.1, 0.4, '動く床タイル: 空いた升目の割合'),
+  'ground.slide.moveSec': num(1.2, 0.5, 4, '動く床タイル: 床板が隣の升目へ滑るのに掛かる秒'),
+  'ground.slide.pauseSec': num(0.5, 0, 4, '動く床タイル: 滑り終えてから次の床板が滑り出すまで（秒）'),
 } as const satisfies Record<string, Spec>;

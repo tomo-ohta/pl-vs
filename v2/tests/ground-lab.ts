@@ -114,3 +114,34 @@ export function countInFloors(defs: string[], worlds: number): Map<string, numbe
 }
 
 export const v3 = (x: number, y: number, z: number): Vec3 => [x, y, z];
+
+/** 部品の出力（`部品.出力`） */
+export const outputRef = (sim: Sim, ref: string): number => { const i = ref.lastIndexOf('.'); return sim.outputOf(ref.slice(0, i), ref.slice(i + 1)); };
+
+export interface HintLike { steps: { at: number[]; look?: number[]; wait?: number; until?: string; crouch?: boolean }[]; enterAt?: number[]; exitAt?: number[] }
+
+/** 区画の中で、手順（BotHint）を歩く人と同じようにこなす（立つ所へ歩く・調べる・待つ）。できなければ理由 */
+export async function followHint(sim: Sim, h: HintLike, maxWait = 60): Promise<string> {
+  const { walkTo } = await import('./helpers/bot.ts');
+  for (const [i, st] of h.steps.entries()) {
+    const res = walkTo(sim, cellIdAt(sim) ?? 'room', [st.at[0]!, st.at[1]!, st.at[2]!], 60);
+    if (!res.ok) return `手順 ${i}: ${res.reason}`;
+    if (st.look) press(sim, st.look);
+    let w = 0;
+    while ((w < (st.wait ?? 0) || (st.until && outputRef(sim, st.until) < 0.5)) && w < maxWait) { idle(sim, 1 / 60, { crouch: !!st.crouch }); w += 1 / 60; }
+    if (w >= maxWait) return `手順 ${i}: ${st.until} を待ちきれない`;
+  }
+  return '';
+}
+
+/** 開口 enter から入って exit から出る手順（enterAt・exitAt で選ぶ） */
+export function hintFor(floor: FloorLayout, enter: { pos: number[] }, exit?: { pos: number[] } | null): HintLike | null {
+  const all = floor.entities.filter((e) => e.params.bot).flatMap((e) => (Array.isArray(e.params.bot) ? e.params.bot : [e.params.bot]) as unknown as HintLike[]);
+  const near = (a: number[] | undefined, o: { pos: number[] } | null | undefined): boolean => !a || !o || Math.hypot(a[0]! - o.pos[0]!, a[1]! - o.pos[2]!) < 1.2;
+  return all.find((h) => h.enterAt && near(h.enterAt, enter) && near(h.exitAt, exit)) ?? null;
+}
+
+function cellIdAt(sim: Sim): string | null {
+  const p = sim.players[0]!.pos;
+  return sim.floor.cells.find((c) => c.footprint.some((r) => p[0] >= r.x0 - 0.2 && p[0] <= r.x1 + 0.2 && p[2] >= r.z0 - 0.2 && p[2] <= r.z1 + 0.2))?.id ?? null;
+}
