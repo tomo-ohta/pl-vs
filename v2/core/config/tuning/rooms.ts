@@ -79,7 +79,7 @@ export const ROOMS_TUNING = {
   // ---- S26 果てしない通路 ----
   'rooms.endless.widthMin': num(1.9, 1.4, 3, '果てしない通路: 通路の幅の下限（m）'),
   'rooms.endless.widthMax': num(2.4, 1.4, 3.5, '果てしない通路: 通路の幅の上限（m）'),
-  'rooms.endless.fogMinM': num(4.5, 2, 20, '果てしない通路: 霧で何も見えなくなる距離の下限（m）'),
+  'rooms.endless.fogMinM': num(7, 2, 20, '果てしない通路: 霧で何も見えなくなる距離の下限（m）'),
   'rooms.endless.fogMaxM': num(13, 4, 40, '果てしない通路: 霧で何も見えなくなる距離の上限（m。通路の長さの 6 割まで）'),
   // ---- S18 円形の部屋 ----
   'rooms.round.minR': num(2.4, 1.8, 6, '円形の部屋: 丸の半径の下限（m）'),

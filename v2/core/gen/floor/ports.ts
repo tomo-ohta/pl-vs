@@ -14,6 +14,7 @@ import type { Rect } from '../../world/footprint.ts';
 import { DOOR_H, DOOR_W, WALL_T, type RegionAirlockCell, type RegionGateCell, type WallOpening } from '../../world/layout.ts';
 import { themePalette } from '../../world/palettes.ts';
 import { airlockAnchor, airlockShape, placeAirlock } from '../world/airlock.ts';
+import { placeLanding } from '../world/landing.ts';
 import { GenError, RISER_MAX, snap, TREAD, type GeoBuild, type Placed, type StraightSpec } from './geometry.ts';
 import { SPECIAL_STYLES, type Skeleton } from './skeleton.ts';
 
@@ -117,71 +118,126 @@ export function regionPorts(g: GeoBuild, sk: Skeleton, placed: Map<number, Place
   });
 
   // ---------------------------------------------------------------- 境目の扉までの廊下
-  reg.gates.forEach((gt, gi) => {
-    const d = gt.side, s = sgnOf(d), B = gt.line, u = gt.at;
-    const end1 = snap(B - s * 2 * half);
-    let best: { pl: Placed; at: number; jog: boolean; rise: number; score: number } | null = null;
+  // 辺ごとに、扉を辺に沿った順に見る。扉ごとに区画の壁から縁の帯まで廊下（stub）を引き、縁の帯の中の通路（lane）で扉へ。
+  // 隣の扉の通路と重なる・届く扉は同じ通路にまとめる（扉が多くても廊下どうしがぶつからない）。
+  // 通路が扉 1 つ・廊下 1 本で、廊下が扉の真正面なら、通路を作らず廊下を辺まで伸ばす
+  interface Stub { pl: Placed; at: number; rise: number }
+  interface Lane { side: Dir; a0: number; a1: number; gates: { gi: number; u: number; id: string }[]; stubs: Stub[] }
+  const findStub = (d: Dir, u: number): Stub | null => {
+    const s = sgnOf(d), B = boundary(d), end1 = snap(B - s * 2 * half);
+    let best: (Stub & { score: number }) | null = null;
     for (const pl of hosts) {
       const wl = wallOf(pl.rect, d);
       if (s * (B - wl.coord) < 2.4) continue;
       const at = pickAlong(pl, d, u, stubW);
       if (at === null) continue;
-      const jog = Math.abs(at - u) > 0.04;
-      const r1 = perp(d, wl.coord, jog ? end1 : B, at, stubW);
-      const L1 = Math.abs((jog ? end1 : B) - wl.coord);
-      if (L1 < 1.2 || !free(r1)) continue;
-      if (jog && !free(perp(((d + 1) % 4) as Dir, Math.min(at, u) - half, Math.max(at, u) + half, B - s * half, 2 * half))) continue;
+      const L1 = Math.abs(end1 - wl.coord);
+      if (L1 < 1.2 || !free(perp(d, wl.coord, end1, at, stubW))) continue;
       const rise = Math.abs(pl.y);
       if (rise > 0.01 && L1 < Math.ceil(rise / RISER_MAX - 1e-9) * TREAD + 1.6) continue;
       const score = Math.abs(at - u) + Math.abs(B - wl.coord) * 0.05 + (rise > 0.01 ? 4 : 0) + (pl.kind === 'junction' ? 2 : 0);
-      if (!best || score < best.score) best = { pl, at, jog, rise, score };
+      if (!best || score < best.score) best = { pl, at, rise, score };
     }
-    if (!best) throw new GenError(`境目の扉への道が引けません: ${gt.id}`);
-    const { pl, at, jog, rise } = best;
-    const wl = wallOf(pl.rect, d);
+    return best;
+  };
+  const laneRect = (d: Dir, a0: number, a1: number): Rect => perp(((d + 1) % 4) as Dir, a0, a1, boundary(d) - sgnOf(d) * half, 2 * half);
+  const stubRect = (d: Dir, st: Stub): Rect => perp(d, wallOf(st.pl.rect, d).coord, snap(boundary(d) - sgnOf(d) * 2 * half), st.at, stubW);
+  const lanes: Lane[] = [];
+  for (const d of [0, 1, 2, 3] as Dir[]) {
+    const list = reg.gates.map((gt, gi) => ({ gi, u: gt.at, id: gt.id, side: gt.side })).filter((x) => x.side === d).sort((a, b) => a.u - b.u);
+    let last: Lane | null = null;
+    for (const x of list) {
+      const st = findStub(d, x.u);
+      const want: [number, number] = st ? [snap(Math.min(st.at, x.u) - half), snap(Math.max(st.at, x.u) + half)] : [snap(x.u - half), snap(x.u + half)];
+      // 前の通路に届く（重なる・すぐ隣）: まとめる。伸ばす所が空いていること
+      if (last && want[0] < last.a1 + 0.6) {
+        const a0 = Math.min(last.a0, want[0]), a1 = Math.max(last.a1, want[1]);
+        const ext = [a0 < last.a0 ? laneRect(d, a0, last.a0) : null, a1 > last.a1 ? laneRect(d, last.a1, a1) : null].filter((r): r is Rect => !!r);
+        if (ext.every(free)) {
+          busy.push(...ext);
+          last.a0 = a0; last.a1 = a1;
+          last.gates.push(x);
+          if (st && last.stubs.every((o) => Math.abs(o.at - st.at) >= stubW + 2 * WALL_T + 0.3) && free(stubRect(d, st))) { last.stubs.push(st); busy.push(stubRect(d, st)); }
+          continue;
+        }
+      }
+      if (st && free(laneRect(d, want[0], want[1]))) {
+        last = { side: d, a0: want[0], a1: want[1], gates: [x], stubs: [st] };
+        lanes.push(last);
+        busy.push(laneRect(d, want[0], want[1]), stubRect(d, st));
+        continue;
+      }
+      // 自分の廊下が引けない: 前の通路を扉まで伸ばす
+      if (last && x.u - half > last.a1 - 1e-6 && free(laneRect(d, last.a1, snap(x.u + half)))) {
+        busy.push(laneRect(d, last.a1, snap(x.u + half)));
+        last.a1 = snap(x.u + half);
+        last.gates.push(x);
+        continue;
+      }
+      throw new GenError(`境目の扉への道が引けません: ${x.id}`);
+    }
+  }
+  let si = 0;
+  lanes.forEach((ln, li) => {
+    const d = ln.side, s = sgnOf(d), B = boundary(d);
+    const end1 = snap(B - s * 2 * half);
     const axis: 'x' | 'z' = d % 2 === 0 ? 'z' : 'x';
-    const door = pl.kind === 'room' ? env.doorRng.chance(t['floor.roomDoorChance']) : pl.kind === 'hall' ? env.doorRng.chance(t['floor.hallDoorChance']) : false;
-    const h = snap(Math.min(env.hc, pl.height - 0.2));
-    const span = wl.hi - wl.lo;
-    const ow = door ? DOOR_W : pl.kind === 'junction' ? Math.min(stubW, span - 2 * WALL_T) : Math.min(stubW, span - 1.2);
-    const oh = door ? DOOR_H : Math.min(h, pl.height - 0.2);
-    const hostPos = wallPoint(d, wl.coord, at, pl.y);
-    g.addOpening(pl.cellId, opening(`${pl.cellId}:gate${gi}`, hostPos, d, ow, oh));
+    const direct = ln.gates.length === 1 && ln.stubs.length === 1 && Math.abs(ln.stubs[0]!.at - ln.gates[0]!.u) <= 0.04;
+    const fam0 = ln.stubs[0]!.pl.fam;
     // 系統の廊下の見た目（区画の系統が区域の系統と違えば、その系統の廊下）
-    const look = (sp: StraightSpec): StraightSpec => {
+    const look = (sp: StraightSpec, pl: Placed): StraightSpec => {
       if (pl.fam !== g.fam) { sp.palette = themePalette(pl.fam.corridor); sp.theme = pl.fam.corridor; sp.audio = pl.fam.corridorAudio; sp.materialKey = `corr:${g.p.id}:${pl.fam.id}`; }
       return sp;
     };
-    const far = jog ? end1 : B;
-    const L1 = Math.abs(far - wl.coord);
-    const s1: StraightSpec = look({ id: `gs${gi}`, axis, a0: Math.min(wl.coord, far), a1: Math.max(wl.coord, far), center: at, width: stubW, y: Math.min(pl.y, 0), height: rise + h, kind: rise > 0.01 ? 'stairs' : 'corridor', role: 'connector', name: rise > 0.01 ? '階段' : '廊下' });
-    if (rise > 0.01) {
-      const n = Math.ceil(rise / RISER_MAX - 1e-9);
-      const hostIsA0 = wl.coord < far;
-      const hostLow = pl.y < 0;
-      s1.stairs = { lowEnd: hostLow === hostIsA0 ? 'a0' : 'a1', offset: snap((L1 - n * TREAD) / 2), rise };
+    const lane: StraightSpec | null = direct ? null : look({ id: `gl${li}`, axis: axis === 'z' ? 'x' : 'z', a0: ln.a0, a1: ln.a1, center: snap(B - s * half), width: 2 * half, y: 0, height: snap(Math.min(env.hc, ...ln.stubs.map((st) => st.pl.height - 0.2))), kind: 'corridor', role: 'connector', name: '廊下' }, ln.stubs[0]!.pl);
+    void fam0;
+    for (const st of ln.stubs) {
+      const { pl, at, rise } = st;
+      const wl = wallOf(pl.rect, d);
+      const door = pl.kind === 'room' ? env.doorRng.chance(t['floor.roomDoorChance']) : pl.kind === 'hall' ? env.doorRng.chance(t['floor.hallDoorChance']) : false;
+      const h = snap(Math.min(env.hc, pl.height - 0.2));
+      const span = wl.hi - wl.lo;
+      const ow = door ? DOOR_W : pl.kind === 'junction' ? Math.min(stubW, span - 2 * WALL_T) : Math.min(stubW, span - 1.2);
+      const oh = door ? DOOR_H : Math.min(h, pl.height - 0.2);
+      const hostPos = wallPoint(d, wl.coord, at, pl.y);
+      const sid = `gs${si++}`;
+      g.addOpening(pl.cellId, opening(`${pl.cellId}:${sid}`, hostPos, d, ow, oh));
+      const far = direct ? B : end1;
+      const L1 = Math.abs(far - wl.coord);
+      const s1: StraightSpec = look({ id: sid, axis, a0: Math.min(wl.coord, far), a1: Math.max(wl.coord, far), center: at, width: stubW, y: Math.min(pl.y, 0), height: rise + h, kind: rise > 0.01 ? 'stairs' : 'corridor', role: 'connector', name: rise > 0.01 ? '階段' : '廊下' }, pl);
+      if (rise > 0.01) {
+        const n = Math.ceil(rise / RISER_MAX - 1e-9);
+        const hostIsA0 = wl.coord < far;
+        const hostLow = pl.y < 0;
+        s1.stairs = { lowEnd: hostLow === hostIsA0 ? 'a0' : 'a1', offset: snap((L1 - n * TREAD) / 2), rise };
+      }
+      g.straights.push(s1);
+      g.addOpening(s1.id, opening(`${s1.id}:host`, hostPos, addDir(d, 2), ow, oh));
+      g.join(pl.cellId, s1.id, axis, wl.coord, at, pl.y, ow, oh, d, door ? { cell: pl.cellId, mat: themePalette(pl.theme).door, swing: -s } : null);
+      if (direct) {
+        const gt = ln.gates[0]!;
+        const gateOpening: WallOpening = opening(`gate${gt.gi}`, wallPoint(d, B, gt.u, 0), d, DOOR_W, DOOR_H);
+        g.addOpening(s1.id, gateOpening);
+        gates.push({ id: gt.id, cell: s1.id, opening: gateOpening });
+        return;
+      }
+      const lh = lane!.height;
+      const joint = wallPoint(d, end1, at, 0);
+      g.addOpening(s1.id, opening(`${s1.id}:lane`, joint, d, stubW, Math.min(h, lh)));
+      g.addOpening(lane!.id, opening(`${lane!.id}:${s1.id}`, joint, addDir(d, 2), stubW, Math.min(h, lh)));
+      g.join(s1.id, lane!.id, axis, end1, at, 0, stubW, Math.min(h, lh), d, null);
     }
-    g.straights.push(s1);
-    g.addOpening(s1.id, opening(`${s1.id}:host`, hostPos, addDir(d, 2), ow, oh));
-    g.join(pl.cellId, s1.id, axis, wl.coord, at, pl.y, ow, oh, d, door ? { cell: pl.cellId, mat: themePalette(pl.theme).door, swing: -s } : null);
-    busy.push(perp(d, wl.coord, far, at, stubW));
-    const gateOpening: WallOpening = opening(`gate${gi}`, wallPoint(d, B, u, 0), d, DOOR_W, DOOR_H);
-    if (!jog) {
-      g.addOpening(s1.id, gateOpening);
-      gates.push({ id: gt.id, cell: s1.id, opening: gateOpening });
-      return;
-    }
-    // 縁の帯の中の通路（辺に沿う。外の壁に境目の開口）
-    const lane: StraightSpec = look({ id: `gl${gi}`, axis: axis === 'z' ? 'x' : 'z', a0: snap(Math.min(at, u) - half), a1: snap(Math.max(at, u) + half), center: snap(B - s * half), width: 2 * half, y: 0, height: h, kind: 'corridor', role: 'connector', name: '廊下' });
+    if (!lane) return;
     g.straights.push(lane);
-    const joint = wallPoint(d, end1, at, 0);
-    g.addOpening(s1.id, opening(`${s1.id}:lane`, joint, d, stubW, h));
-    g.addOpening(lane.id, opening(`${lane.id}:a`, joint, addDir(d, 2), stubW, h));
-    g.addOpening(lane.id, gateOpening);
-    g.join(s1.id, lane.id, axis, end1, at, 0, stubW, h, d, null);
-    busy.push(straightRect(lane));
-    gates.push({ id: gt.id, cell: lane.id, opening: gateOpening });
+    for (const gt of ln.gates) {
+      const gateOpening: WallOpening = opening(`gate${gt.gi}`, wallPoint(d, B, gt.u, 0), d, DOOR_W, DOOR_H);
+      g.addOpening(lane.id, gateOpening);
+      gates.push({ id: gt.id, cell: lane.id, opening: gateOpening });
+    }
   });
+  // 境目の扉は計画の順に（出てくる位置は最初の扉）
+  const order = new Map(reg.gates.map((gt, i) => [gt.id, i]));
+  gates.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
 
   // ---------------------------------------------------------------- 出てくる位置（上から着く階段室の上の踊り場。無ければ入口の区画）
   const up = airlocks.find((a) => a.role === 'up');
@@ -199,6 +255,8 @@ export function regionPorts(g: GeoBuild, sk: Skeleton, placed: Map<number, Place
   }
   const down = airlocks.find((a) => a.role === 'down');
   if (down) g.out.mainTo = down.cell;
-  g.out.region = { gates, airlocks };
+  // 隠しの穴から落ちてくる人が着く部屋（天井の穴と縦穴）
+  const landings = placeLanding(g, hosts, t);
+  g.out.region = { gates, airlocks, ...(landings.length ? { landings } : {}) };
   g.out.sealed = sealed;
 }

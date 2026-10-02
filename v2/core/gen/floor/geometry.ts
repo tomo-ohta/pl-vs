@@ -23,7 +23,7 @@ import { hashAll, Rng } from '../../math/rng.ts';
 import type { Dir, Vec3 } from '../../math/vec.ts';
 import { doorPanel, lightPanel, makeCell, opening, portal, portalAabb, type CellOptions } from '../../world/build.ts';
 import type { Rect } from '../../world/footprint.ts';
-import { box, DOOR_H, DOOR_W, WALL_T, type Box, type CellLayout, type CellRole, type EntitySpec, type FloorExit, type Json, type LightingOverrides, type MatId, type Palette, type PortalSpec, type RegionAirlockCell, type RegionGateCell, type RenderOverrides, type WallOpening } from '../../world/layout.ts';
+import { box, DOOR_H, DOOR_W, WALL_T, type Box, type CellLayout, type CellRole, type EntitySpec, type FloorExit, type Json, type LightingOverrides, type MatId, type Palette, type PortalSpec, type RegionAirlockCell, type RegionGateCell, type RegionLandingCell, type RenderOverrides, type WallOpening } from '../../world/layout.ts';
 import { themePalette } from '../../world/palettes.ts';
 import type { DressKind, DressRoom } from '../dress/types.ts';
 import type { FloorProfile } from './profile.ts';
@@ -91,11 +91,13 @@ export interface FloorGeometry {
    */
   belowFree?: Map<string, number>;
   /** 果てしない階の区域: 境目の扉の開口と階段室（core/gen/floor/ports.ts） */
-  region?: { gates: RegionGateCell[]; airlocks: RegionAirlockCell[] };
+  region?: { gates: RegionGateCell[]; airlocks: RegionAirlockCell[]; landings?: RegionLandingCell[] };
   /** 本道の終わりの区画（無ければ出口の階段 'exitStairs'） */
   mainTo?: string;
   /** 中身（家具）・仕掛け・異変・地図の看板・裏の調子を置かない区画（階段室。上下の階の写しで同じ見た目に保つ） */
   sealed?: Set<string>;
+  /** ほかの部品で開く扉（スイッチの扉など）→ 中から開けられる区画（仕掛けの区画）。区域の入口どうしの行き来を調べるのに使う */
+  remoteDoors?: Map<string, string>;
 }
 
 /** 部屋・曲がり角・広間の置き場所 */
@@ -225,9 +227,59 @@ export class GeoBuild {
   /** 区画（作った後） */
   geo(id: string): GeoCell | undefined { return this.out.cells.find((g) => g.cell.id === id); }
 
+  /**
+   * 雰囲気の違う区画どうしの開口を扉にする（区域だけ。docs/endless-world.md 13 章）: 系統が違う・床・壁・天井の材質が
+   * world.door.moodMats 個以上違う区画は、扉を開けるまで向こうが見えない（扉を開けるたびに雰囲気が変わるのが見どころ）。
+   * 扉にしないのは、同じ雰囲気の区画どうし・屋外の渡り廊下・扉の入らない低い開口・地下街の店先・鏡写し（形そのものが見どころ）
+   */
+  private moodDoors(sk: Skeleton | null): void {
+    if (!this.p.region || sk?.mirror) return;
+    interface Mood { fam: string; theme: string; pal: Palette; host: boolean; outdoor: boolean }
+    const famOfTheme = (theme: string): string => FAMILIES.find((f) => f.corridor === theme)?.id ?? `t:${theme}`;
+    const mood = new Map<string, Mood>();
+    for (const pl of this.cellsToBuild) {
+      const pal = { ...(pl.kind === 'junction' && pl.theme === pl.fam.corridor ? themePalette(pl.fam.corridor) : themePalette(pl.theme)), ...(pl.opts?.palette ?? {}) };
+      mood.set(pl.cellId, { fam: pl.fam.id, theme: pl.theme, pal, host: pl.kind === 'room' || pl.kind === 'hall', outdoor: false });
+    }
+    for (const st of this.straights) {
+      const theme = st.theme ?? this.fam.corridor;
+      // 系統: 素材の鍵 corr:<区域>:<系統>（別の系統の廊下）か、テーマの系統
+      const key = st.materialKey?.startsWith(`corr:${this.p.id}:`) ? st.materialKey.slice(`corr:${this.p.id}:`.length) : null;
+      mood.set(st.id, { fam: key ?? (st.theme ? famOfTheme(theme) : this.fam.id), theme, pal: st.palette ?? this.corridorPalette, host: false, outdoor: !!st.outdoor });
+    }
+    const need = this.t['world.door.moodMats'];
+    const differs = (A: Mood, B: Mood): boolean => {
+      if (A.theme === B.theme || A.outdoor || B.outdoor) return false;
+      if (A.fam !== B.fam) return true;
+      if (this.p.pattern === 'arcade') return false;
+      return Number(A.pal.floor !== B.pal.floor) + Number(A.pal.wall !== B.pal.wall) + Number(A.pal.ceiling !== B.pal.ceiling) >= need;
+    };
+    for (const po of this.out.portals) {
+      if (po.kind !== 'opening' || po.doorId) continue;
+      const [a, b] = po.cells;
+      const A = mood.get(a), B = mood.get(b);
+      if (!A || !B || this.reserved.has(a) || this.reserved.has(b) || !differs(A, B)) continue;
+      const axis: 'x' | 'z' = po.dir % 2 === 1 ? 'x' : 'z';
+      const cx = (po.aabb.min[0] + po.aabb.max[0]) / 2, cz = (po.aabb.min[2] + po.aabb.max[2]) / 2, y = po.aabb.min[1];
+      const near = (o: WallOpening): boolean => Math.abs(o.pos[0] - cx) < 0.06 && Math.abs(o.pos[2] - cz) < 0.06 && Math.abs(o.pos[1] - y) < 0.06 && o.dir % 2 === po.dir % 2 && !o.sill;
+      const oa = (this.openings.get(a) ?? []).filter(near), ob = (this.openings.get(b) ?? []).filter(near);
+      if (oa.length !== 1 || ob.length !== 1) continue;
+      if ([oa[0]!, ob[0]!].some((o) => o.width < DOOR_W - 1e-6 || o.height < DOOR_H - 0.01)) continue;
+      for (const o of [oa[0]!, ob[0]!]) { o.width = DOOR_W; o.height = DOOR_H; }
+      const coord = axis === 'x' ? cx : cz, at = axis === 'x' ? cz : cx;
+      // 扉は部屋・広間の側（どちらも部屋なら片方）。扉の色はその区画のテーマの扉
+      const hostId = A.host && !(B.host && this.doorRng.chance(0.5)) ? a : B.host ? b : a;
+      const H = hostId === a ? A : B;
+      po.aabb = portalAabb(axis, coord, at, DOOR_W, y, DOOR_H);
+      po.kind = 'door';
+      po.doorId = this.door(`door:${po.id.replace(/^p:/, '')}:mood`, axis, coord, at, y, { cell: hostId, mat: H.pal.door, swing: this.doorRng.chance(0.5) ? 1 : -1 });
+    }
+  }
+
   finish(sk: Skeleton | null): FloorGeometry {
     const adj = sk ? adjacency(sk) : new Map<number, number[]>();
     const done = new Set<Placed>();
+    this.moodDoors(sk);
     for (const pl of this.cellsToBuild) for (const f of pl.preBuild ?? []) f(pl);
     for (const pl of this.cellsToBuild) {
       if (done.has(pl)) continue;

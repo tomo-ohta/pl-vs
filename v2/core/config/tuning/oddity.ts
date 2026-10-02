@@ -39,7 +39,7 @@ export const ODDITY_TUNING = {
   // ---- 煙の層（smoke）----
   'anomaly.smoke.bottomMin': num(1.15, 0.9, 1.5, '煙の層: 煙の底の高さの下限（床から m。しゃがんだ目 0.75 m より上・立った目 1.6 m より下）'),
   'anomaly.smoke.bottomMax': num(1.3, 0.9, 1.5, '煙の層: 煙の底の高さの上限（床から m）'),
-  'anomaly.smoke.far': num(1.6, 0.5, 6, '煙の層: 目が煙の中にあるときの見える距離（m）'),
+  'anomaly.smoke.far': num(5.5, 0.5, 12, '煙の層: 目が煙の中にあるときに何も見えなくなる距離（m。近くはなんとか見える。しゃがむと煙の下がよく見える）'),
   // ---- 雨漏り（leak）----
   'anomaly.leak.dripsMax': num(10, 1, 30, '雨漏り: 雨染みと水たまりの数の上限', true),
   'anomaly.leak.dropsMax': num(500, 50, 2000, '雨漏り: 雨の筋の数の上限（描画の粒）', true),
@@ -53,7 +53,7 @@ export const ODDITY_TUNING = {
   'anomaly.wind.push': num(0.6, 0, 2.5, '風の向き: 体を押す風の強さ（m/s。歩く速さ 3.0 より十分弱く）'),
   'anomaly.wind.itemsMax': num(90, 10, 300, '風の向き: 流れる紙・葉の数の上限（描画）', true),
   // ---- 温度（thermal）----
-  'anomaly.thermal.fogFar': num(5.5, 2, 12, '温度: 冷たい霧の見える距離（m。先の開口は入口から見えない）'),
+  'anomaly.thermal.fogFar': num(9, 2, 16, '温度: 冷たい霧の見える距離（m。先の開口は入口から見えない）'),
   'anomaly.thermal.frost': num(0.85, 0, 1, '温度: いちばん寒い所の画面の霜の強さ'),
   // ---- 草原（meadow）----
   'anomaly.meadow.sunflower': num(1, 0, 10, '草原: ひまわり畑（全部が入口を向く）の重み'),

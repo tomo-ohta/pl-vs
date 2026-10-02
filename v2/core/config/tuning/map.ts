@@ -19,7 +19,10 @@ export const MAP_TUNING = {
   'map.trail.stepM': num(1.2, 0.4, 4, '足跡: 地図に足跡を 1 つ残す間隔（歩いた m）'),
   'map.trail.max': num(1500, 100, 6000, '足跡: 1 フロアに残す足跡の数の上限（古いものから消える）', true),
   // ---- 保存 ----
-  'map.save.floors': num(12, 1, 60, '地図の保存: 覚えておくフロアの数（古いものから忘れる）', true),
+  'map.save.floors': num(160, 1, 400, '地図の保存: 覚えておくフロア（果てしない階は区域）の数（古いものから忘れる）', true),
+  'map.save.regions': num(150, 1, 400, '地図の保存: 階の地図（果てしない階）に覚えておく区域の数（古いものから忘れる）', true),
+  'map.save.trail': num(600, 50, 6000, '地図の保存: 区域・フロアごとに保存する足跡の数（新しいものから）', true),
+  'map.story.keep': num(40, 2, 200, '階の地図: 地図の元を持っておく区域の数（超えたら古い区域から、見た所だけの写しにする）', true),
   'map.save.intervalSec': num(4, 1, 60, '地図の保存: 歩いている間の保存の間隔（秒）'),
   // ---- 地図が消える（N02 mapErase）----
   'map.erase.all': num(3, 0, 10, '地図が消える: 今いる部屋のほかを全部消す（重み）'),
@@ -46,8 +49,8 @@ export const MAP_TUNING = {
   'map.note.coverage': num(0.5, 0.1, 1, '他人の地図: 誰かが描いた区画の割合（入口から歩いた範囲）'),
   'map.note.wrongChance': num(0.3, 0, 1, '他人の地図: 書き込みの 1 つが勘違い（違う所に「出口」）になる確率'),
   // ---- 霧の中の塔（N05 fogTower）----
-  'map.fogTower.fogNearM': num(0.6, 0, 5, '霧の中の塔: 霧が掛かり始める距離（m）'),
-  'map.fogTower.fogFarM': num(5.5, 2, 20, '霧の中の塔: 何も見えなくなる距離（m。塔の灯りだけは霧を通して見える）'),
+  'map.fogTower.fogNearM': num(0, 0, 5, '霧の中の塔: 霧が掛かり始める距離（m）'),
+  'map.fogTower.fogFarM': num(10, 2, 20, '霧の中の塔: 何も見えなくなる距離（m。塔の灯りだけは霧を通して見える）'),
   'map.fogTower.pillarPer10': num(2.2, 0, 8, '霧の中の塔: 床 10 m² あたり 1 本の背の高い仕切り・柱の数（迷わせる）'),
   'map.fogTower.awayM': num(9, 3, 30, '霧の中の塔（出現型の隠し）: 塔からこれより離れて'),
   'map.fogTower.awaySec': num(8, 1, 60, '霧の中の塔（出現型の隠し）: 霧の奥にいる秒数'),

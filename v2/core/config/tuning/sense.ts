@@ -78,8 +78,8 @@ export const SENSE_TUNING = {
   'sense.silent.sec': num(3, 1, 10, '無音の隅（BA01）: 無音の隅で止まる秒数'),
   'sense.maze.cellM': num(1.8, 1.6, 2.4, '音で形を知る迷路: 迷路の 1 マス（m）'),
   'sense.maze.dripSec': num(2.2, 0.8, 6, '反響で形が分かる: 出口の前の水の音の間隔（秒）'),
-  'sense.pitch.fogNear': num(0.4, 0, 2, '音の高さの部屋: 霧の掛かり始め（m）'),
-  'sense.pitch.fogFar': num(2.8, 1.5, 8, '音の高さの部屋: 何も見えなくなる距離（m）'),
+  'sense.pitch.fogNear': num(0, 0, 2, '音の高さの部屋: 霧の掛かり始め（m）'),
+  'sense.pitch.fogFar': num(7, 1.5, 12, '音の高さの部屋: 何も見えなくなる距離（m）'),
 
   // ---- 光の仕掛けの続き（gimmicks/sense/beam.ts・power.ts・beacons.ts）----
   'sense.mirror.beamY': num(1.05, 0.6, 1.6, '鏡で光を導く: 光の筋の高さ（床から m。腰の高さ）'),
@@ -90,8 +90,8 @@ export const SENSE_TUNING = {
   'sense.beacon.depthM': num(2.4, 1.6, 4, '霧の誘導灯: 穴の深さ（m）'),
   'sense.beacon.walkM': num(1.15, 0.9, 1.6, '霧の誘導灯: 穴の上の細い道の幅（m）'),
   'sense.beacon.spacingM': num(2.2, 1.2, 4, '霧の誘導灯: 誘導灯の間隔（m）'),
-  'sense.beacon.fogNear': num(0.3, 0, 2, '霧の誘導灯: 霧の掛かり始め（m）'),
-  'sense.beacon.fogFar': num(3.2, 1.5, 8, '霧の誘導灯: 何も見えなくなる距離（m）'),
+  'sense.beacon.fogNear': num(0, 0, 2, '霧の誘導灯: 霧の掛かり始め（m）'),
+  'sense.beacon.fogFar': num(8, 1.5, 12, '霧の誘導灯: 何も見えなくなる距離（m）'),
   'sense.switch.darkSec': num(1.0, 0.2, 4, '照明を消すと現れる扉: 照明を消してから扉が現れるまで（秒）'),
   'sense.sneak.speed': num(2.0, 1.2, 2.9, '人感センサーの灯りをつけずに進む: この速さ（m/s）より速く動くと灯りがつく（しゃがみ歩き 1.5・歩き 3.0）'),
   'sense.sneak.holdSec': num(5, 1, 15, '人感センサーの灯りをつけずに進む: ついた灯りが消えるまで（秒）'),

@@ -65,6 +65,8 @@ export interface RegionContext {
   slotM: number;
   gates: RegionGate[];
   airlocks: RegionAirlock[];
+  /** 隠しの穴から落ちてくる人が着く部屋（天井の穴と縦穴。core/gen/world/landing.ts） */
+  landings?: { id: string; slot: [number, number] }[];
 }
 
 /** rollProfile の追加の指定（果てしない階の区域） */

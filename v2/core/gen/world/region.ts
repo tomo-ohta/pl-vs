@@ -29,6 +29,7 @@ export function regionContext(plan: RegionPlan, t: Tuning): RegionContext {
     id: plan.id, kind: plan.kind, rect: { ...plan.rect }, margin: t['world.marginM'], slotM: t['world.slotM'],
     gates: plan.gates.map((g) => ({ id: g.id, side: g.side, line: g.line, at: g.at })),
     airlocks: plan.airlocks.map((a) => ({ id: a.id, role: a.role, slot: [a.slot[0], a.slot[1]], to: a.to ? storyId(a.to) : null })),
+    landings: (plan.landings ?? []).map((l) => ({ id: l.id, slot: [l.slot[0], l.slot[1]] })),
   };
 }
 
@@ -70,8 +71,17 @@ export function rollRegionProfile(plan: RegionPlan, t: Tuning, salt: number): Fl
 export function generateRegionReport(plan: RegionPlan, t: Tuning, opts: GenOptions = {}): GenReport {
   const key: FloorKey = plan.story;
   const front = key.variant > 0 ? generateRegionReport({ ...plan, story: { ...key, variant: 0 } }, t, { ...(opts.dress ? { dress: opts.dress } : {}), ...(opts.noGimmicks ? { noGimmicks: true } : {}) }) : null;
-  return runPipeline({
+  const r = runPipeline({
     key, id: plan.id, seedBase: hashAll(plan.seed, 'variant', key.variant), front,
     roll: (attempt) => (front ? { ...rollRegionProfile(plan, t, front.attempts - 1), key, id: plan.id } : rollRegionProfile(plan, t, attempt)),
   }, t, opts);
+  // 図鑑に使う中身（区域の layout と一緒に、作業の糸から描く側へ渡る）
+  if (r.floor.region) {
+    r.floor.region.contents = {
+      gimmicks: (r.gimmicks?.gimmicks ?? []).map((g) => [g.cell, g.def]),
+      anomalies: r.anomalies.map((a) => [a.cell, a.def, a.name]),
+      secrets: (r.gimmicks?.secrets ?? []).map((x) => ({ id: x.id, host: x.host, hook: x.hook, dest: x.dest, ...(x.rare ? { rare: x.rare } : {}), cells: x.cells.slice() })),
+    };
+  }
+  return r;
 }

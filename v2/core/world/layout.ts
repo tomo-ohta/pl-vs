@@ -251,6 +251,11 @@ export interface FloorExit {
   to?: { floor: string; exitId?: string };
   /** 果てしない階の階段室（core/gen/world/airlock.ts）: 入れ替えの範囲。扉が両方閉じているときだけ移る */
   airlock?: string;
+  /**
+   * 隠しの穴の縦穴（13 章）: 穴の床の真ん中 anchor と、縦穴の中（暗い）。落ちる途中で行き先の階の着く部屋の縦穴へ移る
+   * （aabb は移れなかったときの、暗転して移る所）
+   */
+  shaft?: { anchor: Vec3; zone: AABB };
 }
 
 export interface FloorLayout {
@@ -290,6 +295,16 @@ export interface RegionAirlockCell {
   to: string | null;
 }
 
+/** 隠しの穴から落ちてくる人が着く部屋（天井の穴の上の縦穴。core/gen/world/landing.ts） */
+export interface RegionLandingCell {
+  id: string;
+  cell: string;
+  /** 縦穴のいちばん上の真ん中（隠しの穴の床の真ん中と同じ所として写す） */
+  anchor: Vec3;
+  /** 縦穴の中（暗い） */
+  zone: AABB;
+}
+
 export interface RegionInfo {
   id: string;
   kind: 'district' | 'patchwork';
@@ -297,11 +312,14 @@ export interface RegionInfo {
   rect: Rect;
   gates: RegionGateCell[];
   airlocks: RegionAirlockCell[];
+  landings?: RegionLandingCell[];
   /** 表示の名前（系統の名前。寄せ集めは「入り組んだ区画」） */
   name: string;
   family: string;
   pattern: string;
   rarity: string;
+  /** 区域の中身（図鑑に使う。生成の報告から）: 仕掛け [区画, 仕掛け]・異変 [区画, 異変, 名前]・隠し */
+  contents?: { gimmicks: [string, string][]; anomalies: [string, string, string][]; secrets: { id: string; host: string; hook: string; dest: string; rare?: string; cells: string[] }[] };
 }
 
 // ---------------------------------------------------------------- 寸法と作るための補助（v1 と同じ値）

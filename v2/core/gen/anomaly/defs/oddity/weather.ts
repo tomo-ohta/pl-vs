@@ -277,7 +277,7 @@ defineAnomaly({
     cell.lights = cell.lights.map((li) => ({ ...li, color: mixColor(0x9fc8ff, 0xffb070, tAt(li.pos[0], li.pos[2])) }));
     for (const b of cell.boxes) if (isCeilingPanel(cell, b) && tAt((b.min[0] + b.max[0]) / 2, (b.min[2] + b.max[2]) / 2) > 0.55) b.mat = 'lightWarm';
     const fogColor = 0xcfd8e2;
-    cell.render = { ...cell.render, fog: { color: fogColor, near: 0.4, far: t['anomaly.thermal.fogFar'] } };
+    cell.render = { ...cell.render, fog: { color: fogColor, near: 0, far: t['anomaly.thermal.fogFar'] } };
     cell.palette = { ...cell.palette, fog: fogColor, ambient: mixColor(cell.palette.ambient, 0x9aa8b8, 0.5) };
     const B: Box[] = [];
     // 凍った床（入口の側）・家具に霜

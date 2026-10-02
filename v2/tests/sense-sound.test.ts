@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import type { Dir } from '../core/math/vec.ts';
 import { IDLE_COMMAND } from '../core/sim/types.ts';
 import type { Sim } from '../core/sim/sim.ts';
+import { defaultTuning } from '../core/config/tuning.ts';
 import { walkTo } from './helpers/bot.ts';
 import { entitiesOf, labRoomDoors, labSim, labSimDoors, stand } from './sense-util.ts';
 
@@ -177,7 +178,7 @@ test('音で形を知る迷路: 黒い仕切り（反響）/ 霧（音の高さ�
         const fx = entitiesOf(room.floor, 'senseFx').find((e) => e.params.fx === 'pitch')!;
         const dist = fx.params.dist as number[];
         assert.ok(dist.includes(0) && Math.max(...dist) >= 3, '出口からの道のり');
-        assert.ok(room.cell.render?.fog && room.cell.render.fog.far < 4, '濃い霧');
+        assert.ok(room.cell.render?.fog && room.cell.render.fog.far <= defaultTuning()['sense.pitch.fogFar'] + 1e-9, '霧');
       }
       const res = walkTo(sim, room.cell.id, [room.exitInside![0]!, 0, room.exitInside![2]!], 90);
       assert.ok(res.ok, `${def} 向き ${dir}: 抜けられる（${res.reason}）`);

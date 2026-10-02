@@ -5,14 +5,17 @@
  * - 階段室の入れ替えの頼み（StoryWorld.transfers）が来たら、プレイヤーを向こうの写しの同じ所へ移し（局所の座標で同じ位置・向き・速さ）、
  *   今の階と向こうの階を入れ替える。前の階は同じ階段室の向こうとして残す（すぐ戻っても作り直さない）
  * - 遠くなった向こうの階は捨てる
+ * - 隠しの穴（13 章）: 穴に world.hole.prepareM まで近づいたら、行き先の階の着く部屋の区域を作っておく。落ちる途中（穴の床から
+ *   world.hole.transferM）で、着く部屋の天井の上の縦穴の同じ所へ移す（速さはそのまま。どちらも暗い縦穴なので見た目は変わらない）。
+ *   まだ用意できなければ、暗い縦穴の中で落ち続けさせる（world.hole.holdSec まで。それでも駄目なら底の出口で暗転して移る）
  * 階を移ったことは changes に出す（描画が場面を入れ替え、カメラを同じだけずらす）
  */
 import type { Tuning } from '../config/tuning.ts';
 import { rotQ, type Dir, type Vec3 } from '../math/vec.ts';
 import type { PhysicsWorld } from '../physics/world.ts';
 import type { PlayerState } from '../sim/types.ts';
-import type { RegionAirlockCell } from '../world/layout.ts';
-import { downSlot, parseAirlockId, storyId, WorldPlanner, type StoryKey } from '../gen/world/plan.ts';
+import type { FloorExit, RegionAirlockCell } from '../world/layout.ts';
+import { downSlot, landingId, landingSlot, parseAirlockId, storyId, WorldPlanner, type StoryKey } from '../gen/world/plan.ts';
 import { StoryWorld, type RegionSource, type StoryOptions, type TransferRequest } from './story.ts';
 
 export interface SessionOptions {
@@ -118,7 +121,7 @@ export class WorldSession {
 
   /** 作ってある向こうの階（全部。暗転して移る先も） */
   beyondWorlds(): StoryWorld[] {
-    return [...this.beyond.values(), ...(this.gotoWorld ? [this.gotoWorld.w] : [])];
+    return [...this.beyond.values(), ...[...this.holes.values()].map((h) => h.w), ...(this.gotoWorld ? [this.gotoWorld.w] : [])];
   }
 
   /** 1 tick: 今の階を進め、区域の出し入れ・向こうの階の用意・入れ替え */
@@ -126,9 +129,97 @@ export class WorldSession {
     this.active.sim.step(cmds);
     this.active.update();
     this.prepare();
+    this.prepareHoles();
+    if (this.fallThroughHoles()) return;
     const reqs = this.active.transfers;
     this.active.transfers = [];
     for (const r of reqs) if (this.transfer(r)) break;
+  }
+
+  // ---------------------------------------------------------------- 隠しの穴（暗転しない）
+  /** 穴の出口の id → 行き先の階（着く部屋の区域から作った）と着く部屋の id・縦穴に入った時刻 */
+  private readonly holes = new Map<string, { w: StoryWorld; landing: string; since: number | null }>();
+
+  /** 今の階の、縦穴のある隠しの穴 */
+  private holeExits(): FloorExit[] {
+    return this.active.regions.flatMap((r) => r.layout.exits.filter((x) => x.shaft && x.to));
+  }
+
+  /** 近くの隠しの穴の行き先を作っておく（同期で作れなければ次の tick にまた試す）。遠くなった行き先は捨てる */
+  private prepareHoles(): void {
+    const near = this.t['world.hole.prepareM'];
+    const p = this.active.sim.players[0];
+    if (!p) return;
+    const keep = new Set<string>();
+    for (const x of this.holeExits()) {
+      const a = x.shaft!.anchor;
+      const d = Math.hypot(p.pos[0] - a[0], p.pos[2] - a[2]);
+      if (d > near * 2.5 && !this.holes.get(x.id)?.since) continue;
+      keep.add(x.id);
+      if (d > near || this.holes.has(x.id)) continue;
+      const m = /^(-?\d+)\.(\d+)$/.exec(x.to!.floor);
+      if (!m) continue;
+      const to: StoryKey = { world: this.active.story.world, depth: Number(m[1]), variant: Number(m[2]) };
+      const L2 = this.t['world.slotM'] * 2;
+      const bx = Math.floor(a[0] / L2), bz = Math.floor(a[2] / L2);
+      const [cx, cz] = landingSlot(to.world, to.depth, bx, bz);
+      try {
+        const plan = this.planner.at(to, cx, cz);
+        const w = new StoryWorld(to, plan, this.storyOpts());
+        const id = landingId(to.depth, bx, bz);
+        const ld = w.regionInfo(plan.id)?.landings?.find((l) => l.id === id);
+        if (!ld) { w.sim.physics?.dispose(); continue; }
+        // 行き先の階のプレイヤーは着く部屋の床に置いておく（区域の読み込みが着く所のまわりになる）
+        const fy = w.regionLayout(plan.id)?.cells.find((c) => c.id === ld.cell)?.floorY ?? 0;
+        w.sim.teleport(0, [ld.anchor[0], fy + 0.05, ld.anchor[2]], 0);
+        this.holes.set(x.id, { w, landing: id, since: null });
+        this.opts.created?.(w);
+      } catch {
+        // 区域がまだ作れていない（作業の糸で作っている）: 次の tick にまた試す
+      }
+    }
+    for (const [id, h] of this.holes) if (!keep.has(id)) { h.w.sim.physics?.dispose(); this.holes.delete(id); }
+  }
+
+  /** 縦穴を落ちている人を、行き先の階の着く部屋の縦穴へ移す。移したら true */
+  private fallThroughHoles(): boolean {
+    const p = this.active.sim.players[0];
+    if (!p) return false;
+    const half = this.t['world.hole.sizeM'] / 2 + 0.05;
+    const tm = this.t['world.hole.transferM'];
+    for (const x of this.holeExits()) {
+      const a = x.shaft!.anchor;
+      if (Math.abs(p.pos[0] - a[0]) > half || Math.abs(p.pos[2] - a[2]) > half) continue;
+      const depth = a[1] - p.pos[1];
+      if (depth < tm) continue;
+      const h = this.holes.get(x.id);
+      const now = this.active.sim.tick * this.active.sim.dt;
+      if (h && h.since === null) h.since = now;
+      const dest = h?.w ?? null;
+      const ld = dest?.regions.flatMap((r) => r.layout.region?.landings ?? []).find((l) => l.id === h!.landing);
+      // 移れる深さ: 着く部屋の縦穴の中（天井より上）に収まる所まで
+      if (dest && ld && depth < this.t['world.hole.shaftM'] - 1 && (!this.opts.ready || this.opts.ready(dest))) {
+        const to = dest.sim.players[0]!;
+        const before = [...p.pos] as Vec3;
+        transferPlayer(p, to, { offset: [...a] as Vec3, q: 0 }, { offset: [...ld.anchor] as Vec3, q: 0 });
+        dest.transfers = [];
+        const prev = this.active;
+        this.holes.delete(x.id);
+        this.active = dest;
+        // 前の階には戻れない（落ちてきた）: 前の階・階段室の向こう・ほかの穴の行き先は捨てる
+        prev.sim.physics?.dispose();
+        for (const w of this.beyond.values()) w.sim.physics?.dispose();
+        this.beyond.clear();
+        for (const o of this.holes.values()) o.w.sim.physics?.dispose();
+        this.holes.clear();
+        this.changes.push({ from: prev.story, to: dest.story, airlock: `hole:${x.id}`, seamless: true, player: 0, dx: to.pos[0] - before[0], dy: to.pos[1] - before[1], dz: to.pos[2] - before[2], dYaw: 0 });
+        return true;
+      }
+      // まだ用意できない: 暗い縦穴の中で落ち続ける（少し上へ戻す。まわりは真っ暗なので見た目は変わらない）
+      if (depth > tm + 2.5 && h && now - (h.since ?? now) < this.t['world.hole.holdSec']) this.active.sim.warpPlayer(p, [p.pos[0], p.pos[1] + 2, p.pos[2]], p.yaw, true, 'hole');
+      return false;
+    }
+    return false;
   }
 
   /** 近くの階段室の向こうの階を作っておく（同期で作れなければ次の tick にまた試す）。遠くなった向こうは捨てる */

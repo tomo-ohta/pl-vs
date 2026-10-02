@@ -297,6 +297,40 @@ function darkCornerOffer(g: GeoCell, rng: Rng): SecretOffer | null {
   return null;
 }
 
+/**
+ * 区域の入口（境目の扉・階段室の区画）どうしが、ほかの部品で開く扉（inputs.open）を通らずに行き来できるか。
+ * 今組んだ仕掛け（区画 cell）が付けた扉は、仕掛けの区画から出る向きだけ通れる（中のスイッチで開けられる）。
+ * 前に組んだ仕掛けの扉は geo.remoteDoors（扉 → 開けられる区画）を見る。今の仕掛けが扉を付けていなければ調べない
+ */
+function regionEntriesConnected(geo: FloorGeometry, cell: string, doorsBefore: string): boolean {
+  const before = new Set((JSON.parse(doorsBefore) as EntitySpec[]).filter((d) => d.inputs?.open).map((d) => d.id));
+  const mine = geo.entities.filter((e) => e.type === 'door' && e.inputs?.open && !before.has(e.id) && !geo.remoteDoors?.has(e.id)).map((e) => e.id);
+  if (!mine.length) return true;
+  // 取り消された仕掛けの扉（もう inputs.open が無い）は数えない
+  const live = new Set(geo.entities.filter((e) => e.type === 'door' && e.inputs?.open).map((e) => e.id));
+  const ctrl = new Map([...(geo.remoteDoors ?? [])].filter(([id]) => live.has(id)));
+  for (const id of mine) ctrl.set(id, cell);
+  const by = new Map<string, { to: string; ok: boolean }[]>();
+  for (const p of geo.portals) {
+    if (p.kind === 'window') continue;
+    const [a, b] = p.cells;
+    const c = p.doorId ? ctrl.get(p.doorId) : undefined;
+    const ab = c === undefined || c === a, ba = c === undefined || c === b;
+    by.set(a, [...(by.get(a) ?? []), { to: b, ok: ab }]);
+    by.set(b, [...(by.get(b) ?? []), { to: a, ok: ba }]);
+  }
+  const entries = [...new Set([...geo.region!.gates.map((x) => x.cell), ...geo.region!.airlocks.map((x) => x.cell)])];
+  for (const e of entries) {
+    const seen = new Set([e]);
+    const q = [e];
+    for (let h = 0; h < q.length; h++) for (const n of by.get(q[h]!) ?? []) if (n.ok && !seen.has(n.to)) { seen.add(n.to); q.push(n.to); }
+    if (entries.some((x) => !seen.has(x))) return false;
+  }
+  (geo.remoteDoors ??= new Map());
+  for (const id of mine) geo.remoteDoors.set(id, cell);
+  return true;
+}
+
 /** 仕掛けを組む。区画の開口どうしが歩いてつながらなければ取り消して null */
 function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeometry, rng: Rng, t: Tuning, p: FloorProfile, depth: number, clue?: () => ClueCell[]): Built | null {
   const id = `g:${def.id}:${g.cell.id}`;
@@ -375,6 +409,9 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
     const reach = reachOpenings({ footprint: g.cell.footprint, floorY: g.cell.floorY, boxes: assist.length ? [...g.cell.boxes, ...assist] : g.cell.boxes }, g.openings, 0.1);
     if (reach && reach.blocked.length) { restore(); return null; }
   }
+  // 果てしない階の区域: ほかの部品で開く扉（スイッチの扉など）で、区域の入口（境目の扉・階段室）どうしが行き来できなくならない
+  // （境目の扉から入った部屋の出口が、向こう側のスイッチでしか開かない扉だけ、にしない）
+  if (geo.region && !regionEntriesConnected(geo, g.cell.id, snapshot.doors)) { restore(); return null; }
   // 段階 4（carry）: 手がかりを足した別の区画も、開口どうしが歩いてつながる（足す前より届かない開口が増えない）
   for (const x of touched.values()) {
     if (x.g.openings.length < 2) continue;

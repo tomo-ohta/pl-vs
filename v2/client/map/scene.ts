@@ -108,6 +108,54 @@ export function sceneOfMap(map: FloorMap, o: MapSceneOptions = {}): DrawInput {
   return { cells, blanks, ghosts, doors, marks, trail, player: o.player ?? null, bounds: unionRects(fitRects) };
 }
 
+/**
+ * 階の地図（果てしない階。docs/endless-world.md 13 章）: 区域ごとの描く物を 1 つにまとめる（区域の座標は階の座標なので、並べるだけでつながる）
+ */
+export function mergeScenes(list: readonly DrawInput[], player: DrawInput['player'] = null): DrawInput {
+  const out: DrawInput = { cells: [], blanks: [], ghosts: [], doors: [], marks: [], trail: [], player, bounds: null };
+  const fit: Rect[] = [];
+  for (const s of list) {
+    out.cells.push(...s.cells);
+    out.blanks.push(...s.blanks);
+    out.ghosts.push(...s.ghosts);
+    out.doors.push(...s.doors);
+    out.marks.push(...s.marks);
+    out.trail.push(...s.trail);
+    if (s.bounds) fit.push(s.bounds);
+    if (!out.player && s.player) out.player = s.player;
+  }
+  out.bounds = unionRects(fit);
+  return out;
+}
+
+/** 区域の地図の写し（保存・覚えておく数を超えた区域。見た区画・扉・印・足跡だけ。調べていない升目の影は描かない） */
+export interface MapSketch {
+  region: string;
+  cells: { id: string; rects: Rect[]; state: DrawCell['state']; kind?: string }[];
+  doors: DrawDoor[];
+  marks: DrawMark[];
+  trail: number[];
+  bounds: Rect | null;
+}
+
+/** 区域の地図（層 layer）の写し */
+export function sketchOf(map: FloorMap, region: string, layer?: number): MapSketch {
+  const sc = sceneOfMap(map, { ...(layer !== undefined ? { layer } : {}), player: null, ghosts: false });
+  return {
+    region,
+    cells: sc.cells.filter((c) => c.state !== 'hidden' && c.state !== 'erasing').map((c) => ({ id: c.id, rects: c.rects.map((r) => ({ ...r })), state: c.state === 'current' ? 'visited' : c.state, ...(c.kind ? { kind: c.kind } : {}) })),
+    doors: sc.doors.map((d) => ({ ...d, kind: d.kind === 'open' ? 'door' : d.kind })),
+    marks: sc.marks.map((m) => ({ ...m })),
+    trail: sc.trail.map((v) => Math.round(v * 10) / 10),
+    bounds: sc.bounds ? { ...sc.bounds } : null,
+  };
+}
+
+/** 写しの描く物 */
+export function sceneOfSketch(k: MapSketch): DrawInput {
+  return { cells: k.cells.map((c) => ({ ...c })), blanks: [], ghosts: [], doors: k.doors, marks: k.marks, trail: k.trail, player: null, bounds: k.bounds };
+}
+
 function sameRects(a: readonly Rect[], b: readonly Rect[]): boolean {
   return a.length === b.length && a.every((r, i) => r.x0 === b[i]!.x0 && r.z0 === b[i]!.z0 && r.x1 === b[i]!.x1 && r.z1 === b[i]!.z1);
 }

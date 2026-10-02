@@ -330,17 +330,18 @@ defineFx('smoke', ({ p, ctx, room, seed, key, rects }) => {
   // 煙の板は床の矩形ごと（L 字の部屋の外形の欠けた隅に出さない）。柄は 3 m で 1 回
   const geo = plateGeo(rects, 3);
   const r = prng(seed);
-  const meshes: { m: THREE.Mesh; mat: THREE.MeshBasicMaterial; tex: THREE.Texture; v: [number, number] }[] = [];
+  const meshes: { m: THREE.Mesh; mat: THREE.MeshBasicMaterial; tex: THREE.Texture; base: number; v: [number, number] }[] = [];
   for (let i = 0; i < layers; i++) {
     const k = i / (layers - 1);
     const tex = cloudTexture().clone();
     tex.needsUpdate = true;
     // いちばん下の層は濃く（煙の底の面が見える）
-    const mat = glowMaterial(color, i === 0 ? 0.55 : 0.32, { map: tex });
+    const base = i === 0 ? 0.55 : 0.32;
+    const mat = glowMaterial(color, base, { map: tex });
     const m = new THREE.Mesh(geo, mat);
     m.position.set(0, y0 + (y1 - y0) * k * 0.92 + 0.02, 0);
     ctx.root.add(m);
-    meshes.push({ m, mat, tex, v: [(r() - 0.5) * 0.05, (r() - 0.5) * 0.05] });
+    meshes.push({ m, mat, tex, base, v: [(r() - 0.5) * 0.05, (r() - 0.5) * 0.05] });
   }
   const fogColor = new THREE.Color(color);
   let t = 0;
@@ -353,16 +354,19 @@ defineFx('smoke', ({ p, ctx, room, seed, key, rects }) => {
         x.m.position.y += Math.sin(t * 0.5 + x.v[0] * 40) * 0.0008;
       }
       const eye = eyeOf(ctx);
-      if (!eye || !inRoom(rects, { min: [room.min[0], room.min[1] - 1, room.min[2]], max: [room.max[0], room.max[1] + 1, room.max[2]] }, eye)) return;
-      const k = smooth(y0 - 0.05, y0 + 0.3, eye.y);
+      const inside = !!eye && inRoom(rects, { min: [room.min[0], room.min[1] - 1, room.min[2]], max: [room.max[0], room.max[1] + 1, room.max[2]] }, eye);
+      const k = inside ? smooth(y0 - 0.05, y0 + 0.3, eye!.y) : 0;
+      // 目が煙の中にあるときは、煙の板を薄くして霧で見せる（板を真横から見ると何枚も重なって一面の灰色になる。現実の煙のように、近くはなんとか見え、遠くほど霞む）
+      for (const x of meshes) x.mat.opacity = x.base * (1 - 0.85 * k);
+      if (!inside) return;
       const fog = ctx.scene?.fog as THREE.Fog | undefined;
       if (fog && k > 0) {
         fog.color.lerp(fogColor, k);
-        fog.near = fog.near + (0.05 - fog.near) * k;
-        fog.far = fog.far + (num(p.far, 1.6) - fog.far) * k;
+        fog.near = fog.near * (1 - k);
+        fog.far = fog.far + (num(p.far, 5.5) - fog.far) * k;
         if (ctx.scene?.background instanceof THREE.Color) ctx.scene.background.copy(fog.color);
       }
-      ctx.postfx?.setRoomGrade(key, { haze: { color, amount: 0.45 * k }, saturation: 1 - 0.35 * k, vignette: 0.15 + 0.25 * k });
+      ctx.postfx?.setRoomGrade(key, { haze: { color, amount: 0.2 * k }, saturation: 1 - 0.3 * k, vignette: 0.15 + 0.2 * k });
     },
     dispose() { for (const x of meshes) { x.m.removeFromParent(); x.mat.dispose(); x.tex.dispose(); } geo.dispose(); },
   };

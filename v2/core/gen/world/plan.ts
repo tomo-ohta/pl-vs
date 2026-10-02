@@ -6,7 +6,7 @@
  * どれも軽い（区域の中身を作らずに、隣の区域・扉の位置・階段室の升目が分かる）。
  *
  * - 区域の形（升目の分け方・種類・境目の扉・階段室）は表と裏（variant）で同じ。中身は区域の生成（region.ts）が variant ごとに変える
- * - 境目の扉: 隣り合う 2 つの区域の境目に 1 つ（長い境目は確率で 2 つ）。位置は境目の id のハッシュ（両側で同じ）
+ * - 境目の扉: 隣り合う 2 つの区域の境目の升目の辺ごとに数個（辺を等分した区間ごとに 1 つ）。位置は境目の id のハッシュ（両側で同じ）
  * - 階段室: 超ブロックごとに下りが 1 つ。偶数の深さは斜めの升目（0,0）（1,1）、奇数は（1,0）（0,1）のどちらか。
  *   下の階の着く升目と、その階の下りの升目が同じにならない（着いてすぐ下りにならない）
  */
@@ -51,6 +51,14 @@ export interface AirlockEnd {
   to: StoryKey | null;
 }
 
+/** 区域から見た、隠しの穴から落ちてくる人が着く部屋（超ブロックごとに 1 つ。どの階の隠しの穴もここへ落ちる） */
+export interface LandingEnd {
+  /** land:<深さ>:<bx>:<bz>（表と裏で同じ） */
+  id: string;
+  /** 置く升目 */
+  slot: [number, number];
+}
+
 export interface RegionPlan {
   story: StoryKey;
   /** 区域の id（階の中で一意）: x<cx>z<cz> */
@@ -65,6 +73,7 @@ export interface RegionPlan {
   ward: string;
   gates: GateEnd[];
   airlocks: AirlockEnd[];
+  landings: LandingEnd[];
 }
 
 export const regionIdOf = (b: Pick<SlotBox, 'cx' | 'cz'>): string => `x${b.cx}z${b.cz}`;
@@ -122,6 +131,13 @@ export function downSlot(world: number, depth: number, bx: number, bz: number): 
 
 export const airlockId = (upperDepth: number, bx: number, bz: number): string => `air:${upperDepth}:${bx}:${bz}`;
 
+/** 深さ depth の超ブロック (bx, bz) の、隠しの穴から落ちてくる人が着く部屋の升目（表と裏で同じ） */
+export function landingSlot(world: number, depth: number, bx: number, bz: number): [number, number] {
+  const h = hashAll(world, 'land', depth, bx, bz);
+  return [bx * 2 + (h & 1), bz * 2 + ((h >> 1) & 1)];
+}
+export const landingId = (depth: number, bx: number, bz: number): string => `land:${depth}:${bx}:${bz}`;
+
 /** 階段室の id → 上の深さ・超ブロック */
 export function parseAirlockId(id: string): { depth: number; bx: number; bz: number } | null {
   const m = /^air:(-?\d+):(-?\d+):(-?\d+)$/.exec(id);
@@ -144,9 +160,8 @@ export function planRegion(story: StoryKey, cx: number, cz: number, t: Tuning): 
   const slots = regionSlots(world, depth, cx, cz, t);
   const id = regionIdOf(slots);
   const rect: Rect = { x0: slots.cx * L, x1: (slots.cx + slots.w) * L, z0: slots.cz * L, z1: (slots.cz + slots.h) * L };
-  const kindR = new Rng(hashAll(world, 'kind', depth, slots.cx, slots.cz));
-  const kind = kindR.weighted<RegionKind>(['district', 'patchwork'], (k) => (k === 'district' ? t['world.kind.district'] : t['world.kind.patchwork']));
-  const gates = gatesOf(story, slots, id, t);
+  const kind = regionKind(world, depth, slots, t);
+  const gates = gatesOf(story, slots, id, kind, t);
   // 階段室: 区域はかならず 1 つの超ブロックの中にある
   const bx = fdiv(slots.cx, 2), bz = fdiv(slots.cz, 2);
   const airlocks: AirlockEnd[] = [];
@@ -154,20 +169,32 @@ export function planRegion(story: StoryKey, cx: number, cz: number, t: Tuning): 
   if (inBox(slots, dn[0], dn[1])) airlocks.push({ id: airlockId(depth, bx, bz), role: 'down', slot: dn, to: { world, depth: depth + 1, variant: 0 } });
   const up = downSlot(world, depth - 1, bx, bz);
   if (inBox(slots, up[0], up[1])) airlocks.push({ id: airlockId(depth - 1, bx, bz), role: 'up', slot: up, to: depth >= 1 ? { world, depth: depth - 1, variant: 0 } : null });
-  return { story, id, slots, rect, kind, seed: hashAll(world, 'region', depth, slots.cx, slots.cz), ward: wardFamily(world, depth, slots.cx, slots.cz, t), gates, airlocks };
+  const landings: LandingEnd[] = [];
+  const ls = landingSlot(world, depth, bx, bz);
+  if (inBox(slots, ls[0], ls[1])) landings.push({ id: landingId(depth, bx, bz), slot: ls });
+  return { story, id, slots, rect, kind, seed: hashAll(world, 'region', depth, slots.cx, slots.cz), ward: wardFamily(world, depth, slots.cx, slots.cz, t), gates, airlocks, landings };
 }
 
-/** 区域の境目の扉（隣の区域ごとに 1 つか 2 つ） */
-function gatesOf(story: StoryKey, b: SlotBox, id: string, t: Tuning): GateEnd[] {
+/** 区域の種類（升目の矩形のハッシュ。表と裏で同じ） */
+export function regionKind(world: number, depth: number, slots: SlotBox, t: Tuning): RegionKind {
+  return new Rng(hashAll(world, 'kind', depth, slots.cx, slots.cz)).weighted<RegionKind>(['district', 'patchwork'], (k) => (k === 'district' ? t['world.kind.district'] : t['world.kind.patchwork']));
+}
+
+/**
+ * 区域の境目の扉: 隣の区域と接する升目の辺ごとに、world.gate.perEdge 個（どちらかが街区なら world.gate.perEdgeDistrict 個）。
+ * 辺を等分した区間ごとに 1 つ（扉どうしが寄らない）。考えずに歩いても、どこかの壁で次の区域への扉に行き当たる
+ */
+function gatesOf(story: StoryKey, b: SlotBox, id: string, kind: RegionKind, t: Tuning): GateEnd[] {
   const { world, depth } = story;
   const L = t['world.slotM'];
   const corner = Math.min(t['world.gate.cornerM'], L / 2 - 2);
-  // 隣の区域ごとの境目: 向き・線の座標・升目の辺の始まり（境目に沿った座標）
-  const borders = new Map<string, { side: Dir; line: number; starts: number[] }>();
+  // 隣の区域ごとの境目: 向き・線の座標・升目の辺の始まり（境目に沿った座標）・隣の種類
+  const borders = new Map<string, { side: Dir; line: number; starts: number[]; kind: RegionKind }>();
   const add = (side: Dir, ncx: number, ncz: number, line: number, start: number): void => {
-    const other = regionIdOf(regionSlots(world, depth, ncx, ncz, t));
+    const ob = regionSlots(world, depth, ncx, ncz, t);
+    const other = regionIdOf(ob);
     if (other === id) return;
-    const e = borders.get(other) ?? { side, line, starts: [] };
+    const e = borders.get(other) ?? { side, line, starts: [], kind: regionKind(world, depth, ob, t) };
     e.starts.push(start);
     borders.set(other, e);
   };
@@ -184,12 +211,15 @@ function gatesOf(story: StoryKey, b: SlotBox, id: string, t: Tuning): GateEnd[] 
     const border = [id, other].sort().join('|');
     const starts = e.starts.slice().sort((x, y) => x - y);
     const r = new Rng(hashAll(world, 'gate', depth, border));
-    const n = starts.length >= 2 && r.chance(t['world.gate.extraChance']) ? 2 : 1;
-    const picks = r.shuffle(starts.map((_, i) => i)).slice(0, n).sort((x, y) => x - y);
-    for (const k of picks) {
-      const at = Math.round((starts[k]! + corner + r.float(0, 1) * (L - 2 * corner)) * 20) / 20;
-      out.push({ id: `gate:${border}:${k}`, other, side: e.side, line: e.line, at });
-    }
+    const n = Math.max(1, Math.round(kind === 'district' || e.kind === 'district' ? t['world.gate.perEdgeDistrict'] : t['world.gate.perEdge']));
+    // 区間の間（隣の区間の扉と、扉の幅 + 壁の分は離す）
+    const seg = (L - 2 * corner) / n, gap = Math.min(seg / 2, 2.4);
+    starts.forEach((s0, k) => {
+      for (let i = 0; i < n; i++) {
+        const at = Math.round((s0 + corner + i * seg + gap / 2 + r.float(0, 1) * (seg - gap)) * 20) / 20;
+        out.push({ id: `gate:${border}:${k}.${i}`, other, side: e.side, line: e.line, at });
+      }
+    });
   }
   return out;
 }

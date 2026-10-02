@@ -237,8 +237,14 @@ export function buildMapInfo(floor: FloorLayout, t: Tuning): MapInfo {
     }
     return mp;
   });
+  // 果てしない階の区域: 境目の扉（扉の部品は階が持つ。区域の側の区画だけの扉として描く）
+  for (const g of floor.region?.gates ?? []) {
+    if (!byId.has(g.cell)) continue;
+    const o = g.opening;
+    portals.push({ id: `p:${g.id}`, cells: [g.cell, g.cell], x: o.pos[0], y: o.pos[1], z: o.pos[2], dir: o.dir, kind: 'door', width: o.width, doorId: g.id, secret: false });
+  }
   const byCell = new Map<string, MapPortal[]>();
-  for (const p of portals) for (const c of p.cells) byCell.set(c, [...(byCell.get(c) ?? []), p]);
+  for (const p of portals) for (const c of new Set(p.cells)) byCell.set(c, [...(byCell.get(c) ?? []), p]);
   const readables: MapReadable[] = ents.filter((e) => (e.type === 'mapBoard' || e.type === 'mapNote') && e.cell).map((e) => ({ id: e.id, cell: e.cell!, type: e.type as 'mapBoard' | 'mapNote', mode: typeof e.params.mode === 'string' ? e.params.mode : e.type === 'mapNote' ? 'note' : 'guide', params: e.params }));
   const landmarks: MapLandmark[] = inCell('landmark').map((e) => {
     const p = Array.isArray(e.params.pos) ? (e.params.pos as number[]) : [0, 0, 0];

@@ -65,7 +65,8 @@ test('最初は上から着く階段室の上の踊り場。区域を渡り歩�
 });
 
 test('階段室: 下の半分に入り、扉が両方閉じると下の階の写しへ移る（同じ所・同じ向き）。上へ戻れる', async () => {
-  const world = 5;
+  // 世界 6（世界 5 は、歩く人が机の椅子と棚の間の 0.72 m の隙間に挟まって止まる。道探しの体の幅ぎりぎり）
+  const world = 6;
   const s = await session(world, 1);
   const w = s.active;
   const p = () => s.active.sim.players[0]!;

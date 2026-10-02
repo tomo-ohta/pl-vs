@@ -42,6 +42,8 @@ import type { StoryChange, WorldSession } from '../../core/stream/session.ts';
 
 const TONE_MAPPINGS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping } as const;
 /** 環境（霧・空の色）の補間時間 */
+/** 縦穴の中の霧の色 */
+const BLACK = new THREE.Color(0, 0, 0);
 const ENV_LERP_SEC = 0.8;
 
 export interface GameOptions {
@@ -651,6 +653,20 @@ export class ClientGame {
     if (!immediate) this.postfx.notifyRoomEnter();
   }
 
+  /** 縦穴の中の暗さ（0..1。隠しの穴の縦穴・着く部屋の天井の上の縦穴。階を移っても続く） */
+  private darkK = 0;
+
+  /** 点 eye が縦穴の中か（docs/endless-world.md 13 章） */
+  private inShaft(eye: THREE.Vector3): boolean {
+    const layouts = this.session ? this.session.active.regions.map((r) => r.layout) : this.sim ? [this.sim.floor] : [];
+    const inside = (a: { min: number[]; max: number[] }): boolean => eye.x >= a.min[0]! && eye.x <= a.max[0]! && eye.y >= a.min[1]! && eye.y <= a.max[1]! && eye.z >= a.min[2]! && eye.z <= a.max[2]!;
+    for (const L of layouts) {
+      for (const x of L.exits) if (x.shaft && inside(x.shaft.zone)) return true;
+      for (const l of L.region?.landings ?? []) if (inside(l.zone)) return true;
+    }
+    return false;
+  }
+
   private updateEnvironment(dt: number): void {
     this.envT = Math.min(ENV_LERP_SEC, this.envT + dt);
     const k = this.envT / ENV_LERP_SEC;
@@ -667,6 +683,18 @@ export class ClientGame {
     (this.scene.background as THREE.Color).copy(this.env.fog);
     this.hemi.color.copy(this.env.sky);
     this.hemi.groundColor.copy(this.env.ground);
+    // 縦穴の中は真っ暗（数 m 先は何も見えない）。落ちてきた穴・落ちていく先の部屋は、縦穴を出ると見えてくる
+    const dark = this.inShaft(this.camera.position);
+    this.darkK = dark ? Math.min(1, this.darkK + dt / 0.2) : Math.max(0, this.darkK - dt / 0.8);
+    if (this.darkK > 0) {
+      const k = this.darkK;
+      fog.color.lerp(BLACK, k);
+      fog.near *= 1 - k;
+      fog.far += (this.tuning['world.hole.darkFarM'] - fog.far) * k;
+      (this.scene.background as THREE.Color).copy(fog.color);
+      this.hemi.color.multiplyScalar(1 - 0.9 * k);
+      this.hemi.groundColor.multiplyScalar(1 - 0.9 * k);
+    }
   }
 
   // ---------------------------------------------------------------- 描画

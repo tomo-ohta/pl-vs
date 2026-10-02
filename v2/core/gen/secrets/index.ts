@@ -482,7 +482,7 @@ export function attachSecret(world: SecretWorld, host: GeoCell, offer: SecretOff
     if (room && rare.fixed) {
       kind = 'secret';
       placed.fixed.push(c.id);
-      furnishFixed(world, cell, c.rect, y, isHole ? dest : rare.id, plan.links.find((l) => l.b === c.id)!, rng, id);
+      furnishFixed(world, cell, c.rect, y, isHole ? dest : rare.id, plan.links.find((l) => l.b === c.id)!, rng, id, t);
     }
     world.cells.push({ cell, kind, openings: ops.get(c.id)!, node: -1 });
   }
@@ -538,7 +538,7 @@ export function attachSecret(world: SecretWorld, host: GeoCell, offer: SecretOff
 }
 
 /** 中身を決める部屋: 白い私室・長椅子の部屋・穴の部屋。entry は部屋への入口のつなぎ目（向き dir は部屋の奥へ） */
-function furnishFixed(world: SecretWorld, cell: CellLayout, r: Rect, y: number, what: RareKind | SecretDest, entry: PlanLink, rng: Rng, id: string): void {
+function furnishFixed(world: SecretWorld, cell: CellLayout, r: Rect, y: number, what: RareKind | SecretDest, entry: PlanLink, rng: Rng, id: string, t: Tuning): void {
   const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
   const n = entry.n, sg = signOf(entry.dir);
   // 奥の壁の内側の面と、横の中心
@@ -580,12 +580,20 @@ function furnishFixed(world: SecretWorld, cell: CellLayout, r: Rect, y: number, 
     case 'floorLink':
     case 'bFloor': {
       // 別のフロアへ: 床の真ん中の下りの穴（落ちると次へ）。裏のフロアは同じ深さの別の版
-      const hole: Rect = { x0: cx - 0.7, x1: cx + 0.7, z0: cz - 0.7, z1: cz + 0.7 };
+      // 果てしない階の区域（地面の階）: 深い暗い縦穴。落ちる途中で行き先の階の着く部屋の縦穴へ移る（暗転しない。13 章）。
+      // 移れなければ（行き先がまだ用意できない）底の手前で暗転して移る。フロア（区域でない・上の階）は今までどおり浅い穴で暗転
+      const half = t['world.hole.sizeM'] / 2;
+      const hole: Rect = { x0: cx - half, x1: cx + half, z0: cz - half, z1: cz + half };
+      const seamless = !!world.bound && Math.abs(y) < 0.05;
+      const D = seamless ? t['world.hole.depthM'] : 6;
       cell.boxes = cell.boxes.filter((b) => !(b.solid && Math.abs(b.max[1] - y) < 1e-3 && b.max[1] - b.min[1] <= 0.25));
       for (const [x0, z0, x1, z1] of [[r.x0, r.z0, r.x1, hole.z0], [r.x0, hole.z1, r.x1, r.z1], [r.x0, hole.z0, hole.x0, hole.z1], [hole.x1, hole.z0, r.x1, hole.z1]] as const) cell.boxes.push(box([x0, y - 0.2, z0], [x1, y, z1], cell.palette.floor));
-      cell.boxes.push(box([hole.x0, y - 6, hole.z0], [hole.x0 + 0.1, y, hole.z1], 'void'), box([hole.x1 - 0.1, y - 6, hole.z0], [hole.x1, y, hole.z1], 'void'), box([hole.x0, y - 6, hole.z0], [hole.x1, y, hole.z0 + 0.1], 'void'), box([hole.x0, y - 6, hole.z1 - 0.1], [hole.x1, y, hole.z1], 'void'));
+      cell.boxes.push(box([hole.x0, y - D, hole.z0], [hole.x0 + 0.1, y, hole.z1], 'void'), box([hole.x1 - 0.1, y - D, hole.z0], [hole.x1, y, hole.z1], 'void'), box([hole.x0, y - D, hole.z0], [hole.x1, y, hole.z0 + 0.1], 'void'), box([hole.x0, y - D, hole.z1 - 0.1], [hole.x1, y, hole.z1], 'void'));
+      if (seamless) cell.boxes.push(box([hole.x0, y - D - 0.2, hole.z0], [hole.x1, y - D, hole.z1], 'void'));
       const to = what === 'bFloor' ? { floor: `${world.depth + 1}.1` } : { floor: `${world.depth + 2}.0` };
-      world.exits.push({ id: `${id}:hole`, kind: 'secret', aabb: { min: [hole.x0, y - 6, hole.z0], max: [hole.x1, y - 1.2, hole.z1] }, to });
+      world.exits.push(seamless
+        ? { id: `${id}:hole`, kind: 'secret', aabb: { min: [hole.x0, y - D, hole.z0], max: [hole.x1, y - D + 3, hole.z1] }, to, shaft: { anchor: [cx, y, cz], zone: { min: [hole.x0, y - D - 0.2, hole.z0], max: [hole.x1, y - 0.3, hole.z1] } } }
+        : { id: `${id}:hole`, kind: 'secret', aabb: { min: [hole.x0, y - 6, hole.z0], max: [hole.x1, y - 1.2, hole.z1] }, to });
       // 穴の縁の光（目印）
       lightPanel(cell.boxes, cx, cz, 0.5, 0.5, y + 2.6, 'lightGreen');
       break;

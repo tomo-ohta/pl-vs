@@ -181,7 +181,7 @@ function assemble(id: string, profile: FloorProfile, geo: FloorGeometry, t: Tuni
   const reg = profile.region;
   if (reg && geo.region) {
     layout.region = {
-      id, kind: reg.kind, rect: { ...reg.rect }, gates: geo.region.gates, airlocks: geo.region.airlocks,
+      id, kind: reg.kind, rect: { ...reg.rect }, gates: geo.region.gates, airlocks: geo.region.airlocks, ...(geo.region.landings?.length ? { landings: geo.region.landings } : {}),
       name: reg.kind === 'patchwork' ? '入り組んだ区画' : profile.family.name, family: profile.family.id, pattern: profile.pattern, rarity: profile.rarity,
     };
   }
@@ -211,6 +211,7 @@ export function validateRegion(floor: FloorLayout, geo: FloorGeometry): string[]
   const ids = new Set(floor.cells.map((c) => c.id));
   for (const g of reg.gates) if (!ids.has(g.cell)) issues.push(`境目の扉の区画がありません: ${g.id}`);
   for (const a of reg.airlocks) if (!ids.has(a.cell)) issues.push(`階段室がありません: ${a.id}`);
+  for (const l of reg.landings ?? []) if (!ids.has(l.cell)) issues.push(`着く部屋がありません: ${l.id}`);
   void geo;
   return issues;
 }

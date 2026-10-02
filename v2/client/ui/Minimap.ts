@@ -6,7 +6,7 @@
  *
  * 統合担当向け: client/map/MapController.ts が毎フレーム draw を呼ぶ（30 fps に間引く）。
  */
-import { drawMap } from '../map/draw.ts';
+import { drawMap, type DrawInput } from '../map/draw.ts';
 import type { FloorMap } from '../map/MapModel.ts';
 import { sceneOfMap } from '../map/scene.ts';
 
@@ -15,6 +15,8 @@ export interface MinimapOptions {
   doorAngle?: (id: string) => number;
   /** 1 m の画素（CSS の画素） */
   pxPerM?: number;
+  /** 描く物（果てしない階の、区域をつないだ階の地図。無ければ map だけ） */
+  scene?: () => DrawInput;
 }
 
 export class Minimap {
@@ -53,7 +55,7 @@ export class Minimap {
     const dpr = Math.min(2, (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1);
     const w = Math.max(60, Math.round((c.clientWidth || 180) * dpr)), h = Math.max(60, Math.round((c.clientHeight || 180) * dpr));
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-    const scene = sceneOfMap(map, { player: o.player, ...(o.doorAngle ? { doorAngle: o.doorAngle } : {}) });
+    const scene = o.scene ? o.scene() : sceneOfMap(map, { player: o.player, ...(o.doorAngle ? { doorAngle: o.doorAngle } : {}) });
     const p = o.player;
     drawMap(g, scene, { width: w, height: h, center: p ? [p.x, p.z] : null, pxPerM: (o.pxPerM ?? 4) * dpr, rotation: map.rotation, style: 'hud', north: true, dpr, time: map.time });
     // 地図に記録されない部屋の中（N08）

@@ -123,7 +123,7 @@ defineRoomShape({
     // 霧: 通路の長さの 6 割で何も見えなくなる（入口からは突き当たりが見えない）
     const color = mixColor(0xc8cacc, cell.palette.lightColor, 0.2);
     const far = Math.max(t['rooms.endless.fogMinM'], Math.min(t['rooms.endless.fogMaxM'], L * 0.6));
-    cell.render = { ...cell.render, fog: { color, near: Math.min(1.5, far * 0.3), far } };
+    cell.render = { ...cell.render, fog: { color, near: 0, far } };
     cell.palette = { ...cell.palette, fog: color };
     // 同じ額・同じ巾木がくり返す（両側の壁。枝の口は避ける）
     const mat = ctx.rng.pick<MatId>(['noticeGreen', 'wallDark', 'skyDusk']);

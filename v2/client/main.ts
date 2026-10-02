@@ -197,7 +197,7 @@ if (worldMode) {
   });
   watchRegionCarry(() => game.sim, (L) => carryKey(game.session!.active.story, L.region!.id), (f) => { game.eventTaps.add(f); return () => game.eventTaps.delete(f); });
   game.startWorld(session);
-  // 地図と調査率は区域ごと（区域 ≒ 今までのフロア）。区域が替わったら地図を替える
+  // 調査率は区域ごと（区域 ≒ 今までのフロア）。地図は階の区域を全部つないで描く（区域が替わっても消えない。MapController.setRegion）
   let regionAt = '';
   const syncRegion = (): void => {
     const sim = game.sim, s = game.session;
@@ -211,7 +211,7 @@ if (worldMode) {
     regionAt = key;
     depth = s.active.story.depth;
     variant = s.active.story.variant;
-    maps.setFloor(L, null, { world: seed, depth, variant, region: plan.id, name: L.region?.name ?? '' });
+    maps.setRegion(L, null, { world: seed, depth, variant, region: plan.id, name: L.region?.name ?? '' });
   };
   syncRegion();
   const frame0 = game.onFrame;

@@ -59,10 +59,12 @@ function route(floor: FloorLayout, from: string, to: string): PortalSpec[] | nul
   // 隠し場所（role secret）は、行き先か出発点でなければ通らない道を先に探す（出現型の隠しは塞がっていて、遊ぶ人も知らない近道は使わない）。
   // 無ければ隠し場所も通る（隠しの奥・通り抜けを歩く試験）
   const secret = new Set(floor.cells.filter((c) => c.role === 'secret' && c.id !== from && c.id !== to).map((c) => c.id));
-  return routeAvoiding(floor, from, to, secret) ?? routeAvoiding(floor, from, to, new Set());
+  // ほかの部品で開く扉（ボタンの扉など。inputs.open）は、ほかに道があればそちらを先に（向こう側のボタンを押さないと開かない）
+  const remote = new Set(floor.entities.filter((e) => e.type === 'door' && e.inputs?.open).map((e) => e.id));
+  return (remote.size ? routeAvoiding(floor, from, to, secret, remote) : null) ?? routeAvoiding(floor, from, to, secret) ?? routeAvoiding(floor, from, to, new Set());
 }
 
-function routeAvoiding(floor: FloorLayout, from: string, to: string, avoid: ReadonlySet<string>): PortalSpec[] | null {
+function routeAvoiding(floor: FloorLayout, from: string, to: string, avoid: ReadonlySet<string>, avoidDoors: ReadonlySet<string> = new Set()): PortalSpec[] | null {
   const by = new Map<string, PortalSpec[]>();
   for (const p of floor.portals) for (const c of p.cells) by.set(c, [...(by.get(c) ?? []), p]);
   // 一方通行の扉（openSide のある扉）は cells[0] → cells[1] の向きだけ通れる（隠し通路の出口）
@@ -72,6 +74,7 @@ function routeAvoiding(floor: FloorLayout, from: string, to: string, avoid: Read
   for (let h = 0; h < q.length && !prev.has(to); h++) {
     for (const p of by.get(q[h]!) ?? []) {
       if (p.doorId && oneWay.has(p.doorId) && p.cells[1] === q[h]) continue;
+      if (p.doorId && avoidDoors.has(p.doorId)) continue;
       // 段階 4（フロアの形）: 窓は通れない（見えるだけ）
       if (p.kind === 'window') continue;
       const o = p.cells[0] === q[h] ? p.cells[1] : p.cells[0];
@@ -113,11 +116,12 @@ export function warpLinks(floor: FloorLayout): WarpLink[] {
 type Step = { portal: PortalSpec; link?: undefined } | { link: WarpLink; portal?: undefined };
 
 /** 開口と空間のゆがみの道をたどる道順（幅優先。窓は通らない・avoid の区画は通らない）。見つからなければ null */
-function routeSteps(floor: FloorLayout, links: readonly WarpLink[], from: string, to: string, avoid: ReadonlySet<string>): Step[] | null {
+function routeSteps(floor: FloorLayout, links: readonly WarpLink[], from: string, to: string, avoid: ReadonlySet<string>, avoidDoors: ReadonlySet<string> = new Set()): Step[] | null {
   const by = new Map<string, Step[]>();
   const oneWay = new Set(floor.entities.filter((e) => e.type === 'door' && typeof e.params.openSide === 'number').map((e) => e.id));
   for (const p of floor.portals) for (const c of p.cells) {
     if (p.doorId && oneWay.has(p.doorId) && p.cells[1] === c) continue;
+    if (p.doorId && avoidDoors.has(p.doorId)) continue;
     if (p.kind === 'window') continue;
     by.set(c, [...(by.get(c) ?? []), { portal: p }]);
   }
@@ -459,7 +463,8 @@ function buildLegs(sim: Sim, floor: FloorLayout, from: string, targetCell: strin
   if (!links.length) steps = route(floor, from, targetCell)?.map((portal): Step => ({ portal })) ?? null;
   else {
     const secret = new Set(floor.cells.filter((c) => c.role === 'secret' && c.id !== from && c.id !== targetCell).map((c) => c.id));
-    steps = routeSteps(floor, links, from, targetCell, secret) ?? routeSteps(floor, links, from, targetCell, new Set());
+    const remote = new Set(floor.entities.filter((e) => e.type === 'door' && e.inputs?.open).map((e) => e.id));
+    steps = (remote.size ? routeSteps(floor, links, from, targetCell, secret, remote) : null) ?? routeSteps(floor, links, from, targetCell, secret) ?? routeSteps(floor, links, from, targetCell, new Set());
   }
   if (!steps) return null;
   // 区間の目標: 開口の手前（扉なら調べる）→ 開口の先（空間のゆがみの道は、調べて移されるのを待つ）

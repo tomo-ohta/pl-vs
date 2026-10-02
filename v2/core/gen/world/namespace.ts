@@ -82,6 +82,13 @@ export function namespaceLayout(src: FloorLayout, rid: string): FloorLayout {
   if (L.region) {
     for (const g of L.region.gates) g.cell = ren(g.cell);
     for (const a of L.region.airlocks) { a.cell = ren(a.cell); a.live = ren(a.live); a.sealed = ren(a.sealed); }
+    for (const l of L.region.landings ?? []) l.cell = ren(l.cell);
+    const c = L.region.contents;
+    if (c) {
+      for (const g of c.gimmicks) g[0] = ren(g[0]);
+      for (const a of c.anomalies) a[0] = ren(a[0]);
+      for (const x of c.secrets) { x.host = ren(x.host); x.cells = x.cells.map(ren); }
+    }
   }
   return L;
 }

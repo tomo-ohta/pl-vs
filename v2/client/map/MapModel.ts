@@ -68,6 +68,8 @@ export interface MapSave {
   ghosts: Ghost[];
   read: string[];
   complete: boolean;
+  /** 果てしない階: 区域の地図の写し（scene.ts の MapSketch。階の地図に、入っていない区域を描く） */
+  sketch?: unknown;
 }
 
 const smooth = (k: number): number => { const x = Math.min(1, Math.max(0, k)); return x * x * (3 - 2 * x); };

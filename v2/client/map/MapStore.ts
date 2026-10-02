@@ -80,6 +80,23 @@ export class MapStore {
     }
   }
 
+  /** 果てしない階の、階の地図の区域（地図の鍵の並び。古い順） */
+  storyRegions(story: string): string[] {
+    try {
+      const raw = this.storage?.getItem(`${MAPS_KEY}:story:${story}`);
+      const o = raw ? (JSON.parse(raw) as unknown) : null;
+      return Array.isArray(o) ? o.filter((k): k is string => typeof k === 'string' && this.order.includes(k)) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** 階の地図に区域を足す（max を超えたら古い区域から外す） */
+  addStoryRegion(story: string, key: string, max: number): void {
+    const list = [...this.storyRegions(story).filter((k) => k !== key), key].slice(-Math.max(1, max));
+    try { this.storage?.setItem(`${MAPS_KEY}:story:${story}`, JSON.stringify(list)); } catch { /* 入らなくてもよい（写しを描かないだけ） */ }
+  }
+
   private forget(k: string): void {
     this.cache.delete(k);
     try {

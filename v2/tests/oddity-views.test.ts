@@ -55,7 +55,7 @@ test('oddity の描画: どの異変の部屋の部品も、Node で作って動
         (scene.fog as THREE.Fog).far = 40;
         for (let k = 0; k < 20; k++) v.update(sim.stateOf(e.id) ?? {}, 1 / 60);
         if (requests.length > before) grades.set(a.def, (grades.get(a.def) ?? 0) + 1);
-        if (a.def === 'smoke' && (scene.fog as THREE.Fog).far < 5) fogged = true;
+        if (a.def === 'smoke' && (scene.fog as THREE.Fog).far < 12 && (scene.fog as THREE.Fog).near < 1) fogged = true;
         // 部屋の外では画面の色を頼まない
         camera.position.set(b.max[0] + 30, cell.floorY + 1.6, b.max[2] + 30);
         const out = requests.length;
