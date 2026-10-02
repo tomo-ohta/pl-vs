@@ -14,4 +14,8 @@ export const GROUND_TUNING = {
   'ground.collapse.speedMin': num(3.4, 2, 8, '崩れていく帰り道: 前線の速さの下限（m/s）'),
   'ground.collapse.speedMax': num(10, 2, 14, '崩れていく帰り道: 前線の速さの上限（m/s。浅い部屋ほど速い）'),
   'ground.collapse.restoreSec': num(8, 2, 60, '崩れていく帰り道: 全部落ちてから床板が戻るまで（秒。落ちて階段を上るあいだに戻る）'),
+  // ドミノの橋（dominoBridge）
+  'ground.domino.trenchM': num(1.9, 1.4, 2.6, 'ドミノの橋: 溝の幅（m。橋の棚の長さ = 幅 + 0.65 が天井に収まること）'),
+  'ground.domino.depthM': num(2.4, 1.8, 3.05, 'ドミノの橋: 溝の深さ（m）'),
+  'ground.domino.heightM': num(1.8, 1.2, 2.4, 'ドミノの橋: 鎖の棚の高さ（m。隣の棚との間 1 m より高く）'),
 } as const satisfies Record<string, Spec>;

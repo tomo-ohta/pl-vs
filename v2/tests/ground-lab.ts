@@ -81,6 +81,28 @@ export function showcaseRooms(def: string, worlds: number[] = [1, 2, 3], o: { fl
   return out;
 }
 
+/** ふつうのフロアの生成（家具なし。速い）で、仕掛け def が本道に置かれたフロアを want 個まで探す */
+export function mainPathFloors(def: string, want: number, maxWorld = 600): ShowRoom[] {
+  const out: ShowRoom[] = [];
+  for (let w = 1; w <= maxWorld && out.length < want; w++) {
+    const r = generateFloorReport({ world: w, depth: 1 + (w % 9), variant: 0 }, T, {});
+    const g = r.gimmicks?.gimmicks.find((x) => x.def === def && x.main);
+    if (g) out.push({ r, floor: r.floor, cell: r.floor.cells.find((c) => c.id === g.cell)!, id: g.id, main: true });
+  }
+  return out;
+}
+
+/** 入口から出口の階段の下まで歩く（歩く人。仕掛けの解き方の手順 params.bot を使う） */
+export async function walkFloorExit(floor: FloorLayout, maxSec = 400): Promise<{ ok: boolean; reason: string }> {
+  const { walkTo } = await import('./helpers/bot.ts');
+  const sim = await newSim(floor);
+  const ex = floor.exits.find((e) => e.id === 'down') ?? floor.exits[0]!;
+  const res = walkTo(sim, 'exitStairs', [(ex.aabb.min[0] + ex.aabb.max[0]) / 2, ex.aabb.min[1], (ex.aabb.min[2] + ex.aabb.max[2]) / 2], maxSec);
+  const reached = sim.drainEvents().some((e) => e.type === 'floor.exit');
+  disposeSim(sim);
+  return { ok: res.ok && reached, reason: res.reason || (reached ? '' : '出口に入れない') };
+}
+
 /** ふつうのフロアの生成で、仕掛け def が置かれた数（worlds 個のフロア） */
 export function countInFloors(defs: string[], worlds: number): Map<string, number> {
   const out = new Map<string, number>(defs.map((d) => [d, 0]));

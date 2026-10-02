@@ -16,7 +16,7 @@ import type { CellLayout, FloorLayout, PortalSpec, Zone } from '../../core/world
 export interface WalkResult { ok: boolean; reason: string; seconds: number; route: string[] }
 
 /**
- * 仕掛けの解き方（部品の params.bot。段階 4 の ground で足した）: 歩く人は、区画を出る前にこの手順をこなす
+ * 仕掛けの解き方（部品の params.bot。手順の組 1 つか、その列。段階 4 の ground で足した）: 歩く人は、区画を出る前にこの手順をこなす
  * （棚を押す・箱を押す・印の上で待つ・円盤がそろうのを待つ）。遊び手と同じ操作だけを使う（移動・調べる・しゃがむ・待つ）。
  * - steps: 立つ所 at（足元）まで歩き、look があればそちらを調べ（E）、wait 秒と until（`部品.出力` が入るまで）待つ。crouch でしゃがんで待つ
  * - enterAt: この開口（外面の床の位置 [x, z]）から入ったときだけ（入口の向きで手順が違う仕掛け。無ければいつでも）
@@ -34,7 +34,7 @@ function hintSteps(floor: FloorLayout, cell: string, exit: PortalSpec, prev: Por
   const out: { step: BotStep; doneIf?: string }[] = [];
   const other = exit.cells[0] === cell ? exit.cells[1] : exit.cells[0];
   const toSecret = floor.cells.find((c) => c.id === other)?.role === 'secret';
-  const hints = floor.entities.filter((e) => e.cell === cell && e.params.bot).map((e) => e.params.bot as unknown as BotHint).filter((h) => h.steps?.length && (h.only !== 'secret' || toSecret));
+  const hints = floor.entities.filter((e) => e.cell === cell && e.params.bot).flatMap((e) => (Array.isArray(e.params.bot) ? e.params.bot : [e.params.bot]) as unknown as BotHint[]).filter((h) => h.steps?.length && (h.only !== 'secret' || toSecret));
   const directed = hints.filter((h) => h.enterAt);
   let pickDirected: BotHint[] = [];
   if (prev) {
@@ -43,7 +43,8 @@ function hintSteps(floor: FloorLayout, cell: string, exit: PortalSpec, prev: Por
   } else if (start && directed.length) {
     pickDirected = [directed.slice().sort((a, b) => Math.hypot(a.enterAt![0] - start[0], a.enterAt![1] - start[2]) - Math.hypot(b.enterAt![0] - start[0], b.enterAt![1] - start[2]))[0]!];
   }
-  for (const h of [...hints.filter((x) => !x.enterAt), ...pickDirected]) for (const s of h.steps) out.push(h.doneIf ? { step: s, doneIf: h.doneIf } : { step: s });
+  // 入ってきた向きの手順を先に（向こう岸から来たら、まず橋を架けて手前へ渡れるようにする）
+  for (const h of [...pickDirected, ...hints.filter((x) => !x.enterAt)]) for (const s of h.steps) out.push(h.doneIf ? { step: s, doneIf: h.doneIf } : { step: s });
   return out;
 }
 
@@ -312,7 +313,7 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     }
     if (n % 15 === 0) {
       const c = cellAtPos(floor, player.pos);
-      replanEvery = c ? Math.max(0, ...floor.entities.filter((e) => e.cell === c.id && e.params.bot).map((e) => Number((e.params.bot as unknown as BotHint).replanSec ?? 0))) : 0;
+      replanEvery = c ? Math.max(0, ...floor.entities.filter((e) => e.cell === c.id && e.params.bot).flatMap((e) => (Array.isArray(e.params.bot) ? e.params.bot : [e.params.bot]) as unknown as BotHint[]).map((h) => Number(h.replanSec ?? 0))) : 0;
     }
     if (replanEvery > 0 && n % Math.max(1, Math.round(replanEvery / sim.dt)) === 0) path = [];
     legT += sim.dt;

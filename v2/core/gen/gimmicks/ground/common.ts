@@ -95,6 +95,10 @@ export interface Trench {
   stairs: Rect;
   /** 階段の下の端の前（溝の底） */
   foot: [number, number];
+  /** 階段の上の端の、縁の柵を空ける範囲（u） */
+  stairGap: [number, number];
+  /** 階段の側（-1 = u0 の壁 / 1 = u1 の壁） */
+  stairSide: -1 | 1;
 }
 
 /**
@@ -148,7 +152,39 @@ export function buildTrench(ctx: GimmickContext, o: { v0: number; v1: number; de
   const c = F.point((iu[0] + iu[1]) / 2, (iv[0] + iv[1]) / 2);
   s.cell.lights.push({ pos: [c[0], y - o.depth + 1.6, c[1]], color: 0xbfd0e0, intensity: 0.35, distance: 6 });
   ctx.keepOut({ min: [hole.x0 - (F.d % 2 ? 1.2 : 0), y - o.depth, hole.z0 - (F.d % 2 ? 0 : 1.2)], max: [hole.x1 + (F.d % 2 ? 1.2 : 0), y + 3, hole.z1 + (F.d % 2 ? 0 : 1.2)] });
-  return { hole, inner, depth: o.depth, v0: o.v0, v1: o.v1, frame: F, stairs, foot };
+  const stairGap: [number, number] = side < 0 ? [iu[0] - 0.2, iu[0] + 1.0] : [iu[1] - 1.0, iu[1] + 0.2];
+  return { hole, inner, depth: o.depth, v0: o.v0, v1: o.v1, frame: F, stairs, foot, stairGap, stairSide: side };
+}
+
+/**
+ * 溝の縁の柵（跳んで越えられない高さ 1.05 m）: 入口の壁からの深さ v の線に沿って、u0..u1 から gaps（[a0, a1] の列）を除いた所。
+ * 走って跳べば 4 m 先まで届くので、溝の縁は柵で囲み、渡る所（橋の棚が立っている所・橋が架かる所・階段の出口）だけ空ける
+ */
+export function railLine(ctx: GimmickContext, F: WallFrame, v0: number, v1: number, u0: number, u1: number, gaps: [number, number][], mat: MatId = 'metal'): void {
+  const y = ctx.slot.cell.floorY;
+  const cuts = gaps.map(([a, b]) => [Math.min(a, b), Math.max(a, b)] as [number, number]).sort((p, q) => p[0] - q[0]);
+  let cur = u0;
+  const put = (a: number, b: number): void => {
+    if (b - a < 0.05) return;
+    const r = F.rect(a, v0, b, v1);
+    ctx.addBox(box([r.x0, y, r.z0], [r.x1, y + 1.0, r.z1], mat));
+    ctx.addBox(box([r.x0, y + 1.0, r.z0], [r.x1, y + 1.06, r.z1], 'handrailWood'));
+  };
+  for (const [a, b] of cuts) { if (a > cur) put(cur, a); cur = Math.max(cur, b); }
+  if (u1 > cur) put(cur, u1);
+}
+
+/**
+ * 溝の上の下がり天井（床から clearH m。走って跳んでも頭が当たって溝を越えられない。歩くのは 1.7 m の体が通る）。
+ * 範囲の天井の照明は外し、点光源は下がり天井の下へ下ろす
+ */
+export function soffit(ctx: GimmickContext, r: Rect, clearH: number): void {
+  const s = ctx.slot;
+  const y = s.cell.floorY, top = y + s.cell.height;
+  if (top - (y + clearH) < 0.05) return;
+  ctx.removeBoxes((b) => !b.solid && b.min[1] > y + clearH && b.min[0] < r.x1 && b.max[0] > r.x0 && b.min[2] < r.z1 && b.max[2] > r.z0);
+  for (const l of s.cell.lights) if (l.pos[0] > r.x0 - 0.3 && l.pos[0] < r.x1 + 0.3 && l.pos[2] > r.z0 - 0.3 && l.pos[2] < r.z1 + 0.3 && l.pos[1] > y + clearH - 0.2) l.pos = [l.pos[0], y + clearH - 0.25, l.pos[2]];
+  ctx.addBox(box([r.x0, y + clearH, r.z0], [r.x1, top, r.z1], 'wallConcrete'));
 }
 
 // ---------------------------------------------------------------- 歩く人への解き方の手順（tests/helpers/bot.ts の BotHint）
