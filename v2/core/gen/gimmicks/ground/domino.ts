@@ -17,7 +17,7 @@ import type { Rect } from '../../../world/footprint.ts';
 import { box, DOOR_W, type Json } from '../../../world/layout.ts';
 import { defineGimmick } from '../types.ts';
 import { aabbJson } from '../util.ts';
-import { botHint, buildTrench, enterAt, entranceFrame, onRectWall, railLine } from './common.ts';
+import { botHint, buildTrench, enterAt, entranceFrame, onRectWall, planTrench, railLine } from './common.ts';
 
 /** 入口の壁を手前にした座標で、u0 の側・u1 の側の横の壁の向き */
 const sideDir = (d: Dir, side: -1 | 1): Dir => (d % 2 === 0 ? (side < 0 ? 3 : 1) : (side < 0 ? 2 : 0));
@@ -68,11 +68,12 @@ defineGimmick({
     const sideScore = (sd: -1 | 1): number => Math.min(...farGaps.map((u) => Math.abs(u - (sd < 0 ? F.u0 : F.u1))));
     const stairSide: -1 | 1 = sideScore(-1) >= sideScore(1) ? -1 : 1;
     if (sideScore(stairSide) < 2.2) return;
-    const tr = buildTrench(ctx, { v0: vt0, v1: vt1, depth: t['ground.domino.depthM'], stairSide });
-    if (!tr) return;
     const hC = Math.min(t['ground.domino.heightM'], s.cell.height - 0.25);
     const Lb = W + 0.65;
     if (Lb > s.cell.height - 0.15) return;
+    const plan = planTrench(ctx, { v0: vt0, v1: vt1, depth: t['ground.domino.depthM'], stairSide });
+    if (!plan) return;
+    const tr = buildTrench(ctx, plan);
     const rect3 = (r: Rect, y0: number, y1: number): Json => aabbJson({ min: [r.x0, y0, r.z0], max: [r.x1, y1, r.z1] });
     // 棚: [小部屋の橋の棚] + 鎖 + [出口の側の橋の棚]（鎖の並びは uEnd → um）
     type Piece = { stand: Json; lieP: Json; lieN?: Json; push: boolean; fixed?: number; u: number; kind: string };

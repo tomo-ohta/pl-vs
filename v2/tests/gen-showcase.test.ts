@@ -16,7 +16,8 @@ import type { FloorLayout } from '../core/world/layout.ts';
 const t = defaultTuning();
 /** 段階 3 までの仕掛け（段階 4 の担当が足した仕掛けを、全種の見本の検査から外す） */
 const STAGE3_GIMMICKS = ['sensorLights', 'lowCeiling', 'soundGuide', 'switchDoor', 'mannequin', 'beltMaze', 'crumbleFloor', 'bouncePad', 'appearPath', 'tiltRoom', 'narrowPath', 'beamNetwork', 'guideLight', 'puzzleRoom'];
-const shape = (f: FloorLayout): string => f.cells.filter((c) => c.role !== 'secret').map((c) => `${c.id}:${c.bounds.min.join(',')}:${c.bounds.max.join(',')}`).join('|');
+// 外形の下端は比べない（穴の仕掛け・床に沈めた水槽が下端を下げる。中身なので表と裏で違ってよい）
+const shape = (f: FloorLayout): string => f.cells.filter((c) => c.role !== 'secret').map((c) => `${c.id}:${c.bounds.min[0]},${c.bounds.min[2]}:${c.bounds.max.join(',')}`).join('|');
 
 test('裏のフロア: 表と同じ形・中身と調子は裏の seed で決まる（決定的）', () => {
   const tones = new Set<string>();

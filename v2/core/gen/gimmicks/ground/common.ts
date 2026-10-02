@@ -106,7 +106,11 @@ export interface Trench {
  * 溝の中の階段は、入口側の縁の壁沿い（stairSide の端）に、溝の真ん中の方へ下りる（落ちたら入口側へ戻る）。
  * 横の壁の開口の前が溝にならないこと（置けなければ null）
  */
-export function buildTrench(ctx: GimmickContext, o: { v0: number; v1: number; depth: number; stairSide?: -1 | 1; laneW?: number }): Trench | null {
+export interface TrenchOptions { v0: number; v1: number; depth: number; stairSide?: -1 | 1; laneW?: number }
+export interface TrenchPlan extends Trench { steps: { r: Rect; top: number }[] }
+
+/** 溝の計画（何も足さない）。置けなければ null。仕掛けは、ほかの条件を全部確かめてから buildTrench で作る（途中で諦めて半端な部屋を残さない） */
+export function planTrench(ctx: GimmickContext, o: TrenchOptions): TrenchPlan | null {
   const s = ctx.slot;
   const ent = s.entrance;
   if (!ent) return null;
@@ -132,28 +136,38 @@ export function buildTrench(ctx: GimmickContext, o: { v0: number; v1: number; de
   const laneW = o.laneW ?? 1.0;
   const tread = Math.min(t['gimmick.pit.stairTread'] * 1.3, (F.u1 - F.u0 - laneW - 0.9) / n);
   if (tread < 0.22) return null;
-  cutFloorSlab(s, hole);
-  pitShell(ctx, hole, o.depth);
   const inner = pitInner(ctx, hole);
   const iu = [F.u(inner.x0, inner.z0), F.u(inner.x1, inner.z1)].sort((a, b) => a - b) as [number, number];
   const iv = [F.v(inner.x0, inner.z0), F.v(inner.x1, inner.z1)].sort((a, b) => a - b) as [number, number];
   // 階段: 入口側の縁（v = iv[0]）の帯（幅 laneW）に、壁 stairSide の端から真ん中の方へ下りる
   const side = o.stairSide ?? (ctx.rng.chance(0.5) ? -1 : 1);
   const a0 = side < 0 ? iu[0] : iu[1];
+  const steps: { r: Rect; top: number }[] = [];
   for (let j = 0; j < n; j++) {
     const p = a0 - side * j * tread, q = a0 - side * (j + 1) * tread;
-    const r = F.rect(Math.min(p, q), iv[0], Math.max(p, q), iv[0] + laneW);
-    ctx.addBox(box([r.x0, y - o.depth, r.z0], [r.x1, y - rise * (j + 1), r.z1], s.cell.palette.floor));
+    steps.push({ r: F.rect(Math.min(p, q), iv[0], Math.max(p, q), iv[0] + laneW), top: y - rise * (j + 1) });
   }
   const end = a0 - side * n * tread;
   const stairs = F.rect(Math.min(a0, end), iv[0], Math.max(a0, end), iv[0] + laneW);
   const foot = F.point(end - side * 0.45, iv[0] + laneW / 2);
-  // 底をぼんやり照らす灯り
-  const c = F.point((iu[0] + iu[1]) / 2, (iv[0] + iv[1]) / 2);
-  s.cell.lights.push({ pos: [c[0], y - o.depth + 1.6, c[1]], color: 0xbfd0e0, intensity: 0.35, distance: 6 });
-  ctx.keepOut({ min: [hole.x0 - (F.d % 2 ? 1.2 : 0), y - o.depth, hole.z0 - (F.d % 2 ? 0 : 1.2)], max: [hole.x1 + (F.d % 2 ? 1.2 : 0), y + 3, hole.z1 + (F.d % 2 ? 0 : 1.2)] });
   const stairGap: [number, number] = side < 0 ? [iu[0] - 0.2, iu[0] + 1.0] : [iu[1] - 1.0, iu[1] + 0.2];
-  return { hole, inner, depth: o.depth, v0: o.v0, v1: o.v1, frame: F, stairs, foot, stairGap, stairSide: side };
+  return { hole, inner, depth: o.depth, v0: o.v0, v1: o.v1, frame: F, stairs, foot, stairGap, stairSide: side, steps };
+}
+
+/** 計画どおりに溝を作る（床板を切る・側壁・階段・底の灯り・家具を置かない範囲） */
+export function buildTrench(ctx: GimmickContext, p: TrenchPlan): Trench {
+  const s = ctx.slot;
+  const y = s.cell.floorY;
+  const F = p.frame;
+  cutFloorSlab(s, p.hole);
+  pitShell(ctx, p.hole, p.depth);
+  for (const st of p.steps) ctx.addBox(box([st.r.x0, y - p.depth, st.r.z0], [st.r.x1, st.top, st.r.z1], s.cell.palette.floor));
+  // 底をぼんやり照らす灯り
+  const c: [number, number] = [(p.inner.x0 + p.inner.x1) / 2, (p.inner.z0 + p.inner.z1) / 2];
+  s.cell.lights.push({ pos: [c[0], y - p.depth + 1.6, c[1]], color: 0xbfd0e0, intensity: 0.35, distance: 6 });
+  const h = p.hole;
+  ctx.keepOut({ min: [h.x0 - (F.d % 2 ? 1.2 : 0), y - p.depth, h.z0 - (F.d % 2 ? 0 : 1.2)], max: [h.x1 + (F.d % 2 ? 1.2 : 0), y + 3, h.z1 + (F.d % 2 ? 0 : 1.2)] });
+  return p;
 }
 
 /**

@@ -5,7 +5,7 @@
  *     端の「橋の棚」（params.fixed）は決まった向き（溝を横切る向き）に倒れて橋になる。橋の棚は直接は押せない
  *     （鎖が当たるか、入力 drop で倒れる）。出力 fallen
  * - crate: 升目の上の箱。調べると押した人から離れる向きへ 1 升動く（ほかの箱・塞がった升・人のいる升には動かない）。
- *     穴の升（'o'）へ押すと落ちて床になる（上に乗れる）。入力 reset で最初の位置へ戻る（穴も空に戻る）。
+ *     穴の升（'o'）へ押すと落ちて床になる（上に乗れる）。'x' は人だけが通れる升。入力 reset で最初の位置へ戻る（穴も空に戻る）。
  *     liftBy の升の上では、その部品（mover）の高さに合わせて上下する（天秤の皿の上）
  * - loadPlate: 区画の上の重さ（人 1 人 = 1、箱 = 箱の weight）。出力 load・pressed（load ≥ need）
  * - balanceScale: 天秤の 2 枚の皿の重さを比べ、皿の高さ（mover の target）を出す。両方に同じ重さ（> 0）が holdSec 秒載ると balanced
@@ -161,7 +161,8 @@ function holeFilled(ctx: PartContext, i: number, k: number): boolean {
 
 function canMove(ctx: PartContext, g: CrateGrid, s: CrateState, ni: number, nk: number): boolean {
   const ch = cellChar(g, ni, nk);
-  if (ch === '#') return false;
+  // '#' 柱・段 / 'x' 人は通れるが箱を置かない升（溝の段の出口を塞がない）
+  if (ch === '#' || ch === 'x') return false;
   // ほかの箱（落ちて床になった箱の上へは動ける）
   if (peers(ctx).some((p) => !p.dropped && ((p.i === ni && p.k === nk) || (p.t < 1 && p.fi === ni && p.fk === nk)))) return false;
   // 人のいる升へは動かない（押しつぶさない）
@@ -176,18 +177,21 @@ function canMove(ctx: PartContext, g: CrateGrid, s: CrateState, ni: number, nk: 
 // ---------------------------------------------------------------- 重さの板
 definePart<{ load: number }>({
   type: 'loadPlate',
-  outputs: ['load', 'pressed'],
+  outputs: ['load', 'pressed', 'crateLoad'],
   init: () => ({ load: 0 }),
   step(s, ctx) {
-    s.load = plateLoad(ctx, pAabb(ctx.spec, 'aabb'), (ctx.spec.params.crates as string[] | undefined) ?? []);
+    const a = pAabb(ctx.spec, 'aabb'), crates = (ctx.spec.params.crates as string[] | undefined) ?? [];
+    s.load = plateLoad(ctx, a, crates);
     ctx.output('load', s.load);
     ctx.output('pressed', s.load >= pNum(ctx.spec, 'need', 1) ? 1 : 0);
+    // 箱だけの重さ（人が降りても載ったまま）
+    ctx.output('crateLoad', plateLoad(ctx, a, crates, false));
   },
 });
 
-/** 区画の上の重さ: 人 1 人 = 1、箱 = weight（区画の中に真ん中がある、落ちていない箱） */
-function plateLoad(ctx: PartContext, a: AABB, crates: string[]): number {
-  let load = ctx.players.filter((p) => playerIn(p, a) && p.onGround).length;
+/** 区画の上の重さ: 人 1 人 = 1（withPlayers）、箱 = weight（区画の中に真ん中がある、落ちていない箱） */
+function plateLoad(ctx: PartContext, a: AABB, crates: string[], withPlayers = true): number {
+  let load = withPlayers ? ctx.players.filter((p) => playerIn(p, a) && p.onGround).length : 0;
   for (const id of crates) {
     const st = ctx.stateOf(id) as CrateState | null;
     if (!st || st.dropped || st.t < 1) continue;

@@ -255,6 +255,8 @@ function darkCornerOffer(g: GeoCell, rng: Rng): SecretOffer | null {
 function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeometry, rng: Rng, t: Tuning, p: FloorProfile, depth: number): Built | null {
   const id = `g:${def.id}:${g.cell.id}`;
   const snapshot = { boxes: g.cell.boxes.slice(), lights: g.cell.lights.map((l) => ({ ...l })), zones: g.cell.zones.slice(), entities: geo.entities.length, doors: JSON.stringify(geo.entities.filter((e) => e.type === 'door' && e.cell === g.cell.id)) };
+  // 穴の仕掛けは区画の外形の下端を下げる（pit.ts の pitShell）ので、取り消すときに戻す
+  const boundsMinY = g.cell.bounds.min[1];
   const myKeep: AABB[] = [];
   const myOffers: SecretOffer[] = [];
   const assist: Box[] = [];
@@ -281,6 +283,7 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
   const cellsBefore = geo.cells.length;
   const exitsBefore = geo.exits.length;
   const restore = (): void => {
+    g.cell.bounds.min[1] = boundsMinY;
     g.cell.boxes = snapshot.boxes;
     g.cell.lights = snapshot.lights;
     g.cell.zones = snapshot.zones;
