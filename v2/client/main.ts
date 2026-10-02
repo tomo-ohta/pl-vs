@@ -25,6 +25,7 @@ import { RARE_DEFS } from '../core/gen/secrets/index.ts';
 import { CATALOG_BY_WS } from '../core/gen/catalog/index.ts';
 import type { FloorLayout } from '../core/world/layout.ts';
 import { ClientGame } from './game/ClientGame.ts';
+import { IS_MOBILE } from './device.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
 import { downSlot, WorldPlanner } from '../core/gen/world/plan.ts';
@@ -38,7 +39,8 @@ import { RecOverlay } from './ui/RecOverlay.ts';
 import { SettingsPanel } from './ui/SettingsPanel.ts';
 
 const params = new URLSearchParams(location.search);
-const { tuning, errors } = makeTuning(parseTuneParam(params.get('tune')));
+// スマホは持つ区域を減らす（果てしない階。URL の ?tune= が優先）
+const { tuning, errors } = makeTuning({ ...(IS_MOBILE ? { 'world.maxRegions': 4, 'world.unload.gateM': 56 } : {}), ...parseTuneParam(params.get('tune')) });
 if (errors.length) console.warn('[tune]', errors.join(' / '));
 const seed = Number(params.get('seed') ?? 1) >>> 0 || 1;
 const useLab = params.has('lab');

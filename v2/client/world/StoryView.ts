@@ -32,6 +32,10 @@ interface RegionState {
   root: THREE.Group;
   units: CellUnit[];
   pending: CellLayout[];
+  /** 作りかけの区画（少し作るたびに止まる） */
+  job: Generator<void, CellUnit, void> | null;
+  /** 部品の描画を作り終えた数 */
+  viewAt: number;
   neighbors: Map<string, CellLayout[]>;
   views: Map<string, EntityView>;
   viewRoots: Map<string, { root: THREE.Group; cells: string[] }>;
@@ -104,7 +108,7 @@ export class StoryView {
     const root = new THREE.Group();
     root.name = `region:${id}`;
     this.root.add(root);
-    this.regions.set(id, { id, layout, root, units: [], pending: [...layout.cells], neighbors: openNeighbors(layout), views: new Map(), viewRoots: new Map(), state: 'build' });
+    this.regions.set(id, { id, layout, root, units: [], pending: [...layout.cells], job: null, viewAt: 0, neighbors: openNeighbors(layout), views: new Map(), viewRoots: new Map(), state: 'build' });
     this.visibility.addGroup(id, layout.cells, layout.portals);
   }
 
@@ -112,6 +116,8 @@ export class StoryView {
     const r = this.regions.get(id);
     if (!r) return;
     for (const v of r.views.values()) v.dispose();
+    // 作りかけの区画は最後まで作ってから捨てる（途中の物を残さない）
+    if (r.job) { for (;;) { const x = r.job.next(); if (x.done) { r.units.push(x.value); break; } } r.job = null; }
     for (const u of r.units) {
       this.built.cells.delete(u.built.id);
       u.dispose();
@@ -131,16 +137,24 @@ export class StoryView {
     const order = [...this.regions.values()].sort((a, b) => Number(b.id === first) - Number(a.id === first));
     for (const r of order) {
       while (r.state === 'build' && performance.now() - t0 < budgetMs) {
-        const cell = r.pending.shift();
-        if (!cell) { r.state = 'views'; break; }
-        const u = this.env.builder.buildCellUnit(r.layout.seed, cell, r.neighbors.get(cell.id) ?? []);
+        if (!r.job) {
+          const cell = r.pending.shift();
+          if (!cell) { r.state = 'views'; break; }
+          r.job = this.env.builder.buildCellJob(r.layout.seed, cell, r.neighbors.get(cell.id) ?? []);
+        }
+        const x = r.job.next();
+        if (!x.done) continue;
+        r.job = null;
+        const u = x.value;
         u.built.group.visible = false;
         r.root.add(u.built.group);
         r.units.push(u);
         this.built.cells.set(u.built.id, u.built);
         this.built.lights.push(...u.lights);
       }
-      if (r.state === 'views' && performance.now() - t0 < budgetMs) { this.createViews(r); r.state = 'compile'; this.compile(r); }
+      if (r.state === 'views' && performance.now() - t0 < budgetMs) {
+        if (this.createViews(r, t0 + budgetMs)) { r.state = 'compile'; this.compile(r); }
+      }
       if (performance.now() - t0 >= budgetMs) break;
     }
     return performance.now() - t0;
@@ -154,19 +168,27 @@ export class StoryView {
     }
   }
 
-  private createViews(r: RegionState): void {
+  /** 部品の描画を作る（deadline の時刻まで。全部作り終えたら true） */
+  private createViews(r: RegionState, deadline = Infinity): boolean {
     const built: BuiltFloor = { floor: r.layout, root: this.root, cells: this.built.cells, lights: this.built.lights, dispose: () => {} };
     const sim = simFacade(this.sim, r.layout);
-    for (const e of r.layout.entities) {
+    const list = r.layout.entities;
+    for (; r.viewAt < list.length; r.viewAt++) {
+      if (performance.now() > deadline) return false;
+      const e = list[r.viewAt]!;
       const root = new THREE.Group();
       root.name = `entity:${e.id}`;
       r.root.add(root);
+      const tv = performance.now();
       const v = createView(e, this.env.viewContext(root, built, sim, (f) => { this.listeners.add(f); return () => this.listeners.delete(f); }));
+      const dv = performance.now() - tv;
+      if (dv > 25) console.warn(`[描画] 部品の描画を作るのに ${dv.toFixed(0)} ms: ${e.type}（${e.id}）`);
       if (!v) { root.removeFromParent(); continue; }
       r.views.set(e.id, v);
       const portal = e.type === 'door' ? r.layout.portals.find((p) => p.doorId === e.id) : undefined;
       r.viewRoots.set(e.id, { root, cells: portal ? [...portal.cells] : e.cell ? [e.cell] : [] });
     }
+    return true;
   }
 
   /** 区域の入れ物ごとシェーダを作る（隠したまま。作り終わったら ready） */

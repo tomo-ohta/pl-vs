@@ -150,12 +150,20 @@ export class FloorBuilder {
    * frame 'group' の区画（階段室）は、局所の座標で作って入れ物を回し・ずらす（上下の階の写しで同じ見た目）
    */
   buildCellUnit(seed: number, cell: CellLayout, neighbors: CellLayout[]): CellUnit {
+    const job = this.buildCellJob(seed, cell, neighbors);
+    for (;;) { const r = job.next(); if (r.done) return r.value; }
+  }
+
+  /**
+   * 区画 1 つを作る仕事（少し作るたびに止まる。果てしない階の流し込みが 1 フレームの時間に分ける。v1 の RoomBuildJob と同じ考え方）
+   */
+  *buildCellJob(seed: number, cell: CellLayout, neighbors: CellLayout[]): Generator<void, CellUnit, void> {
     const disposables: THREE.BufferGeometry[] = [];
     let built: BuiltCell;
     if (cell.frame === 'group' && cell.uvFrame) {
       const f = cell.uvFrame;
       const local = localCell(cell, f);
-      const inner = this.buildCell(0, local, disposables, []);
+      const inner = yield* this.buildCellGen(0, local, disposables, []);
       const outer = new THREE.Group();
       outer.name = `cell:${cell.id}`;
       outer.add(inner.group);
@@ -163,7 +171,7 @@ export class FloorBuilder {
       outer.rotation.y = (f.q * Math.PI) / 2;
       outer.updateMatrixWorld(true);
       built = { ...inner, id: cell.id, layout: cell, group: outer, bounds: cell.bounds, frame: f };
-    } else built = this.buildCell(seed, cell, disposables, neighbors);
+    } else built = yield* this.buildCellGen(seed, cell, disposables, neighbors);
     const key = cell.materialKey ?? cell.id;
     this.roomRefs.set(key, (this.roomRefs.get(key) ?? 0) + 1);
     let done = false;
@@ -183,7 +191,7 @@ export class FloorBuilder {
     };
   }
 
-  private buildCell(seed: number, cell: CellLayout, disposables: THREE.BufferGeometry[], neighbors: CellLayout[]): BuiltCell {
+  private *buildCellGen(seed: number, cell: CellLayout, disposables: THREE.BufferGeometry[], neighbors: CellLayout[]): Generator<void, BuiltCell, void> {
     const group = new THREE.Group();
     group.name = `cell:${cell.id}`;
     const fy = cell.floorY;
@@ -244,7 +252,10 @@ export class FloorBuilder {
       b.geos.push(g);
     };
     let triangles = 0;
+    let slice = performance.now();
     for (const b of drawn) {
+      // 3 ms ごとに止まる（大きな区画を 1 フレームで作らない）
+      if (performance.now() - slice > 3) { yield; slice = performance.now(); }
       const lamp = b.kind?.startsWith('lamp:') ? b.kind.slice(5) : null;
       const variants: { mat: MatId; kind: string; grp: string }[] = lamp
         ? [{ mat: b.mat, kind: 'lampOn', grp: lamp }, { mat: 'lightOff', kind: 'lampOff', grp: lamp }]
@@ -288,6 +299,7 @@ export class FloorBuilder {
     const built: BuiltCell = { id: cell.id, layout: cell, group, bounds: cell.bounds, reveal: new Map(), conceal: new Map(), lampPanels: new Map(), blend: [], lamps: lampList, lighting: { on: bakeOn, offs: bakeOff }, triangles };
     const lmMeshes: { mesh: THREE.Mesh; ranges: number[] }[] = [];
     for (const [key, b] of buckets) {
+      if (performance.now() - slice > 3) { yield; slice = performance.now(); }
       const merged = b.geos.length === 1 ? b.geos[0]! : mergeGeometries(b.geos, false);
       if (!merged) { console.warn(`[FloorBuilder] 結合に失敗: ${cell.id} ${key}`); continue; }
       if (b.geos.length > 1) for (const g of b.geos) g.dispose();

@@ -36,18 +36,21 @@ URL の指定（開発用）:
 
 | 指定 | 内容 |
 |---|---|
-| `?seed=3&depth=2` | 世界の seed と始める深さ |
-| `?variant=1` | 裏のフロアから始める |
+| `?seed=3&depth=2` | 世界の seed と始める深さ（ふつうは果てしない階。`docs/endless-world.md`） |
+| `?floor=1` | 果てしない階でなく、今までのフロア（フロア単位の生成・出口の階段で次のフロアを読む）で遊ぶ |
+| `?variant=1` | 裏のフロアから始める（`?floor=1` のとき） |
 | `?showcase=1` / `?showcase=2` | 段階 3 の見本のフロア（仕掛け 14 種・異変 14 種・隠し全部。2 は隠しの型が逆）。G / Shift+G で仕掛けの入口へ移る |
 | `?try=id,id,…` | 指定した仕掛け・異変・部屋の形（id か案の番号。例 `?try=windTunnel,snow,S08`）だけを置いた見本のフロア。1 つのフロアに 8 種くらいまで |
 | `?group=<担当>` | 担当（move・ground・sense・oddity・carry・warp・structure・rooms・map）の仕掛け・異変を置ける分だけ置いた見本 |
-| `?shape=<型>` | フロアの形の型を決めて作る（spiral・tower・station・islands・rooftop・megahall …。`core/gen/floor/themes.ts`） |
+| `?shape=<型>` | フロアの形の型を決めて作る（spiral・tower・station・islands・rooftop・megahall …。`core/gen/floor/themes.ts`）。フロアで遊ぶ |
 | `?name=…` | 名札・掲示に出す名前（異変「自分の名前」） |
 | `?dev=1` | ふつうのフロアでも G で仕掛けを見て回れる |
 | `?tune=キー=値,…` | 調整表の上書き（例: `?tune=secrets.perFloorMean=3`） |
 | `?nodress=1` | 区画の中身（家具）を置かない |
 | `?lab=1` | 段階 1 の実験場 |
 
+- 果てしない階の開発用: `window.session`（core/stream/session.ts の WorldSession。`session.active` が今の階の StoryWorld）。
+  区域は Worker で作り、作った区域を `[区域]` で console に出す
 - import は拡張子 `.ts` まで書く（Vite と Node の両方でそのまま動かすため）。
 - 本番ビルドで `VITE_ASSET_BASE=/pl-vs/` を渡すと、素材を複写せず v1 と同じ素材を読む（`BASE_PATH=/pl-vs/v2/` と一緒に使う）。
 
