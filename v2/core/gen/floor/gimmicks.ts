@@ -70,6 +70,8 @@ function openingTo(geo: FloorGeometry, g: GeoCell, other: string): WallOpening |
  * 型を選べる隠しは存在 / 出現を交互に（flip で逆から）。仕掛けとは別の隠し（暗がり）は 1 つだけ
  */
 export interface ShowcaseOptions { gimmicks: string[]; flip?: boolean }
+/** 部屋の形（core/gen/rooms）: 見本に置く形の id（か案の番号）。無ければ形を掛けない（段階 4・rooms が足した） */
+export interface ShowcaseOptions { rooms?: string[] }
 /** 見本のフロアの隠しの行き先（付けた順。行き先ごとの見た目・つながりを全部見られるように） */
 const SHOWCASE_DESTS: SecretDest[] = ['bFloor', 'passageRare', 'loop', 'rareRoom', 'loop', 'floorLink'];
 const SHOWCASE_RARE: RareKind[] = ['white', 'theater', 'pool', 'gallery', 'library', 'chapel', 'machine', 'play', 'garden'];

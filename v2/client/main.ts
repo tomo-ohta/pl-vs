@@ -33,6 +33,8 @@ const showcase = Math.max(0, Number(params.get('showcase') ?? 0) | 0);
 const tryIds = [...new Set([
   ...(params.get('try') ?? '').split(',').map((x) => x.trim()).filter(Boolean),
   ...(CATALOG_BY_WS[params.get('group') ?? ''] ?? []).flatMap((e) => e.impl.filter((m) => m.kind === 'gimmick' || m.kind === 'anomaly').map((m) => m.id)),
+  // 部屋の形（core/gen/rooms。台帳の kind 'room'）
+  ...(CATALOG_BY_WS[params.get('group') ?? ''] ?? []).flatMap((e) => e.impl.filter((m) => m.kind === 'room' && e.status === 'done').map((m) => m.id)),
 ])];
 const devTour = showcase > 0 || tryIds.length > 0 || params.has('dev');
 let depth = Math.max(0, Number(params.get('depth') ?? 0) | 0);

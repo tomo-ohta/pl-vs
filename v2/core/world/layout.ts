@@ -157,6 +157,8 @@ export interface CellLayout {
    * 床・壁の素材の柄と色合いを揃える（区画の境目で色が切り替わらないように）
    */
   materialKey?: string;
+  /** 部屋の形（core/gen/rooms の形の id。柱林・段々の部屋 …）。地図・図鑑・試験が読む。無ければ普通の箱の部屋 */
+  shape?: string;
 }
 
 /** 区画どうしの開口（cell and portal の描画で、ここを通して隣の区画が見える） */

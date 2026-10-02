@@ -22,6 +22,7 @@ import { placeGimmicks, type GimmickResult, type ShowcaseOptions } from './gimmi
 import { floorId, floorSeed, rollProfile, type FloorKey, type FloorProfile } from './profile.ts';
 import { familyById } from './themes.ts';
 import { buildSkeleton } from './skeleton.ts';
+import { shapeRooms } from '../rooms/index.ts';
 
 export const GEN_VERSION = 'gen-1';
 
@@ -89,6 +90,8 @@ export function generateFloorReport(key: FloorKey, t: Tuning, opts: GenOptions =
     const anomalies = opts.noGimmicks ? null : planAnomalies(content, geo, gimmicks, t, key.depth, opts.showcase?.anomalies ? { anomalies: opts.showcase.anomalies } : undefined);
     // 見て回る順（見本のフロアのワープ）に異変の部屋も入れる
     if (gimmicks && anomalies) gimmicks.tour.push(...anomalies.tour);
+    // 部屋の形（core/gen/rooms。仕掛けと異変を決めた後、中身を置く前。見本のフロアでは頼んだ形だけ。裏のフロアは表と同じ形）
+    if (gimmicks && anomalies) shapeRooms(content, geo, gimmicks, anomalies, t, key.depth, opts.showcase ? opts.showcase.rooms ?? [] : undefined, front?.floor);
     const dressedFrom = new Map<string, number>();
     if (opts.dress) {
       // 隠し部屋のうち、中身が決まっているもの（別のフロアへの穴・私室）と、異変が自分で埋める部屋には置かない
