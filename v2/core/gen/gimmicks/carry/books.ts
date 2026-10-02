@@ -16,7 +16,7 @@ import { distToRoute, freeSpans, gridRoute, offer, onMainWall, snap, thinRoute, 
 const COVERS: MatId[] = ['plasticRed', 'plasticBlue', 'lightGreen', 'plasticYellow', 'furnitureDark', 'woodPanel'];
 
 defineGimmick({
-  id: 'bookCollect', name: '本を集める', axes: ['carry'], kinds: ['room', 'hall'], minSize: [5, 6], weight: 0.4, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'bookCollect', name: '本を集める', axes: ['carry'], kinds: ['room', 'hall'], minSize: [5, 6], weight: 0.22, intensity: 1, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;

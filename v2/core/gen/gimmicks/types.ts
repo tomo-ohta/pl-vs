@@ -33,6 +33,8 @@ export interface GimmickSlot {
   exit: WallOpening | null;
   /** 主の矩形（足跡の最大の矩形） */
   rect: Rect;
+  /** 段階 4（carry）: 選んだ仕掛けだけの見本のフロア（?try / ?group）に置いている（行き止まりにしか置かない仕掛けを、脇の部屋にも置いて見られるように） */
+  showcase?: boolean;
 }
 
 export interface GimmickContext {

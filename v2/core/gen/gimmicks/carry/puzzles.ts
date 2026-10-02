@@ -28,7 +28,8 @@ export function puzzleBase(ctx: GimmickContext, need = 1.6): { y: number; r: Ret
   return null;
 }
 
-const deadEnd = (s: GimmickSlot): boolean => s.openings.length === 1 && s.openings.every((o) => onMainWall(s, o));
+/** 行き止まりの部屋（見本のフロアでは、脇の部屋の開口 2 つまで） */
+const deadEnd = (s: GimmickSlot): boolean => (s.openings.length === 1 || (!!s.showcase && !s.main && s.openings.length === 2)) && s.openings.every((o) => onMainWall(s, o));
 
 /** 手がかりの板（枠の材質 frame）を壁 w に貼る: 幅 hw の板 */
 function cluePlate(ctx: GimmickContext, w: ClueWall, hw: number, y0: number, y1: number, frame: MatId): void {
@@ -39,7 +40,7 @@ function cluePlate(ctx: GimmickContext, w: ClueWall, hw: number, y0: number, y1:
 
 // ---------------------------------------------------------------- PZ01 数字錠
 defineGimmick({
-  id: 'dialLock', name: '数字錠', axes: ['puzzle'], kinds: ['room'], minSize: [3.6, 3.8], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'dialLock', name: '数字錠', axes: ['puzzle'], kinds: ['room'], minSize: [3.6, 3.8], weight: 0.25, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const b = puzzleBase(ctx, 2.8);
@@ -73,7 +74,7 @@ defineGimmick({
 const RGB: { mat: MatId; color: number }[] = [{ mat: 'neonRed', color: 0xff3a30 }, { mat: 'lightGreen', color: 0x40ff50 }, { mat: 'neonBlue', color: 0x4060ff }];
 
 defineGimmick({
-  id: 'colorMix', name: '色の照明を混ぜる', axes: ['puzzle', 'light'], kinds: ['room'], minSize: [3.6, 4.2], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'colorMix', name: '色の照明を混ぜる', axes: ['puzzle', 'light'], kinds: ['room'], minSize: [3.6, 4.2], weight: 0.3, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const b = puzzleBase(ctx, 1.6);
@@ -117,7 +118,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- PZ03 時計
 defineGimmick({
-  id: 'clockRoom', name: '時計を合わせる', axes: ['puzzle', 'time'], kinds: ['room'], minSize: [3.6, 4.2], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'clockRoom', name: '時計を合わせる', axes: ['puzzle', 'time'], kinds: ['room'], minSize: [3.6, 4.2], weight: 0.25, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const b = puzzleBase(ctx, 1.6);
@@ -161,7 +162,7 @@ defineGimmick({
 const SCALE = [0, 2, 4, 7, 9, 12];
 
 defineGimmick({
-  id: 'bellOrder', name: '鐘を鳴らす順', axes: ['puzzle', 'sound'], kinds: ['room'], minSize: [3.6, 4.2], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'bellOrder', name: '鐘を鳴らす順', axes: ['puzzle', 'sound'], kinds: ['room'], minSize: [3.6, 4.2], weight: 0.25, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const b = puzzleBase(ctx, 1.6);
@@ -198,7 +199,7 @@ const BULBS: { id: string; glass: MatId; color: number }[] = [
 ];
 
 defineGimmick({
-  id: 'bulbOrder', name: '電球を元の順に', axes: ['puzzle', 'carry', 'light'], kinds: ['room'], minSize: [3.6, 4.2], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'bulbOrder', name: '電球を元の順に', axes: ['puzzle', 'carry', 'light'], kinds: ['room'], minSize: [3.6, 4.2], weight: 0.25, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const b = puzzleBase(ctx, 1.6);

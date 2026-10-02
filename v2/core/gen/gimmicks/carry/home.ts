@@ -12,7 +12,7 @@ import { innerRect } from '../util.ts';
 import { aabbJ, addItem, freeSpans, offer, onMainWall, wallBox, wallPoint } from './util.ts';
 
 defineGimmick({
-  id: 'homeObject', name: '元の部屋の物', axes: ['carry'], kinds: ['room', 'hall'], minSize: [3.8, 4.4], weight: 0.35, intensity: 0, offersSecret: true, onMainPath: true,
+  id: 'homeObject', name: '元の部屋の物', axes: ['carry'], kinds: ['room', 'hall'], minSize: [3.8, 4.4], weight: 0.12, intensity: 0, offersSecret: true, onMainPath: true,
   fits: (s) => s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;

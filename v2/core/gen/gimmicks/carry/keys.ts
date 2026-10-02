@@ -30,7 +30,7 @@ export function placeFar(ctx: GimmickContext, name: string, o: ItemOpts, minHops
 }
 
 defineGimmick({
-  id: 'keycardGate', name: '鍵ではない鍵', axes: ['carry'], kinds: ['room', 'hall', 'corridor'], minSize: [2.6, 5], weight: 0.35, intensity: 0, offersSecret: true, requiresSecret: true, onMainPath: true,
+  id: 'keycardGate', name: '鍵ではない鍵', axes: ['carry'], kinds: ['room', 'hall'], minSize: [2.6, 5], weight: 0.16, intensity: 0, offersSecret: true, requiresSecret: true, onMainPath: true,
   fits: (s) => s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;
@@ -72,7 +72,7 @@ const LOST_KINDS: { kind: string; half: Vec3 }[] = [
 ];
 
 defineGimmick({
-  id: 'lostItem', name: '落とし物を届ける', axes: ['carry'], kinds: ['room'], minSize: [3.6, 4.2], weight: 0.3, intensity: 0, offersSecret: true, requiresSecret: true, onMainPath: false,
+  id: 'lostItem', name: '落とし物を届ける', axes: ['carry'], kinds: ['room'], minSize: [3.6, 4.2], weight: 0.22, intensity: 0, offersSecret: true, requiresSecret: true, onMainPath: false,
   fits: (s) => s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;
@@ -102,7 +102,7 @@ defineGimmick({
 });
 
 defineGimmick({
-  id: 'bulbRoom', name: '電球を付け替える', axes: ['carry', 'light'], kinds: ['room', 'hall'], minSize: [4.2, 5], weight: 0.35, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'bulbRoom', name: '電球を付け替える', axes: ['carry', 'light'], kinds: ['room', 'hall'], minSize: [4.2, 5], weight: 0.12, intensity: 1, offersSecret: true, onMainPath: true,
   fits: (s) => s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;

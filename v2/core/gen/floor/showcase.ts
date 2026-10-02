@@ -25,11 +25,14 @@ export function showcaseFloor(t: Tuning, opts: { flip?: boolean; from?: number; 
   }
   // 仕掛けを全種置けたかを先に見て、同じなら異変の種類の多い方
   const placed = (r: GenReport): number => new Set(r.gimmicks?.gimmicks.map((g) => g.def)).size * 100 + new Set(r.anomalies.map((a) => a.def)).size;
+  // 段階 4（carry）: 一覧の前の方（登録の順なので段階 3 の仕掛け）を途切れずに置けたフロアを先に選ぶ。
+  // 段階 4 で種類が増えて全種は 1 つのフロアに入らないので、数だけで選ぶと段階 3 の仕掛けが押し出されることがある
+  const lead = (r: GenReport): number => { const s = new Set(r.gimmicks?.gimmicks.map((g) => g.def)); const i = all.findIndex((id) => !s.has(id)); return i < 0 ? all.length : i; };
   let best: GenReport | null = null;
   const from = opts.from ?? 1;
   for (let w = from; w < from + 24; w++) {
-    const r = generateFloorReport({ world: w, depth: 0, variant: 0 }, t, { showcase: { gimmicks: all, flip: opts.flip, anomalies }, dress: opts.dress });
-    if (!best || placed(r) > placed(best)) best = r;
+    const r = generateFloorReport({ world: w, depth: 0, variant: 0 }, t, { showcase: { gimmicks: all, flip: opts.flip, anomalies, ...(opts.ids ? { pick: true } : {}) }, dress: opts.dress });
+    if (!best || lead(r) > lead(best) || (lead(r) === lead(best) && placed(r) > placed(best))) best = r;
     if (placed(r) === all.length * 100 + anomalies.length) break;
   }
   return best!;

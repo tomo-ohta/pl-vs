@@ -18,7 +18,7 @@ const SMALL: { kind: string; half: Vec3; mat: MatId }[] = [
 ];
 
 defineGimmick({
-  id: 'replicaRoom', name: '物を置くと増える', axes: ['carry', 'sight'], kinds: ['room', 'hall'], minSize: [4.4, 5.2], weight: 0.3, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'replicaRoom', name: '物を置くと増える', axes: ['carry', 'sight'], kinds: ['room', 'hall'], minSize: [4.4, 5.2], weight: 0.14, intensity: 1, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;

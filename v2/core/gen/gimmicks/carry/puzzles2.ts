@@ -22,7 +22,8 @@ import { doorZone, innerRect, wallFrame } from '../util.ts';
 import { puzzleBase } from './puzzles.ts';
 import { aabbJ, addClueBox, addItem, clueWall, floorSpots, freeSpans, keepClueFront, offer, onMainWall, snap, wallBox, wallPoint } from './util.ts';
 
-const deadEnd = (s: GimmickSlot): boolean => s.openings.length === 1 && s.openings.every((o) => onMainWall(s, o));
+/** 行き止まりの部屋（見本のフロアでは、脇の部屋の開口 2 つまで） */
+const deadEnd = (s: GimmickSlot): boolean => (s.openings.length === 1 || (!!s.showcase && !s.main && s.openings.length === 2)) && s.openings.every((o) => onMainWall(s, o));
 
 /** 手がかりの額（壁 w）に canvas の絵を掛ける */
 function cluePicture(ctx: GimmickContext, name: string, draw: string, extra: { [k: string]: import('../../../world/layout.ts').Json }, avoid: Dir[], w0 = 0.8, h0 = 0.6): boolean {
@@ -37,7 +38,7 @@ function cluePicture(ctx: GimmickContext, name: string, draw: string, extra: { [
 
 // ---------------------------------------------------------------- PZ04 タイルの絵
 defineGimmick({
-  id: 'tilePicture', name: 'タイルの絵', axes: ['puzzle', 'carry'], kinds: ['room'], minSize: [3.8, 4.2], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'tilePicture', name: 'タイルの絵', axes: ['puzzle', 'carry'], kinds: ['room'], minSize: [3.8, 4.2], weight: 0.35, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const b = puzzleBase(ctx, 1.6);
@@ -68,7 +69,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- PZ05 影絵
 defineGimmick({
-  id: 'shadowPuzzle', name: '影絵の扉', axes: ['puzzle', 'light'], kinds: ['room', 'hall'], minSize: [3.8, 5.2], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'shadowPuzzle', name: '影絵の扉', axes: ['puzzle', 'light'], kinds: ['room', 'hall'], minSize: [3.8, 5.2], weight: 0.35, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const s = ctx.slot;
@@ -129,7 +130,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- PZ06 鏡の光
 defineGimmick({
-  id: 'mirrorBeam', name: '鏡の光', axes: ['puzzle', 'light', 'carry'], kinds: ['room', 'hall'], minSize: [4.2, 4.8], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'mirrorBeam', name: '鏡の光', axes: ['puzzle', 'light', 'carry'], kinds: ['room', 'hall'], minSize: [4.2, 4.8], weight: 0.25, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const s = ctx.slot;
@@ -251,7 +252,7 @@ const FURN: { kind: string; half: Vec3; mat: MatId }[] = [
 ];
 
 defineGimmick({
-  id: 'furnitureMatch', name: '写真と同じ配置', axes: ['puzzle', 'carry'], kinds: ['room'], minSize: [3.8, 4.4], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'furnitureMatch', name: '写真と同じ配置', axes: ['puzzle', 'carry'], kinds: ['room'], minSize: [3.8, 4.4], weight: 0.35, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const b = puzzleBase(ctx, 1.6);
@@ -287,7 +288,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- PZ09 天秤
 defineGimmick({
-  id: 'balanceScale', name: '天秤', axes: ['puzzle', 'carry'], kinds: ['room'], minSize: [3.8, 4.4], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'balanceScale', name: '天秤', axes: ['puzzle', 'carry'], kinds: ['room'], minSize: [3.8, 4.4], weight: 0.35, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const b = puzzleBase(ctx, 1.6);
@@ -363,7 +364,7 @@ export function slideSolve(nu: number, nv: number, open: ReadonlySet<string>, st
 
 // ---------------------------------------------------------------- PZ10 迷路の模型
 defineGimmick({
-  id: 'mazeModel', name: '迷路の模型', axes: ['puzzle', 'sight'], kinds: ['room', 'hall'], minSize: [5.0, 6.4], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'mazeModel', name: '迷路の模型', axes: ['puzzle', 'sight'], kinds: ['room', 'hall'], minSize: [4.2, 5.4], weight: 0.45, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const s = ctx.slot;
@@ -371,11 +372,11 @@ defineGimmick({
     const r = innerRect(s);
     const ent = s.openings[0]!;
     const F = wallFrame(r, ent.dir);
-    const ante = 2.3;
+    const ante = 2.6;
     const W = F.u1 - F.u0, Dm = F.depth - ante;
-    const cellM = 1.7;
+    const cellM = 1.5;
     const nu = Math.max(2, Math.round(W / cellM)), nv = Math.max(2, Math.round(Dm / cellM));
-    if (nu * nv < 6 || W / nu < 1.4 || Dm / nv < 1.4) return;
+    if (nu * nv < 6 || W / nu < 1.25 || Dm / nv < 1.25) return;
     const cu = W / nu, cv = Dm / nv;
     // 迷路の升目（局所 u, v）。番号は k * nu + i（i: u の向き、k: v の向き。k = 0 が手前）
     const cellRect = (i: number, k: number): Rect => F.rect(F.u0 + i * cu, ante + k * cv, F.u0 + (i + 1) * cu, ante + (k + 1) * cv);
@@ -423,9 +424,11 @@ defineGimmick({
     ctx.removeBoxes((bx) => !bx.solid && bx.mat === s.cell.palette.light && walls.some((w) => bx.min[0] < w.max[0] && bx.max[0] > w.min[0] && bx.min[2] < w.max[2] && bx.max[2] > w.min[2]));
     for (const w of walls) ctx.addBox(w);
     // 模型の机: 手前の部屋の真ん中（入口の升目の前を避けて、横へずらす）
-    const tu = startI < nu / 2 ? F.u1 - Math.min(1.6, (F.u1 - F.u0) / 3) : F.u0 + Math.min(1.6, (F.u1 - F.u0) / 3);
-    const tc = F.point(tu, ante / 2 + 0.1);
-    const tw = 0.6, td = 0.45;
+    // 机: 4 辺のまわりに立てる（0.9 m 空ける）。入口から横へ離れた方（扉の前を空ける）
+    const tw = 0.5, td = 0.4;
+    const tu = [F.u0 + 1.4, F.u1 - 1.4].sort((a, b) => Math.abs(b - eu) - Math.abs(a - eu))[0]!;
+    if (Math.abs(tu - eu) < 1.3) return;
+    const tc = F.point(tu, 1.3);
     const alongX = ent.dir % 2 === 0;
     const table = alongX ? box([tc[0] - tw, y, tc[1] - td], [tc[0] + tw, y + 0.85, tc[1] + td], 'woodPanel') : box([tc[0] - td, y, tc[1] - tw], [tc[0] + td, y + 0.85, tc[1] + tw], 'woodPanel');
     if (s.openings.some((o) => { const z = doorZone(o, y, 1.4, 0.3); return table.min[0] < z.max[0] && table.max[0] > z.min[0] && table.min[2] < z.max[2] && table.max[2] > z.min[2]; })) return;
@@ -444,7 +447,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- PZ12 足跡の模様
 defineGimmick({
-  id: 'footPattern', name: '足跡の模様', axes: ['puzzle', 'floor'], kinds: ['room', 'hall'], minSize: [4.4, 4.8], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'footPattern', name: '足跡の模様', axes: ['puzzle', 'floor'], kinds: ['room', 'hall'], minSize: [4.4, 4.8], weight: 0.3, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const b = puzzleBase(ctx, 1.6);

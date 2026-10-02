@@ -15,7 +15,7 @@ import { innerRect } from '../util.ts';
 import { aabbJ, addItem, freeSpans, idOf, offer, onMainWall, wallBox, wallPoint } from './util.ts';
 
 defineGimmick({
-  id: 'carryWater', name: '水を運ぶ', axes: ['carry'], kinds: ['room', 'hall'], minSize: [4.4, 6], weight: 0.45, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'carryWater', name: '水を運ぶ', axes: ['carry'], kinds: ['room', 'hall'], minSize: [4.4, 6], weight: 0.2, intensity: 1, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;

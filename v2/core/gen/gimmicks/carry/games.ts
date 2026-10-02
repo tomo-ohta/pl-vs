@@ -76,7 +76,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- U02 ボウリングの廊下
 defineGimmick({
-  id: 'bowlingLane', name: 'ボウリングの廊下', axes: ['carry', 'move'], kinds: ['room', 'hall'], minSize: [2.8, 8], weight: 0.25, intensity: 0, physics: true, offersSecret: true, onMainPath: false,
+  id: 'bowlingLane', name: 'ボウリングの廊下', axes: ['carry', 'move'], kinds: ['room', 'hall'], minSize: [2.8, 8], weight: 0.3, intensity: 0, physics: true, offersSecret: true, onMainPath: false,
   fits: sideRoom,
   build(ctx) {
     const s = ctx.slot;
@@ -177,7 +177,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- U04 鬼ごっこする灯り
 defineGimmick({
-  id: 'tagRoom', name: '鬼ごっこする灯り', axes: ['light', 'move'], kinds: ['room', 'hall'], minSize: [5, 6], weight: 0.25, intensity: 0, offersSecret: true, onMainPath: false,
+  id: 'tagRoom', name: '鬼ごっこする灯り', axes: ['light', 'move'], kinds: ['room', 'hall'], minSize: [5, 6], weight: 0.22, intensity: 0, offersSecret: true, onMainPath: false,
   fits: sideRoom,
   build(ctx) {
     const s = ctx.slot;
@@ -197,7 +197,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- U05 かくれんぼ
 defineGimmick({
-  id: 'hideSeek', name: 'かくれんぼ', axes: ['sight', 'light'], kinds: ['room', 'hall'], minSize: [6, 7], weight: 0.25, intensity: 1, offersSecret: true, onMainPath: false,
+  id: 'hideSeek', name: 'かくれんぼ', axes: ['sight', 'light'], kinds: ['room', 'hall'], minSize: [6, 7], weight: 0.3, intensity: 1, offersSecret: true, onMainPath: false,
   fits: sideRoom,
   build(ctx) {
     const s = ctx.slot;
@@ -253,9 +253,9 @@ defineGimmick({
 
 // ---------------------------------------------------------------- U06 ピンボールの吹き抜け
 defineGimmick({
-  id: 'pinballHall', name: 'ピンボールの吹き抜け', axes: ['move', 'floor'], kinds: ['room', 'hall'], minSize: [6, 7], weight: 0.25, intensity: 1, offersSecret: true, onMainPath: false,
+  id: 'pinballHall', name: 'ピンボールの吹き抜け', axes: ['move', 'floor'], kinds: ['room', 'hall'], minSize: [6, 7], weight: 0.4, intensity: 1, offersSecret: true, onMainPath: false,
   // 行き止まりの部屋だけ（押される床・弾く柱の部屋を、ほかの部屋への通り道にしない）
-  fits: (s) => sideRoom(s) && s.openings.length === 1,
+  fits: (s) => sideRoom(s) && (s.openings.length === 1 || !!s.showcase),
   build(ctx) {
     const s = ctx.slot;
     const y = s.cell.floorY;

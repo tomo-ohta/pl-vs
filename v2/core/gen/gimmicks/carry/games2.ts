@@ -31,7 +31,7 @@ function secretWall(ctx: GimmickContext, need = 1.4, avoid: Dir[] = []): { d: Di
 
 // ---------------------------------------------------------------- U07 カートの坂
 defineGimmick({
-  id: 'cartLoop', name: 'カートの坂', axes: ['move'], kinds: ['room', 'hall'], minSize: [6.4, 7], minHeight: 2.7, weight: 0.25, intensity: 0, offersSecret: true, onMainPath: false,
+  id: 'cartLoop', name: 'カートの坂', axes: ['move'], kinds: ['room', 'hall'], minSize: [6.4, 7], minHeight: 2.7, weight: 0.4, intensity: 0, offersSecret: true, onMainPath: false,
   fits: sideRoom,
   build(ctx) {
     const s = ctx.slot;
@@ -113,8 +113,8 @@ const MEMO: { kind: string; half: Vec3; mat: MatId }[] = [
 ];
 
 defineGimmick({
-  id: 'memoryRoom', name: '記憶の部屋', axes: ['carry', 'light'], kinds: ['room'], minSize: [4, 4.5], weight: 0.25, intensity: 0, offersSecret: true, onMainPath: false,
-  fits: (s) => sideRoom(s) && s.openings.length === 1,
+  id: 'memoryRoom', name: '記憶の部屋', axes: ['carry', 'light'], kinds: ['room'], minSize: [4, 4.5], weight: 0.18, intensity: 0, offersSecret: true, onMainPath: false,
+  fits: (s) => sideRoom(s) && (s.openings.length === 1 || !!s.showcase),
   build(ctx) {
     const s = ctx.slot;
     const y = s.cell.floorY;
@@ -146,7 +146,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- U10 自分の影絵
 defineGimmick({
-  id: 'shadowPose', name: '影絵（自分の影）', axes: ['light', 'body'], kinds: ['room', 'hall'], minSize: [4.2, 6], weight: 0.25, intensity: 0, offersSecret: true, onMainPath: false,
+  id: 'shadowPose', name: '影絵（自分の影）', axes: ['light', 'body'], kinds: ['room', 'hall'], minSize: [4.2, 6], weight: 0.22, intensity: 0, offersSecret: true, onMainPath: false,
   fits: sideRoom,
   build(ctx) {
     const s = ctx.slot;
@@ -208,7 +208,7 @@ defineGimmick({
 const SCALE8 = [0, 2, 4, 5, 7, 9, 11, 12];
 
 defineGimmick({
-  id: 'pianoFloor', name: 'ピアノの床', axes: ['sound', 'floor'], kinds: ['room', 'hall'], minSize: [4.2, 5.4], weight: 0.25, intensity: 0, offersSecret: true, onMainPath: false,
+  id: 'pianoFloor', name: 'ピアノの床', axes: ['sound', 'floor'], kinds: ['room', 'hall'], minSize: [4.2, 5.4], weight: 0.14, intensity: 0, offersSecret: true, onMainPath: false,
   fits: sideRoom,
   build(ctx) {
     const s = ctx.slot;
@@ -247,7 +247,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- U12 無重力で輪をくぐる
 defineGimmick({
-  id: 'ringRoom', name: '浮かぶ輪', axes: ['gravity', 'body'], kinds: ['hall', 'room'], minSize: [5, 6], minHeight: 3.2, weight: 0.25, intensity: 0, offersSecret: true, onMainPath: false,
+  id: 'ringRoom', name: '浮かぶ輪', axes: ['gravity', 'body'], kinds: ['hall', 'room'], minSize: [5, 6], minHeight: 3.2, weight: 0.4, intensity: 0, offersSecret: true, onMainPath: false,
   fits: sideRoom,
   build(ctx) {
     const s = ctx.slot;

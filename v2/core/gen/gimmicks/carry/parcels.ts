@@ -18,7 +18,7 @@ export const PARCEL_COLORS: { id: string; mat: MatId }[] = [
 ];
 
 defineGimmick({
-  id: 'parcelGate', name: '荷物と待つ扉', axes: ['carry'], kinds: ['room', 'hall'], minSize: [4.2, 5.2], weight: 0.4, intensity: 1, offersSecret: true, requiresSecret: true, onMainPath: true,
+  id: 'parcelGate', name: '荷物と待つ扉', axes: ['carry'], kinds: ['room', 'hall'], minSize: [4.2, 5.2], weight: 0.22, intensity: 1, offersSecret: true, requiresSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;

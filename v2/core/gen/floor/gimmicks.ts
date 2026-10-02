@@ -69,7 +69,11 @@ function openingTo(geo: FloorGeometry, g: GeoCell, other: string): WallOpening |
  * 見本のフロア（確認用）: 仕掛けを決めた順に 1 つずつ置き、差し出された隠しを全部付ける。
  * 型を選べる隠しは存在 / 出現を交互に（flip で逆から）。仕掛けとは別の隠し（暗がり）は 1 つだけ
  */
-export interface ShowcaseOptions { gimmicks: string[]; flip?: boolean }
+export interface ShowcaseOptions {
+  gimmicks: string[]; flip?: boolean;
+  /** 段階 4（carry）: 選んだ仕掛けだけを見る（?try / ?group）。区画に GimmickSlot.showcase を付ける（全種の見本では付けない） */
+  pick?: boolean;
+}
 /** 見本のフロアの隠しの行き先（付けた順。行き先ごとの見た目・つながりを全部見られるように） */
 const SHOWCASE_DESTS: SecretDest[] = ['bFloor', 'passageRare', 'loop', 'rareRoom', 'loop', 'floorLink'];
 const SHOWCASE_RARE: RareKind[] = ['white', 'theater', 'pool', 'gallery', 'library', 'chapel', 'machine', 'play', 'garden'];
@@ -141,7 +145,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
     const entrance = onMain && idx > 0 ? openingTo(geo, g, main[idx - 1]!) : g.openings[0] ?? null;
     const exit = onMain && idx >= 0 && idx < main.length - 1 ? openingTo(geo, g, main[idx + 1]!) : g.openings.find((o) => o !== entrance) ?? null;
     const rect = g.cell.footprint.reduce((a, x) => ((x.x1 - x.x0) * (x.z1 - x.z0) > (a.x1 - a.x0) * (a.z1 - a.z0) ? x : a));
-    const slot: GimmickSlot = { cell: g.cell, kind: g.kind, openings: g.openings, main: onMain, entrance, exit, rect };
+    const slot: GimmickSlot = { cell: g.cell, kind: g.kind, openings: g.openings, main: onMain, entrance, exit, rect, ...(showcase?.pick ? { showcase: true } : {}) };
     const w = rect.x1 - rect.x0, d = rect.z1 - rect.z0;
     const fit = defs.filter((def) =>
       def.kinds.includes(g.kind) &&

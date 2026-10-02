@@ -22,7 +22,7 @@ const CHAIR_MATS: MatId[] = ['woodPanel', 'seatBlue', 'furnitureLight', 'plastic
 const yawOfDir = (d: Dir): number => [Math.PI, -Math.PI / 2, 0, Math.PI / 2][d]!;
 
 defineGimmick({
-  id: 'chairRoom', name: '椅子を戻す', axes: ['carry'], kinds: ['room', 'hall'], minSize: [5.4, 6.4], weight: 0.4, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'chairRoom', name: '椅子を戻す', axes: ['carry'], kinds: ['room', 'hall'], minSize: [5.4, 6.4], weight: 0.3, intensity: 1, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;
@@ -78,7 +78,7 @@ defineGimmick({
 });
 
 defineGimmick({
-  id: 'alignChairs', name: '向きのそろわない椅子', axes: ['carry'], kinds: ['room', 'hall'], minSize: [4.4, 5.2], weight: 0.35, intensity: 0, offersSecret: true, onMainPath: true,
+  id: 'alignChairs', name: '向きのそろわない椅子', axes: ['carry'], kinds: ['room', 'hall'], minSize: [4.4, 5.2], weight: 0.14, intensity: 0, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;

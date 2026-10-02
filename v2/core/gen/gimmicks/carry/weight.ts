@@ -12,7 +12,7 @@ import { buildHatch, hatchSecret, planHatch } from './hatch.ts';
 import { aabbJ, addItem, floorSpots, offer, onMainWall } from './util.ts';
 
 defineGimmick({
-  id: 'weightHatch', name: '重さで開く床', axes: ['carry', 'floor'], kinds: ['room', 'hall'], minSize: [5.2, 6.4], weight: 0.4, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'weightHatch', name: '重さで開く床', axes: ['carry', 'floor'], kinds: ['room', 'hall'], minSize: [5.2, 6.4], weight: 0.3, intensity: 1, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && s.openings.every((o) => onMainWall(s, o)),
   build(ctx) {
     const s = ctx.slot;
