@@ -8,6 +8,7 @@
  *          調べる（E / タップ）と read が入る（クライアントが自分の地図に写す）。params.box は板の面
  * - mapNote: 落ちている誰かの地図（N09 他人の地図）。調べると read（クライアントが書き込みを自分の地図に写す）。
  *          持ち運ぶ仕組み（carry の担当）とは後でつなぐ: いまは「調べると読める物」
+ * - mapWall: 調べられる壁（BX04 地図の空白の壁）。見た目は無い。調べると pressed（その tick だけ）
  * - landmark: 霧の中の塔の灯り（N05）。見た目だけ（クライアントが霧を通して見える灯りを描く）。出力 on（明滅）
  */
 import { aabbCenter, aabbExpand } from '../../../math/aabb.ts';
@@ -47,6 +48,22 @@ function readable(type: string): void {
 }
 readable('mapBoard');
 readable('mapNote');
+
+/** 調べられる壁（BX04 地図の空白の壁）: 見た目は無い。調べると pressed（その tick だけ）。壁を叩いた音の合図 map.knock */
+definePart<{ count: number }>({
+  type: 'mapWall',
+  outputs: ['pressed', 'count'],
+  init(ctx) {
+    ctx.setInteractable(aabbExpand(pAabb(ctx.spec, 'box'), 0.05), pNum(ctx.spec, 'range', 2.6));
+    return { count: 0 };
+  },
+  step(s, ctx) {
+    const pressed = !!ctx.interactedBy();
+    if (pressed) { s.count++; ctx.cue('map.knock', aabbCenter(pAabb(ctx.spec, 'box'))); }
+    ctx.output('pressed', pressed ? 1 : 0);
+    ctx.output('count', s.count);
+  },
+});
 
 definePart({
   type: 'landmark',

@@ -129,7 +129,13 @@ export function readableContent(info: MapInfo, r: MapReadable): ReadableContent 
   const p = r.params;
   const lie = (p.lie && typeof p.lie === 'object' && !Array.isArray(p.lie) ? p.lie : {}) as { [k: string]: Json };
   const lieKind = typeof lie.kind === 'string' ? lie.kind : '';
-  let ids = strs(p.cells).filter((id) => info.byId.has(id) && !info.byId.get(id)!.hidden);
+  // 描く区画（区画の一覧が無い地図 = 机の上の測量図は、中心から半径の中の区画）
+  const listed = Array.isArray(p.cells) ? strs(p.cells) : (() => {
+    const c = xz(p.center), rad = typeof p.radius === 'number' ? p.radius : 12;
+    if (!c) return [];
+    return info.cells.filter((x) => x.kind !== 'secret' && x.rects.some((q) => Math.hypot(Math.max(q.x0 - c[0], 0, c[0] - q.x1), Math.max(q.z0 - c[1], 0, c[1] - q.z1)) <= rad)).map((x) => x.id);
+  })();
+  let ids = listed.filter((id) => info.byId.has(id) && !info.byId.get(id)!.hidden);
   if (lieKind === 'missing') { const miss = new Set(strs(lie.cells)); ids = ids.filter((id) => !miss.has(id)); }
   const cells = ids.map((id) => info.byId.get(id)!.shape);
   if (lieKind === 'secret') for (const id of strs(lie.cells)) { const c = info.byId.get(id); if (c) cells.push(c.rects); }

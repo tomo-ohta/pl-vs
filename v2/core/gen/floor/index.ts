@@ -22,6 +22,7 @@ import { placeGimmicks, type GimmickResult, type ShowcaseOptions } from './gimmi
 import { floorId, floorSeed, rollProfile, type FloorKey, type FloorProfile } from './profile.ts';
 import { familyById } from './themes.ts';
 import { buildSkeleton } from './skeleton.ts';
+import { placeMapSigns } from '../gimmicks/map/signs.ts';
 
 export const GEN_VERSION = 'gen-1';
 
@@ -101,6 +102,8 @@ export function generateFloorReport(key: FloorKey, t: Tuning, opts: GenOptions =
     }
     // 異変の中身を置いた後の変化（post: 家具の変形）
     anomalies?.post(dressedFrom);
+    // 地図の看板（入口の案内図・現在地の看板）と落ちている誰かの地図（段階 4・地図の担当。家具の後に空いている壁と床へ）
+    if (gimmicks) placeMapSigns(content, geo, gimmicks, anomalies?.placed ?? [], t);
     const floor = assemble(key, content, geo, t);
     const tone = front ? applyBSide(floor, new Rng(hashAll(floorSeed(key), 'tone')), new Set(anomalies?.placed.map((x) => x.cell))).id : undefined;
     // 仕掛けを置いた区画は置くときに到達を確かめている（部品が作る床を含めて）ので、ここでは見ない
