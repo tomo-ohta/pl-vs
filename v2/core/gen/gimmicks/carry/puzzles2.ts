@@ -5,7 +5,7 @@
  *     絵がつながると扉。完成した絵は、別の部屋の壁に額に入って掛かっている
  * - shadowPuzzle PZ05 影絵: 壁際の強い灯りと、向かいの白い壁の扉の形の線。間に高さの同じ台が 3 つ。扉の形の切り抜きを
  *     どの台に置くかで、壁に落ちる影の大きさが変わる。影が線にぴったり重なると、影が扉になる
- * - mirrorBeam PZ06 鏡の光: 壁の穴から床の升目に沿って光の筋。柱に当たって止まっている。鏡（持てる物）を斜めに置くと
+ * - mirrorPuzzle PZ06 鏡の光: 壁の穴から床の升目に沿って光の筋。柱に当たって止まっている。鏡（持てる物）を斜めに置くと
  *     光が曲がる（置いた人の向きに置かれる。45° 刻み）。光を奥の壁の目に届けると扉
  * - furnitureMatch PZ08 写真と同じ配置: 椅子・丸椅子・鉢植え・電気スタンド。壁の写真（上から見た部屋の図）と同じ所に置く
  * - balanceScale PZ09 天秤: 真ん中の天秤の両側の皿。重さの違う箱（点の数が重さ）。両側を同じ重さ（4 以上）にすると扉
@@ -130,7 +130,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- PZ06 鏡の光
 defineGimmick({
-  id: 'mirrorBeam', name: '鏡の光', axes: ['puzzle', 'light', 'carry'], kinds: ['room', 'hall'], minSize: [4.2, 4.8], weight: 0.25, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
+  id: 'mirrorPuzzle', name: '鏡の光', axes: ['puzzle', 'light', 'carry'], kinds: ['room', 'hall'], minSize: [4.2, 4.8], weight: 0.25, intensity: 1, offersSecret: true, onMainPath: false, requiresSecret: true,
   fits: deadEnd,
   build(ctx) {
     const s = ctx.slot;

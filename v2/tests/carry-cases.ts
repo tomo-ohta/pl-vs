@@ -35,7 +35,7 @@ export const CARRY_CASES: { def: string; exits: ('opposite' | 'side' | 'none')[]
   { def: 'bulbOrder', exits: ['none'] },
   { def: 'tilePicture', exits: ['none'] },
   { def: 'shadowPuzzle', exits: ['none'] },
-  { def: 'mirrorBeam', exits: ['none'] },
+  { def: 'mirrorPuzzle', exits: ['none'] },
   { def: 'furnitureMatch', exits: ['none'] },
   { def: 'balanceScale', exits: ['none'] },
   { def: 'mazeModel', exits: ['none'] },

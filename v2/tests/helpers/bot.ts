@@ -12,6 +12,7 @@ import type { Sim } from '../../core/sim/sim.ts';
 import { IDLE_COMMAND, type InputCommand } from '../../core/sim/types.ts';
 import { inRect } from '../../core/world/footprint.ts';
 import type { CellLayout, FloorLayout, PortalSpec, Zone } from '../../core/world/layout.ts';
+import { senseAdjust, senseDrive } from './sense-bot.ts';
 
 export interface WalkResult { ok: boolean; reason: string; seconds: number; route: string[] }
 
@@ -19,6 +20,13 @@ export interface WalkResult { ok: boolean; reason: string; seconds: number; rout
 export const botDebug: { trace?: (msg: string) => void } = {};
 
 function route(floor: FloorLayout, from: string, to: string): PortalSpec[] | null {
+  // 隠し場所（role secret）は、行き先か出発点でなければ通らない道を先に探す（出現型の隠しは塞がっていて、遊ぶ人も知らない近道は使わない）。
+  // 無ければ隠し場所も通る（隠しの奥・通り抜けを歩く試験）
+  const secret = new Set(floor.cells.filter((c) => c.role === 'secret' && c.id !== from && c.id !== to).map((c) => c.id));
+  return routeAvoiding(floor, from, to, secret) ?? routeAvoiding(floor, from, to, new Set());
+}
+
+function routeAvoiding(floor: FloorLayout, from: string, to: string, avoid: ReadonlySet<string>): PortalSpec[] | null {
   const by = new Map<string, PortalSpec[]>();
   for (const p of floor.portals) for (const c of p.cells) by.set(c, [...(by.get(c) ?? []), p]);
   // 一方通行の扉（openSide のある扉）は cells[0] → cells[1] の向きだけ通れる（隠し通路の出口）
@@ -31,7 +39,7 @@ function route(floor: FloorLayout, from: string, to: string): PortalSpec[] | nul
       // 段階 4（フロアの形）: 窓は通れない（見えるだけ）
       if (p.kind === 'window') continue;
       const o = p.cells[0] === q[h] ? p.cells[1] : p.cells[0];
-      if (prev.has(o)) continue;
+      if (prev.has(o) || avoid.has(o)) continue;
       prev.set(o, { cell: q[h]!, portal: p });
       q.push(o);
     }
@@ -306,6 +314,9 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     if (!L) return { ok: true, reason: '', seconds: n * sim.dt, route: r.map((p) => p.id) };
     legT += sim.dt;
     if (botDebug.trace && n % 60 === 0) botDebug.trace(`t=${(n * sim.dt).toFixed(0)} leg ${leg}/${legs.length} pos ${player.pos.map((v) => v.toFixed(2)).join(',')} path ${path.length} best ${bestD.toFixed(2)} stuck ${stuck}`);
+    // 光・音・視線・時間の仕掛け（sense-bot.ts）が歩き方を決める間は、その操作で進める（道探しをしない・止まったと数えない）
+    const sc = senseDrive(sim, [L.x, L.y, L.z]);
+    if (sc) { sim.step([sc]); path = []; bestD = Infinity; stuck = 0; continue; }
     // 区画の中の道を引き直す（区間の始まり・止まったとき・流された・落ちたとき）
     if (!path.length) {
       const c = cellAtPos(floor, player.pos);
@@ -356,6 +367,7 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
       cmd.moveY = 0;
     }
     // 扉が開くのを待つ間も、扉の手前の目標までは歩く（崩れる床・動く歩道の上で立ち止まらない）
+    senseAdjust(sim, cmd);
     sim.step([cmd]);
     // 目標の点に着いた（区間の終わりは高さも合っていること: 穴の底の扉の真上の床板の上では着いていない）
     if (dist < (path.length > 1 ? 0.2 : 0.3) && (path.length > 1 || Math.abs(player.pos[1] - L.y) < 1.2)) {

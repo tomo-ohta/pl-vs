@@ -75,6 +75,11 @@ export interface FloorGeometry {
   keepOut?: Map<string, AABB[]>;
   /** 仕掛け・異変を置かない区画（形そのものが見どころの区画: 中庭・吹き抜け・巨大空間の建物・車両 …） */
   reserved?: Set<string>;
+  /**
+   * 大きさ・高さを変えてはいけない区画（形の見どころが大きさそのもの: 縮むくり返しの部屋・巨大空間の中の建物）。仕掛け・異変・中身は置ける。
+   * 部屋の形（core/gen/rooms）と、天井を上げる異変（vast）が掛けない（段階 4 の統合で足した）
+   */
+  fixedSize?: Set<string>;
   /** 中身を置いた後の仕上げ（index.ts が中身・異変の後に呼ぶ） */
   afterDress?: (env: AfterDressEnv) => void;
   /**
@@ -157,6 +162,7 @@ export class GeoBuild {
   readonly cellsToBuild: Placed[] = [];
   readonly keepOut = new Map<string, AABB[]>();
   readonly reserved = new Set<string>();
+  readonly fixedSize = new Set<string>();
   /** 区画を作った後に、区画 id で呼ぶ仕上げ（GeoCell を見る物） */
   readonly finishers: ((g: GeoBuild) => void)[] = [];
   readonly afterDress: ((env: AfterDressEnv) => void)[] = [];
@@ -260,6 +266,7 @@ export class GeoBuild {
     this.out.exits.sort((a, b) => (a.id === 'down' ? 0 : 1) - (b.id === 'down' ? 0 : 1));
     if (this.keepOut.size) this.out.keepOut = this.keepOut;
     if (this.reserved.size) this.out.reserved = this.reserved;
+    if (this.fixedSize.size) this.out.fixedSize = this.fixedSize;
     if (this.afterDress.length) { const list = this.afterDress.slice(); this.out.afterDress = (env) => { for (const f of list) f(env); }; }
     return this.out;
   }

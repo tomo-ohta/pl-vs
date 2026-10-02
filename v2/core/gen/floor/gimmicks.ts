@@ -80,6 +80,12 @@ export interface ShowcaseOptions {
 const SHOWCASE_DESTS: SecretDest[] = ['bFloor', 'passageRare', 'loop', 'rareRoom', 'loop', 'floorLink'];
 const SHOWCASE_RARE: RareKind[] = ['white', 'theater', 'pool', 'gallery', 'library', 'chapel', 'machine', 'play', 'garden'];
 
+/** 仕掛けの重み（調整表に gimmick.w.<id> があればそちら。異変の anomalyWeight と同じ。試験で 1 つの仕掛けを出やすくするのにも使う） */
+export function gimmickWeight(def: GimmickDef, t: Tuning): number {
+  const v = (t as unknown as Record<string, number | boolean | undefined>)[`gimmick.w.${def.id}`];
+  return typeof v === 'number' ? v : def.weight;
+}
+
 export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, depth: number, showcase?: ShowcaseOptions): GimmickResult {
   const rng = new Rng(hashAll(p.seed, 'gimmicks'));
   const main = mainCells(geo);
@@ -162,7 +168,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
     if (!fit.length) continue;
     // 見本: 残りの一覧の先頭から、この区画に置けるもの
     const weightOf = (x: GimmickDef): number => {
-      let wt = x.weight;
+      let wt = gimmickWeight(x, t);
       if (x.offersSecret && budget > offers.length) wt *= t['gimmick.secretBoost'];
       wt *= t['gimmick.repeatMul'] ** result.gimmicks.filter((y) => y.def === x.id).length;
       if (onMain && prevMain) {

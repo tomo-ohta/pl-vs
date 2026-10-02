@@ -30,6 +30,9 @@ defineAnomaly({
   fits: (g) => !MAZE_THEMES.has(g.cell.theme ?? '') && g.cell.height <= 4.5,
   post(ctx) {
     const t = ctx.tuning, cell = ctx.cell, fy = cell.floorY, h0 = cell.height;
+    // 大きさが見どころの区画（縮むくり返し・巨大空間の中の建物）と、ほかの区画の中にある区画（足跡が重なり、床が同じか下）には掛けない
+    if (ctx.world.fixedSize?.has(cell.id)) return false;
+    if (ctx.world.cells.some((g) => g.cell !== cell && g.cell.bounds.min[1] < fy + 0.5 && g.cell.bounds.max[1] > fy + 0.5 && g.cell.footprint.some((a) => cell.footprint.some((b) => rectsOverlap(a, b, 0.3))))) return false;
     // 部屋の上の空き: 足跡の重なるほかの区画の床まで
     let H = ctx.rng.float(t['anomaly.vast.heightMin'], Math.max(t['anomaly.vast.heightMin'], t['anomaly.vast.heightMax']));
     for (const g of ctx.world.cells) {

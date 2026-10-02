@@ -93,7 +93,7 @@ export const CARRY_CATALOG: CatalogEntry[] = [
     note: '壁際の低い強い灯りと、向かいの壁の扉の形の線。間に高さの同じ台が 3 つ。扉の形の切り抜きを正しい台に置くと、壁に落ちる影（灯りから 4 隅を写した四角。持って動かすと影も動く）が線にぴったり重なり、影が扉になる',
   },
   {
-    idea: 'PZ06', name: '鏡を並べて光を部屋の奥へ通す', status: 'done', impl: [{ kind: 'gimmick', id: 'mirrorBeam' }, { kind: 'part', id: 'beamGrid' }],
+    idea: 'PZ06', name: '鏡を並べて光を部屋の奥へ通す', status: 'done', impl: [{ kind: 'gimmick', id: 'mirrorPuzzle' }, { kind: 'part', id: 'beamGrid' }],
     note: '壁の穴から床の升目に沿って光の筋。柱で止まっている。鏡（持てる物）は置いた人の向き（45° 刻み）に置かれ、斜めに置くと光が曲がる。光を壁の目に届けると、目の横に扉。解き方は生成のときに決めて、鏡の升目のまわりに柱を置かない（斜めに立って置ける）',
   },
   {

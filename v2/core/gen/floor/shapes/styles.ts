@@ -343,6 +343,7 @@ function mega(g: GeoBuild, pl: Placed, rng: Rng): void {
   const house = theme === 'GenericRoom' || theme === 'SmallRoom';
   const bh = t['structure.building.heightM'];
   const inner = carveInner(g, pl, hole, { node: { ...pl.node, id: -1, kind: 'room', style: undefined }, y: pl.y, height: bh, theme, kind: 'room', cellId: `${pl.cellId}b`, fam: pl.fam, opts: { name: house ? '家' : '小屋', role: 'side' } }, house ? 'sidingWood' : 'sidingMetal');
+  g.fixedSize.add(`${pl.cellId}b`);
   // 扉: 広間の真ん中を向く辺。窓: 残りの辺から 2 つ
   const toward = (d: Dir): number => (d === 0 ? r.z1 - hole.z1 : d === 2 ? hole.z0 - r.z0 : d === 1 ? r.x1 - hole.x1 : hole.x0 - r.x0);
   const sides = ([0, 1, 2, 3] as Dir[]).sort((a, b) => toward(b) - toward(a));

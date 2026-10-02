@@ -194,6 +194,7 @@ export class ClientGame {
         root, materials: this.materials, built: this.built, sim: this.sim, levelOf: this.lampLevel,
         audio: this.audio, postfx: this.postfx, camera: this.camera, scene: this.scene,
         onEvent: (f) => { this.eventListeners.add(f); return () => this.eventListeners.delete(f); },
+        quality: () => this.tier,
       });
       if (!v) { root.removeFromParent(); continue; }
       this.views.set(e.id, v);
@@ -329,7 +330,7 @@ export class ClientGame {
   }
 
   private command(input: InputState): InputCommand {
-    return { moveX: input.moveX, moveY: input.moveY, yaw: this.yaw, pitch: this.pitch, jump: this.pendingJump, dash: input.dash, crouch: input.crouch, interact: this.pendingInteract, drop: this.pendingDrop, flashlight: this.flashlightOn };
+    return { moveX: input.moveX, moveY: input.moveY, yaw: this.yaw, pitch: this.pitch, jump: this.pendingJump, dash: input.dash, crouch: input.crouch, interact: this.pendingInteract, drop: this.pendingDrop, flashlight: this.flashlightOn, ...(this.audio.loudness.micAvailable ? { voice: this.audio.loudness.level() } : {}) };
   }
 
   /** タップした画面の位置（NDC）を、視線の向きにする */

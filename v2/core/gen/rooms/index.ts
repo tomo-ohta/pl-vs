@@ -236,8 +236,8 @@ export function shapeRooms(p: FloorProfile, geo: FloorGeometry, gimmicks: Gimmic
     return !shape || !!roomShapeDef(shape)?.anomalies?.includes(defId);
   };
 
-  // フロアの形が作った区画（geo.reserved: 鏡写しの組など）には掛けない
-  const cands = geo.cells.filter((g) => ROOM_KINDS.has(g.kind) && !NOT_ROLES.has(g.cell.role) && g.openings.length > 0 && !gimCells.has(g.cell.id) && !hosts.has(g.cell.id) && !anomalies.noDress.has(g.cell.id) && !geo.reserved?.has(g.cell.id));
+  // フロアの形が作った区画（geo.reserved: 鏡写しの組など・geo.fixedSize: 大きさが見どころの区画）には掛けない
+  const cands = geo.cells.filter((g) => ROOM_KINDS.has(g.kind) && !NOT_ROLES.has(g.cell.role) && g.openings.length > 0 && !gimCells.has(g.cell.id) && !hosts.has(g.cell.id) && !anomalies.noDress.has(g.cell.id) && !geo.reserved?.has(g.cell.id) && !geo.fixedSize?.has(g.cell.id));
   cands.sort((a, b) => (mainIdx.get(a.cell.id) ?? 1e6) - (mainIdx.get(b.cell.id) ?? 1e6));
 
   const entranceOf = (g: GeoCell): WallOpening => {

@@ -64,6 +64,7 @@ export function buildShrink(p: FloorProfile, rng: Rng, t: Tuning): FloorGeometry
     const rect: Rect = { x0: snap(nx - w / 2), x1: snap(nx + w / 2), z0: snap(z0 - d), z1: z0 };
     const pl: Placed = { node: node(k), rect, y: 0, height: h, theme, kind: 'room', cellId: `kr${k}`, fam, opts: { role: k === count - 1 ? 'exit' : 'gimmick', name: k === 0 ? '部屋' : 'また同じ部屋' } };
     g.cell(pl);
+    g.fixedSize.add(pl.cellId);
     rooms.push(pl);
     g.addOpening(cid, opening(`${cid}:a0`, [nx, 0, z0], 2, dw, dh));
     g.addOpening(pl.cellId, opening(`${pl.cellId}:${cid}`, [nx, 0, z0], 0, dw, dh));

@@ -70,10 +70,10 @@ test('霧の中の塔: ふつうのフロアに出る（表のフロアだけ）
 });
 
 /** 隠しの元 hook の隠しのあるフロアを集める */
-function withSecret(hook: string, want: number, max = 400): { r: GenReport; sec: NonNullable<GenReport['gimmicks']>['secrets'][number] }[] {
+function withSecret(hook: string, want: number, max = 400, tt: typeof t = t): { r: GenReport; sec: NonNullable<GenReport['gimmicks']>['secrets'][number] }[] {
   const out: { r: GenReport; sec: NonNullable<GenReport['gimmicks']>['secrets'][number] }[] = [];
   for (let w = 1; w <= max && out.length < want; w++) {
-    const r = generateFloorReport({ world: w, depth: 1 + (w % 9), variant: 0 }, t);
+    const r = generateFloorReport({ world: w, depth: 1 + (w % 9), variant: 0 }, tt);
     for (const sec of r.gimmicks?.secrets ?? []) if (sec.hook === hook && out.length < want) out.push({ r, sec });
   }
   return out;
@@ -130,7 +130,9 @@ test('地図の空白（BX04）: 製図台の地図と自分の地図に、壁�
 });
 
 test('地図の空白: 出現型は空白の壁の前で立ち止まる・壁を調べると扉になり、奥まで歩ける / 存在型は最初から扉がある', () => {
-  const found = withSecret('map.blank', 6);
+  // 地図の空白を出やすく・出現型と存在型を半々に（段階 4 で仕掛けが増え、ふつうの調整では数が少ない）
+  const found = [...withSecret('map.blank', 3, 400, { ...t, 'gimmick.w.mapBlank': 20, 'secrets.mode.present': 0, 'secrets.mode.appear': 100 } as typeof t),
+    ...withSecret('map.blank', 3, 400, { ...t, 'gimmick.w.mapBlank': 20, 'secrets.mode.present': 100, 'secrets.mode.appear': 0 } as typeof t)];
   let appear = 0, present = 0;
   for (const { r, sec } of found) {
     const at = frontOfSecret(r.floor, sec.host, sec.cell);

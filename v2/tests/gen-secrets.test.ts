@@ -116,12 +116,14 @@ test('謎のパズル: 手がかりの順にボタンを押すと扉が現れる
 test('細い道: 落ちた先の隠し部屋まで歩いて行ける（存在型）', async () => {
   const R = await loadRapier();
   let ok = 0, n = 0;
+  // 細い道を出やすくする（段階 4 で仕掛けが 80 種を超え、ふつうの重みでは 600 フロアに数回しか出ない）
+  const tn = { ...t, 'gimmick.w.narrowPath': 30 } as typeof t;
   for (let w = 1; w <= 600 && n < 4; w++) {
-    const r = generateFloorReport({ world: w, depth: 1 + (w % 8), variant: 0 }, t);
+    const r = generateFloorReport({ world: w, depth: 1 + (w % 8), variant: 0 }, tn);
     const sec = r.gimmicks?.secrets.find((s) => s.hook === 'fall.below');
     if (!sec) continue;
     n++;
-    const sim = new Sim(r.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
+    const sim = new Sim(r.floor, { tuning: tn, physics: new PhysicsWorld(R, 1 / 60) });
     // ほかの隠し（出現型）の壁は消しておく（歩く人の道順は隠し通路も通る。gen-walk の prepare と同じ）
     for (const e of r.floor.entities) if (e.type === 'reveal') (sim as unknown as { revealGroup(g: string, b: string): void }).revealGroup(String(e.params.group), 'test');
     // 段階 4（carry）: スイッチで開く扉は開いたままにする（歩く人はスイッチを探さない。gen-walk の prepare と同じ）

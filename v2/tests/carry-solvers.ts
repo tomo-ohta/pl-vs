@@ -379,7 +379,7 @@ SOLVERS.shadowPuzzle = [async (sim, room) => {
   return ['puzzle.shadow'];
 }];
 /** 鏡を解き方の升目に、解き方の向きで置く（置く向きに立って、升目を見て Q） */
-SOLVERS.mirrorBeam = [async (sim, room) => {
+SOLVERS.mirrorPuzzle = [async (sim, room) => {
   const beam = ents(room, 'beamGrid')[0]!;
   const o = beam.params.origin as number[];
   const C = Number(beam.params.cell);
