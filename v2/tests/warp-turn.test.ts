@@ -17,6 +17,9 @@ import { stepWith } from './helpers/warp.ts';
 const t = defaultTuning();
 const RAPIER = await loadRapier();
 const ROOMS = findRooms('turnRoom', 5, { maxWorld: 400 });
+/** 開口が 2 つ以上の部屋（扉から扉へ抜ける試験） */
+const MANY = findRooms('turnRoom', 14, { maxWorld: 700 });
+const THROUGH = MANY.filter((r) => r.beyond && r.floor.portals.filter((p) => p.cells.includes(r.cell.id) && !p.cells.some((c) => c.startsWith('secret'))).length >= 2).slice(0, 4);
 
 const ent = (f: FloorLayout, id: string) => f.entities.find((e) => e.id === id)!;
 interface Turn { id: string; c: [number, number]; R: number; omega: number; gaps: { at: number; half: number }[] }
@@ -65,8 +68,7 @@ test('回転する部屋: 1 回り periodSec で回る・真ん中にいれば�
 
 test('回転する部屋: 扉から扉へは筒の中を通る・入口が来るのを待って乗り降りし、ほかの開口へ抜けられる（歩く人）', () => {
   let crossed = 0, through = 0;
-  for (const room of ROOMS) {
-    if (!room.beyond) continue;
+  for (const room of THROUGH) {
     const T = turnOf(room);
     const sim = simOf(room);
     sim.teleport(0, [room.inside[0], room.cell.floorY + 0.02, room.inside[2]], 0);
@@ -117,7 +119,7 @@ function ringReach(room: GimmickRoom, T: Turn, a: readonly number[], b: readonly
 
 test('回転する部屋: 仕切りで、筒の外の通路だけでは向かいの扉・隠しの扉へ行けない（筒の中を通る）・決定的', () => {
   let walled = 0, two = 0, secrets = 0;
-  for (const room of findRooms('turnRoom', 12, { maxWorld: 600 })) {
+  for (const room of MANY) {
     const f = room.floor;
     const T = turnOf(room);
     const into = (p: { aabb: { min: number[]; max: number[] } }): number[] => {

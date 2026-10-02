@@ -23,6 +23,8 @@ export interface PortalOpts {
   active?(): boolean;
   /** 板を表の向きへずらす量（m） */
   lift?: number;
+  /** 切る面を、写した板の真ん中から向こうへずらす量（m。既定 -0.01 = 少し手前。窓の向こうを部屋の中から描くときは、向かいの壁の内側へ） */
+  clipShift?: number;
 }
 
 /** 板を作って描画の仕組みに登録する。戻り値の dispose で外す */
@@ -49,7 +51,7 @@ export function addPortal(ctx: ViewContext, o: PortalOpts): { mesh: THREE.Mesh; 
     surface = {
       mesh, center, normal, radius: Math.hypot(o.w, o.h) / 2 + 0.1,
       xform: xformMatrix(x),
-      clip: new THREE.Plane().setFromNormalAndCoplanarPoint(clipN, toC.addScaledVector(clipN, -0.01)),
+      clip: new THREE.Plane().setFromNormalAndCoplanarPoint(clipN, toC.addScaledVector(clipN, o.clipShift ?? -0.01)),
       ...(o.cells ? { cells: o.cells } : {}),
       ...(o.layers ? { layers: o.layers } : {}),
       ...(o.active ? { active: o.active } : {}),

@@ -8,3 +8,4 @@ import './sign.ts';
 import './lap.ts';
 import './turn.ts';
 import './portal.ts';
+import './past.ts';

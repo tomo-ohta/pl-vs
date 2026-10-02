@@ -13,3 +13,4 @@ import './turnRoom.ts';
 import './twoDoors.ts';
 import './timedDoors.ts';
 import './lightFrame.ts';
+import './pastWindow.ts';

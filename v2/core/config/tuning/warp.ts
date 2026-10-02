@@ -68,4 +68,9 @@ export const WARP_TUNING = {
   // ---- 距離を飛び越える扉（lightFrame: W03・BX03）
   'warp.lightFrame.weight': num(0.5, 0, 10, '距離を飛び越える扉: 出やすさ（相対）'),
   'warp.lightFrame.secretWeight': num(1.5, 0, 5, '距離を飛び越える扉（BX03）: 隠しの元（枠の裏から入る廊下）の重み'),
+  // ---- 窓の向こうの自分（pastWindow: W08・BX08）
+  'warp.pastWindow.weight': num(0.5, 0, 10, '窓の向こうの自分: 出やすさ（相対）'),
+  'warp.pastWindow.delaySec': num(4, 1, 15, '窓の向こうの自分: 窓の向こうの自分が、何秒前の自分か'),
+  'warp.pastWindow.stillSec': num(18, 5, 120, '窓の向こうの自分（BX08）: 窓の前で何秒じっとしていると、向こうの自分が壁を叩きに行くか'),
+  'warp.pastWindow.secretWeight': num(1.4, 0, 5, '窓の向こうの自分（BX08）: 隠しの元（向こうの自分が叩く壁）の重み'),
 } as const satisfies Record<string, Spec>;
