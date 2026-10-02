@@ -112,7 +112,7 @@ export const MOVE_TUNING = {
   'move.tilt.push': num(0.35, 0, 1, '傾いていく部屋: 傾きで低い側へ押す強さ（重さに対する割合）'),
 
   // ---- 吹き抜けを渡る部屋（atrium）: ロープ渡り [M16]・ジップライン [M17]・台車 [M29]・ゴンドラ [M30] ----
-  'move.atrium.depthM': num(2.6, 1.8, 3.4, '吹き抜け: 穴の深さ（m）'),
+  'move.atrium.depthM': num(2.0, 1.6, 3.4, '吹き抜け: 穴の深さ（m）'),
   'move.atrium.w.rope': num(0.3, 0, 10, '吹き抜け: ロープ渡りの重み'),
   'move.atrium.w.zip': num(0.25, 0, 10, '吹き抜け: ジップラインの重み'),
   'move.atrium.w.cart': num(0.2, 0, 10, '吹き抜け: 台車の重み'),
@@ -141,4 +141,12 @@ export const MOVE_TUNING = {
   'move.underwater.drag': num(1.8, 0.5, 5, '水の中の部屋: 落ちる速さの上限（m/s）'),
   'move.underwater.gravity': num(0.55, 0.2, 1, '水の中の部屋: 重さの倍率（ふわりと跳ぶ）'),
   'move.underwater.fogFar': num(10, 4, 30, '水の中の部屋: 霧の届く距離（m）'),
+
+  // ---- 球に乗る部屋（ballRide）: 玉乗り [M05]・バブル [M06] ----
+  'move.ball.bubbleChance': num(0.5, 0, 1, '球に乗る部屋: バブル（球の中に入る）になる確率'),
+  'move.ball.accel': num(3.5, 1, 10, '玉乗り: 操作の向きへの加速（m/s²）'),
+  'move.ball.bubbleAccel': num(4.5, 1, 10, 'バブル: 操作の向きへの加速（m/s²）'),
+  'move.ball.vmax': num(5, 2, 9, '球: 速さの上限（m/s）'),
+  'move.ball.throwSpeed': num(2.6, 1, 6, '玉乗り: この速さより速く壁にぶつかると振り落とされる（m/s）'),
+  'move.ball.paintSlow': num(0.3, 0.1, 0.8, '球に乗る部屋: 塗りたてのペンキの床を歩く速さの倍率'),
 } as const satisfies Record<string, Spec>;

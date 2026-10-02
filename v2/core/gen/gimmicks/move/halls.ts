@@ -13,7 +13,7 @@ import { hallAabb, hallBox, hallOf, hallPoint, removeLightsIn, sideDir } from '.
 const opposite = (s: { entrance: { dir: number } | null; exit: { dir: number } | null }): boolean => !!s.entrance && !!s.exit && s.exit.dir === (s.entrance.dir + 2) % 4;
 
 defineGimmick({
-  id: 'backwardHall', name: '後ろ向きの通路', axes: ['body', 'sight'], kinds: ['room', 'hall', 'corridor'], minSize: [1.8, 6.5], weight: 0.6, intensity: 1, onMainPath: true,
+  id: 'backwardHall', name: '後ろ向きの通路', axes: ['body', 'sight'], kinds: ['room', 'hall', 'corridor'], minSize: [1.8, 6.5], weight: 0.3, intensity: 1, onMainPath: true,
   fits: opposite,
   build(ctx) {
     const H = hallOf(ctx.slot);

@@ -1,5 +1,5 @@
 /**
- * 移動と身体の仕掛けの部屋（生成したフロア）: 入口のすぐ外から、部屋のほかの全部の開口の向こうへ歩いて行ける（閉じ込めない・
+ * 移動と身体の仕掛けの部屋（生成したフロア）: 入口のすぐ内側から、部屋のほかの全部の開口の向こうへ歩いて行ける（閉じ込めない・
  * 横の開口を塞がない）。仕掛けの種類が出る・決まった割合で出すぎない
  */
 import { test } from 'node:test';
@@ -14,13 +14,14 @@ import { partDef } from '../core/sim/part.ts';
 import '../core/sim/parts/index.ts';
 import { Sim } from '../core/sim/sim.ts';
 import { walkTo } from './helpers/bot.ts';
+import { intoCell } from './helpers/gimmick-rooms.ts';
 
 const t = defaultTuning();
 /** この担当が作った仕掛け（段階 3 までの物を除く） */
 export const MOVE_GIMMICKS = [...new Set(MOVE_CATALOG.filter((e) => e.status === 'done' || e.status === 'merged').flatMap((e) => e.impl.filter((m) => m.kind === 'gimmick').map((m) => m.id)))]
   .filter((id) => !['beltMaze', 'lowCeiling', 'narrowPath', 'bouncePad', 'tiltRoom'].includes(id));
 
-test('移動と身体の仕掛けの部屋: 入口の外から、ほかの全部の開口の向こうへ歩いて行ける', async () => {
+test('移動と身体の仕掛けの部屋: 入口の内側から、ほかの全部の開口の向こうへ歩いて行ける', async () => {
   const R = await loadRapier();
   const fails: string[] = [];
   const seen = new Map<string, number>();
@@ -44,8 +45,11 @@ test('移動と身体の仕掛けの部屋: 入口の外から、ほかの全部
         if (Math.min(tb.max[0] - tb.min[0], tb.max[2] - tb.min[2]) < 1.5) continue;
         const needsPhysics = floor.entities.some((e) => partDef(e.type)?.physics);
         const sim = new Sim(floor, { tuning: t, physics: needsPhysics ? new PhysicsWorld(R, 1 / 60) : null });
-        sim.teleport(0, stop.pos, stop.yaw);
-        // 入口から部屋に入り、目当ての開口の向こうへ（別の道を通らないよう、部屋を経由する道順）
+        // 入口の内側 1 m から（見て回る位置は扉と扉の間の短い切れ端のことがあり、歩く人が後ろの扉を調べてしまう）
+        const cell = floor.cells.find((c) => c.id === g.cell)!;
+        const start = intoCell(entry, cell, 1.0);
+        sim.teleport(0, [start[0], start[1] + 0.02, start[2]], stop.yaw);
+        // 部屋から、目当ての開口の向こうへ
         let res = walkTo(sim, g.cell, undefined, 120);
         if (res.ok) res = walkTo(sim, target, undefined, 200);
         walks++;

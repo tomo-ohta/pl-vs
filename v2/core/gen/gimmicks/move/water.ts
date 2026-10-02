@@ -19,7 +19,7 @@ const opposite = (s: { entrance: { dir: number } | null; exit: { dir: number } |
 
 // ---------------------------------------------------------------- 深いプール
 defineGimmick({
-  id: 'poolRoom', name: '深いプール', axes: ['move'], kinds: ['room', 'hall'], minSize: [4.6, 7.0], minHeight: 2.6, weight: 0.7, intensity: 1, onMainPath: true,
+  id: 'poolRoom', name: '深いプール', axes: ['move'], kinds: ['room', 'hall'], minSize: [4.6, 7.0], minHeight: 2.6, weight: 1.6, intensity: 1, onMainPath: true,
   fits: opposite,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning, y = s.cell.floorY;
@@ -81,7 +81,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- ボールプール
 defineGimmick({
-  id: 'ballPool', name: 'ボールプール', axes: ['move', 'body'], kinds: ['room', 'hall'], minSize: [4.0, 6.0], weight: 0.6, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'ballPool', name: 'ボールプール', axes: ['move', 'body'], kinds: ['room', 'hall'], minSize: [4.0, 6.0], weight: 0.9, intensity: 1, offersSecret: true, onMainPath: true,
   fits: opposite,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning;

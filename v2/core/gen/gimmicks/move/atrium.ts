@@ -19,7 +19,7 @@ import { stripsFits } from './common.ts';
 type Variant = 'rope' | 'zip' | 'cart' | 'gondola';
 
 defineGimmick({
-  id: 'atrium', name: '吹き抜けを渡る部屋', axes: ['move'], kinds: ['room', 'hall'], minSize: [5.2, 8.0], minHeight: 2.6, weight: 0.8, intensity: 2, onMainPath: true,
+  id: 'atrium', name: '吹き抜けを渡る部屋', axes: ['move'], kinds: ['room', 'hall'], minSize: [5.2, 8.0], minHeight: 2.6, weight: 2, intensity: 2, onMainPath: true,
   fits: stripsFits,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning, y = s.cell.floorY, h = s.cell.height;

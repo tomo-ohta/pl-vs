@@ -21,7 +21,7 @@ const opposite = (s: { entrance: { dir: number } | null; exit: { dir: number } |
 
 // ---------------------------------------------------------------- 回る床
 defineGimmick({
-  id: 'turntable', name: '回る床', axes: ['move'], kinds: ['room', 'hall'], minSize: [5.0, 5.0], weight: 0.6, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'turntable', name: '回る床', axes: ['move'], kinds: ['room', 'hall'], minSize: [5.0, 5.0], weight: 0.45, intensity: 1, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning, y = s.cell.floorY;
@@ -56,7 +56,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- 回転扉
 defineGimmick({
-  id: 'revolvingDoor', name: '回転扉', axes: ['move'], kinds: ['room', 'hall'], minSize: [4.0, 7.0], minHeight: 2.4, weight: 0.6, intensity: 1, onMainPath: true,
+  id: 'revolvingDoor', name: '回転扉', axes: ['move'], kinds: ['room', 'hall'], minSize: [4.0, 7.0], minHeight: 2.4, weight: 1.4, intensity: 1, onMainPath: true,
   fits: opposite,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning;
@@ -108,7 +108,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- 押せる壁
 defineGimmick({
-  id: 'pushWall', name: '押せる壁', axes: ['move', 'sight'], kinds: ['room', 'hall'], minSize: [3.0, 7.0], weight: 0.6, intensity: 1, onMainPath: true,
+  id: 'pushWall', name: '押せる壁', axes: ['move', 'sight'], kinds: ['room', 'hall'], minSize: [3.0, 7.0], weight: 1.2, intensity: 1, onMainPath: true,
   fits: opposite,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning;
@@ -159,7 +159,7 @@ defineGimmick({
 
 // ---------------------------------------------------------------- 傾いていく部屋
 defineGimmick({
-  id: 'slantRoom', name: '傾いていく部屋', axes: ['move', 'sight'], kinds: ['room', 'hall'], minSize: [4.2, 6.0], minHeight: 2.6, weight: 0.6, intensity: 2, onMainPath: true,
+  id: 'slantRoom', name: '傾いていく部屋', axes: ['move', 'sight'], kinds: ['room', 'hall'], minSize: [4.2, 6.0], minHeight: 2.6, weight: 1.4, intensity: 2, onMainPath: true,
   fits: (s) => opposite(s) && s.openings.length === 2,
   build(ctx) {
     const s = ctx.slot, t = ctx.tuning;

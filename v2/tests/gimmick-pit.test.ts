@@ -129,7 +129,7 @@ test('崩れる床: 乗り続けると揺れて落ち、穴の底へ落ちる。
     // 真ん中あたりの床板（段階 4 で足した: 体が固い床・階段の縁に掛からない床板から選ぶ。掛かると落ちずに縁に立つ）
     const fy = room.cell.floorY;
     const solidTop = room.cell.boxes.filter((x) => x.solid && Math.abs(x.max[1] - fy) < 0.02);
-    const clear = tiles.filter((e) => { const tb = e.params.box as { min: number[]; max: number[] }; const cx = (tb.min[0]! + tb.max[0]!) / 2, cz = (tb.min[2]! + tb.max[2]!) / 2; return !solidTop.some((x) => cx + 0.4 > x.min[0] && cx - 0.4 < x.max[0] && cz + 0.4 > x.min[2] && cz - 0.4 < x.max[2]); });
+    const clear = tiles.filter((e) => { const tb = e.params.box as { min: number[]; max: number[] }; if (tb.max[0]! - tb.min[0]! < 0.4 || tb.max[2]! - tb.min[2]! < 0.4) return false; const cx = (tb.min[0]! + tb.max[0]!) / 2, cz = (tb.min[2]! + tb.max[2]!) / 2; return !solidTop.some((x) => cx + 0.4 > x.min[0] && cx - 0.4 < x.max[0] && cz + 0.4 > x.min[2] && cz - 0.4 < x.max[2]); });
     const pool = clear.length ? clear : tiles;
     const tile = pool[Math.floor(pool.length / 2)]!;
     const b = tile.params.box as { min: number[]; max: number[] };

@@ -16,7 +16,7 @@ import { aabbJson, doorZone, fillRects, frontOf, innerRect, rectGap } from '../u
 import { hallAabb, hallBox, hallOf, removeLightsIn, sideDir, wallAt, type Hall } from './common.ts';
 
 defineGimmick({
-  id: 'crawlTunnel', name: '這う部屋', axes: ['body'], kinds: ['room', 'hall'], minSize: [3.4, 6], weight: 0.7, intensity: 1, offersSecret: true, onMainPath: true,
+  id: 'crawlTunnel', name: '這う部屋', axes: ['body'], kinds: ['room', 'hall'], minSize: [3.4, 6], weight: 0.45, intensity: 1, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && !!s.exit,
   build(ctx) {
     const s = ctx.slot;
