@@ -45,4 +45,11 @@ export const GROUND_TUNING = {
   'ground.rise.speed': num(0.45, 0.1, 1.5, 'せり上がる床: 上下の速さ（m/s）'),
   'ground.balance.holdSec': num(2, 0.5, 8, '天秤の床: 釣り合ってから間の床が下がり始めるまで（秒）'),
   'ground.hatch.depthM': num(2.4, 1.8, 3.05, '床下の明かり: 地下の小部屋の深さ（m）'),
+  // 踏むと鳴る床（chimeTiles）・踏まない区画（avoidTiles）
+  'ground.chime.tileM': num(1.1, 0.8, 1.6, '踏むと鳴る床: 升目の大きさ（m）'),
+  'ground.chime.length': num(4, 3, 8, '踏むと鳴る床: 節の長さ（升目の数）', true),
+  'ground.chime.demoSec': num(5, 2, 20, '踏むと鳴る床: 節を見せたあと、次に見せるまでの間（秒）'),
+  'ground.avoid.tileM': num(1.0, 0.8, 1.6, '踏まない区画: 升目の大きさ（m）'),
+  'ground.avoid.decoy': num(0.12, 0, 0.6, '踏まない区画: 道の外の升目のうち、白い（踏んでよい）おとりの割合'),
+  'ground.visit.stopSec': num(0.6, 0.2, 3, '順番の区画: 印の上で立ち止まって「訪れた」になるまで（秒）'),
 } as const satisfies Record<string, Spec>;

@@ -8,3 +8,4 @@ import './crates.ts';
 import './weight.ts';
 import './still.ts';
 import './lifts.ts';
+import './tiles.ts';

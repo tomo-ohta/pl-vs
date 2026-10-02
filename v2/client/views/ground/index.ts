@@ -5,3 +5,4 @@
 import './collapse.ts';
 import './bridges.ts';
 import './lifts.ts';
+import './tiles.ts';
