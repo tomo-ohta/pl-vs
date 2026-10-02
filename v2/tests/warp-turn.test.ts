@@ -115,20 +115,37 @@ function ringReach(room: GimmickRoom, T: Turn, a: readonly number[], b: readonly
   return false;
 }
 
-test('回転する部屋: 仕切りで、筒の外の通路だけでは向かいの扉へ行けない部屋がある・決定的', () => {
-  let walled = 0;
-  for (const room of ROOMS) {
+test('回転する部屋: 仕切りで、筒の外の通路だけでは向かいの扉・隠しの扉へ行けない（筒の中を通る）・決定的', () => {
+  let walled = 0, two = 0, secrets = 0;
+  for (const room of findRooms('turnRoom', 12, { maxWorld: 600 })) {
     const f = room.floor;
     const T = turnOf(room);
-    if (room.exit) {
-      const e = room.exit, ec = [(e.aabb.min[0] + e.aabb.max[0]) / 2, 0, (e.aabb.min[2] + e.aabb.max[2]) / 2];
+    const into = (p: { aabb: { min: number[]; max: number[] } }): number[] => {
+      const ec = [(p.aabb.min[0]! + p.aabb.max[0]!) / 2, 0, (p.aabb.min[2]! + p.aabb.max[2]!) / 2];
       const cc = [(room.cell.bounds.min[0] + room.cell.bounds.max[0]) / 2, (room.cell.bounds.min[2] + room.cell.bounds.max[2]) / 2];
       const l = Math.hypot(cc[0]! - ec[0]!, cc[1]! - ec[2]!);
-      const exitIn = [ec[0]! + ((cc[0]! - ec[0]!) / l) * 0.5, 0, ec[2]! + ((cc[1]! - ec[2]!) / l) * 0.5];
-      if (!ringReach(room, T, room.inside, exitIn)) walled++;
+      return [ec[0]! + ((cc[0]! - ec[0]!) / l) * 0.5, 0, ec[2]! + ((cc[1]! - ec[2]!) / l) * 0.5];
+    };
+    const ports = f.portals.filter((p) => p.cells.includes(room.cell.id) && !p.cells.some((c) => c.startsWith('secret')));
+    if (ports.length >= 2 && room.exit) {
+      two++;
+      if (!ringReach(room, T, room.inside, into(room.exit))) walled++;
+    }
+    // 隠し（付いていれば）: 入口から筒の外の通路だけでは行けない
+    const sec = room.r.gimmicks?.secrets.find((x) => x.host === room.cell.id && x.hook === 'turn.bay');
+    if (sec) {
+      secrets++;
+      const sp = f.portals.find((p) => p.cells.includes(room.cell.id) && p.cells.some((c) => c.startsWith(sec.id)))!;
+      assert.ok(!ringReach(room, T, room.inside, into(sp)), `${room.cell.id}: 隠しの扉は筒の向こう`);
+      const sim = simOf(room);
+      sim.teleport(0, [room.inside[0], room.cell.floorY + 0.02, room.inside[2]], 0);
+      const r = walkTo(sim, sec.cells[sec.cells.length - 1]!, undefined, 200);
+      assert.ok(r.ok, `${room.cell.id}: 筒を通って隠しへ: ${r.reason}`);
     }
     const again = regenerate(room);
     assert.equal(JSON.stringify(again.entities.filter((e) => e.id.startsWith(room.id))), JSON.stringify(f.entities.filter((e) => e.id.startsWith(room.id))));
   }
-  assert.ok(walled >= 2, `筒を通らないと出口へ行けない部屋 ${walled}/${ROOMS.length}`);
+  console.log(`  開口 2 つ以上 ${two}（筒を通らないと出口へ行けない ${walled}）・隠し ${secrets}`);
+  assert.ok(walled >= 1 && walled >= two / 2, `筒を通らないと出口へ行けない部屋 ${walled}/${two}`);
+  assert.ok(secrets >= 1, `隠し ${secrets}`);
 });

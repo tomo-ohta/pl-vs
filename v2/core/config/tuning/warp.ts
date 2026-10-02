@@ -54,6 +54,7 @@ export const WARP_TUNING = {
   'warp.turnRoom.ringM': num(1.2, 1.0, 2.0, '回転する部屋: 筒の外の通路の幅（m）'),
   'warp.turnRoom.gapM': num(1.1, 0.9, 1.6, '回転する部屋: 筒の入口の幅（m）'),
   'warp.turnRoom.periodSec': num(40, 15, 120, '回転する部屋: 1 回りの秒数'),
+  'warp.turnRoom.secretWeight': num(1.2, 0, 5, '回転する部屋: 隠しの元（筒を通らないと行けない区切りの壁）の重み'),
   'warp.turnRoom.drift': num(0.12, 0, 0.6, '回転する部屋: 外へ押す強さ（軸から 1 m 離れるごとの m/s）'),
   // ---- 2 つの扉が同じ部屋へ（twoDoors: W12）
   'warp.twoDoors.weight': num(0.5, 0, 10, '2 つの扉が同じ部屋へ: 出やすさ（相対）'),
@@ -64,4 +65,7 @@ export const WARP_TUNING = {
   'warp.timedDoors.spacingM': num(2.0, 1.8, 4, '時間で入れ替わる扉: 並んだ扉の真ん中どうしの間隔（m）'),
   'warp.timedDoors.periodSec': num(30, 8, 300, '時間で入れ替わる扉: 2 枚の扉の行き先が入れ替わる間隔（秒）'),
   'warp.timedDoors.secretWeight': num(1.4, 0, 5, '時間で入れ替わる扉: 隠しの元（琥珀の部屋の壁）の重み'),
+  // ---- 距離を飛び越える扉（lightFrame: W03・BX03）
+  'warp.lightFrame.weight': num(0.5, 0, 10, '距離を飛び越える扉: 出やすさ（相対）'),
+  'warp.lightFrame.secretWeight': num(1.5, 0, 5, '距離を飛び越える扉（BX03）: 隠しの元（枠の裏から入る廊下）の重み'),
 } as const satisfies Record<string, Spec>;

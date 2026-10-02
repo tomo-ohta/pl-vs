@@ -7,3 +7,4 @@ import './recede.ts';
 import './sign.ts';
 import './lap.ts';
 import './turn.ts';
+import './portal.ts';

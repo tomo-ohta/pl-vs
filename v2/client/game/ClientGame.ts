@@ -32,6 +32,7 @@ import { Settings } from '../settings/Settings.ts';
 import type { UiRefs } from '../ui/dom.ts';
 import { PlayerFlashlight } from '../render/PlayerFlashlight.ts';
 import { createView, type EntityView } from '../views/index.ts';
+import { PortalRenderer } from '../world/Portals.ts';
 import { applyLampLevels, cellAt, FloorBuilder, type BuiltFloor } from '../world/FloorBuilder.ts';
 import { LightManager } from '../world/LightManager.ts';
 import { Visibility } from '../world/Visibility.ts';
@@ -50,6 +51,9 @@ export class ClientGame {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(72, 1, 0.05, 150);
+  /** 窓・枠の向こうに別の所を描く（段階 4 warp で足した） */
+  private readonly portals = new PortalRenderer();
+  private mainVisible: ReadonlySet<string> | null = null;
   readonly rig: CameraRig;
   readonly materials = new MaterialLibrary();
   readonly settings: Settings;
@@ -192,6 +196,7 @@ export class ClientGame {
         root, materials: this.materials, built: this.built, sim: this.sim, levelOf: this.lampLevel,
         audio: this.audio, postfx: this.postfx, camera: this.camera, scene: this.scene,
         onEvent: (f) => { this.eventListeners.add(f); return () => this.eventListeners.delete(f); },
+        portals: this.portals,
       });
       if (!v) { root.removeFromParent(); continue; }
       this.views.set(e.id, v);
@@ -498,6 +503,7 @@ export class ClientGame {
       this.enterCell();
       this.updateEnvironment(dt);
       const visible = this.cull && this.visibility ? this.visibility.update(built, sim, this.camera) : null;
+      this.mainVisible = visible ? new Set(visible) : null;
       for (const [id, v] of this.views) {
         const vr = this.viewRoots.get(id);
         const shown = !visible || !vr || !vr.cells.length || vr.cells.some((c) => visible.has(c));
@@ -526,8 +532,24 @@ export class ClientGame {
     }
     const t0 = performance.now();
     this.materials.update(dt);
+    this.renderPortals();
     this.postfx.render();
     this.materials.uploads.flush(this.renderer, performance.now() - t0);
+  }
+
+  /** 窓・枠の向こうを描く（場面を描く前。区画の見え方を面ごとに替えて、終わったら戻す。段階 4 warp で足した） */
+  private renderPortals(): void {
+    const sim = this.sim, built = this.built;
+    if (!sim || !built || !this.portals.surfaces.size) return;
+    const apply = (cells: ReadonlySet<string> | null): void => {
+      const vis = cells ?? this.mainVisible;
+      for (const [id, c] of built.cells) c.group.visible = !vis || vis.has(id);
+      for (const vr of this.viewRoots.values()) vr.root.visible = !vis || !vr.cells.length || vr.cells.some((c) => vis.has(c));
+    };
+    this.portals.render(this.renderer, this.scene, this.camera, {
+      applyCells: apply,
+      visibleFrom: (cam) => (this.visibility ? this.visibility.compute(built, sim, cam) : new Set(built.cells.keys())),
+    });
   }
 
   private updateRevealAnim(dt: number): void {

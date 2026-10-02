@@ -8,3 +8,18 @@ definePart<Record<string, never>>({
   type: 'warpSign',
   init: () => ({}),
 });
+
+/**
+ * warpPortal: 描画だけの部品（窓・枠の向こうに別の所を描く板。client/views/warp/portal.ts）。シミュレーションでは何もしない。
+ * params: center・dir・w・h・xform・cells?・needs?
+ */
+definePart<Record<string, never>>({
+  type: 'warpPortal',
+  init: () => ({}),
+});
+
+/** warpLinks: 何もしない部品（歩く人（試験）の道順 params.warpLinks だけを持つ。光の枠のように、移す部品が道順を持たないとき） */
+definePart<Record<string, never>>({
+  type: 'warpLinks',
+  init: () => ({}),
+});

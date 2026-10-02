@@ -42,9 +42,10 @@ function route(floor: FloorLayout, from: string, to: string): PortalSpec[] | nul
 
 /**
  * 空間のゆがみの道（warp で足した）: 部品の params.warpLinks（{ from, to, at, interact? }）。区画 from の点 at へ行き、
- * 部品 interact を調べる（無ければ立って待つ）と区画 to へ移される（控え室の 3 枚目の扉・双子の部屋の扉 …）
+ * 部品 interact を調べる（無ければ立って待つ）と区画 to へ移される（控え室の 3 枚目の扉・双子の部屋の扉 …）。
+ * push（[x, z] の向き）があれば、着いたらその向きへ歩いて面をくぐる（光の枠）
  */
-export interface WarpLink { from: string; to: string; at: [number, number, number]; interact?: string }
+export interface WarpLink { from: string; to: string; at: [number, number, number]; interact?: string; push?: [number, number] }
 
 export function warpLinks(floor: FloorLayout): WarpLink[] {
   const out: WarpLink[] = [];
@@ -52,10 +53,11 @@ export function warpLinks(floor: FloorLayout): WarpLink[] {
     const ls = e.params.warpLinks;
     if (!Array.isArray(ls)) continue;
     for (const l of ls) {
-      const o = l as { from?: unknown; to?: unknown; at?: unknown; interact?: unknown };
+      const o = l as { from?: unknown; to?: unknown; at?: unknown; interact?: unknown; push?: unknown };
       if (typeof o.from !== 'string' || typeof o.to !== 'string' || !Array.isArray(o.at)) continue;
       const link: WarpLink = { from: o.from, to: o.to, at: [Number(o.at[0]), Number(o.at[1]), Number(o.at[2])] };
       if (typeof o.interact === 'string') link.interact = o.interact;
+      if (Array.isArray(o.push)) link.push = [Number(o.push[0]), Number(o.push[1])];
       out.push(link);
     }
   }
@@ -197,10 +199,21 @@ export function pathInCell(sim: Sim, cell: CellLayout, from: [number, number, nu
     return v;
   };
   const blockedCache = new Map<string, boolean>();
+  // 面をくぐると移す部品（warpGate: 光の枠）の面は、道に使わない（くぐるのは空間のゆがみの道 push のときだけ）
+  const gates = sim.floor.entities.filter((e) => e.type === 'warpGate').map((e) => {
+    const a = e.params.box as { min: number[]; max: number[] };
+    const ax = (Number(e.params.dir) & 1) === 1 ? 0 : 2;
+    return { a, ax, c: (a.min[ax]! + a.max[ax]!) / 2 };
+  }).filter((q) => q.a.max[0]! >= b.min[0] && q.a.min[0]! <= b.max[0] && q.a.max[2]! >= b.min[2] && q.a.min[2]! <= b.max[2] && q.a.max[1]! >= b.min[1] && q.a.min[1]! <= b.max[1]);
+  const onGate = (x: number, z: number, g: number): boolean => gates.some((q) => {
+    const p = [x, g + 0.1, z];
+    const lat = q.ax === 0 ? 2 : 0;
+    return Math.abs(p[q.ax]! - q.c) < 0.15 && p[lat]! > q.a.min[lat]! - 0.3 && p[lat]! < q.a.max[lat]! + 0.3 && p[1]! > q.a.min[1]! && p[1]! < q.a.max[1]!;
+  });
   const blocked = (i: number, k: number, g: number): boolean => {
     const key = `${idx(i, k)}|${g}`;
     let v = blockedCache.get(key);
-    if (v === undefined) { v = bodyBlocked(sim, b.min[0] + i * G, b.min[2] + k * G, g, 0.85); blockedCache.set(key, v); }
+    if (v === undefined) { v = bodyBlocked(sim, b.min[0] + i * G, b.min[2] + k * G, g, 0.85) || (gates.length > 0 && onGate(b.min[0] + i * G, b.min[2] + k * G, g)); blockedCache.set(key, v); }
     return v;
   };
   /**
@@ -387,6 +400,8 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     // 空間のゆがみの道: 着いたら調べて（調べる物が無ければ立って）移されるのを待つ
     if (L.link && legD < 0.45 && path.length <= 1) {
       cmd.moveY = 0; cmd.moveX = 0;
+      // 面をくぐる道: その向きへ歩く（移されるまで）
+      if (L.link.push) { cmd.yaw = Math.atan2(-L.link.push[0], -L.link.push[1]); cmd.moveY = 1; }
       if (waitWarp <= 0 && L.link.interact) {
         const ent = floor.entities.find((e) => e.id === L.link!.interact);
         const pn = ent?.params.panel as { min: number[]; max: number[] } | undefined;

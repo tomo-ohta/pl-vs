@@ -14,6 +14,7 @@ import type { PostFX } from '../render/PostFX.ts';
 import type { Sim } from '../../core/sim/sim.ts';
 import type { EntitySpec, Json, MatId } from '../../core/world/layout.ts';
 import type { MaterialLibrary } from '../render/MaterialLibrary.ts';
+import type { PortalRenderer } from '../world/Portals.ts';
 import { surfaceBox } from '../render/SurfaceGeometry.ts';
 import { cellAt, sampleCellLight, type BuiltFloor } from '../world/FloorBuilder.ts';
 
@@ -34,6 +35,8 @@ export interface ViewContext {
   scene?: THREE.Scene;
   /** シミュレーションのイベントを受け取る（足音・扉・Cue など）。戻り値で受け取りをやめる */
   onEvent?(f: (e: SimEvent) => void): () => void;
+  /** 窓・枠の向こうに別の所を描く（段階 4 warp で足した。client/world/Portals.ts）。テストでは無いことがある */
+  portals?: PortalRenderer;
 }
 
 export interface EntityView {
