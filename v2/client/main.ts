@@ -158,5 +158,6 @@ const tickRec = (now: number): void => {
 };
 requestAnimationFrame(tickRec);
 
-(window as unknown as { game: ClientGame; maps: MapController }).game = game;
+(window as unknown as { game: ClientGame }).game = game;
+// 開発用: 地図と図鑑（window.maps.map が自分の地図）
 (window as unknown as { maps: MapController }).maps = maps;

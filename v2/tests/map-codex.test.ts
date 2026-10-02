@@ -77,6 +77,8 @@ test('地図の保存: フロアごとに覚える・古いものから忘れる
   for (let i = 0; i < 5; i++) s.put(`f${i}`, save(i));
   assert.deepEqual(s.keys(), ['f4', 'f3', 'f2']);
   assert.equal(s.get('f0'), null);
+  assert.ok(!mem.getItem(`${MAPS_KEY}:f0`), '忘れたフロアは保存先からも消す');
+  assert.ok(mem.getItem(`${MAPS_KEY}:f4`), 'フロアごとに別の鍵で保存（歩いている間は今のフロアだけ書く）');
   s.put('f2', save(22));
   assert.deepEqual(s.keys(), ['f2', 'f4', 'f3'], '使ったものが先頭へ');
   const again = MapStore.load(mem, 3);

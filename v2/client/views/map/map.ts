@@ -4,6 +4,7 @@
  *   絵は client/map/scene.ts の sceneOfReadable（嘘を含めて、描かれているとおり）を draw.ts の 'sign' の見た目で描く
  * - mapNote: 床に落ちている誰かの地図。鉛筆の線の紙（'paper' の見た目）
  * - landmark: 霧の中の塔の灯り（N05）。霧を通して見える（霧を掛けない材質）明滅する灯りと、ぼんやりした光の輪
+ * - mapWall: 調べられる壁（BX04）。見た目は無く、調べたら壁を叩く音だけ
  * 絵は区画の焼き込みの明るさを測って暗くする（暗い部屋の板が光って見えないように）。document の無い環境（Node）では描かない。
  */
 import * as THREE from 'three';
@@ -89,6 +90,14 @@ function readable(type: 'mapBoard' | 'mapNote'): void {
 }
 readable('mapBoard');
 readable('mapNote');
+
+/** 調べられる壁（BX04）: 見た目は無い。調べたら壁を叩く音（中が空洞の音） */
+defineView('mapWall', (spec, ctx) => {
+  const off = ctx.onEvent?.((e) => {
+    if (e.type === 'cue' && e.entity === spec.id && e.data?.name === 'map.knock') ctx.audio?.play('knock', { ...(e.pos ? { pos: e.pos } : {}), gain: 0.8 });
+  });
+  return { update() {}, dispose() { off?.(); } };
+});
 
 /** 光の輪の絵（中心が明るい丸） */
 function glowTexture(): THREE.Texture | null {
