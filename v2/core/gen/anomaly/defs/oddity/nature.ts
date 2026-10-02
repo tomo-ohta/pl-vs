@@ -54,9 +54,11 @@ defineAnomaly({
     const e = ctx.entrance.pos;
     const B: Box[] = [];
     const max = t['anomaly.meadow.boxesMax'];
+    let plants = 0;
     for (const [x, z] of gridPoints(ctx, step, 0.25, step * 0.25)) {
       if (B.length >= max) break;
       if (hitsAny(doors, { min: [x - 0.15, fy, z - 0.15], max: [x + 0.15, fy + 1, z + 0.15] }) || blockedAt(solids, x, z, 0.2, fy, fy + 2.2)) continue;
+      plants++;
       if (kind === 'sunflower') {
         const H = ctx.rng.float(1.25, 1.85);
         B.push(box([x - 0.02, fy, z - 0.02], [x + 0.02, fy + H, z + 0.02], 'plant', false));
@@ -85,7 +87,8 @@ defineAnomaly({
         }
       }
     }
-    if (B.length < 20) return false;
+    // 草原に見えるだけの株が無ければ掛けない（家具の多い部屋では、ひまわりが数本しか立たないことがある）
+    if (plants < 12) return false;
     addGroup(ctx, B, `meadow-${kind}`);
     roomFx(ctx, { kind: 'drift', count: 10, dir: [ctx.rng.float(-1, 1), ctx.rng.float(-1, 1)], speed: 0.35, shape: 'leaf', color: 0xf4f0d8 });
     cell.audioPreset = '鳥声・微風・虫';

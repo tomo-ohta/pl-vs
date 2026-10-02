@@ -114,8 +114,10 @@ test('異変: 種類がばらける・扉の向こうの部屋の約 3 割・同
   console.log(`  ${ALL.map((id) => `${id} ${by.get(id) ?? 0}`).join('・')}`);
   for (const id of ALL) assert.ok((by.get(id) ?? 0) >= 5, `${id} が出る: ${by.get(id) ?? 0}`);
   assert.ok(share > 0.24 && share < 0.37, `扉の向こうの部屋の異変の割合 ${share.toFixed(3)}`);
+  // 1 つの異変が出すぎない（平均の 3 倍未満。種類が 40 を超えたので、いちばん少ない物との比は数の揺れが大きく使わない）
   const counts = ALL.map((id) => by.get(id) ?? 0);
-  assert.ok(Math.max(...counts) < 6 * Math.min(...counts), `偏りすぎない: ${counts.join(',')}`);
+  const mean = counts.reduce((x, y) => x + y, 0) / counts.length;
+  assert.ok(Math.max(...counts) < 3 * mean, `偏りすぎない: 平均 ${mean.toFixed(1)}・${counts.join(',')}`);
 });
 
 test('異変: それぞれ見て分かる形になっている（浸水の水・暗闇の灯り・逆さまの床 …）', () => {
