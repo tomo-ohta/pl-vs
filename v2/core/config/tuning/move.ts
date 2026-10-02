@@ -75,4 +75,14 @@ export const MOVE_TUNING = {
   'move.chasm.pendulumPitch': num(1.9, 1.5, 3, '振り子の通路: 振り子の間隔（m。間で待てる）'),
   'move.chasm.pendulumPeriod': num(2.6, 1.6, 5, '振り子の通路: 振り子の周期（秒）'),
   'move.chasm.rideSec': num(1.2, 0.3, 5, '振り子の通路（出現型の隠し）: 振り子の板に乗っている秒数'),
+
+  // ---- 高い所へ上がる部屋（riseHall）: ばね床の連続 [M36]・上昇気流 [M21]・はしご [M13] ----
+  'move.rise.w.springs': num(0.4, 0, 10, '高い所へ上がる部屋: 弾む床の重み'),
+  'move.rise.w.updraft': num(0.3, 0, 10, '高い所へ上がる部屋: 上昇気流の重み'),
+  'move.rise.w.ladder': num(0.3, 0, 10, '高い所へ上がる部屋: はしごの重み'),
+  'move.rise.stepM': num(1.25, 1.0, 1.8, '高い所へ上がる部屋: 棚 1 段の高さ（m。跳んで届く 0.9 m より高く）'),
+  'move.rise.ledgeDepthM': num(1.5, 1.1, 2.2, '高い所へ上がる部屋: 棚の奥行き（m）'),
+  'move.rise.ledgeLenM': num(2.0, 1.6, 3, '高い所へ上がる部屋: 棚 1 段の長さ（m）'),
+  'move.rise.overshootM': num(0.7, 0.3, 1.5, '弾む床: 次の棚より高く跳ね上がる分（m）'),
+  'move.rise.updraftSpeed': num(3.2, 1.5, 6, '上昇気流: 吹き上がる速さ（m/s）'),
 } as const satisfies Record<string, Spec>;

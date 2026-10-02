@@ -103,6 +103,13 @@ export function pathInCell(sim: Sim, cell: CellLayout, from: [number, number, nu
   const stairTop = Math.max(-Infinity, ...cell.boxes.filter((x) => x.kind === 'stairStep' || x.kind === 'landing').map((x) => x.max[1]));
   const top = Math.max(cell.floorY + 0.15, Number.isFinite(stairTop) ? stairTop : -Infinity, from[1] + 0.05) - 0.36 + 0.5;
   const zones = [...sim.zones].filter((zn) => zn.kind === 'force' && zn.vector && (zn.params?.speed ?? 0) >= STRONG && zn.aabb.max[0] >= b.min[0] && zn.aabb.min[0] <= b.max[0] && zn.aabb.max[2] >= b.min[2] && zn.aabb.min[2] <= b.max[2]);
+  const lifts = liftsOf(sim, b);
+  /** 点 (x, z) へ足元 gc から上がれる高さ（縦につなぐ物の柱の中で、下端に届くなら上端。ほかは gc） */
+  const liftAt = (x: number, z: number, gc: number): number => {
+    let h = gc;
+    for (const l of lifts) if (x >= l.x0 && x <= l.x1 && z >= l.z0 && z <= l.z1 && l.base <= gc + 0.36 && l.top > h) h = l.top;
+    return h;
+  };
   const cellOf = (x: number, z: number): [number, number] => [Math.round((x - b.min[0]) / G), Math.round((z - b.min[2]) / G)];
   // 点ごとの面: 体の真ん中の下（±0.05 m。真ん中が面の上に無い道、つまり梁・床の縁を体の端だけで歩く道は選ばない。
   // 体の端だけで乗っていると、少しずれただけで落ちる）と、体の下全体（±0.35 m。実際に立つ高さ）
@@ -130,9 +137,22 @@ export function pathInCell(sim: Sim, cell: CellLayout, from: [number, number, nu
    */
   const standAt = (i: number, k: number, gc: number): number | 'edge' | null => {
     const [center, full] = surfAt(i, k);
-    let gp = -Infinity, gs = -Infinity;
-    for (const v of full) if (v <= gc + 0.36 && v > gp) gp = v;
-    for (const v of center) if (v <= gc + 0.36 && v > gs) gs = v;
+    const pick = (lim: number): [number, number] => {
+      let p = -Infinity, c = -Infinity;
+      for (const v of full) if (v <= lim && v > p) p = v;
+      for (const v of center) if (v <= lim && v > c) c = v;
+      return [p, c];
+    };
+    let [gp, gs] = pick(gc + 0.36);
+    // 段階 4（移動と身体）: 縦につなぐ物（はしご・上昇気流・弾む床）の柱の中では、その上端まで上がれる
+    // （体の下に高い面があれば、その高さへ上がる。縁に掛かっていても、上がりながら前へ出るので縁の判定はしない）
+    const reach = liftAt(b.min[0] + i * G, b.min[2] + k * G, gc);
+    if (reach > gc + 0.01) {
+      // 体の幅より少し広く見る（体が面の縁に触れる所でも、上の面へ上がれる）
+      let lp = -Infinity;
+      for (const v of surfacesAt(sim, b.min[0] + i * G, b.min[2] + k * G, top, R + 0.08)) if (v <= reach + 0.36 && v > lp) lp = v;
+      if (lp > -Infinity && lp >= gp && !blocked(i, k, lp)) return lp;
+    }
     if (gp === -Infinity) return null;
     if (gs === -Infinity || gp > gs + 0.6) return 'edge';
     return blocked(i, k, gp) ? null : gp;
@@ -240,6 +260,32 @@ function pendulumAhead(sim: Sim, p: { pos: number[] }, dx: number, dz: number): 
     }
   }
   return false;
+}
+
+/**
+ * 段階 4（移動と身体）: 縦につなぐ物の柱（足元の範囲 x0..z1・下端 base・上がれる高さ top）。
+ * はしご（climb ゾーン: 上端まで）・上昇気流（force の上向き: 上端 + 抜けてからの惰性）・弾む床（bouncePad: 跳ね上がる高さ）。
+ * 柱の範囲は少し内側（端では柱から外れて上がれない）。高い面は柱の中の点で、体の幅より少し広く探す（standAt）
+ */
+export function liftsOf(sim: Sim, b: { min: number[]; max: number[] }): { x0: number; z0: number; x1: number; z1: number; base: number; top: number }[] {
+  const out: { x0: number; z0: number; x1: number; z1: number; base: number; top: number }[] = [];
+  const near = (a: { min: number[]; max: number[] }): boolean => a.max[0]! >= b.min[0]! - 1 && a.min[0]! <= b.max[0]! + 1 && a.max[2]! >= b.min[2]! - 1 && a.min[2]! <= b.max[2]! + 1;
+  for (const z of sim.zones) {
+    if (!near(z.aabb)) continue;
+    if (z.kind === 'climb') out.push({ x0: z.aabb.min[0] + 0.1, z0: z.aabb.min[2] + 0.1, x1: z.aabb.max[0] - 0.1, z1: z.aabb.max[2] - 0.1, base: z.aabb.min[1], top: z.aabb.max[1] - 0.3 });
+    else if (z.kind === 'force' && z.vector && z.vector[1] > 0.5) {
+      const v = (z.params?.speed ?? 1) * z.vector[1] / Math.hypot(z.vector[0], z.vector[1], z.vector[2]);
+      out.push({ x0: z.aabb.min[0] + 0.1, z0: z.aabb.min[2] + 0.1, x1: z.aabb.max[0] - 0.1, z1: z.aabb.max[2] - 0.1, base: z.aabb.min[1], top: z.aabb.max[1] + (v * v) / (2 * PLAYER.gravity) - 0.2 });
+    }
+  }
+  for (const e of sim.floor.entities) {
+    if (e.type !== 'bouncePad') continue;
+    const a = e.params.aabb as { min: number[]; max: number[] };
+    if (!near(a)) continue;
+    const v = Number(e.params.speed ?? 7.2);
+    out.push({ x0: a.min[0]! + 0.05, z0: a.min[2]! + 0.05, x1: a.max[0]! - 0.05, z1: a.max[2]! - 0.05, base: a.min[1]!, top: a.min[1]! + 0.1 + (v * v) / (2 * PLAYER.gravity) - 0.4 });
+  }
+  return out;
 }
 
 /** 段階 4（移動と身体）: 部品 type の範囲（params.aabb）に足元が入っているか */

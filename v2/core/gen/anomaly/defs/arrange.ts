@@ -186,6 +186,8 @@ defineAnomaly({
       else left.push(...tw);
     }
     if (!built) return false;
+    // 塔が低い（低い物を 2 つ重ねただけ）と積み上げに見えないので、腰より上に載った物が無ければ掛けない（段階 4 で足した）
+    if (!placed.some((b) => b.min[1] > fy + 0.9)) return false;
     // 塔に載らなかった物: 塔の足元に倒れている（置けなければ片付ける）
     const base = bbOf(placed);
     for (const g of left) {
