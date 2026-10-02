@@ -11,7 +11,7 @@ import type { Dir } from '../../../math/vec.ts';
 import { box, type MatId } from '../../../world/layout.ts';
 import { defineGimmick } from '../types.ts';
 import { innerRect } from '../util.ts';
-import { addItem, aabbJ, freeSpans, onMainWall, wallBox, wallPoint } from './util.ts';
+import { aabbJ, addItem, freeSpans, offer, onMainWall, wallBox, wallPoint } from './util.ts';
 
 export const PARCEL_COLORS: { id: string; mat: MatId }[] = [
   { id: 'red', mat: 'plasticRed' }, { id: 'blue', mat: 'plasticBlue' }, { id: 'yellow', mat: 'plasticYellow' }, { id: 'green', mat: 'lightGreen' },
@@ -67,10 +67,10 @@ defineGimmick({
     }
     const sec = ctx.tuning['carry.parcel.waitSec'];
     const sensor = ctx.addEntity('frame', { type: 'carrySensor', params: { aabb: frame, want: [`parcel.${want.id}`], sec, latch: true, glow: aabbJ({ min: [frame.min[0]! + 0.1, y, frame.min[2]! + 0.1], max: [frame.max[0]! - 0.1, y + 0.01, frame.max[2]! - 0.1] }) } });
-    ctx.offerSecret({ hook: 'carry.parcel.match', modes: ['appear'], weight: 1, required: true, revealOutput: `${sensor}.match`, doorway: { dir: gate.d, at: gateAt, y, width: 1.0, height: 2.0 }, tell: '受け取り口の色の札' });
+    offer(ctx, { hook: 'carry.parcel.match', modes: ['appear'], weight: 1, required: true, revealOutput: `${sensor}.match`, doorway: { dir: gate.d, at: gateAt, y, width: 1.0, height: 2.0 }, tell: '受け取り口の色の札' });
     if (back) {
       ctx.addBox(wallBox(r, back.d, back.at, 0.35, y + 2.15, y + 2.3, 0.03, 'signPlate'));
-      ctx.offerSecret({ hook: 'carry.parcel.wrong', modes: ['appear'], weight: 0.8, revealOutput: `${sensor}.other`, doorway: { dir: back.d, at: back.at, y, width: 1.0, height: 2.0 }, tell: '札の無い返品口' });
+      offer(ctx, { hook: 'carry.parcel.wrong', modes: ['appear'], weight: 0.8, revealOutput: `${sensor}.other`, doorway: { dir: back.d, at: back.at, y, width: 1.0, height: 2.0 }, tell: '札の無い返品口' });
     }
     ctx.keepOut({ min: [frame.min[0]! - 0.4, y - 0.1, frame.min[2]! - 0.4], max: [frame.max[0]! + 0.4, y + 2.6, frame.max[2]! + 0.4] });
     const s0 = wallPoint(r, shelfW.d, shelfAt - len / 2, 0, y), s1 = wallPoint(r, shelfW.d, shelfAt + len / 2, 1.5, y);

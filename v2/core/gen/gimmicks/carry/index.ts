@@ -10,3 +10,5 @@ import './weight.ts';
 import './keys.ts';
 import './replica.ts';
 import './home.ts';
+import './puzzles.ts';
+import './puzzles2.ts';

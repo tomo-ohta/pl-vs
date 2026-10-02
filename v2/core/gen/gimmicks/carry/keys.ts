@@ -14,7 +14,7 @@ import { box } from '../../../world/layout.ts';
 import { defineGimmick, type GimmickContext } from '../types.ts';
 import { innerRect } from '../util.ts';
 import { PARCEL_COLORS } from './parcels.ts';
-import { addItem, clueFloorSpot, floorSpots, freeSpans, idOf, onMainWall, roomLamp, wallBox, wallPoint, type ItemOpts } from './util.ts';
+import { addItem, clueFloorSpot, floorSpots, freeSpans, idOf, type ItemOpts, offer, onMainWall, roomLamp, wallBox, wallPoint } from './util.ts';
 
 /** 運ぶ物を別の区画（無ければ自分の部屋の床）に置く。戻り値は部品の id */
 export function placeFar(ctx: GimmickContext, name: string, o: ItemOpts, minHops = 2): { id: string; cell: string; pos: Vec3 } | null {
@@ -61,7 +61,7 @@ defineGimmick({
       ? { half: [0.05, 0.004, 0.03], kind: 'ticket', tag: 'ticket', mat: 'paintWhite', label: 'plasticBlue', yaw: ctx.rng.float(-3, 3) }
       : { half: [0.045, 0.004, 0.065], kind: 'card', tag: 'card', mat: 'paintWhite', label: 'plasticRed', yaw: ctx.rng.float(-3, 3) });
     if (!key) return;
-    ctx.offerSecret({ hook: 'carry.keycard', modes: ['appear'], weight: 1, required: true, revealOutput: `${sensor}.match`, doorway: { dir: d, at, y, width: 1.0, height: 2.0 }, tell: '改札の向こうから吹く風' });
+    offer(ctx, { hook: 'carry.keycard', modes: ['appear'], weight: 1, required: true, revealOutput: `${sensor}.match`, doorway: { dir: d, at, y, width: 1.0, height: 2.0 }, tell: '改札の向こうから吹く風' });
     const k0 = wallPoint(r, d, at - 1.0, 0, y), k1 = wallPoint(r, d, at + 1.0, 1.9, y);
     ctx.keepOut({ min: [Math.min(k0[0], k1[0]), y - 0.1, Math.min(k0[2], k1[2])], max: [Math.max(k0[0], k1[0]), y + 2.6, Math.max(k0[2], k1[2])] });
   },
@@ -95,7 +95,7 @@ defineGimmick({
     const lk = ctx.rng.pick(LOST_KINDS);
     const item = placeFar(ctx, 'lost', { half: lk.half, kind: lk.kind, tag: `lost.${color.id}`, mat: color.mat, label: color.mat, yaw: ctx.rng.float(-3, 3) }, 2);
     if (!item || !doorW) return;
-    ctx.offerSecret({ hook: 'carry.lost.returned', modes: ['appear'], weight: 1, required: true, revealOutput: `${desk}.ok`, doorway: { dir: doorW.d, at: doorW.sp!.at, y, width: 1.0, height: 2.0 }, tell: '机の上の名札' });
+    offer(ctx, { hook: 'carry.lost.returned', modes: ['appear'], weight: 1, required: true, revealOutput: `${desk}.ok`, doorway: { dir: doorW.d, at: doorW.sp!.at, y, width: 1.0, height: 2.0 }, tell: '机の上の名札' });
     const k0 = wallPoint(r, opp, deskW.at - 0.8, 0, y), k1 = wallPoint(r, opp, deskW.at + 0.8, 1.6, y);
     ctx.keepOut({ min: [Math.min(k0[0], k1[0]), y - 0.1, Math.min(k0[2], k1[2])], max: [Math.max(k0[0], k1[0]), y + 2.6, Math.max(k0[2], k1[2])] });
   },
@@ -124,7 +124,7 @@ defineGimmick({
     if (!bulb) return;
     // 暗がりの壁の隠し（存在型 = 暗くて見えない / 出現型 = 明るくなると現れる）
     const wall = ctx.rng.shuffle([0, 1, 2, 3] as Dir[]).map((d) => ({ d, sp: freeSpans(r, s.openings, d, 1.4, 0.9)[0] })).find((w) => w.sp);
-    if (wall) ctx.offerSecret({ hook: 'carry.bulb.lit', modes: ['present', 'appear'], weight: 1, revealOutput: `${lit}.out`, doorway: { dir: wall.d, at: wall.sp!.at, y, width: 1.0, height: 2.0 }, tell: '空の電球の受け口' });
+    if (wall) offer(ctx, { hook: 'carry.bulb.lit', modes: ['present', 'appear'], weight: 1, revealOutput: `${lit}.out`, doorway: { dir: wall.d, at: wall.sp!.at, y, width: 1.0, height: 2.0 }, tell: '空の電球の受け口' });
     ctx.keepOut({ min: [at[0] - 0.8, y - 0.1, at[2] - 0.8], max: [at[0] + 0.8, y + 2.6, at[2] + 0.8] });
   },
 });

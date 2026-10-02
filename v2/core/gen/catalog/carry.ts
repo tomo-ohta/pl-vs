@@ -74,18 +74,54 @@ export const CARRY_CATALOG: CatalogEntry[] = [
     note: '台の上のオルゴール。部屋の外へ持ち出してから戻して置くと、戻した部屋に新しい扉（出現型。持てる物の出力 returned）。持ち出さずに置き直しても何も起きない。元の部屋の物（homeObject）の変種 return',
   },
   // ---- 4.7 パズル（行き止まりの部屋。解くと隠し）----
-  { idea: 'PZ01', name: '手がかりが別の部屋にある数字錠', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ02', name: '色の照明を混ぜて決まった色にする', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ03', name: '部屋中の時計の針を同じ時刻に合わせる', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ04', name: '床のタイルを入れ替えて絵を完成させる', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ05', name: '影絵: 照明と物の位置を合わせ、扉の形の影を作る', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ06', name: '鏡を並べて光を部屋の奥へ通す', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ07', name: '音の高さの順にベルを鳴らす', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ08', name: '家具の配置を壁の写真と同じにする', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ09', name: '重さの違う箱を天秤の両側で釣り合わせる', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ10', name: '迷路の模型で球を転がし、本物の迷路の隠し出口を知る', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ11', name: '消えた照明を、電球を運んで元の順に戻す', status: 'deferred', impl: [], note: WIP },
-  { idea: 'PZ12', name: '足跡の模様どおりに床を踏む', status: 'deferred', impl: [], note: WIP },
+  {
+    idea: 'PZ01', name: '手がかりが別の部屋にある数字錠', status: 'done', impl: [{ kind: 'gimmick', id: 'dialLock' }, { kind: 'part', id: 'dial' }],
+    note: '行き止まりの部屋の扉の横に 3 桁のダイヤル（調べると 1 進む。7 本の線の数字）。同じ色の枠の 3 桁の番号の札が、同じフロアの別の部屋（廊下・曲がり角・入口と出口の部屋を先に）の壁にある（clueCells / addToCell）。合わせると扉（出現型・必ず付ける）',
+  },
+  {
+    idea: 'PZ02', name: '色の照明を混ぜて決まった色にする', status: 'done', impl: [{ kind: 'gimmick', id: 'colorMix' }, { kind: 'part', id: 'matchBits' }],
+    note: '暗い部屋に赤・緑・青の灯りと 3 つのスイッチ（押すたびに入切）。灯りは本当に混ざる（3 つの点光源）。別の部屋の壁の「色の扉の絵」と同じ色（黄・紫・水色・白のどれか）にすると扉',
+  },
+  {
+    idea: 'PZ03', name: '部屋中の時計の針を同じ時刻に合わせる', status: 'done', impl: [{ kind: 'gimmick', id: 'clockRoom' }, { kind: 'part', id: 'dial' }, { kind: 'part', id: 'sameValue' }],
+    note: '部屋の壁の時計 4〜5 つがばらばらの時刻。調べると 1 時間進む。全部を同じ時刻に（別の部屋に止まった時計を置けたときは、その時刻に）すると扉',
+  },
+  {
+    idea: 'PZ04', name: '床のタイルを入れ替えて絵を完成させる', status: 'done', impl: [{ kind: 'gimmick', id: 'tilePicture' }, { kind: 'part', id: 'carryReceiver' }],
+    note: '床の 3×3 の升目のタイルの絵がばらばら（自分の升目にあるタイルは無い）。タイルを持って別のタイルを調べると入れ替わる（持てる物の入れ替え）。絵がつながると扉。完成した絵は別の部屋の額（canvas の絵。seed で決まる）',
+  },
+  {
+    idea: 'PZ05', name: '影絵: 照明と物の位置を合わせ、扉の形の影を作る', status: 'done', impl: [{ kind: 'gimmick', id: 'shadowPuzzle' }, { kind: 'part', id: 'carryDecor' }],
+    note: '壁際の低い強い灯りと、向かいの壁の扉の形の線。間に高さの同じ台が 3 つ。扉の形の切り抜きを正しい台に置くと、壁に落ちる影（灯りから 4 隅を写した四角。持って動かすと影も動く）が線にぴったり重なり、影が扉になる',
+  },
+  {
+    idea: 'PZ06', name: '鏡を並べて光を部屋の奥へ通す', status: 'done', impl: [{ kind: 'gimmick', id: 'mirrorBeam' }, { kind: 'part', id: 'beamGrid' }],
+    note: '壁の穴から床の升目に沿って光の筋。柱で止まっている。鏡（持てる物）は置いた人の向き（45° 刻み）に置かれ、斜めに置くと光が曲がる。光を壁の目に届けると、目の横に扉。解き方は生成のときに決めて、鏡の升目のまわりに柱を置かない（斜めに立って置ける）',
+  },
+  {
+    idea: 'PZ07', name: '音の高さの順にベルを鳴らす', status: 'done', impl: [{ kind: 'gimmick', id: 'bellOrder' }, { kind: 'part', id: 'bell' }],
+    note: '大きさの違う鐘 4〜5 つ（調べると鳴る。WebAudio の合成の鐘の音）。音の低い順（大きい順）に鳴らすと扉。間違えると最初から（逆の順では開かない: 試験で確かめる）',
+  },
+  {
+    idea: 'PZ08', name: '家具の配置を壁の写真と同じにする', status: 'done', impl: [{ kind: 'gimmick', id: 'furnitureMatch' }],
+    note: '椅子・丸椅子・鉢植え・電気スタンドのうち 3 つ。壁の写真（上から見た部屋の図。写真の壁が上・入口と扉の印・家具の形の印）と同じ所に置くと扉',
+  },
+  {
+    idea: 'PZ09', name: '重さの違う箱を天秤の両側で釣り合わせる', status: 'done', impl: [{ kind: 'gimmick', id: 'balanceScale' }],
+    note: '天秤の両側の皿と、点の数が重さの箱 4 つ（重さ 1〜4。大きさは重さと関係ない）。竿が重さの差で傾く。両側を同じ重さ（片側 4 以上: carry.balance.min）にすると扉。1 と 2 では開かない',
+  },
+  {
+    idea: 'PZ10', name: '迷路の模型で球を転がし、本物の迷路の隠し出口を知る', status: 'done', impl: [{ kind: 'gimmick', id: 'mazeModel' }, { kind: 'part', id: 'marbleModel' }],
+    note: '部屋の奥は天井までの迷路、手前の机に同じ迷路の模型と玉。机の辺に立つと模型がそちらへ傾き、玉は壁まで転がる（氷の迷路）。模型の行き止まりの 1 つに穴。玉が落ちると、本物の迷路の同じ行き止まりに扉が現れる。玉が転がって届く穴だけ選ぶ（slideSolve）',
+  },
+  {
+    idea: 'PZ11', name: '消えた照明を、電球を運んで元の順に戻す', status: 'done', impl: [{ kind: 'gimmick', id: 'bulbOrder' }],
+    note: '壁の吊り灯り 3〜4 つの受け口が空。色の電球が同じフロアの別の部屋に散らばる。別の部屋の古い写真（灯りの色の並び）の順に差すと扉。差すと受け口がその色に灯る',
+  },
+  {
+    idea: 'PZ12', name: '足跡の模様どおりに床を踏む', status: 'done', impl: [{ kind: 'gimmick', id: 'footPattern' }, { kind: 'part', id: 'stepPattern' }],
+    note: '床の 4×4 の升目。別の部屋の足跡の図（入口の側が下）の順に踏むと扉。踏めた升目が灯り、違う升目を踏むと赤く光って最初から（逆から踏んでも開かない）',
+  },
   // ---- 2.15 自由に遊べるミニゲーム（脇の部屋。いつでも出られる・失敗は区間の最初へ・報酬なし・普通と違う遊び方で隠し）----
   { idea: 'U01', name: '球を穴に入れる（床を傾ける）', status: 'deferred', impl: [], note: WIP },
   { idea: 'U02', name: 'ボウリングの廊下', status: 'deferred', impl: [], note: WIP },

@@ -5,6 +5,7 @@ import { generateFloorReport } from '../core/gen/floor/index.ts';
 import { BSIDE_TONES } from '../core/gen/floor/bside.ts';
 import { showcaseFloor } from '../core/gen/floor/showcase.ts';
 import { gimmickDefs } from '../core/gen/gimmicks/types.ts';
+import { CATALOG } from '../core/gen/catalog/index.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
 import '../core/sim/parts/index.ts';
@@ -36,12 +37,14 @@ test('裏のフロア: 表と同じ形・中身と調子は裏の seed で決ま
 
 test('見本のフロア: 仕掛けを全種置き、見て回る位置はどれも床の上', async () => {
   const R = await loadRapier();
-  const all = gimmickDefs().map((d) => d.id);
+  // 段階 4（carry）: 段階 4 の仕掛け（案の台帳に載っている物）は ?try / ?group で見る。見本のフロアに必ず入るのは段階 3 の仕掛け
+  const stage4 = new Set(CATALOG.flatMap((e) => e.impl.filter((m) => m.kind === 'gimmick').map((m) => m.id)));
+  const all = gimmickDefs().map((d) => d.id).filter((id) => !stage4.has(id));
   const modesBy: string[][] = [];
   for (const flip of [false, true]) {
     const r = showcaseFloor(t, { flip });
     const g = r.gimmicks!;
-    assert.deepEqual(new Set(g.gimmicks.map((x) => x.def)), new Set(all), '全種');
+    assert.deepEqual(new Set(g.gimmicks.map((x) => x.def).filter((id) => !stage4.has(id))), new Set(all), '全種');
     assert.equal(g.tour.length, g.gimmicks.length + g.secrets.filter((s) => s.hook === 'generic.darkCorner').length + r.anomalies.length);
     const sim = new Sim(r.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
     for (const s of g.tour) {

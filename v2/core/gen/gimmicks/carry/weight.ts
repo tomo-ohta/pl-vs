@@ -9,7 +9,7 @@ import { box } from '../../../world/layout.ts';
 import { defineGimmick } from '../types.ts';
 import { innerRect } from '../util.ts';
 import { buildHatch, hatchSecret, planHatch } from './hatch.ts';
-import { addItem, aabbJ, floorSpots, onMainWall } from './util.ts';
+import { aabbJ, addItem, floorSpots, offer, onMainWall } from './util.ts';
 
 defineGimmick({
   id: 'weightHatch', name: '重さで開く床', axes: ['carry', 'floor'], kinds: ['room', 'hall'], minSize: [5.2, 6.4], weight: 0.4, intensity: 1, offersSecret: true, onMainPath: true,
@@ -43,7 +43,7 @@ defineGimmick({
     if (!spots) return;
     addItem(ctx, 'crate', spots[0]!, { half: [0.3, 0.27, 0.3], kind: 'parcel', tag: 'box.heavy', mat: 'woodPanel', label: 'metalDark', weight: need, yaw: 0 });
     for (let i = 1; i < 3; i++) addItem(ctx, `box${i}`, spots[i]!, { half: [0.2, 0.17, 0.2], kind: 'parcel', tag: 'box.light', mat: 'boxCardboard', weight: Math.ceil(need / 2), yaw: ctx.rng.float(0, Math.PI) });
-    ctx.offerSecret(hatchSecret(plan, y, 'carry.weight.hold', '板の上の擦れた跡'));
+    offer(ctx, hatchSecret(plan, y, 'carry.weight.hold', '板の上の擦れた跡'));
     ctx.keepOut({ min: [r.x0, y - 3, r.z0], max: [r.x1, y + 2.6, r.z1] });
   },
 });

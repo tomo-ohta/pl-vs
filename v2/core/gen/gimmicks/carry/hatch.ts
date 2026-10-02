@@ -104,7 +104,8 @@ export function buildHatch(ctx: GimmickContext, p: HatchPlan, kind: 'reveal' | '
   const half = (a: number, b: number, sg: number, name: string): string => {
     const q = F.rect(a, F.v(h.x0, h.z0), b, F.v(h.x1, h.z1));
     const L = (b - a) + 0.05;
-    return ctx.addEntity(name, { type: 'mover', params: { box: aabbJ({ min: [q.x0, y - 0.12, q.z0], max: [q.x1, y, q.z1] }), mat: s.cell.palette.floor, points: [[0, 0, 0], [0, -0.22, 0], [sg * ux * L, -0.22, sg * uz * L]], speed: 1.6, carry: true }, inputs: { target: trigger } });
+    // hatch: true（床の蓋。歩く人の試験は開いたままにして、穴の底の隠しへ行けることを確かめる）
+    return ctx.addEntity(name, { type: 'mover', params: { box: aabbJ({ min: [q.x0, y - 0.12, q.z0], max: [q.x1, y, q.z1] }), mat: s.cell.palette.floor, points: [[0, 0, 0], [0, -0.22, 0], [sg * ux * L, -0.22, sg * uz * L]], speed: 1.6, carry: true, hatch: true }, inputs: { target: trigger } });
   };
   const first = half(u0, um, -1, 'hatchA');
   half(um, u1, 1, 'hatchB');

@@ -17,9 +17,12 @@ const t = defaultTuning();
 function prepare(sim: Sim, floor: FloorLayout): void {
   for (const e of floor.entities) if (e.type === 'reveal') (sim as unknown as { revealGroup(g: string, b: string): void }).revealGroup(String(e.params.group), 'test');
   const wired = floor.entities.filter((e) => e.type === 'door' && e.inputs?.open).map((e) => e.id);
+  // 段階 4（carry）: 重さで開く床の蓋（mover の params.hatch）も開いたままにする（歩く人は板に物を載せない）
+  const hatches = floor.entities.filter((e) => e.type === 'mover' && e.params.hatch === true).map((e) => e.id);
   const step = sim.step.bind(sim);
   (sim as unknown as { step: typeof sim.step }).step = (c) => {
     for (const id of wired) { const st = sim.stateOf(id) as { angle: number; target: number }; st.angle = 1; st.target = 1; }
+    for (const id of hatches) (sim.stateOf(id) as { t: number }).t = 1;
     step(c);
   };
 }

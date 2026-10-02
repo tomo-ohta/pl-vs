@@ -12,6 +12,8 @@ import type { EntitySpec, Json, MatId } from '../../../core/world/layout.ts';
 import { defineView, type ViewContext } from '../views.ts';
 import { lightAt, onCue, Parts, withBaked } from './common.ts';
 import { persistFor } from './persist.ts';
+import { receiverGlow } from './puzzle.ts';
+import { tileTop } from './picture.ts';
 
 type V3 = [number, number, number];
 
@@ -63,6 +65,13 @@ export function buildShape(P: Parts, kind: string, half: V3, mat: MatId, params:
     case 'bulb': {
       ball(Math.min(hx, hz) * 0.95, (params.glass as MatId | undefined) ?? 'lightWarm', [0, hy * 0.3, 0]);
       cyl(hx * 0.45, hx * 0.4, H * 0.35, 'metal', [0, -hy + H * 0.17, 0]);
+      break;
+    }
+    case 'tile': {
+      // 床のタイル（PZ04）: 上の面に絵の一部
+      P.box([W, H, D], 'paintWhite');
+      const top = tileTop(W * 0.96, Number(params.pic ?? 0), Number(params.picN ?? 3), Number(params.picSeed ?? 0));
+      P.add(top.geometry, top.material as THREE.Material, [0, hy + 0.002, 0]);
       break;
     }
     case 'card': case 'ticket': {
@@ -249,9 +258,9 @@ defineView('carryBody', itemView);
  * 受けの枠: 床・台の上の薄い四角の印（params.mark が false なら描かない）。合う物が置かれた枠は印が明るくなる
  */
 defineView('carryReceiver', (spec, ctx) => {
-  if (spec.params.mark === false) return null;
+  const glow = receiverGlow(spec, ctx);
   const slots = Array.isArray(spec.params.slots) ? (spec.params.slots as { pos: number[]; r?: number }[]) : [];
-  if (!slots.length) return null;
+  if (spec.params.mark === false || !slots.length) return glow ? { update: (s: Readonly<PartState>) => glow.update(s), dispose: () => glow.dispose() } : null;
   const P = new Parts(ctx);
   const size = typeof spec.params.markM === 'number' ? spec.params.markM : 0.42;
   const markMat = (spec.params.markMat as MatId | undefined) ?? 'yellowLine';
@@ -271,9 +280,10 @@ defineView('carryReceiver', (spec, ctx) => {
     update(s: Readonly<PartState>, dt: number) {
       const occ = (s.occ as (string | null)[] | undefined) ?? [];
       meshes.forEach((m, i) => { m.material = occ[i] ? lit : base; });
+      glow?.update(s);
       relight -= dt;
       if (relight <= 0) { relight = 0.5; const c = slots[0]!.pos; P.relight(lightAt(ctx, [c[0]!, c[1]! + 0.3, c[2]!])); }
     },
-    dispose() { P.dispose(); lit.dispose(); },
+    dispose() { P.dispose(); lit.dispose(); glow?.dispose(); },
   };
 });

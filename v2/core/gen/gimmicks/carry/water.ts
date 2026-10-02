@@ -12,7 +12,7 @@ import type { Dir } from '../../../math/vec.ts';
 import { box } from '../../../world/layout.ts';
 import { defineGimmick } from '../types.ts';
 import { innerRect } from '../util.ts';
-import { aabbJ, addItem, freeSpans, idOf, onMainWall, wallBox, wallPoint } from './util.ts';
+import { aabbJ, addItem, freeSpans, idOf, offer, onMainWall, wallBox, wallPoint } from './util.ts';
 
 defineGimmick({
   id: 'carryWater', name: '水を運ぶ', axes: ['carry'], kinds: ['room', 'hall'], minSize: [4.4, 6], weight: 0.45, intensity: 1, offersSecret: true, onMainPath: true,
@@ -77,7 +77,7 @@ defineGimmick({
       const w = ctx.rng.float(0.35, 0.7), d = ctx.rng.float(0.3, 0.6);
       ctx.addBox(box([x - w / 2, y, z - d / 2], [x + w / 2, y + 0.004, z + d / 2], 'puddle', false));
     }
-    ctx.offerSecret({ hook: 'carry.water.full', modes: ['appear'], weight: 1.0, revealOutput: `${level}.full`, doorway: { dir: standD, at: doorAt, y, width: 1.0, height: 2.0 }, tell: '台の縁の満水の線' });
+    offer(ctx, { hook: 'carry.water.full', modes: ['appear'], weight: 1.0, revealOutput: `${level}.full`, doorway: { dir: standD, at: doorAt, y, width: 1.0, height: 2.0 }, tell: '台の縁の満水の線' });
     // 家具を置かない: 台と扉の前・蛇口の前
     const k1 = wallPoint(r, standD, standAt, 1.8, y), k0 = wallPoint(r, standD, doorAt, 0, y);
     ctx.keepOut({ min: [Math.min(k0[0], k1[0], sc[0]) - 0.9, y - 0.1, Math.min(k0[2], k1[2], sc[2]) - 0.9], max: [Math.max(k0[0], k1[0], sc[0]) + 0.9, y + 2.6, Math.max(k0[2], k1[2], sc[2]) + 0.9] });

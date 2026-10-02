@@ -32,6 +32,8 @@ export const CARRY_TUNING = {
   'carry.replica.pitchM': num(0.7, 0.4, 1.5, '物を置くと増える: 並べる間隔（m）'),
   'carry.replica.max': num(64, 8, 200, '物を置くと増える: 並べる数の上限', true),
   'carry.home.stageM': num(12, 3, 60, '運ぶと変わる物: この道のり（m）を運ぶごとに次の形になる（4 段。最後は鍵）'),
+  // ---- パズル ----
+  'carry.balance.min': num(4, 1, 10, '天秤: 釣り合わせる片側の重さの下限（軽い箱 1 つずつでは開かない）'),
   // ---- 本を集める（I03）----
   'carry.book.pickR': num(0.45, 0.2, 1, '本を集める: 本を拾う半径（体の中心から水平に m）'),
   'carry.book.routeClear': num(0.45, 0.2, 1.2, '本を集める: 1 冊も拾わずに返却台へ行く道から、本を離す余裕（拾う半径に足す m）'),

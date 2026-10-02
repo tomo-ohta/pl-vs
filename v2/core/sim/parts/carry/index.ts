@@ -7,4 +7,5 @@ import './receiver.ts';
 import './logic.ts';
 import './collect.ts';
 import './replica.ts';
+import './puzzle.ts';
 export { carrySave, carryRestore, type CarrySave } from './persist.ts';

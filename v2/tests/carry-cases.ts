@@ -27,6 +27,18 @@ export const CARRY_CASES: { def: string; exits: ('opposite' | 'side' | 'none')[]
   { def: 'bulbRoom', exits: ['opposite', 'side', 'none'] },
   { def: 'replicaRoom', exits: ['opposite', 'side', 'none'] },
   { def: 'homeObject', exits: ['opposite', 'side', 'none'] },
+  { def: 'dialLock', exits: ['none'] },
+  { def: 'colorMix', exits: ['none'] },
+  { def: 'clockRoom', exits: ['none'] },
+  { def: 'bellOrder', exits: ['none'] },
+  { def: 'bulbOrder', exits: ['none'] },
+  { def: 'tilePicture', exits: ['none'] },
+  { def: 'shadowPuzzle', exits: ['none'] },
+  { def: 'mirrorBeam', exits: ['none'] },
+  { def: 'furnitureMatch', exits: ['none'] },
+  { def: 'balanceScale', exits: ['none'] },
+  { def: 'mazeModel', exits: ['none'] },
+  { def: 'footPattern', exits: ['none'] },
 ];
 
 /** 行き止まりの部屋の奥: 入口からいちばん遠い、体を置ける床の点（0.5 m 格子） */

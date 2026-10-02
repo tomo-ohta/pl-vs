@@ -11,61 +11,9 @@ import type { Rect } from '../../../world/footprint.ts';
 import { box, type MatId } from '../../../world/layout.ts';
 import { defineGimmick } from '../types.ts';
 import { frontOf, innerRect } from '../util.ts';
-import { freeSpans, onMainWall, snap, wallBox, wallPoint } from './util.ts';
+import { distToRoute, freeSpans, gridRoute, offer, onMainWall, snap, thinRoute, wallBox, wallPoint } from './util.ts';
 
 const COVERS: MatId[] = ['plasticRed', 'plasticBlue', 'lightGreen', 'plasticYellow', 'furnitureDark', 'woodPanel'];
-
-/** 格子の道（体の半径 0.4 m で塞がりを太らせる）: from から to へ。無ければ null。点の並び（格子 g） */
-export function gridRoute(area: Rect, blocks: readonly Rect[], from: [number, number], to: [number, number], g = 0.2, body = 0.4): [number, number][] | null {
-  const nx = Math.max(1, Math.floor((area.x1 - area.x0) / g)), nz = Math.max(1, Math.floor((area.z1 - area.z0) / g));
-  const cx = (i: number): number => area.x0 + (i + 0.5) * g, cz = (k: number): number => area.z0 + (k + 0.5) * g;
-  const free = (i: number, k: number): boolean => {
-    const x = cx(i), z = cz(k);
-    if (x - body < area.x0 || x + body > area.x1 || z - body < area.z0 || z + body > area.z1) return false;
-    return !blocks.some((b) => x + body > b.x0 && x - body < b.x1 && z + body > b.z0 && z - body < b.z1);
-  };
-  const cell = (p: [number, number]): number => Math.min(nz - 1, Math.max(0, Math.floor((p[1] - area.z0) / g))) * nx + Math.min(nx - 1, Math.max(0, Math.floor((p[0] - area.x0) / g)));
-  const a = cell(from), b = cell(to);
-  const prev = new Int32Array(nx * nz).fill(-1);
-  prev[a] = a;
-  const q = [a];
-  for (let h = 0; h < q.length && prev[b]! < 0; h++) {
-    const c = q[h]!, i = c % nx, k = (c - i) / nx;
-    for (const [di, dk] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-      const ii = i + di, kk = k + dk;
-      if (ii < 0 || kk < 0 || ii >= nx || kk >= nz) continue;
-      const j = kk * nx + ii;
-      if (prev[j]! >= 0 || (j !== b && !free(ii, kk))) continue;
-      prev[j] = c;
-      q.push(j);
-    }
-  }
-  if (prev[b]! < 0) return null;
-  const out: [number, number][] = [];
-  for (let c = b; ; c = prev[c]!) { out.unshift([cx(c % nx), cz(Math.floor(c / nx))]); if (c === a) break; }
-  return out;
-}
-
-/** 点の並びと点 p の距離（折れ線） */
-export function distToRoute(route: readonly [number, number][], x: number, z: number): number {
-  let best = Infinity;
-  for (let i = 1; i < route.length; i++) {
-    const a = route[i - 1]!, b = route[i]!;
-    const ex = b[0] - a[0], ez = b[1] - a[1];
-    const l2 = ex * ex + ez * ez;
-    const k = l2 > 1e-9 ? Math.min(1, Math.max(0, ((x - a[0]) * ex + (z - a[1]) * ez) / l2)) : 0;
-    best = Math.min(best, Math.hypot(a[0] + ex * k - x, a[1] + ez * k - z));
-  }
-  return route.length === 1 ? Math.hypot(route[0]![0] - x, route[0]![1] - z) : best;
-}
-
-/** 向きの変わる所だけ残す */
-export function thinRoute(route: [number, number][]): [number, number][] {
-  return route.filter((p, i) => {
-    const a = route[i - 1], n = route[i + 1];
-    return !a || !n || Math.sign(p[0] - a[0]) !== Math.sign(n[0] - p[0]) || Math.sign(p[1] - a[1]) !== Math.sign(n[1] - p[1]);
-  });
-}
 
 defineGimmick({
   id: 'bookCollect', name: '本を集める', axes: ['carry'], kinds: ['room', 'hall'], minSize: [5, 6], weight: 0.4, intensity: 1, offersSecret: true, onMainPath: true,
@@ -161,8 +109,8 @@ defineGimmick({
       }
     }
     const set = ctx.addEntity('books', { type: 'collectSet', params: { items: books, r: pickR, desk: deskZone, deskSec: 1.2, kind: 'book', mats: books.map(() => ctx.rng.pick(COVERS)), route: thinRoute(route).map(([x, z]) => [x, y, z]), lamp: wallPoint(r, desk.d, desk.at, 0.3, y + 0.95) } });
-    ctx.offerSecret({ hook: 'carry.books.all', modes: ['appear'], weight: 1, revealOutput: `${set}.all`, doorway: { dir: desk.d, at: desk.doorAt, y, width: 1.0, height: 2.0 }, tell: '返却台の空の棚' });
-    if (none) ctx.offerSecret({ hook: 'carry.books.none', modes: ['appear'], weight: 0.9, revealOutput: `${set}.none`, doorway: { dir: none.d, at: none.at, y, width: 1.0, height: 2.0 }, tell: '本の落ちていない細い道' });
+    offer(ctx, { hook: 'carry.books.all', modes: ['appear'], weight: 1, revealOutput: `${set}.all`, doorway: { dir: desk.d, at: desk.doorAt, y, width: 1.0, height: 2.0 }, tell: '返却台の空の棚' });
+    if (none) offer(ctx, { hook: 'carry.books.none', modes: ['appear'], weight: 0.9, revealOutput: `${set}.none`, doorway: { dir: none.d, at: none.at, y, width: 1.0, height: 2.0 }, tell: '本の落ちていない細い道' });
     ctx.keepOut({ min: [r.x0, y - 0.1, r.z0], max: [r.x1, y + 2.6, r.z1] });
   },
 });

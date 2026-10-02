@@ -8,7 +8,7 @@ import type { Dir, Vec3 } from '../../../math/vec.ts';
 import { box, type MatId } from '../../../world/layout.ts';
 import { defineGimmick } from '../types.ts';
 import { doorZone, innerRect } from '../util.ts';
-import { addItem, aabbJ, clueFloorSpot, freeSpans, mainRectOf, onMainWall, snap, wallPoint } from './util.ts';
+import { aabbJ, addItem, clueFloorSpot, freeSpans, mainRectOf, offer, onMainWall, snap, wallPoint } from './util.ts';
 
 const SMALL: { kind: string; half: Vec3; mat: MatId }[] = [
   { kind: 'cup', half: [0.05, 0.06, 0.05], mat: 'paintWhite' },
@@ -67,7 +67,7 @@ defineGimmick({
     }
     if (spots.length < 12) return;
     const field = ctx.addEntity('field', { type: 'replicaField', params: { from: pedestal, region: aabbJ({ min: [s.rect.x0, y - 0.3, s.rect.z0], max: [s.rect.x1, y + 3, s.rect.z1] }), spots: spots.slice(0, ctx.tuning['carry.replica.max']) } });
-    ctx.offerSecret({ hook: 'carry.replica', modes: ['appear'], weight: 1, revealOutput: `${field}.shown`, doorway: { dir: dz, at: wall.sp!.at, y, width: 1.0, height: 2.0 }, tell: '台の上の、何かが置かれていた丸い跡' });
+    offer(ctx, { hook: 'carry.replica', modes: ['appear'], weight: 1, revealOutput: `${field}.shown`, doorway: { dir: dz, at: wall.sp!.at, y, width: 1.0, height: 2.0 }, tell: '台の上の、何かが置かれていた丸い跡' });
     ctx.keepOut({ min: [r.x0, y - 0.1, r.z0], max: [r.x1, y + 2.6, r.z1] });
   },
 });

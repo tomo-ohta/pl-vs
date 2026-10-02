@@ -15,7 +15,7 @@ import { box, type MatId } from '../../../world/layout.ts';
 import { defineGimmick } from '../types.ts';
 import { doorZone, innerRect } from '../util.ts';
 import { buildHatch, hatchSecret, planHatch } from './hatch.ts';
-import { addItem, aabbJ, floorSpots, freeSpans, onMainWall, snap } from './util.ts';
+import { aabbJ, addItem, floorSpots, freeSpans, offer, onMainWall, snap } from './util.ts';
 
 const CHAIR_HALF: Vec3 = [0.22, 0.43, 0.22];
 const CHAIR_MATS: MatId[] = ['woodPanel', 'seatBlue', 'furnitureLight', 'plasticRed'];
@@ -72,7 +72,7 @@ defineGimmick({
     const room = ctx.addEntity('room', { type: 'carryReceiver', params: { region: aabbJ({ min: [s.rect.x0, y - 0.5, s.rect.z0], max: [s.rect.x1, y + 3, s.rect.z1] }), accept: ['chair'], mark: false } });
     const empty = ctx.addEntity('empty', { type: 'threshold', params: { max: 0.5 }, inputs: { in: `${room}.present` } });
     buildHatch(ctx, plan, 'reveal', `${empty}.out`);
-    ctx.offerSecret(hatchSecret(plan, y, 'carry.chairs.cleared', '床の蓋の継ぎ目'));
+    offer(ctx, hatchSecret(plan, y, 'carry.chairs.cleared', '床の蓋の継ぎ目'));
     ctx.keepOut({ min: [r.x0, y - 3, r.z0], max: [r.x1, y + 2.6, r.z1] });
   },
 });
@@ -97,7 +97,7 @@ defineGimmick({
     const mat = ctx.rng.pick(CHAIR_MATS);
     spots.forEach((p, i) => addItem(ctx, `chair${i}`, p, { half: CHAIR_HALF, kind: 'chair', tag: 'chair', mat, yaw: (yaws[i]! * Math.PI) / 2, weight: 3 }));
     const room = ctx.addEntity('room', { type: 'carryReceiver', params: { region: aabbJ({ min: [s.rect.x0, y - 0.5, s.rect.z0], max: [s.rect.x1, y + 3, s.rect.z1] }), accept: ['chair'], need: n, alignDeg: 20, mark: false } });
-    ctx.offerSecret({ hook: 'carry.chairs.aligned', modes: ['appear'], weight: 1, revealOutput: `${room}.aligned`, doorway: { dir: wall.d, at: wall.sp!.at, y, width: 1.0, height: 2.0 }, tell: '1 脚だけ壁を向いた椅子' });
+    offer(ctx, { hook: 'carry.chairs.aligned', modes: ['appear'], weight: 1, revealOutput: `${room}.aligned`, doorway: { dir: wall.d, at: wall.sp!.at, y, width: 1.0, height: 2.0 }, tell: '1 脚だけ壁を向いた椅子' });
     ctx.keepOut({ min: [r.x0, y - 0.1, r.z0], max: [r.x1, y + 2.6, r.z1] });
   },
 });

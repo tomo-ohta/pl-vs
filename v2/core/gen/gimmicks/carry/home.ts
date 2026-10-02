@@ -9,7 +9,7 @@ import type { Dir } from '../../../math/vec.ts';
 import { box } from '../../../world/layout.ts';
 import { defineGimmick } from '../types.ts';
 import { innerRect } from '../util.ts';
-import { addItem, aabbJ, freeSpans, onMainWall, wallBox, wallPoint } from './util.ts';
+import { aabbJ, addItem, freeSpans, offer, onMainWall, wallBox, wallPoint } from './util.ts';
 
 defineGimmick({
   id: 'homeObject', name: '元の部屋の物', axes: ['carry'], kinds: ['room', 'hall'], minSize: [3.8, 4.4], weight: 0.35, intensity: 0, offersSecret: true, onMainPath: true,
@@ -39,12 +39,12 @@ defineGimmick({
       const last = ctx.addEntity('last', { type: 'valueIs', params: { value: stages - 1 }, inputs: { in: `${ped}.stage` } });
       const back = ctx.addEntity('back', { type: 'and', params: {}, inputs: { a: `${last}.out`, b: `${ped}.count` } });
       void item;
-      ctx.offerSecret({ hook: 'carry.home.morph', modes: ['appear'], weight: 1, revealOutput: `${back}.out`, doorway: { dir: d, at: doorAt, y, width: 1.0, height: 2.0 }, tell: '台の上の、鍵の形のくぼみ' });
+      offer(ctx, { hook: 'carry.home.morph', modes: ['appear'], weight: 1, revealOutput: `${back}.out`, doorway: { dir: d, at: doorAt, y, width: 1.0, height: 2.0 }, tell: '台の上の、鍵の形のくぼみ' });
       // くぼみ（台の上の鍵の形の印）
       ctx.addBox(box([top[0] - 0.06, top[1], top[2] - 0.02], [top[0] + 0.06, top[1] + 0.004, top[2] + 0.02], 'metalDark', false));
     } else {
       const item = addItem(ctx, 'thing', top, { half: [0.1, 0.07, 0.07], kind: 'box', tag: 'musicbox', mat: 'woodPanel', yaw: 0, homeRegion: home });
-      ctx.offerSecret({ hook: 'carry.home.returned', modes: ['appear'], weight: 1, revealOutput: `${item}.returned`, doorway: { dir: d, at: doorAt, y, width: 1.0, height: 2.0 }, tell: '台の上の、何かが長く置かれていた跡' });
+      offer(ctx, { hook: 'carry.home.returned', modes: ['appear'], weight: 1, revealOutput: `${item}.returned`, doorway: { dir: d, at: doorAt, y, width: 1.0, height: 2.0 }, tell: '台の上の、何かが長く置かれていた跡' });
     }
     const k0 = wallPoint(r, d, sp.at - 1.4, 0, y), k1 = wallPoint(r, d, sp.at + 1.4, 1.6, y);
     ctx.keepOut({ min: [Math.min(k0[0], k1[0]), y - 0.1, Math.min(k0[2], k1[2])], max: [Math.max(k0[0], k1[0]), y + 2.6, Math.max(k0[2], k1[2])] });

@@ -161,25 +161,31 @@ function slotTaken(ctx: PartContext, sl: Slot, self: string): boolean {
   return false;
 }
 
-/** 点 at に近い空いた枠（吸い付く物だけ）。視線（eye から dir）に近い枠も見る */
+/**
+ * 点 at に近い空いた枠（吸い付く物だけ）。目の前の点（at）から吸い付く半径の中の枠があればそれ（近い順）、
+ * 無ければ視線（eye から dir）が枠の高さを横切る所に近い枠（高い棚・遠くの枠を見て置く）
+ */
 function nearestSlot(ctx: PartContext, cfg: ItemCfg, at: Vec3, eye: Vec3 | null, dir: Vec3 | null): { slot: Slot; receiver: string } | null {
-  let best: { slot: Slot; receiver: string; d: number } | null = null;
+  let front: { slot: Slot; receiver: string; d: number } | null = null;
+  let aim: { slot: Slot; receiver: string; d: number } | null = null;
   const reach = ctx.tuning['carry.item.slotAimM'];
   for (const rs of carryIndex(ctx.floor).receivers) {
     for (const sl of slotsOf(rs)) {
       if (!tagMatch(cfg.tag, sl.accept)) continue;
-      const c: Vec3 = [sl.pos[0], sl.pos[1] + cfg.half[1], sl.pos[2]];
-      let d = Math.abs(at[1] - sl.pos[1]) < 1.6 ? Math.hypot(at[0] - sl.pos[0], at[2] - sl.pos[2]) : Infinity;
+      const df = Math.abs(at[1] - sl.pos[1]) < 1.6 ? Math.hypot(at[0] - sl.pos[0], at[2] - sl.pos[2]) : Infinity;
+      let da = Infinity;
       if (eye && dir) {
-        const vx = c[0] - eye[0], vy = c[1] - eye[1], vz = c[2] - eye[2];
+        // 視線が枠の上の物の中心の高さを横切る所（下を見ていないと横切らない枠は、視線に最も近い点）
+        const cy = sl.pos[1] + cfg.half[1];
+        const vx = sl.pos[0] - eye[0], vy = cy - eye[1], vz = sl.pos[2] - eye[2];
         const t = clamp(vx * dir[0] + vy * dir[1] + vz * dir[2], 0, reach);
-        d = Math.min(d, Math.hypot(eye[0] + dir[0] * t - c[0], eye[1] + dir[1] * t - c[1], eye[2] + dir[2] * t - c[2]));
+        da = Math.hypot(eye[0] + dir[0] * t - sl.pos[0], eye[1] + dir[1] * t - cy, eye[2] + dir[2] * t - sl.pos[2]);
       }
-      if (d >= sl.r || (best && d >= best.d)) continue;
-      if (slotTaken(ctx, sl, ctx.id)) continue;
-      best = { slot: sl, receiver: rs.id, d };
+      if (df < sl.r && (!front || df < front.d) && !slotTaken(ctx, sl, ctx.id)) front = { slot: sl, receiver: rs.id, d: df };
+      if (da < sl.r && (!aim || da < aim.d) && !slotTaken(ctx, sl, ctx.id)) aim = { slot: sl, receiver: rs.id, d: da };
     }
   }
+  const best = front ?? aim;
   return best ? { slot: best.slot, receiver: best.receiver } : null;
 }
 

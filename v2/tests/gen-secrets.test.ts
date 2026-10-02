@@ -76,7 +76,8 @@ test('隠し: 入口には扉がある・行き先がばらける・隠しが 2 
 test('謎のパズル: 手がかりの順にボタンを押すと扉が現れる（間違えると現れない）', async () => {
   const R = await loadRapier();
   let solved = 0;
-  for (let w = 1; w <= 60 && solved < 4; w++) {
+  // 段階 4（carry）: パズルの種類が増えて謎のパズルの出る割合が下がったので、探すフロアを 60 → 400 に
+  for (let w = 1; w <= 400 && solved < 4; w++) {
     const r = generateFloorReport({ world: w, depth: 2, variant: 0 }, t);
     const sec = r.gimmicks?.secrets.find((s) => s.hook === 'puzzle.sequence');
     if (!sec) continue;
