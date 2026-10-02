@@ -145,6 +145,10 @@ defineFx('sunbeam', (spec, ctx) => {
   const n = alongX ? new THREE.Vector3(0, 0, inward) : new THREE.Vector3(inward, 0, 0);
   const side = alongX ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
   const d = new THREE.Vector3();
+  // 窓のある床の矩形（窓に近い矩形）
+  const rs = (spec.params.rects as number[][] | undefined) ?? [];
+  const wr = rs.slice().sort((p, q) => Math.hypot((p[0]! + p[2]!) / 2 - win[0]!.x, (p[1]! + p[3]!) / 2 - win[0]!.z) - Math.hypot((q[0]! + q[2]!) / 2 - win[0]!.x, (q[1]! + q[3]!) / 2 - win[0]!.z))[0] ?? [-1e9, -1e9, 1e9, 1e9];
+  const [bx0, bz0, bx1, bz1] = [wr[0]! + 0.05, wr[1]! + 0.05, wr[2]! - 0.05, wr[3]! - 0.05];
   return {
     update() {
       // 日の向き: 窓から部屋の中へ。横の向きが ±65° を 36 秒で往復し、高さも 25°〜55° で揺れる（早回し）
@@ -156,7 +160,8 @@ defineFx('sunbeam', (spec, ctx) => {
       const pa = patchGeo.getAttribute('position') as THREE.BufferAttribute, sa = shaftGeo.getAttribute('position') as THREE.BufferAttribute;
       win.forEach((c, i) => {
         const k = (c.y - (fy + 0.015)) / -d.y;
-        const fx = c.x + d.x * k, fz = c.z + d.z * k;
+        // 日だまりは部屋の床の中だけ（壁の向こうの床に写らない）
+        const fx = Math.min(bx1, Math.max(bx0, c.x + d.x * k)), fz = Math.min(bz1, Math.max(bz0, c.z + d.z * k));
         pa.setXYZ(i, fx, fy + 0.015, fz);
         sa.setXYZ(i, c.x + n.x * 0.02, c.y, c.z + n.z * 0.02);
         sa.setXYZ(i + 4, fx, fy + 0.02, fz);
