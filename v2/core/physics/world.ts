@@ -34,6 +34,32 @@ export class PhysicsWorld {
   private readonly bodies = new Map<number, Body>();
   /** 部品が動かす箱の当たり判定（setKinematicPose で接触を作り直させる） */
   private readonly kinematicColliders = new Map<number, Collider>();
+  /** 静的な箱の剛体（区域を外すときに外す） */
+  private readonly statics = new Map<number, Body>();
+  /**
+   * 果てしない階の区域（docs/endless-world.md 5.1）: 今から作る剛体の持ち主（区域の id）。Sim が部品を呼ぶ前に入れる。
+   * removeOwned で、その区域の剛体を全部外す
+   */
+  owner: string | null = null;
+  private readonly owned = new Map<string, number[]>();
+
+  private track(h: number): void {
+    if (this.owner === null) return;
+    const l = this.owned.get(this.owner);
+    if (l) l.push(h); else this.owned.set(this.owner, [h]);
+  }
+
+  /** 持ち主 owner の剛体を全部外す（区域を外すとき） */
+  removeOwned(owner: string): void {
+    for (const h of this.owned.get(owner) ?? []) {
+      const b = this.bodies.get(h) ?? this.statics.get(h);
+      if (b) this.world.removeRigidBody(b);
+      this.bodies.delete(h);
+      this.statics.delete(h);
+      this.kinematicColliders.delete(h);
+    }
+    this.owned.delete(owner);
+  }
 
   constructor(R: Rapier, dt: number) {
     this.R = R;
@@ -41,13 +67,16 @@ export class PhysicsWorld {
     this.world.timestep = dt;
   }
 
-  /** 動かない箱（床・壁） */
-  addStaticBox(b: AABB, friction = 0.6): void {
+  /** 動かない箱（床・壁）。戻り値は剛体の番号（小さすぎる箱は入れず null） */
+  addStaticBox(b: AABB, friction = 0.6): number | null {
     const R = this.R;
     const hx = (b.max[0] - b.min[0]) / 2, hy = (b.max[1] - b.min[1]) / 2, hz = (b.max[2] - b.min[2]) / 2;
-    if (hx <= 1e-4 || hy <= 1e-4 || hz <= 1e-4) return;
+    if (hx <= 1e-4 || hy <= 1e-4 || hz <= 1e-4) return null;
     const body = this.world.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(b.min[0] + hx, b.min[1] + hy, b.min[2] + hz));
     this.world.createCollider(R.ColliderDesc.cuboid(hx, hy, hz).setFriction(friction), body);
+    this.statics.set(body.handle, body);
+    this.track(body.handle);
+    return body.handle;
   }
 
   /** 転がる物（中心と半分の寸法） */
@@ -62,6 +91,7 @@ export class PhysicsWorld {
     shape.setDensity(o.density ?? 300).setFriction(o.friction ?? 0.6).setRestitution(o.restitution ?? 0.05);
     this.world.createCollider(shape, body);
     this.bodies.set(body.handle, body);
+    this.track(body.handle);
     return body.handle;
   }
 
@@ -71,6 +101,7 @@ export class PhysicsWorld {
     const body = this.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(center[0], center[1], center[2]));
     this.kinematicColliders.set(body.handle, this.world.createCollider(R.ColliderDesc.cuboid(half[0], half[1], half[2]).setFriction(friction), body));
     this.bodies.set(body.handle, body);
+    this.track(body.handle);
     return body.handle;
   }
 
@@ -150,6 +181,8 @@ export class PhysicsWorld {
   dispose(): void {
     this.world.free();
     this.bodies.clear();
+    this.statics.clear();
+    this.owned.clear();
     this.kinematicColliders.clear();
     this.player = null;
   }

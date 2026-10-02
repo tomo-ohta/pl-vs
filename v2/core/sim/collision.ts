@@ -33,6 +33,28 @@ export class ColliderIndex {
     this.staticCount++;
   }
 
+  /** 静的な箱を外す（addStatic に渡した同じ物。果てしない階の区域を外すとき） */
+  removeStatic(b: AABB): void {
+    const ix0 = Math.floor(b.min[0] / CELL), ix1 = Math.floor(b.max[0] / CELL);
+    const iz0 = Math.floor(b.min[2] / CELL), iz1 = Math.floor(b.max[2] / CELL);
+    let hit = false;
+    for (let ix = ix0; ix <= ix1; ix++) {
+      for (let iz = iz0; iz <= iz1; iz++) {
+        const k = ColliderIndex.key(ix, iz);
+        const list = this.grid.get(k);
+        if (!list) continue;
+        const i = list.indexOf(b);
+        if (i >= 0) { list.splice(i, 1); hit = true; if (!list.length) this.grid.delete(k); }
+      }
+    }
+    if (hit) this.staticCount--;
+  }
+
+  /** key が prefix で始まる動く箱を全部外す（区域の部品の箱） */
+  removeDynamicPrefix(prefix: string): void {
+    for (const k of [...this.dynamic.keys()]) if (k.startsWith(prefix)) this.dynamic.delete(k);
+  }
+
   /** 動く箱を置く・動かす（null で外す） */
   setDynamic(key: string, b: AABB | null): void {
     if (b) this.dynamic.set(key, b);

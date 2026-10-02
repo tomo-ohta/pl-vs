@@ -17,7 +17,7 @@ import { hashAll, Rng } from '../math/rng.ts';
 import type { Vec3 } from '../math/vec.ts';
 import type { Tuning } from '../config/tuning.ts';
 import type { PhysicsWorld } from '../physics/world.ts';
-import { PASSABLE_VEGETATION, type EntitySpec, type FloorLayout, type InputWire, type SupportSurface, type Zone } from '../world/layout.ts';
+import { PASSABLE_VEGETATION, type EntitySpec, type FloorExit, type FloorLayout, type InputWire, type SupportSurface, type Zone } from '../world/layout.ts';
 import { ColliderIndex } from './collision.ts';
 import { partDef, type PartContext, type PartDef, type PartState } from './part.ts';
 import { createPlayer, PLAYER, playerEye, playerHeight, playerLook, stepPlayer, type PlayerWorld } from './player.ts';
@@ -27,7 +27,23 @@ import { IDLE_COMMAND } from './types.ts';
 interface WireRef { entity: string; port: string }
 interface InputBinding { refs: WireRef[]; invert: boolean }
 
+/**
+ * 区域（果てしない階。docs/endless-world.md 5.1）: Sim に入れた layout ごとの持ち物。外すときに全部外す。
+ * フロア（フロア単位の生成）は 1 つの区域（id は ''）として入る
+ */
+interface RegionRuntime {
+  id: string;
+  layout: FloorLayout;
+  statics: AABB[];
+  zones: Zone[];
+  /** 見え隠れの組 */
+  groups: string[];
+  /** 部品（配線の順） */
+  entities: EntityRuntime[];
+}
+
 interface EntityRuntime {
+  region: RegionRuntime;
   spec: EntitySpec;
   def: PartDef;
   state: PartState;
@@ -52,6 +68,9 @@ export interface SimSnapshot {
   revealed: string[];
 }
 
+/** 世界が持つ部品（境目の扉）の入れ物の区域 id */
+export const WORLD_REGION = '@world';
+
 /** 調べる操作が届く既定の距離（m） */
 const INTERACT_RANGE = 2.6;
 /** この高さまで落ちたら戻す（フロアの下端から） */
@@ -66,11 +85,16 @@ export class Sim implements PlayerWorld {
   readonly players: PlayerState[];
   tick = 0;
 
-  private readonly staticZones: Zone[] = [];
+  private readonly regions = new Map<string, RegionRuntime>();
+  /** 全部の区域の静的なゾーン・面・出口（区域の出し入れで作り直す） */
+  private staticZones: Zone[] = [];
+  private staticSurfaces: SupportSurface[] = [];
+  private exits: FloorExit[] = [];
+  private killY = -Infinity;
   private readonly dynamicZones = new Map<string, Zone>();
   private readonly dynamicSurfaces = new Map<string, SupportSurface>();
   private readonly entities = new Map<string, EntityRuntime>();
-  private readonly order: EntityRuntime[] = [];
+  private order: EntityRuntime[] = [];
   private readonly revealedGroups = new Set<string>();
   private readonly revealBoxes = new Map<string, AABB[]>();
   private readonly concealBoxes = new Map<string, AABB[]>();
@@ -86,10 +110,124 @@ export class Sim implements PlayerWorld {
     const ids = opts.playerIds ?? ['p1'];
     this.players = ids.map((id) => createPlayer(id, floor.spawn.pos, floor.spawn.yaw));
 
+    this.addRegionRuntime(floor.region?.id ?? '', floor);
+    this.reindex();
+  }
+
+  // ---------------------------------------------------------------- 区域（果てしない階。docs/endless-world.md 5.1）
+  /**
+   * 区域を入れる（id を付け替えた layout。core/gen/world/namespace.ts）。当たり判定・ゾーン・見え隠れ・部品・物理の静的な箱を足し、
+   * 部品を配線の順に初期化する。配線はその区域の中か、入っている部品（境目の扉）へ。tick の間に呼ぶこと
+   */
+  addRegion(layout: FloorLayout): void {
+    const id = layout.region?.id;
+    if (!id) throw new Error('区域の情報（region）の無い layout です');
+    if (this.regions.has(id)) throw new Error(`区域がもう入っています: ${id}`);
+    this.addRegionRuntime(id, layout);
+    this.reindex();
+  }
+
+  /**
+   * 区域を外す。プレイヤーが持っている物・乗っている物がその区域にあれば外さない（false）。
+   * 部品の状態は捨てる（置いた物の位置の保存は carry の保存で）
+   */
+  removeRegion(id: string): boolean {
+    const rr = this.regions.get(id);
+    if (!rr) return true;
+    const eids = new Set(rr.entities.map((e) => e.spec.id));
+    if (this.players.some((p) => (p.holding && eids.has(p.holding)) || (p.ride && eids.has(p.ride)))) return false;
+    for (const b of rr.statics) this.colliders.removeStatic(b);
+    for (const eid of eids) {
+      this.colliders.removeDynamicPrefix(`${eid}:`);
+      for (const k of [...this.dynamicZones.keys()]) if (k.startsWith(`${eid}:`)) this.dynamicZones.delete(k);
+      for (const k of [...this.dynamicSurfaces.keys()]) if (k.startsWith(`${eid}:`)) this.dynamicSurfaces.delete(k);
+      this.entities.delete(eid);
+    }
+    for (const g of rr.groups) {
+      this.colliders.removeDynamicPrefix(`conceal:${g}:`);
+      this.colliders.removeDynamicPrefix(`reveal:${g}:`);
+      this.revealedGroups.delete(g);
+      this.revealBoxes.delete(g);
+      this.concealBoxes.delete(g);
+    }
+    this.order = this.order.filter((rt) => rt.region !== rr);
+    this.physics?.removeOwned(id);
+    const exitIds = new Set(rr.layout.exits.map((x) => x.id));
+    for (const k of [...this.exitInside]) if (exitIds.has(k.slice(k.indexOf(':') + 1))) this.exitInside.delete(k);
+    for (const p of this.players) {
+      if (p.interactedId && eids.has(p.interactedId)) p.interactedId = null;
+      if (p.surfaceId && [...eids].some((e) => p.surfaceId!.startsWith(`${e}:`))) p.surfaceId = null;
+    }
+    this.regions.delete(id);
+    this.reindex();
+    return true;
+  }
+
+  /** 入っている区域の id（世界の部品の入れ物 '@world' は除く） */
+  regionIds(): string[] {
+    return [...this.regions.keys()].filter((k) => k !== WORLD_REGION);
+  }
+
+  /**
+   * 世界が持つ部品（境目の扉。どの区域にも属さない）を足す。配線は持たない物だけ。
+   * 部品の区画（spec.cell）は描画の区画を指すだけ（区域が外れたら付け替える）
+   */
+  addWorldEntity(spec: EntitySpec): void {
+    let rr = this.regions.get(WORLD_REGION);
+    if (!rr) {
+      const layout: FloorLayout = { ...this.floor, id: WORLD_REGION, cells: [], portals: [], entities: [], surfaces: [], exits: [] };
+      rr = { id: WORLD_REGION, layout, statics: [], zones: [], groups: [], entities: [] };
+      this.regions.set(WORLD_REGION, rr);
+    }
+    const def = partDef(spec.type);
+    if (!def) throw new Error(`未登録の部品の種類です: ${spec.type}（${spec.id}）`);
+    if (this.entities.has(spec.id)) throw new Error(`部品の id が重複しています: ${spec.id}`);
+    const out: Record<string, number> = {};
+    for (const o of def.outputs ?? []) out[o] = 0;
+    const rt: EntityRuntime = { region: rr, spec, def, state: {}, out, inputs: parseInputs(spec), interact: null, randomCounter: 0 };
+    if (rt.inputs.size) throw new Error(`世界の部品は配線を持てません: ${spec.id}`);
+    this.entities.set(spec.id, rt);
+    rr.entities.push(rt);
+    this.order.push(rt);
+    rt.state = def.init(this.contextFor(rt));
+  }
+
+  /** 世界が持つ部品を外す */
+  removeWorldEntity(id: string): void {
+    const rt = this.entities.get(id);
+    if (!rt || rt.region.id !== WORLD_REGION) return;
+    this.colliders.removeDynamicPrefix(`${id}:`);
+    for (const k of [...this.dynamicZones.keys()]) if (k.startsWith(`${id}:`)) this.dynamicZones.delete(k);
+    this.entities.delete(id);
+    rt.region.entities = rt.region.entities.filter((x) => x !== rt);
+    this.order = this.order.filter((x) => x !== rt);
+    for (const p of this.players) if (p.interactedId === id) p.interactedId = null;
+  }
+
+  /** 区域の layout（入っていなければ null） */
+  regionLayout(id: string): FloorLayout | null {
+    return this.regions.get(id)?.layout ?? null;
+  }
+
+  /** 部品の設定（書き換えると次の tick から効く。境目の扉の錠など、世界が持つ部品に使う） */
+  entitySpec(id: string): EntitySpec | null {
+    return this.entities.get(id)?.spec ?? null;
+  }
+
+  /** 部品のいる区域の layout */
+  layoutOf(entityId: string): FloorLayout | null {
+    return this.entities.get(entityId)?.region.layout ?? null;
+  }
+
+  private addRegionRuntime(id: string, layout: FloorLayout): void {
+    const rr: RegionRuntime = { id, layout, statics: [], zones: [], groups: [], entities: [] };
+    this.regions.set(id, rr);
+    const groups = new Set<string>();
     // 静的な当たり判定とゾーン
-    for (const cell of floor.cells) {
+    for (const cell of layout.cells) {
       for (const b of cell.boxes) {
         if (b.revealGroup) {
+          groups.add(b.revealGroup);
           if (b.solid && !PASSABLE_VEGETATION.has(b.mat)) {
             const list = this.revealBoxes.get(b.revealGroup) ?? [];
             list.push({ min: [...b.min], max: [...b.max] });
@@ -100,29 +238,35 @@ export class Sim implements PlayerWorld {
         if (!b.solid || PASSABLE_VEGETATION.has(b.mat) || b.kind === 'emitOnly') continue;
         if (b.concealGroup) {
           // 現れたら消える箱は動く当たり判定に置き、reveal で外す
+          groups.add(b.concealGroup);
           const list = this.concealBoxes.get(b.concealGroup) ?? [];
           list.push({ min: [...b.min], max: [...b.max] });
           this.concealBoxes.set(b.concealGroup, list);
           continue;
         }
-        this.colliders.addStatic({ min: [...b.min], max: [...b.max] });
+        const a: AABB = { min: [...b.min], max: [...b.max] };
+        this.colliders.addStatic(a);
+        rr.statics.push(a);
       }
-      for (const z of cell.zones) this.staticZones.push(z);
+      for (const z of cell.zones) rr.zones.push(z);
     }
-
-    for (const [g, list] of this.concealBoxes) list.forEach((b, i) => this.colliders.setDynamic(`conceal:${g}:${i}`, b));
+    rr.groups = [...groups];
+    for (const g of rr.groups) (this.concealBoxes.get(g) ?? []).forEach((b, i) => this.colliders.setDynamic(`conceal:${g}:${i}`, b));
 
     // 部品: 配線の順（入力の元が先）に並べる。循環は宣言順のまま（前の tick の値を読む）
-    for (const spec of floor.entities) {
+    const added: EntityRuntime[] = [];
+    for (const spec of layout.entities) {
       const def = partDef(spec.type);
       if (!def) throw new Error(`未登録の部品の種類です: ${spec.type}（${spec.id}）`);
       if (def.physics && !this.physics) throw new Error(`部品 ${spec.id}（${spec.type}）は物理を使いますが、PhysicsWorld が渡されていません`);
       if (this.entities.has(spec.id)) throw new Error(`部品の id が重複しています: ${spec.id}`);
       const out: Record<string, number> = {};
       for (const o of def.outputs ?? []) out[o] = 0;
-      this.entities.set(spec.id, { spec, def, state: {}, out, inputs: parseInputs(spec), interact: null, randomCounter: 0 });
+      const rt: EntityRuntime = { region: rr, spec, def, state: {}, out, inputs: parseInputs(spec), interact: null, randomCounter: 0 };
+      this.entities.set(spec.id, rt);
+      added.push(rt);
     }
-    for (const rt of this.entities.values()) {
+    for (const rt of added) {
       for (const [name, b] of rt.inputs) {
         for (const r of b.refs) {
           const src = this.entities.get(r.entity);
@@ -131,10 +275,22 @@ export class Sim implements PlayerWorld {
         }
       }
     }
-    this.order = topoOrder([...this.entities.values()]);
-    for (const rt of this.order) rt.state = rt.def.init(this.contextFor(rt));
+    rr.entities = topoOrder(added);
+    this.order.push(...rr.entities);
+    if (this.physics) this.physics.owner = id;
+    for (const rt of rr.entities) rt.state = rt.def.init(this.contextFor(rt));
     // 物理: 剛体を使う区画の静的な箱を入れる
-    if (this.physics) this.addPhysicsStatics();
+    if (this.physics) { this.addPhysicsStatics(rr); this.physics.owner = null; }
+  }
+
+  /** 全部の区域のゾーン・面・出口・落下の高さを作り直す */
+  private reindex(): void {
+    const rs = [...this.regions.values()];
+    this.staticZones = rs.flatMap((r) => r.zones);
+    this.staticSurfaces = rs.flatMap((r) => r.layout.surfaces);
+    this.exits = rs.flatMap((r) => r.layout.exits);
+    const lows = rs.filter((r) => r.layout.cells.length).map((r) => r.layout.bounds.min[1]);
+    this.killY = (lows.length ? Math.min(...lows) : this.floor.bounds.min[1]) - KILL_DEPTH;
   }
 
   // ---------------------------------------------------------------- PlayerWorld
@@ -143,7 +299,7 @@ export class Sim implements PlayerWorld {
   }
 
   get surfaces(): Iterable<SupportSurface> {
-    return this.dynamicSurfaces.size ? [...this.floor.surfaces, ...this.dynamicSurfaces.values()] : this.floor.surfaces;
+    return this.dynamicSurfaces.size ? [...this.staticSurfaces, ...this.dynamicSurfaces.values()] : this.staticSurfaces;
   }
 
   // ---------------------------------------------------------------- 進める
@@ -165,7 +321,8 @@ export class Sim implements PlayerWorld {
 
     // 2. 部品（乗っている物の速度は部品が毎 tick 入れ直す）
     for (const p of this.players) p.carry = [0, 0, 0];
-    for (const rt of this.order) rt.def.step?.(rt.state, this.contextFor(rt));
+    for (const rt of this.order) { if (this.physics) this.physics.owner = rt.region.id; rt.def.step?.(rt.state, this.contextFor(rt)); }
+    if (this.physics) this.physics.owner = null;
 
     // 3. プレイヤー
     for (let i = 0; i < this.players.length; i++) stepPlayer(this.players[i]!, this.cmds[i]!, this, this.dt, this.tick, this.events);
@@ -175,14 +332,14 @@ export class Sim implements PlayerWorld {
       const p0 = this.players[0];
       if (p0) this.physics.setPlayer(p0.pos, PLAYER.radius, playerHeight(p0));
       this.physics.step();
-      for (const rt of this.order) rt.def.post?.(rt.state, this.contextFor(rt));
+      for (const rt of this.order) { this.physics.owner = rt.region.id; rt.def.post?.(rt.state, this.contextFor(rt)); }
+      this.physics.owner = null;
     }
 
     // 5. 落下・出口
-    const killY = this.floor.bounds.min[1] - KILL_DEPTH;
     for (const p of this.players) {
-      if (p.pos[1] < killY) this.respawnPlayer(p, null, 'fall');
-      for (const ex of this.floor.exits) {
+      if (p.pos[1] < this.killY) this.respawnPlayer(p, null, 'fall');
+      for (const ex of this.exits) {
         const key = `${p.id}:${ex.id}`;
         const inside = p.pos[0] >= ex.aabb.min[0] && p.pos[0] <= ex.aabb.max[0] && p.pos[1] + 0.1 >= ex.aabb.min[1] && p.pos[1] <= ex.aabb.max[1] && p.pos[2] >= ex.aabb.min[2] && p.pos[2] <= ex.aabb.max[2];
         if (inside && !this.exitInside.has(key)) {
@@ -244,7 +401,7 @@ export class Sim implements PlayerWorld {
       time: this.tick * this.dt,
       id,
       spec: rt.spec,
-      floor: this.floor,
+      floor: rt.region.layout,
       tuning: this.tuning,
       players: this.players,
       physics: this.physics,
@@ -290,10 +447,10 @@ export class Sim implements PlayerWorld {
         sim.events.push(e);
       },
       random() {
-        return hashAll(sim.floor.seed, id, sim.tick, rt.randomCounter++) / 4294967296;
+        return hashAll(rt.region.layout.seed, id, sim.tick, rt.randomCounter++) / 4294967296;
       },
       rng() {
-        return new Rng(hashAll(sim.floor.seed, 'part', id));
+        return new Rng(hashAll(rt.region.layout.seed, 'part', id));
       },
       stateOf(other) {
         return sim.entities.get(other)?.state ?? null;
@@ -402,14 +559,15 @@ export class Sim implements PlayerWorld {
    * 剛体を使う部品のある区画と、その隣の区画（開口でつながる）の静的な箱（床・壁・家具）を物理に入れる。
    * 隣も入れるのは、扉から押し出された物が隣の廊下の床を抜けて落ちないように
    */
-  private addPhysicsStatics(): void {
+  private addPhysicsStatics(rr: RegionRuntime): void {
     const cells = new Set<string>();
-    for (const rt of this.order) if (rt.def.physics) cells.add(rt.spec.cell ?? '*');
-    for (const p of this.floor.portals) {
+    for (const rt of rr.entities) if (rt.def.physics) cells.add(rt.spec.cell ?? '*');
+    if (!cells.size) return;
+    for (const p of rr.layout.portals) {
       if (cells.has(p.cells[0])) cells.add(p.cells[1]);
       else if (cells.has(p.cells[1])) cells.add(p.cells[0]);
     }
-    for (const cell of this.floor.cells) {
+    for (const cell of rr.layout.cells) {
       if (!cells.has('*') && !cells.has(cell.id)) continue;
       for (const b of cell.boxes) {
         if (!b.solid || b.revealGroup || b.concealGroup || PASSABLE_VEGETATION.has(b.mat) || b.kind === 'emitOnly') continue;
