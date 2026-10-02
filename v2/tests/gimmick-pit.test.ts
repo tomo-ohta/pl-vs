@@ -126,7 +126,12 @@ test('崩れる床: 乗り続けると揺れて落ち、穴の底へ落ちる。
   for (const room of ROOMS.crumbleFloor.slice(0, 6)) {
     const tiles = room.floor.entities.filter((e) => e.type === 'crumbleTile' && e.cell === room.cell.id);
     assert.ok(tiles.length >= 6, `${room.cell.id}: 床板 ${tiles.length}`);
-    const tile = tiles[Math.floor(tiles.length / 2)]!;
+    // 真ん中あたりの床板（段階 4 で足した: 体が固い床・階段の縁に掛からない床板から選ぶ。掛かると落ちずに縁に立つ）
+    const fy = room.cell.floorY;
+    const solidTop = room.cell.boxes.filter((x) => x.solid && Math.abs(x.max[1] - fy) < 0.02);
+    const clear = tiles.filter((e) => { const tb = e.params.box as { min: number[]; max: number[] }; const cx = (tb.min[0]! + tb.max[0]!) / 2, cz = (tb.min[2]! + tb.max[2]!) / 2; return !solidTop.some((x) => cx + 0.4 > x.min[0] && cx - 0.4 < x.max[0] && cz + 0.4 > x.min[2] && cz - 0.4 < x.max[2]); });
+    const pool = clear.length ? clear : tiles;
+    const tile = pool[Math.floor(pool.length / 2)]!;
     const b = tile.params.box as { min: number[]; max: number[] };
     const sim = await newSim(room);
     sim.teleport(0, [(b.min[0]! + b.max[0]!) / 2, room.cell.floorY + 0.02, (b.min[2]! + b.max[2]!) / 2], 0);

@@ -91,7 +91,8 @@ function buildDuct(ctx: GimmickContext): void {
   const t = ctx.tuning;
   const y = s.cell.floorY;
   const area = innerRect(s);
-  const Wd = t['move.crawl.widthM'], Hd = t['move.crawl.heightM'] + 0.05;
+  // ダクトは縮むトンネルの奥より少し広い（曲がり角で体の端が角に掛からない）
+  const Wd = t['move.crawl.widthM'] + 0.15, Hd = t['move.crawl.heightM'] + 0.05;
   const hw = Wd / 2;
   // 開口の前の床（普通の高さ）
   const lands: Rect[] = s.openings.map((o) => { const z = doorZone(o, y, 1.3, 0.5); return { x0: Math.max(area.x0, z.min[0]), z0: Math.max(area.z0, z.min[2]), x1: Math.min(area.x1, z.max[0]), z1: Math.min(area.z1, z.max[2]) }; });

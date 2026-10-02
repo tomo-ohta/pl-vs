@@ -5,3 +5,4 @@
 import './flow.ts';
 import './body.ts';
 import './chasm.ts';
+import './mech.ts';

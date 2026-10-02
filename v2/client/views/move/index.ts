@@ -4,3 +4,4 @@
  */
 import './flow.ts';
 import './chasm.ts';
+import './mech.ts';

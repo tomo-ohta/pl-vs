@@ -8,6 +8,7 @@
  *   残りの道のりが 10 秒縮まなければ失敗
  */
 import { PLAYER, surfaceY } from '../../core/sim/player.ts';
+import { pushBlockBox } from '../../core/sim/parts/move/mech.ts';
 import type { Sim } from '../../core/sim/sim.ts';
 import { IDLE_COMMAND, type InputCommand } from '../../core/sim/types.ts';
 import { inRect } from '../../core/world/footprint.ts';
@@ -315,11 +316,25 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
   const r = route(floor, from, targetCell);
   if (!r) return { ok: false, reason: '道順がありません', seconds: 0, route: [] };
   // 区間の目標: 開口の手前（扉なら調べる）→ 開口の先
-  const legs: { x: number; y: number; z: number; portal?: PortalSpec; via?: boolean }[] = [];
+  const legs: { x: number; y: number; z: number; portal?: PortalSpec; via?: boolean; press?: string }[] = [];
   let cell = from;
   for (let i = 0; i < r.length; i++) {
     const p = r[i]!;
     const [x, y, z] = center(p);
+    // 段階 4（試験の歩く人の追加）: スイッチで開く扉（扉の open が同じ区画のボタンの仕掛けにつながる）は、先にボタンを押しに行く
+    const dspec = p.doorId ? floor.entities.find((e) => e.id === p.doorId) : undefined;
+    const wire = dspec?.inputs?.open;
+    const src = typeof wire === 'string' ? wire.split('.').slice(0, -2).join('.') : null;
+    const btn = src ? floor.entities.find((e) => e.type === 'button' && e.id.startsWith(`${src}.`) && e.cell === cell) : undefined;
+    const bc = btn ? floor.cells.find((c) => c.id === cell) : undefined;
+    if (btn && bc) {
+      const bb = btn.params.box as { min: number[]; max: number[] };
+      const c = [(bb.min[0]! + bb.max[0]!) / 2, (bb.min[2]! + bb.max[2]!) / 2];
+      const thinX = bb.max[0]! - bb.min[0]! < bb.max[2]! - bb.min[2]!;
+      const mid = [(bc.bounds.min[0] + bc.bounds.max[0]) / 2, (bc.bounds.min[2] + bc.bounds.max[2]) / 2];
+      const sx = thinX ? Math.sign(mid[0]! - c[0]!) : 0, sz = thinX ? 0 : Math.sign(mid[1]! - c[1]!);
+      legs.push({ x: c[0]! + sx * 0.8, y: bc.floorY, z: c[1]! + sz * 0.8, press: btn.id });
+    }
     const forward = p.cells[0] === cell ? 1 : -1;
     const d = [[0, 1], [1, 0], [0, -1], [-1, 0]][p.dir]!;
     const prev = r[i - 1], next = r[i + 1];
@@ -334,7 +349,7 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
   let leg = 0;
   let path: [number, number][] = [];
   // 進み具合は「残りの道のり」（道を引いた所から目標まで）で測る。迷路・帯の回り道で目標から離れても止まったとみなさない
-  let stuck = 0, bestD = Infinity, waitDoor = 0, crouch = 0, planY = player.pos[1], legT = 0, idle = 0, pushedFor = 0;
+  let stuck = 0, bestD = Infinity, waitDoor = 0, crouch = 0, planY = player.pos[1], legT = 0, idle = 0, pushedFor = 0, pushDone = -1;
   let segFrom: [number, number] = [player.pos[0], player.pos[2]];
   const remaining = (): number => {
     let d = Math.hypot(path[0]![0] - player.pos[0], path[0]![1] - player.pos[2]);
@@ -347,13 +362,35 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     const L = legs[leg];
     if (!L) return { ok: true, reason: '', seconds: n * sim.dt, route: r.map((p) => p.id) };
     legT += sim.dt;
+    // ボタンの前に着いた: ボタンを見て調べる（押す）
+    if (L.press && Math.hypot(L.x - player.pos[0], L.z - player.pos[2]) < 0.45) {
+      const bb = floor.entities.find((e) => e.id === L.press)!.params.box as { min: number[]; max: number[] };
+      const ex = (bb.min[0]! + bb.max[0]!) / 2 - player.pos[0], ez = (bb.min[2]! + bb.max[2]!) / 2 - player.pos[2];
+      const ey = (bb.min[1]! + bb.max[1]!) / 2 - (player.pos[1] + player.eye);
+      const yaw = Math.atan2(-ex, -ez), pitch = Math.atan2(ey, Math.hypot(ex, ez));
+      sim.step([{ ...IDLE_COMMAND, yaw, pitch, interact: { yaw, pitch } }]);
+      for (let i = 0; i < 5; i++) sim.step([{ ...IDLE_COMMAND, yaw, pitch }]);
+      leg++; stuck = 0; legT = 0; replan();
+      continue;
+    }
     if (botDebug.trace && n % 60 === 0) botDebug.trace(`t=${(n * sim.dt).toFixed(0)} leg ${leg}/${legs.length} pos ${player.pos.map((v) => v.toFixed(2)).join(',')} path ${path.length} best ${bestD.toFixed(2)} stuck ${stuck}`);
+    // 段階 4: 押せる壁が端まで動いたら、道を引き直す（動かし終えた壁は避けて通る）
+    let pd = 0;
+    for (const e of floor.entities) if (e.type === 'pushBlock' && sim.outputOf(e.id, 'done') > 0.5) pd++;
+    if (pd !== pushDone) { pushDone = pd; replan(); }
     // 区画の中の道を引き直す（区間の始まり・止まったとき・流された・落ちたとき）
     if (!path.length) {
       // 段階 4（移動と身体）: 道を引くときは振り子の板を見ない（払う所の前で待つ。板の当たり判定は次の tick に部品が置き直す）
       for (const e of floor.entities) if (e.type === 'pendulum') sim.colliders.setDynamic(`${e.id}:bob`, null);
+      // 段階 4: 回る床の柱（毎 tick 置き直される）と、まだ動かせる押せる壁も見ない（押して進む。押せる壁は道を引いたら戻す）
+      const pushed: [string, ReturnType<typeof pushBlockBox>][] = [];
+      for (const e of floor.entities) {
+        if (e.type === 'turntable') ((e.params.posts as unknown[] | undefined) ?? []).forEach((_, i) => sim.colliders.setDynamic(`${e.id}:post${i}`, null));
+        if (e.type === 'pushBlock' && sim.outputOf(e.id, 'done') < 0.5) { pushed.push([`${e.id}:block`, pushBlockBox(e, sim.outputOf(e.id, 'off'))]); sim.colliders.setDynamic(`${e.id}:block`, null); }
+      }
       const c = cellAtPos(floor, player.pos);
       path = (c && !L.via ? pathInCell(sim, c, player.pos, [L.x, L.y, L.z]) : null) ?? [];
+      for (const [k, a] of pushed) sim.colliders.setDynamic(k, a);
       path.push([L.x, L.z]);
       segFrom = [player.pos[0], player.pos[2]];
       planY = player.pos[1];
@@ -389,6 +426,43 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     const push = moveRegion(floor, 'facingPush', player.pos) ?? moveRegion(floor, 'facingPush', [player.pos[0] + (dx / dl0) * 0.6, player.pos[1], player.pos[2] + (dz / dl0) * 0.6]);
     const pf = push?.params.fwd as number[] | undefined;
     if (pf && -Math.sin(cmd.yaw) * pf[0]! - Math.cos(cmd.yaw) * pf[2]! > 0) { cmd.yaw += Math.PI; cmd.moveY = -cmd.moveY; cmd.moveX = -cmd.moveX; }
+    // 段階 4: 回転扉の筒の中では、目標の向きへ回るように羽を横へ押す（真ん中へ向かって押しても回らない）
+    for (const e of floor.entities) {
+      if (e.type !== 'revolvingDoor') continue;
+      const c = e.params.center as number[], Rd = Number(e.params.radius);
+      const ex = player.pos[0] - c[0]!, ez = player.pos[2] - c[2]!;
+      if (Math.hypot(ex, ez) > Rd + 0.1 || Math.abs(player.pos[1] - c[1]!) > 1) continue;
+      // 道が筒から出る所（道の点のうち筒の外の最初の点。無ければ区間の目標）の向きへ回す
+      const out = path.find((q) => Math.hypot(q[0] - c[0]!, q[1] - c[2]!) > Rd + 0.3) ?? [L.x, L.z];
+      const tx = out[0] - c[0]!, tz = out[1] - c[2]!;
+      if (Math.hypot(tx, tz) < Rd + 0.3) continue;
+      const phi = Math.atan2(ez, ex);
+      let d = Math.atan2(tz, tx) - phi;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      if (Math.abs(d) > 0.35) {
+        const sg = Math.sign(d);
+        const vx = -Math.sin(phi) * sg, vz = Math.cos(phi) * sg;
+        cmd.yaw = Math.atan2(-vx, -vz); cmd.moveY = 1; cmd.moveX = 0;
+      }
+    }
+    // 段階 4: 押せる壁（pushBlock）の面に体が付いていて、目標が壁の向こうなら、壁の動く向きへまっすぐ押す
+    for (const e of floor.entities) {
+      if (e.type !== 'pushBlock' || sim.outputOf(e.id, 'done') > 0.5) continue;
+      const ax = Number(e.params.axis), la = ax === 0 ? 2 : 0;
+      const bb = pushBlockBox(e, sim.outputOf(e.id, 'off'));
+      const r = PLAYER.radius;
+      if (player.pos[la]! + r < bb.min[la]! + 0.1 || player.pos[la]! - r > bb.max[la]! - 0.1 || player.pos[1] > bb.max[1]! - 0.3) continue;
+      const tgtA = ax === 0 ? L.x : L.z;
+      const front = player.pos[ax]! + r <= bb.min[ax]! + 0.05 && player.pos[ax]! + r > bb.min[ax]! - 0.6 && tgtA > bb.max[ax]!;
+      const back = player.pos[ax]! - r >= bb.max[ax]! - 0.05 && player.pos[ax]! - r < bb.max[ax]! + 0.6 && tgtA < bb.min[ax]!;
+      if (!front && !back) continue;
+      // 壁の動く向きへ押しながら、横は壁の真ん中へ寄る（壁の端で押すと、隣の動かない壁に体が掛かる）
+      const v = front ? 1 : -1;
+      const lat = Math.max(-0.8, Math.min(0.8, ((bb.min[la]! + bb.max[la]!) / 2 - player.pos[la]!) * 1.5));
+      const wx = ax === 0 ? v : lat, wz = ax === 0 ? lat : v;
+      cmd.yaw = Math.atan2(-wx, -wz);
+      cmd.moveY = 1; cmd.moveX = 0;
+    }
     // 段階 4: 歩くと伸びる廊下（stretchWarp）で進めなくなったら、しばらく立ち止まる（立ち止まると前へ滑る）
     if (idle > 0) { idle -= sim.dt; cmd.moveX = 0; cmd.moveY = 0; }
     // 段階 4: 振り子（pendulum）の払う所へ入る前は、板が通り過ぎて離れていくまで待つ（待つ間は止まったと数えない）

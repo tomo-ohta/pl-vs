@@ -96,4 +96,18 @@ export const MOVE_TUNING = {
   'move.slide.slopeDeg': num(38, 25, 45, '滑り台: 傾き（度）'),
   'move.slide.speed': num(4.5, 2.5, 8, '滑り台: 滑り落ちる流れの速さ（m/s。歩く速さより強く、上へは戻れない）'),
   'move.slide.chuteSpeed': num(3.0, 2.5, 6, '滑り台（隠し）: 横の溝の流れの速さ（m/s）'),
+
+  // ---- 回る・動く床と壁: 回る床 [M11]・回転扉 [M34]・押せる壁 [M35]・傾いていく部屋 [M37] ----
+  'move.turn.radiusMaxM': num(3.2, 1.9, 5, '回る床: 円盤の半径の上限（m）'),
+  'move.turn.omega': num(0.42, 0.1, 1.2, '回る床: 回る速さ（rad/s。縁で約 1.3 m/s）'),
+  'move.turn.rimSec': num(9, 2, 30, '回る床（出現型の隠し）: 縁に乗り続ける秒数'),
+  'move.revolve.radiusM': num(1.6, 1.3, 2.2, '回転扉: 筒の半径（m）'),
+  'move.revolve.walkW': num(1.3, 0.4, 3, '回転扉: 歩いて押したときの回る速さの上限（rad/s）'),
+  'move.revolve.runW': num(2.8, 1, 5, '回転扉: 走って押したときの回る速さの上限（rad/s）'),
+  'move.revolve.damp': num(0.9, 0.2, 4, '回転扉: 手を離した後に回る勢いが弱まる速さ（/ 秒）'),
+  'move.push.travelM': num(1.8, 1.2, 3, '押せる壁: 板が動く距離（m）'),
+  'move.push.speed': num(0.7, 0.2, 2, '押せる壁: 押しているときに動く速さ（m/s）'),
+  'move.tilt.maxDeg': num(12, 4, 20, '傾いていく部屋: 床の傾きの上限（度）'),
+  'move.tilt.rate': num(1.1, 0.2, 5, '傾いていく部屋: 傾いていく速さ（度 / 秒。人がいなくなると半分の速さで戻る）'),
+  'move.tilt.push': num(0.35, 0, 1, '傾いていく部屋: 傾きで低い側へ押す強さ（重さに対する割合）'),
 } as const satisfies Record<string, Spec>;
