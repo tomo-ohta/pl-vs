@@ -10,6 +10,10 @@ import { drawMap, type Ctx2D, type DrawInput } from '../client/map/draw.ts';
 import { buildMapInfo } from '../client/map/MapInfo.ts';
 import { FloorMap, type MapObservation } from '../client/map/MapModel.ts';
 import { ghostOf, readableContent, sceneOfMap, sceneOfReadable } from '../client/map/scene.ts';
+import { MapPanel } from '../client/ui/MapPanel.ts';
+import { makeCell, portal, portalAabb } from '../core/world/build.ts';
+import type { FloorLayout } from '../core/world/layout.ts';
+import { themePalette } from '../core/world/palettes.ts';
 
 const t = defaultTuning();
 
@@ -134,4 +138,39 @@ test('誰かの地図（N09）: 書き込み・歩いた跡・名前', () => {
   const s = sceneOfMap(map);
   assert.equal(s.ghosts.length, 1);
   assert.ok(s.bounds!.z0 <= -14, '写しも範囲に入る');
+});
+
+test('上下に重なる区画: 層ごとに描く（ほかの層は薄い破線）・メニューの地図は ↑↓ で層を変える', () => {
+  const pal = themePalette('GenericRoom');
+  const low = makeCell({ id: 'low', role: 'rest', rects: [{ x0: 0, z0: 0, x1: 10, z1: 10 }], height: 6.5, floorY: 0, palette: pal });
+  const mezz = makeCell({ id: 'mezz', role: 'rest', rects: [{ x0: 2, z0: 2, x1: 8, z1: 6 }], height: 2.8, floorY: 3.4, palette: pal });
+  const hall = makeCell({ id: 'upHall', role: 'connector', name: '廊下', rects: [{ x0: 8, z0: 3, x1: 14, z1: 5 }], height: 2.8, floorY: 3.4, palette: pal });
+  const floor: FloorLayout = {
+    id: 'test', seed: 1, genVersion: 't', tuningVersion: 't', bounds: { min: [0, 0, 0], max: [14, 7, 10] }, cells: [low, mezz, hall],
+    portals: [portal('p1', 'mezz', 'upHall', portalAabb('x', 8, 4, 1.0, 3.4, 2.1), 1)], entities: [], surfaces: [], spawn: { pos: [1, 0.02, 1], yaw: 0, cell: 'low' }, exits: [],
+  };
+  const info = buildMapInfo(floor, t);
+  assert.equal(info.layers, 2);
+  assert.deepEqual(info.cells.map((c) => c.layer), [0, 1, 1]);
+  const map = new FloorMap(info, t);
+  map.update(obs([5, 3.42, 4], -Math.PI / 2));
+  assert.equal(map.current, 'mezz', '中二階の上（重なるときは小さい区画）');
+  map.update(obs([5, 0.02, 4], 0));
+  assert.equal(map.current, 'low', '中二階の下にいれば下の区画');
+  map.update(obs([1, 0.02, 1], 0));
+  assert.equal(map.current, 'low');
+  const s0 = sceneOfMap(map);
+  assert.equal(s0.cells.find((c) => c.id === 'low')!.state, 'current');
+  assert.equal(s0.cells.find((c) => c.id === 'mezz')!.state, 'other');
+  const s1 = sceneOfMap(map, { layer: 1 });
+  assert.equal(s1.cells.find((c) => c.id === 'mezz')!.state, 'visited');
+  assert.equal(s1.cells.find((c) => c.id === 'low')!.state, 'other');
+  const panel = new MapPanel(null);
+  panel.show({ map, floorLabel: 'B1F', player: null });
+  assert.equal(panel.shownLayer, 0);
+  assert.ok(panel.onKey('ArrowUp'));
+  assert.equal(panel.shownLayer, 1);
+  assert.ok(!panel.onKey('ArrowUp'), '一番上');
+  assert.ok(panel.onKey('ArrowDown'));
+  assert.equal(panel.shownLayer, 0);
 });

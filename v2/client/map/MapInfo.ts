@@ -289,18 +289,22 @@ export function buildMapInfo(floor: FloorLayout, t: Tuning): MapInfo {
   };
 }
 
-/** 点 pos のいる区画（区画の外形の中。重なるときは小さい区画。client/world/FloorBuilder.ts の cellAt と同じ決め方） */
+/**
+ * 点 pos のいる区画。区画の外形の中で、足跡の中にいて床より上（立っている区画）を先に、上下に重なるなら床がいちばん高い区画
+ * （中二階の下にいれば下の区画）、同じなら小さい区画（client/world/FloorBuilder.ts の cellAt と同じ）。
+ * 穴の底（床より 3.2 m まで下）にいれば、その穴の区画
+ */
 export function cellAtPos(info: Pick<MapInfo, 'cells'>, pos: readonly [number, number, number]): MapCell | null {
   let best: MapCell | null = null;
-  let bestA = Infinity;
+  let bestKey: [number, number, number] = [Infinity, Infinity, Infinity];
   for (const c of info.cells) {
     const b = c.bounds;
     if (pos[0] < b.min[0] || pos[0] > b.max[0] || pos[2] < b.min[2] || pos[2] > b.max[2] || pos[1] < b.min[1] - 3.2 || pos[1] > b.max[1] + 0.5) continue;
-    const a = (b.max[0] - b.min[0]) * (b.max[2] - b.min[2]);
-    // 重なるときは足跡の中にいる方、同じなら小さい方
     const inside = c.rects.some((r) => pos[0] >= r.x0 && pos[0] <= r.x1 && pos[2] >= r.z0 && pos[2] <= r.z1);
-    const score = inside ? a : a + 1e6;
-    if (score < bestA) { best = c; bestA = score; }
+    const above = pos[1] >= c.floorY - 0.6;
+    const tier = inside && above ? 0 : inside ? 1 : 2;
+    const key: [number, number, number] = [tier, tier === 0 ? -c.floorY : 0, (b.max[0] - b.min[0]) * (b.max[2] - b.min[2])];
+    if (key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] < bestKey[1] - 1e-6 || (Math.abs(key[1] - bestKey[1]) <= 1e-6 && key[2] < bestKey[2])))) { best = c; bestKey = key; }
   }
   return best;
 }

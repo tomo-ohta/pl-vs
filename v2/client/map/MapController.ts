@@ -91,6 +91,8 @@ export class MapController {
   private saveAcc = 0;
   private wasPaused = true;
   private focusHint = false;
+  /** 一時停止の画面の題（最初に読んだときの文字。フロアの名前を後ろに足す） */
+  private titleBase: string | null = null;
 
   constructor(o: MapControllerOptions) {
     this.game = o.game;
@@ -103,6 +105,12 @@ export class MapController {
     this.panel = new MapPanel(o.ui?.pause.panes.map ?? null);
     this.codexPanel = new CodexPanel(o.ui?.pause.panes.codex ?? null);
     if (o.ui) o.ui.onTabChange = (tab) => this.onTab(tab);
+    // 地図のタブを開いている間の ↑↓（高さの層）
+    if (o.ui && typeof window !== 'undefined') {
+      window.addEventListener('keydown', (e) => {
+        if (this.ui?.pauseVisible && this.ui.tab === 'map' && this.panel.onKey(e.key)) e.preventDefault();
+      });
+    }
     this.codex.onChange(() => { if (this.ui?.pauseVisible && this.ui.tab === 'codex') this.codexPanel.render(this.codex, this.defs); });
   }
 
@@ -118,6 +126,12 @@ export class MapController {
     this.codex.recordFloor(this.floorKey, floorLabel(meta), { ...(report ? { rarity: report.profile.rarity, family: report.profile.family.name } : {}), secretsTotal: this.contents.secrets.length });
     this.codex.setSurvey(this.floorKey, this.map.survey(), this.secretsFound());
     this.saveAcc = 0;
+    // 一時停止の画面の題に、今いるフロア（v1 の OSD と同じく「いまどこか」）
+    const title = this.ui?.pause?.title;
+    if (title) {
+      this.titleBase ??= title.textContent ?? 'LIMINAL';
+      title.textContent = `${this.titleBase} ・ ${floorLabel(meta)}`;
+    }
   }
 
   /** 毎フレーム（ClientGame の onFrame） */

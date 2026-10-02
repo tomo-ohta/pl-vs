@@ -203,7 +203,9 @@ export function placeMapSigns(p: FloorProfile, geo: FloorGeometry, gimmicks: Gim
   // ---------------------------------------------------------------- N07 入口の案内図
   if (spawn && rng.chance(t['map.guide.chance'])) {
     const sp = geo.spawn.pos;
-    const spots = wallSpots(spawn, 1.3, 1.05, 2.0, (x, z) => Math.hypot(x - sp[0], z - sp[2]));
+    // 出てきたときに目に入る壁（近い・前か横。後ろの壁は振り返らないと見えないので後回し）
+    const fx = -Math.sin(geo.spawn.yaw), fz = -Math.cos(geo.spawn.yaw);
+    const spots = wallSpots(spawn, 1.3, 1.05, 2.0, (x, z) => Math.hypot(x - sp[0], z - sp[2]) + ((x - sp[0]) * fx + (z - sp[2]) * fz < -0.5 ? 6 : 0));
     const s = spots[0];
     if (s) {
       const board = hangBoard(spawn, s, 1.3, 1.05, 2.0, 'mapGuide');
