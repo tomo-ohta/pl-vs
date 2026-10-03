@@ -590,6 +590,8 @@ function furnishFixed(world: SecretWorld, cell: CellLayout, r: Rect, y: number, 
       for (const [x0, z0, x1, z1] of [[r.x0, r.z0, r.x1, hole.z0], [r.x0, hole.z1, r.x1, r.z1], [r.x0, hole.z0, hole.x0, hole.z1], [hole.x1, hole.z0, r.x1, hole.z1]] as const) cell.boxes.push(box([x0, y - 0.2, z0], [x1, y, z1], cell.palette.floor));
       cell.boxes.push(box([hole.x0, y - D, hole.z0], [hole.x0 + 0.1, y, hole.z1], 'void'), box([hole.x1 - 0.1, y - D, hole.z0], [hole.x1, y, hole.z1], 'void'), box([hole.x0, y - D, hole.z0], [hole.x1, y, hole.z0 + 0.1], 'void'), box([hole.x0, y - D, hole.z1 - 0.1], [hole.x1, y, hole.z1], 'void'));
       if (seamless) cell.boxes.push(box([hole.x0, y - D - 0.2, hole.z0], [hole.x1, y - D, hole.z1], 'void'));
+      // 区画の外形の下端を縦穴の底まで（落下の判定で戻されない）
+      cell.bounds.min[1] = Math.min(cell.bounds.min[1], y - D - 0.2);
       const to = what === 'bFloor' ? { floor: `${world.depth + 1}.1` } : { floor: `${world.depth + 2}.0` };
       world.exits.push(seamless
         ? { id: `${id}:hole`, kind: 'secret', aabb: { min: [hole.x0, y - D, hole.z0], max: [hole.x1, y - D + 3, hole.z1] }, to, shaft: { anchor: [cx, y, cz], zone: { min: [hole.x0, y - D - 0.2, hole.z0], max: [hole.x1, y - 0.3, hole.z1] } } }

@@ -44,6 +44,7 @@ export function labRoom(defId: string, o: { w: number; d: number; height?: numbe
   const entities: EntitySpec[] = [];
   const offers: SecretOffer[] = [];
   const keepOut: AABB[] = [];
+  const exits: FloorLayout['exits'] = [];
   let added = 0;
   const ctx: GimmickContext = {
     slot, rng: new Rng(o.seed), tuning: t, id: `g:${defId}:room`,
@@ -57,6 +58,7 @@ export function labRoom(defId: string, o: { w: number; d: number; height?: numbe
     doorAt: () => null,
     removeBoxes(pred) { cell.boxes = cell.boxes.filter((b) => !pred(b)); },
     reachAssist() {},
+    addExit(x) { exits.push(x); },
   };
   if (def.fits && !def.fits(slot)) return null;
   def.build(ctx);
@@ -64,7 +66,7 @@ export function labRoom(defId: string, o: { w: number; d: number; height?: numbe
   const floor: FloorLayout = {
     id: 'lab', seed: o.seed, genVersion: 'lab', tuningVersion: 'lab',
     bounds: { min: [cell.bounds.min[0], cell.bounds.min[1] - 6, cell.bounds.min[2]], max: cell.bounds.max },
-    cells: [cell], portals: [], entities, surfaces: [], spawn: { pos: frontOf(openings[0]!, 1.0), yaw: 0, cell: 'room' }, exits: [],
+    cells: [cell], portals: [], entities, surfaces: [], spawn: { pos: frontOf(openings[0]!, 1.0), yaw: 0, cell: 'room' }, exits,
   };
   const inside = frontOf(openings[0]!, 1.0);
   return { floor, cell, slot, offers, keepOut, inside: [inside[0], 0, inside[2]], exitInside: openings[1] ? (() => { const p = frontOf(openings[1]!, 1.0); return [p[0], 0, p[2]] as Vec3; })() : null };

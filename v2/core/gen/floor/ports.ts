@@ -13,8 +13,8 @@ import { opening } from '../../world/build.ts';
 import type { Rect } from '../../world/footprint.ts';
 import { DOOR_H, DOOR_W, WALL_T, type RegionAirlockCell, type RegionGateCell, type WallOpening } from '../../world/layout.ts';
 import { themePalette } from '../../world/palettes.ts';
-import { airlockAnchor, airlockShape, placeAirlock } from '../world/airlock.ts';
-import { placeLanding } from '../world/landing.ts';
+import { airlockAnchor, airlockShape, airlockSpawn, hostFront, placeAirlock } from '../world/airlock.ts';
+import { placeLanding, placeOpenHoles } from '../world/landing.ts';
 import { GenError, RISER_MAX, snap, TREAD, type GeoBuild, type Placed, type StraightSpec } from './geometry.ts';
 import { SPECIAL_STYLES, type Skeleton } from './skeleton.ts';
 
@@ -83,8 +83,14 @@ export function regionPorts(g: GeoBuild, sk: Skeleton, placed: Map<number, Place
   const gates: RegionGateCell[] = [];
 
   // ---------------------------------------------------------------- 階段室（大きいので先に置く）
+  // 升目ごとに下りと上から着く所があるので、その升目の中の区画を先に（区域の中に散らばる）
+  const inSlot = (pl: Placed, slot: [number, number]): boolean => {
+    const cx = (pl.rect.x0 + pl.rect.x1) / 2, cz = (pl.rect.z0 + pl.rect.z1) / 2;
+    return cx >= slot[0] * reg.slotM && cx < (slot[0] + 1) * reg.slotM && cz >= slot[1] * reg.slotM && cz < (slot[1] + 1) * reg.slotM;
+  };
+  const usedHosts = new Map<Placed, number>();
   reg.airlocks.forEach((a, i) => {
-    const shape = airlockShape(a.id, t);
+    const shape = airlockShape(a.id, t, a.kind);
     const first = a.role === 'down' ? placed.get(sk.exit) : placed.get(sk.entry);
     const order = [...(first && okHost(first) ? [first] : []), ...hosts.filter((h) => h !== first)];
     let best: { pl: Placed; d: Dir; at: number; score: number } | null = null;
@@ -95,26 +101,28 @@ export function regionPorts(g: GeoBuild, sk: Skeleton, placed: Map<number, Place
         if (at === null) continue;
         const r = perp(d, wl.coord, wl.coord + sgnOf(d) * shape.length, at, shape.width);
         if (!free(r)) continue;
-        // 区域の辺に向いた壁ほどよい（縁の帯へ出す）・最初の候補の区画ほどよい
-        const score = hi * 2 + Math.abs(boundary(d) - wl.coord) * 0.05;
+        // 升目の中の区画・区域の辺に向いた壁ほどよい（縁の帯へ出す）・最初の候補の区画ほどよい・同じ区画に何個も付けない
+        const score = (inSlot(pl, a.slot) ? 0 : 60) + hi * 0.5 + Math.abs(boundary(d) - wl.coord) * 0.05 + (usedHosts.get(pl) ?? 0) * 25;
         if (!best || score < best.score) best = { pl, d, at, score };
       }
-      if (best && hi === 0) break;
     }
     if (!best) throw new GenError(`階段室を置けません: ${a.id}`);
     const { pl, d, at } = best;
     const anchor = airlockAnchor(a.role, wallPoint(d, wallOf(pl.rect, d).coord, at, pl.y), d, shape);
     const cellId = `air${i}`;
-    const pa = placeAirlock(a.id, a.role, cellId, pl.cellId, anchor, shape, a.to, t['world.airlock.closeSec']);
+    const pa = placeAirlock(a.id, a.role, cellId, pl.cellId, anchor, shape, a.to, t['world.airlock.closeSec'], t);
+    usedHosts.set(pl, (usedHosts.get(pl) ?? 0) + 1);
     g.addOpening(pl.cellId, pa.hostOpening);
     g.out.portals.push(pa.portal);
-    g.out.entities.push(...pa.entities);
+    g.out.entities.push(...pa.entities, ...pa.hostEntities);
+    // 扉の前（区域の区画の側）は家具を置かない
+    g.keep(pl.cellId, hostFront(pa.hostOpening));
     if (pa.exit) g.out.exits.push(pa.exit);
     g.finishers.push((gb) => gb.out.cells.push({ cell: pa.cell, kind: 'stairs', openings: pa.openings, node: -1 }));
     busy.push(pa.rect);
     sealed.add(cellId);
     g.reserved.add(cellId);
-    airlocks.push({ id: a.id, role: a.role, cell: cellId, anchor: pa.anchor, live: pa.live, sealed: pa.sealed, to: a.to });
+    airlocks.push({ id: a.id, kind: a.kind, role: a.role, cell: cellId, anchor: pa.anchor, live: pa.live, sealed: pa.sealed, to: a.to, ...(pa.car ? { car: pa.car } : {}) });
   });
 
   // ---------------------------------------------------------------- 境目の扉までの廊下
@@ -240,12 +248,9 @@ export function regionPorts(g: GeoBuild, sk: Skeleton, placed: Map<number, Place
   gates.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
 
   // ---------------------------------------------------------------- 出てくる位置（上から着く階段室の上の踊り場。無ければ入口の区画）
-  const up = airlocks.find((a) => a.role === 'up');
-  if (up) {
-    const q = up.anchor.q;
-    const lp = rotQ([0, 0.02, WALL_T + 0.7], q), f = rotQ([0, 0, 1], q);
-    g.out.spawn = { pos: [snap(lp[0] + up.anchor.offset[0]), up.anchor.offset[1] + 0.02, snap(lp[2] + up.anchor.offset[2])], yaw: Math.atan2(-f[0], -f[2]), cell: up.cell };
-  } else if (gates.length) {
+  const up = airlocks.find((a) => a.role === 'up' && a.kind !== 'lift') ?? airlocks.find((a) => a.role === 'up');
+  if (up) g.out.spawn = airlockSpawn(up, t);
+  else if (gates.length) {
     // 最初の境目の扉の 1.2 m 内側（廊下の真ん中。家具が無い）に、区域の中を向いて
     const o = gates[0]!.opening, v = rotQ([0, 0, 1], o.dir);
     g.out.spawn = { pos: [snap(o.pos[0] - v[0] * 1.2), 0.02, snap(o.pos[2] - v[2] * 1.2)], yaw: Math.atan2(v[0], v[2]), cell: gates[0]!.cell };
@@ -257,6 +262,7 @@ export function regionPorts(g: GeoBuild, sk: Skeleton, placed: Map<number, Place
   if (down) g.out.mainTo = down.cell;
   // 隠しの穴から落ちてくる人が着く部屋（天井の穴と縦穴）
   const landings = placeLanding(g, hosts, t);
+  placeOpenHoles(g, hosts, t);
   g.out.region = { gates, airlocks, ...(landings.length ? { landings } : {}) };
   g.out.sealed = sealed;
 }

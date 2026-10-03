@@ -112,8 +112,9 @@ test('階段室の上の階の写しと下の階の写しは、局所の座標�
         return [...boxes, ...lights, ...doors, `h:${cell.height}`].sort();
       };
       assert.deepEqual(shapeOf(below.floor, b.cell, b.anchor), shapeOf(r.floor, a.cell, a.anchor), `${a.id}`);
-      // 上の階の写しは上の扉、下の階の写しは下の扉が区域につながる。上に階が無い階の着く階段室には入れ替えが無い
-      assert.ok(a.live.endsWith(':top') && b.live.endsWith(':bottom'));
+      // 上の階の写しは上の扉、下の階の写しは下の扉が区域につながる（エレベーターは同じ戸）
+      if (a.kind === 'lift') assert.ok(a.live.endsWith(':door') && b.live.endsWith(':door') && a.car && b.car);
+      else assert.ok(a.live.endsWith(':top') && b.live.endsWith(':bottom'));
       compared++;
     }
   }

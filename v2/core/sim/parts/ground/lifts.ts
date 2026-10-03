@@ -36,11 +36,15 @@ definePart<LiftState>({
     s.still = stillNow ? s.still + ctx.dt : 0;
     const still = s.still >= pNum(ctx.spec, 'stillSec', 0.4);
     let target = s.t;
+    // commitT: ここより先へ動いたら、歩いても戻らない（沈む床で 1 つ下の階へ。14 章）
+    const commit = pNum(ctx.spec, 'commitT', 2);
     if (still) { target = 1; s.idle = 0; }
-    else if (on.length) { target = 0; s.idle = 0; }
+    else if (on.length) { target = s.t >= commit && s.t < 1 ? 1 : 0; s.idle = 0; }
     else { s.idle += ctx.dt; if (s.idle >= pNum(ctx.spec, 'idleSec', 3)) target = 0; }
     const prevT = s.t;
-    s.t = approach(s.t, target, (pNum(ctx.spec, 'speed', 0.35) * ctx.dt) / L);
+    // fastAfter m より先は fastSpeed で（暗い縦穴の中は速く）
+    const far = Math.abs(travel) * s.t > pNum(ctx.spec, 'fastAfter', Infinity);
+    s.t = approach(s.t, target, ((far ? pNum(ctx.spec, 'fastSpeed', 1) : pNum(ctx.spec, 'speed', 0.35)) * ctx.dt) / L);
     const moving = s.t !== prevT ? 1 : 0;
     if (moving !== s.moving) ctx.cue(moving ? 'lift.start' : 'lift.stop', aabbCenter(liftBox(b, travel * s.t)));
     s.moving = moving;

@@ -57,7 +57,8 @@ export interface MapPortal {
   secret: boolean;
 }
 
-export interface MapExit { id: string; kind: string; x: number; y: number; z: number; cell: string | null }
+/** 出口（up: 上の階へ。label: 地図に添える名前（階段・EV・穴）） */
+export interface MapExit { id: string; kind: string; x: number; y: number; z: number; cell: string | null; up?: boolean; label?: string }
 
 export type MapFxKind = 'erase' | 'rotate' | 'hide';
 export interface MapFxInfo { id: string; cell: string; fx: MapFxKind; params: { [k: string]: Json } }
@@ -200,12 +201,22 @@ export function buildMapInfo(floor: FloorLayout, t: Tuning): MapInfo {
   const inCell = (type: string): EntitySpec[] => ents.filter((e) => e.type === type && e.cell);
   const fx: MapFxInfo[] = inCell('mapFx').map((e) => ({ id: e.id, cell: e.cell!, fx: (e.params.fx === 'rotate' ? 'rotate' : e.params.fx === 'hide' ? 'hide' : 'erase') as MapFxKind, params: e.params }));
   const hideCells = new Set(fx.filter((f) => f.fx === 'hide').map((f) => f.cell));
-  const exits: MapExit[] = floor.exits.map((x) => ({ id: x.id, kind: x.kind, x: (x.aabb.min[0] + x.aabb.max[0]) / 2, y: x.aabb.min[1], z: (x.aabb.min[2] + x.aabb.max[2]) / 2, cell: null }));
+  // 果てしない階: 上下の階へ移る所は、上り・下りと種類（階段・エレベーター）。落ちる所は「穴」。地図では縦穴の上（床の穴の所）に描く
+  const roles = new Map((floor.region?.airlocks ?? []).map((a) => [a.id, a.role]));
+  const exits: MapExit[] = floor.exits.map((x) => {
+    const at = x.shaft ? x.shaft.anchor : null;
+    const e: MapExit = { id: x.id, kind: x.kind, x: at ? at[0] : (x.aabb.min[0] + x.aabb.max[0]) / 2, y: at ? Math.max(at[1], x.aabb.min[1]) : x.aabb.min[1], z: at ? at[2] : (x.aabb.min[2] + x.aabb.max[2]) / 2, cell: null };
+    if (x.airlock) { e.up = roles.get(x.airlock) === 'up'; e.label = x.kind === 'elevator' ? 'EV' : '階段'; }
+    else if (x.kind === 'hole') e.label = '穴';
+    return e;
+  });
   const layers = computeLayers(floor.cells, floor.portals, t['map.layer.riseM']);
   const cells: MapCell[] = floor.cells.map((c, i) => {
     const kind = kindOf(c);
     const hidden = !!c.map?.hidden || hideCells.has(c.id);
     const hasExit = floor.exits.some((x) => {
+      // 部屋の床の穴・落ちる所（縦穴）は、部屋そのものは調べる（調査率に数える）
+      if (x.shaft) return false;
       const cx = (x.aabb.min[0] + x.aabb.max[0]) / 2, cz = (x.aabb.min[2] + x.aabb.max[2]) / 2;
       return cx >= c.bounds.min[0] && cx <= c.bounds.max[0] && cz >= c.bounds.min[2] && cz <= c.bounds.max[2] && x.aabb.max[1] >= c.bounds.min[1] - 7 && x.aabb.min[1] <= c.bounds.max[1];
     });

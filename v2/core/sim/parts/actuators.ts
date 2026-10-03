@@ -17,7 +17,7 @@ const ON = 0.5;
 
 definePart<{ angle: number; target: number; idle: number }>({
   type: 'door',
-  outputs: ['open', 'angle'],
+  outputs: ['open', 'angle', 'touched'],
   inputs: ['open', 'lock'],
   init(ctx) {
     const panel = pAabb(ctx.spec, 'panel');
@@ -33,6 +33,8 @@ definePart<{ angle: number; target: number; idle: number }>({
     const prevTarget = s.target;
     if (ctx.wired('open')) {
       s.target = ctx.input('open') > ON ? 1 : 0;
+      // ほかの部品が開け閉めする扉: 調べたことだけ知らせる（エレベーターの戸を調べると呼ぶ）
+      ctx.output('touched', ctx.interactedBy() ? 1 : 0);
     } else {
       const who = ctx.interactedBy();
       if (who) {

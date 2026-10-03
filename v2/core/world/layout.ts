@@ -255,7 +255,7 @@ export interface FloorExit {
    * 隠しの穴の縦穴（13 章）: 穴の床の真ん中 anchor と、縦穴の中（暗い）。落ちる途中で行き先の階の着く部屋の縦穴へ移る
    * （aabb は移れなかったときの、暗転して移る所）
    */
-  shaft?: { anchor: Vec3; zone: AABB };
+  shaft?: { anchor: Vec3; zone: AABB; lift?: string };
 }
 
 export interface FloorLayout {
@@ -285,7 +285,11 @@ export interface RegionGateCell { id: string; cell: string; opening: WallOpening
 /** 区域の階段室（core/gen/world/airlock.ts）: 局所の形 → 階の座標の写し方と、扉 */
 export interface RegionAirlockCell {
   id: string;
+  /** 階段室 / エレベーター（無ければ階段室） */
+  kind?: 'stairs' | 'lift';
   role: 'down' | 'up';
+  /** エレベーター: かごの部品（出力 ready が入ったら移す） */
+  car?: string;
   cell: string;
   anchor: { offset: Vec3; q: Dir };
   /** 区域につながる扉 / 開かない扉 */
@@ -303,6 +307,8 @@ export interface RegionLandingCell {
   anchor: Vec3;
   /** 縦穴の中（暗い） */
   zone: AABB;
+  /** 沈む床で降りてくる人を乗せる床板（縦穴のいちばん上で待つ。部品 dropLift） */
+  lift?: string;
 }
 
 export interface RegionInfo {

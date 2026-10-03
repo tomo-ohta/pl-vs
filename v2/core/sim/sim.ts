@@ -367,6 +367,12 @@ export class Sim implements PlayerWorld {
     return this.entities.get(id)?.state ?? null;
   }
 
+  /** 部品の状態を書き換える（階を移るときに、向こうの階の部品をこちらにそろえる。WorldSession） */
+  patchState(id: string, patch: Partial<PartState>): void {
+    const e = this.entities.get(id);
+    if (e) Object.assign(e.state, patch);
+  }
+
   outputOf(id: string, port: string): number {
     return this.entities.get(id)?.out[port] ?? 0;
   }

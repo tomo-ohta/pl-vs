@@ -258,7 +258,8 @@ export class GeoBuild {
       if (po.kind !== 'opening' || po.doorId) continue;
       const [a, b] = po.cells;
       const A = mood.get(a), B = mood.get(b);
-      if (!A || !B || this.reserved.has(a) || this.reserved.has(b) || !differs(A, B)) continue;
+      // 階段室・エレベーター（区画の作り方が別。mood に無い）は除く
+      if (!A || !B || !differs(A, B)) continue;
       const axis: 'x' | 'z' = po.dir % 2 === 1 ? 'x' : 'z';
       const cx = (po.aabb.min[0] + po.aabb.max[0]) / 2, cz = (po.aabb.min[2] + po.aabb.max[2]) / 2, y = po.aabb.min[1];
       const near = (o: WallOpening): boolean => Math.abs(o.pos[0] - cx) < 0.06 && Math.abs(o.pos[2] - cz) < 0.06 && Math.abs(o.pos[1] - y) < 0.06 && o.dir % 2 === po.dir % 2 && !o.sill;

@@ -52,7 +52,7 @@ export interface FloorProfile {
 /** 区域の境目の扉（区域から見た向き。core/gen/world/plan.ts の GateEnd と同じ形） */
 export interface RegionGate { id: string; side: Dir; line: number; at: number }
 /** 区域の階段室（core/gen/world/plan.ts の AirlockEnd。to は向こうの階 'depth.variant'、null は上の階が無い） */
-export interface RegionAirlock { id: string; role: 'down' | 'up'; slot: [number, number]; to: string | null }
+export interface RegionAirlock { id: string; kind: 'stairs' | 'lift'; role: 'down' | 'up'; slot: [number, number]; to: string | null }
 
 /** 区域として作るときの情報 */
 export interface RegionContext {

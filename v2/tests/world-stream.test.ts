@@ -72,10 +72,10 @@ test('階段室: 下の半分に入り、扉が両方閉じると下の階の写
   const p = () => s.active.sim.players[0]!;
   // 下りの階段室がある区域（今の区域か、そのとなり）
   const startPlan = w.planAt(p().pos[0], p().pos[2]);
-  const target = [startPlan, ...startPlan.gates.map((g) => w.planner.byId(w.story, g.other))].find((pl) => pl.airlocks.some((a) => a.role === 'down'));
+  const target = [startPlan, ...startPlan.gates.map((g) => w.planner.byId(w.story, g.other))].find((pl) => pl.airlocks.some((a) => a.role === 'down' && a.kind === 'stairs'));
   assert.ok(target, '超ブロックの中に下りの階段室がある');
   w.ensure(target);
-  const down = w.regionInfo(target.id)!.airlocks.find((a) => a.role === 'down')!;
+  const down = w.regionInfo(target.id)!.airlocks.find((a) => a.role === 'down' && a.kind === 'stairs')!;
   const L = (w.regionLayout(target.id)!.cells.find((c) => c.id === down.cell)!);
   void L;
   // 下の踊り場（局所 z = 長さ − 1）まで
@@ -95,8 +95,9 @@ test('階段室: 下の半分に入り、扉が両方閉じると下の階の写
   assert.ok(cell.footprint.some((f) => p().pos[0] >= f.x0 - 0.01 && p().pos[0] <= f.x1 + 0.01 && p().pos[2] >= f.z0 - 0.01 && p().pos[2] <= f.z1 + 0.01), '下の階の階段室の中');
   // 上の踊り場へ戻ると、上の階へ戻る
   const up = (z: number): Vec3 => { const r = rotQ([0, 0, z], below.anchor.q); return [r[0] + below.anchor.offset[0], below.anchor.offset[1] + 0.02, r[2] + below.anchor.offset[2]]; };
-  const back = walkTo(streamSim(s), below.cell, up(0.9), 120);
+  // （歩く人は階を移っても歩き続けて、また階段室に入ってしまうので、上の踊り場へ移してから待つ）
+  for (let i = 0; i < 10; i++) s.step([]);
+  s.active.sim.teleport(0, up(0.9), p().yaw);
   for (let i = 0; i < 60 * 6 && s.active.story.depth === 2; i++) s.step([]);
-  assert.ok(back.ok || s.active.story.depth === 1, `上の踊り場へ: ${back.reason}`);
   assert.equal(s.active.story.depth, 1, '上の階へ戻った');
 });

@@ -9,39 +9,42 @@ import { PhysicsWorld } from '../core/physics/world.ts';
 import '../core/sim/parts/index.ts';
 import { WorldSession } from '../core/stream/session.ts';
 import { syncSource, type StoryWorld } from '../core/stream/story.ts';
-import { landingSlot, WorldPlanner } from '../core/gen/world/plan.ts';
+import { landingId, WorldPlanner } from '../core/gen/world/plan.ts';
 import { generateRegionReport } from '../core/gen/world/region.ts';
 import type { FloorExit } from '../core/world/layout.ts';
 
 const t = defaultTuning();
 
-test('着く部屋は超ブロックごとに 1 つ。天井に穴があり、その上の縦穴は塞がっていない（ほかの区画と重ならない）', () => {
+test('着く部屋は升目ごとに 1 つ。天井に穴があり、その上の縦穴は塞がっていない（ほかの区画と重ならない）。縦穴の上に床板が待つ', () => {
   const pl = new WorldPlanner(t);
+  let n = 0;
   for (const world of [2, 9]) {
-    for (const [bx, bz] of [[0, 0], [-1, 0], [0, -1]] as const) {
-      const story = { world, depth: 4, variant: 0 };
-      const ls = landingSlot(world, 4, bx, bz);
-      const plans = new Map<string, ReturnType<WorldPlanner['at']>>();
-      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { const p = pl.at(story, bx * 2 + i, bz * 2 + j); plans.set(p.id, p); }
-      const withLanding = [...plans.values()].filter((p) => p.landings.length);
-      assert.equal(withLanding.length, 1, '超ブロックに 1 つ');
-      const p = withLanding[0]!;
-      assert.ok(ls[0] >= p.slots.cx && ls[0] < p.slots.cx + p.slots.w && ls[1] >= p.slots.cz && ls[1] < p.slots.cz + p.slots.h);
+    const story = { world, depth: 4, variant: 0 };
+    const seen = new Set<string>();
+    for (const [cx, cz] of [[0, 0], [1, 0], [-1, 1], [0, -2]] as const) {
+      const p = pl.at(story, cx, cz);
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      assert.equal(p.landings.length, p.slots.w * p.slots.h, '升目ごと');
       const L = generateRegionReport(p, t, { dress: dressCell }).floor;
-      const ld = L.region!.landings![0]!;
-      const cell = L.cells.find((c) => c.id === ld.cell)!;
-      assert.ok(cell.role !== 'secret' && cell.floorY === 0, '地面の階の部屋');
-      const [x, , z] = ld.anchor;
-      // 天井の板は穴の所に無い。縦穴の壁は穴を囲む
-      const ceil = cell.floorY + cell.height;
-      assert.ok(!cell.boxes.some((b) => b.solid && b.min[1] >= ceil - 0.01 && b.min[1] < ceil + 0.3 && b.min[0] < x && b.max[0] > x && b.min[2] < z && b.max[2] > z), '天井の穴');
-      assert.equal(cell.boxes.filter((b) => b.mat === 'void' && b.min[1] >= ceil - 0.01).length, 5, '縦穴の壁と蓋');
-      // 穴の真下は家具が無い（落ちてきた人が立てる）
-      assert.ok(!cell.boxes.some((b) => b.solid && b.max[1] > cell.floorY + 0.05 && b.min[1] < ceil - 0.3 && b.min[0] < x + 0.4 && b.max[0] > x - 0.4 && b.min[2] < z + 0.4 && b.max[2] > z - 0.4), '穴の真下が空いている');
-      // 上にほかの区画が無い
-      for (const c of L.cells) if (c !== cell && c.bounds.max[1] > ceil + 0.1) assert.ok(!c.footprint.some((f) => x > f.x0 && x < f.x1 && z > f.z0 && z < f.z1), `縦穴の上に区画 ${c.id}`);
+      assert.equal(L.region!.landings!.length, p.landings.length);
+      for (const ld of L.region!.landings!) {
+        assert.ok(p.landings.some((x) => x.id === ld.id && x.id === landingId(4, x.slot[0], x.slot[1])));
+        const cell = L.cells.find((c) => c.id === ld.cell)!;
+        assert.ok(cell.role !== 'secret', '部屋');
+        const [x, , z] = ld.anchor;
+        const ceil = cell.floorY + cell.height;
+        assert.ok(!cell.boxes.some((b) => b.solid && b.min[1] >= ceil - 0.01 && b.min[1] < ceil + 0.3 && b.min[0] < x && b.max[0] > x && b.min[2] < z && b.max[2] > z), '天井の穴');
+        assert.equal(cell.boxes.filter((b) => b.mat === 'void' && b.min[1] >= ceil - 0.01).length, 5, '縦穴の壁と蓋');
+        assert.ok(!cell.boxes.some((b) => b.solid && b.max[1] > cell.floorY + 0.05 && b.min[1] < ceil - 0.3 && b.min[0] < x + 0.4 && b.max[0] > x - 0.4 && b.min[2] < z + 0.4 && b.max[2] > z - 0.4), '穴の真下が空いている');
+        for (const c of L.cells) if (c !== cell && c.bounds.max[1] > ceil + 0.1) assert.ok(!c.footprint.some((f) => x > f.x0 && x < f.x1 && z > f.z0 && z < f.z1), `縦穴の上に区画 ${c.id}`);
+        const lift = L.entities.find((e) => e.id === ld.lift);
+        assert.ok(lift && lift.type === 'dropLift', '床板');
+        n++;
+      }
     }
   }
+  assert.ok(n >= 6, `着く部屋 ${n}`);
 });
 
 async function holeSession(ready?: (w: StoryWorld) => boolean): Promise<{ s: WorldSession; hole: FloorExit }> {
@@ -65,7 +68,7 @@ test('隠しの穴に落ちると、途中で行き先の階の着く部屋の�
   assert.equal(`${s.active.story.depth}.${s.active.story.variant}`, hole.to!.floor, '行き先の階へ移った');
   const ch = s.drainChanges();
   assert.equal(ch.length, 1);
-  assert.ok(ch[0]!.seamless && ch[0]!.airlock.startsWith('hole:'), '暗転しない');
+  assert.ok(ch[0]!.seamless && ch[0]!.airlock.startsWith('drop:'), '暗転しない');
   const p = s.active.sim.players[0]!;
   assert.ok(vy < -5 && p.vel[1] < -5, `落ちる速さを保つ（${p.vel[1].toFixed(1)}）`);
   const ld = s.active.regions.flatMap((r) => r.layout.region?.landings ?? [])[0]!;

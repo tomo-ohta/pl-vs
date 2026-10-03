@@ -31,7 +31,7 @@ export interface MapPanelContext {
 const LEGEND: [string, string][] = [
   ['#7a86a2', '今いる'], ['#505a6e', '入った'], ['#2a2f3a', '見ただけ'], ['#7a5aa0', '隠し'], ['#f1eee4', '空白'],
 ];
-const NOTE = '影 まだ調べていない所 ／ ・ 足跡 ／ ▼ 出口 ／ ▲ 塔（霧の中の目印） ／ 点線 読んだ地図の写し ／ ホイール・ドラッグ 拡大・移動 ／ 0 全体';
+const NOTE = '影 まだ調べていない所 ／ ・ 足跡 ／ ▼ 下の階へ（階段・EV・穴） ／ ▲ 上の階へ ／ △ 塔（霧の中の目印） ／ 点線 読んだ地図の写し ／ ホイール・ドラッグ 拡大・移動 ／ 0 全体';
 const SOURCE_JA = { guide: '案内図', here: '現在地の看板', note: '誰かの地図' } as const;
 
 export class MapPanel {

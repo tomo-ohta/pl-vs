@@ -154,6 +154,11 @@ export class StoryWorld {
     return true;
   }
 
+  /** ids に無い区域を外す（移る先の階で、近くの移る所の行き先の区域だけを残す。WorldSession） */
+  retain(ids: ReadonlySet<string>): void {
+    for (const id of [...this.loaded.keys()]) if (!ids.has(id)) this.remove(id);
+  }
+
   /** tick ごとに: 区域の出し入れ・境目の扉・階段室の入れ替えの頼み */
   update(): void {
     const t = this.t;
@@ -271,6 +276,8 @@ export class StoryWorld {
           if (st === undefined || st === 'blocked') { this.zones.set(key, 'blocked'); continue; }
           if (st === 'outside') this.zones.set(key, 'armed');
           if (this.sim.outputOf(a.live, 'angle') > 0.01 || this.sim.outputOf(a.sealed, 'angle') > 0.01) continue;
+          // エレベーター: 戸が閉まって、かごが動き終えたら
+          if (a.car && this.sim.outputOf(a.car, 'ready') < 0.5) continue;
           if (this.transfers.some((x) => x.player === pi && x.airlock === a.id)) continue;
           const [d, v] = a.to.split('.').map(Number) as [number, number];
           this.transfers.push({ player: pi, airlock: a.id, region: plan.id, role: a.role, to: { world: this.story.world, depth: d, variant: v } });

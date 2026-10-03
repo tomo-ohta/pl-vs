@@ -148,6 +148,34 @@ defineView('door', (spec, ctx) => {
   const H = size[1] + 0.03;
   const T = 0.05;
   const hingeSign = P.hinge === 1 ? 1 : -1;
+  // 引き戸（エレベーター。params.slide）: 2 枚の板が左右の壁の中へ滑る
+  if (spec.params.slide) {
+    const light0 = lightAt(ctx, aabbCenter(worldPanel));
+    const group = new THREE.Group();
+    const gs: THREE.BufferGeometry[] = [];
+    const cx = (panel.min[0] + panel.max[0]) / 2, cz = (panel.min[2] + panel.max[2]) / 2, y0 = panel.min[1];
+    const halves = [-1, 1].map((side) => {
+      const g0 = boxGeometry(axis === 'z' ? [W / 2, H, T] : [T, H, W / 2], mat);
+      setBaked(g0, light0);
+      gs.push(g0);
+      const m = new THREE.Mesh(g0, ctx.materials.get(mat));
+      group.add(m);
+      return { m, side };
+    });
+    const place = (e: number): void => {
+      for (const { m, side } of halves) {
+        const o = side * (W / 4 + e * (W / 2 - 0.04));
+        if (axis === 'z') m.position.set(cx + o, y0 + H / 2, cz); else m.position.set(cx, y0 + H / 2, cz + o);
+      }
+    };
+    place(0);
+    const hold = fr ? new THREE.Group() : null;
+    if (hold && fr) { hold.position.set(fr.offset[0]!, fr.offset[1]!, fr.offset[2]!); hold.rotation.y = (fr.q * Math.PI) / 2; hold.add(group); ctx.root.add(hold); } else ctx.root.add(group);
+    return {
+      update(s) { const a = typeof s.angle === 'number' ? s.angle : 0; place(a * a * (3 - 2 * a)); },
+      dispose() { (hold ?? group).removeFromParent(); for (const x of gs) x.dispose(); },
+    };
+  }
   // 蝶番: 'z' の扉（x に沿う板）は x の端、'x' の扉は z の端。板は蝶番から -hingeSign の向きへ伸びる
   const pivot = new THREE.Group();
   if (axis === 'z') pivot.position.set(hingeSign < 0 ? panel.min[0] - 0.03 : panel.max[0] + 0.03, panel.min[1], (panel.min[2] + panel.max[2]) / 2);

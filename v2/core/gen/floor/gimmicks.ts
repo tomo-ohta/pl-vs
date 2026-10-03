@@ -334,7 +334,7 @@ function regionEntriesConnected(geo: FloorGeometry, cell: string, doorsBefore: s
 /** 仕掛けを組む。区画の開口どうしが歩いてつながらなければ取り消して null */
 function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeometry, rng: Rng, t: Tuning, p: FloorProfile, depth: number, clue?: () => ClueCell[]): Built | null {
   const id = `g:${def.id}:${g.cell.id}`;
-  const snapshot = { boxes: g.cell.boxes.slice(), lights: g.cell.lights.map((l) => ({ ...l })), zones: g.cell.zones.slice(), entities: geo.entities.length, doors: JSON.stringify(geo.entities.filter((e) => e.type === 'door' && e.cell === g.cell.id)) };
+  const snapshot = { boxes: g.cell.boxes.slice(), lights: g.cell.lights.map((l) => ({ ...l })), zones: g.cell.zones.slice(), entities: geo.entities.length, doors: JSON.stringify(geo.entities.filter((e) => e.type === 'door')) };
   // 穴の仕掛けは区画の外形の下端を下げる（pit.ts の pitShell）ので、取り消すときに戻す
   const boundsMinY = g.cell.bounds.min[1];
   const myKeep: AABB[] = [];
@@ -376,9 +376,10 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
     addPortal(p) { geo.portals.push(p); },
     cells: () => geo.cells.map((c) => c.cell),
     noDress(cellId) { myNoDress.push(cellId ?? g.cell.id); },
+    addExit(x) { geo.exits.push(x); added++; },
   };
   // 仕掛けが足す区画・開口（warp）は、組む前の数まで戻す
-  const cellsAtStart = geo.cells.length, portalsAtStart = geo.portals.length;
+  const cellsAtStart = geo.cells.length, portalsAtStart = geo.portals.length, exitsAtStart = geo.exits.length;
   def.build(ctx);
   const openingsBefore = g.openings.length;
   const portalsBefore = geo.portals.length;
@@ -395,7 +396,7 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
     geo.cells.length = cellsBefore;
     geo.cells.length = Math.min(geo.cells.length, cellsAtStart);
     geo.portals.length = Math.min(geo.portals.length, portalsAtStart);
-    geo.exits.length = exitsBefore;
+    geo.exits.length = Math.min(exitsBefore, exitsAtStart);
     const doors = JSON.parse(snapshot.doors) as EntitySpec[];
     for (const d of doors) { const e = geo.entities.find((x) => x.id === d.id); if (e) { e.params = d.params; if (d.inputs) e.inputs = d.inputs; else delete e.inputs; } }
     for (const x of touched.values()) x.g.cell.boxes = x.boxes;

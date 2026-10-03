@@ -14,6 +14,7 @@ import type { Dir } from '../../../math/vec.ts';
 import type { Rect } from '../../../world/footprint.ts';
 import { box, type Box, type Json, type MatId } from '../../../world/layout.ts';
 import { pitShell } from '../pit.ts';
+import { dropShaft, lowerBounds, storyBelow } from '../../world/drop.ts';
 import { defineGimmick, type GimmickContext } from '../types.ts';
 import { aabbJson, cutFloorSlab, doorZone, freeWallSpan, hitsDoorZones, innerRect, wallFrame, type WallFrame } from '../util.ts';
 import { botHint, snap } from './common.ts';
@@ -24,6 +25,15 @@ function seamRing(ctx: GimmickContext, r: Rect, mat: MatId, w = 0.04, h = 0.004)
   for (const [x0, z0, x1, z1] of [[r.x0 - w, r.z0 - w, r.x1 + w, r.z0], [r.x0 - w, r.z1, r.x1 + w, r.z1 + w], [r.x0 - w, r.z0, r.x0, r.z1], [r.x1, r.z0, r.x1 + w, r.z1]] as const) {
     ctx.addBox(box([x0, y, z0], [x1, y + h, z1], mat, false));
   }
+}
+
+/** 穴の側壁（部屋の壁の続き。底は作らない） */
+function sideWalls(ctx: GimmickContext, hole: Rect, depth: number): void {
+  const y = ctx.slot.cell.floorY, mat = ctx.slot.cell.palette.wall, T = 0.12;
+  ctx.addBox(box([hole.x0 - T, y - depth, hole.z0 - T], [hole.x0, y, hole.z1 + T], mat));
+  ctx.addBox(box([hole.x1, y - depth, hole.z0 - T], [hole.x1 + T, y, hole.z1 + T], mat));
+  ctx.addBox(box([hole.x0, y - depth, hole.z0 - T], [hole.x1, y, hole.z0], mat));
+  ctx.addBox(box([hole.x0, y - depth, hole.z1], [hole.x1, y, hole.z1 + T], mat));
 }
 
 /** 開口の無い壁の、長さ need の区間（入口から遠い壁を先に）。壁の向き・壁に沿った位置・その壁の座標系 */
@@ -56,18 +66,21 @@ defineGimmick({
     if (!ok.length) return;
     const hole = ctx.rng.pick(ok);
     cutFloorSlab(s, hole);
-    pitShell(ctx, hole, depth);
+    // 縦穴: 上の depth m は部屋の壁の続き（沈んでいくのが見える）、その下は暗い縦穴。底の無い縦穴を下りていき、
+    // 暗い所で 1 つ下の階の着く部屋の縦穴へ移る（着く部屋の床板に乗ったまま、天井の穴から部屋へ下りる。14 章）
+    sideWalls(ctx, hole, depth);
     seamRing(ctx, hole, 'metalDark');
     const mat = ctx.rng.pick((['floorTile', 'marbleFloor', 'floorWood', 'metal'] as const).filter((m) => m !== s.cell.palette.floor));
     const plate = { min: [hole.x0 + 0.02, y - 0.2, hole.z0 + 0.02], max: [hole.x1 - 0.02, y, hole.z1 - 0.02] };
-    const lift = ctx.addEntity('lift', { type: 'stillLift', params: { box: aabbJson({ min: [plate.min[0]!, plate.min[1]!, plate.min[2]!], max: [plate.max[0]!, plate.max[1]!, plate.max[2]!] }), travel: -depth, speed: t['ground.sink.speed'], stillSec: 0.5, idleSec: 2, mat } });
-    // 底で止まっていると 1 つ下のフロアへ
-    const bottom = ctx.addEntity('atBottom', { type: 'and', params: {}, inputs: { a: `${lift}.atFar`, b: `${lift}.still` } });
-    const hold = ctx.addEntity('hold', { type: 'timer', params: { onDelay: t['ground.sink.gotoSec'], offDelay: 0 }, inputs: { in: `${bottom}.out` } });
+    const D = t['world.hole.depthM'];
+    const lift = ctx.addEntity('lift', { type: 'stillLift', params: { box: aabbJson({ min: [plate.min[0]!, plate.min[1]!, plate.min[2]!], max: [plate.max[0]!, plate.max[1]!, plate.max[2]!] }), travel: -(D - 1.2), speed: t['ground.sink.speed'], fastAfter: 1.2, fastSpeed: t['world.hole.liftSpeed'], commitT: 1.2 / (D - 1.2), stillSec: 0.5, idleSec: 2, mat } });
+    const ds = dropShaft(`${ctx.id}:shaft`, hole, y, y - depth, storyBelow(ctx.floor.depth, ctx.floor.variant ?? 0), t, { lift, kind: 'elevator' });
+    for (const b of ds.boxes) ctx.addBox(b);
+    lowerBounds(s.cell, ds.minY);
+    ctx.addExit?.(ds.exit);
     const cx = (hole.x0 + hole.x1) / 2, cz = (hole.z0 + hole.z1) / 2;
-    ctx.addEntity('goto', { type: 'floorGoto', params: { kind: 'hole', pos: [cx, y - depth, cz] }, inputs: { go: `${hold}.out` } });
-    // 縦穴の底の暗い灯り（沈んでいく先が見える）
-    s.cell.lights.push({ pos: [cx, y - depth + 1.2, cz], color: 0x8fa6c8, intensity: 0.25, distance: 3.5 });
+    // 縦穴の上の方の暗い灯り（沈んでいく先が暗いのが分かる）
+    s.cell.lights.push({ pos: [cx, y - depth + 0.6, cz], color: 0x8fa6c8, intensity: 0.2, distance: 3 });
     ctx.keepOut({ min: [hole.x0 - 0.5, y - depth, hole.z0 - 0.5], max: [hole.x1 + 0.5, y + 3, hole.z1 + 0.5] });
   },
 });

@@ -7,8 +7,8 @@
  *
  * - 区域の形（升目の分け方・種類・境目の扉・階段室）は表と裏（variant）で同じ。中身は区域の生成（region.ts）が variant ごとに変える
  * - 境目の扉: 隣り合う 2 つの区域の境目の升目の辺ごとに数個（辺を等分した区間ごとに 1 つ）。位置は境目の id のハッシュ（両側で同じ）
- * - 階段室: 超ブロックごとに下りが 1 つ。偶数の深さは斜めの升目（0,0）（1,1）、奇数は（1,0）（0,1）のどちらか。
- *   下の階の着く升目と、その階の下りの升目が同じにならない（着いてすぐ下りにならない）
+ * - 上下の階へ移る所（階段室・エレベーター）: 升目ごとに下りが 1 つ。下の階の同じ升目に、上から着く所として現れる（14 章）
+ * - 着く部屋: 升目ごとに 1 つ。上の階の同じ升目で落ちた人（穴・落ちる所）は、ここの天井の穴から落ちてくる
  */
 import type { Tuning } from '../../config/tuning.ts';
 import { hashAll, Rng } from '../../math/rng.ts';
@@ -40,9 +40,13 @@ export interface GateEnd {
 }
 
 /** 区域から見た階段室 */
+/** 上下の階を移る所の種類: 階段室（両端に扉の直線の階段）・エレベーター（引き戸のかご） */
+export type ConnectorKind = 'stairs' | 'lift';
+
 export interface AirlockEnd {
-  /** 階段室の id（上の階と下の階の写しで同じ）: air:<上の深さ>:<bx>:<bz> */
+  /** 移る所の id（上の階と下の階の写しで同じ）: air:<上の深さ>:<cx>:<cz>（升目ごとに 1 つ） */
   id: string;
+  kind: ConnectorKind;
   /** down: 上の扉がこの区域につながる（降りていく）/ up: 下の扉がこの区域につながる（上から着く） */
   role: 'down' | 'up';
   /** 置く升目 */
@@ -51,9 +55,9 @@ export interface AirlockEnd {
   to: StoryKey | null;
 }
 
-/** 区域から見た、隠しの穴から落ちてくる人が着く部屋（超ブロックごとに 1 つ。どの階の隠しの穴もここへ落ちる） */
+/** 区域から見た、上の階から落ちてくる人が着く部屋（升目ごとに 1 つ。上の階の同じ升目の穴・落ちる所は、ここへ落ちる） */
 export interface LandingEnd {
-  /** land:<深さ>:<bx>:<bz>（表と裏で同じ） */
+  /** land:<深さ>:<cx>:<cz>（表と裏で同じ） */
   id: string;
   /** 置く升目 */
   slot: [number, number];
@@ -85,7 +89,6 @@ export function parseRegionId(id: string): [number, number] | null {
 }
 
 const fdiv = (a: number, b: number): number => Math.floor(a / b);
-const mod = (a: number, b: number): number => ((a % b) + b) % b;
 
 /** 超ブロックの分け方（升目の [x, z, w, h]。超ブロックの左下からの相対） */
 const SPLITS: Record<string, [number, number, number, number][]> = {
@@ -122,29 +125,27 @@ export function regionSlots(world: number, depth: number, cx: number, cz: number
   throw new Error(`升目が区域に入っていません: ${cx},${cz}`);
 }
 
-/** 深さ depth の超ブロック (bx, bz) の下りの階段室の升目（偶数の深さは斜め、奇数は逆の斜め） */
-export function downSlot(world: number, depth: number, bx: number, bz: number): [number, number] {
-  const h = hashAll(world, 'down', depth, bx, bz);
-  const k = mod(depth, 2) === 0 ? (h & 1 ? 0 : 3) : (h & 1 ? 1 : 2);
-  return [bx * 2 + (k & 1), bz * 2 + (k >> 1)];
+/** 階の始まりの升目（いちばん上の階の、上の扉に錠のかかった階段室がある） */
+export const START_SLOT: readonly [number, number] = [0, 0];
+
+/** 升目 (cx, cz) の、深さ upperDepth から 1 つ下の階へ移る所の種類（表と裏で同じ。始まりの升目はいつも階段室） */
+export function connectorKind(world: number, upperDepth: number, cx: number, cz: number, t: Tuning): ConnectorKind {
+  if (cx === START_SLOT[0] && cz === START_SLOT[1] && upperDepth < 0) return 'stairs';
+  return new Rng(hashAll(world, 'connector', upperDepth, cx, cz)).chance(t['world.connector.lift']) ? 'lift' : 'stairs';
 }
 
-export const airlockId = (upperDepth: number, bx: number, bz: number): string => `air:${upperDepth}:${bx}:${bz}`;
+export const airlockId = (upperDepth: number, cx: number, cz: number): string => `air:${upperDepth}:${cx}:${cz}`;
+export const landingId = (depth: number, cx: number, cz: number): string => `land:${depth}:${cx}:${cz}`;
 
-/** 深さ depth の超ブロック (bx, bz) の、隠しの穴から落ちてくる人が着く部屋の升目（表と裏で同じ） */
-export function landingSlot(world: number, depth: number, bx: number, bz: number): [number, number] {
-  const h = hashAll(world, 'land', depth, bx, bz);
-  return [bx * 2 + (h & 1), bz * 2 + ((h >> 1) & 1)];
-}
-export const landingId = (depth: number, bx: number, bz: number): string => `land:${depth}:${bx}:${bz}`;
-
-/** 階段室の id → 上の深さ・超ブロック */
-export function parseAirlockId(id: string): { depth: number; bx: number; bz: number } | null {
+/** 移る所の id → 上の深さ・升目 */
+export function parseAirlockId(id: string): { depth: number; cx: number; cz: number } | null {
   const m = /^air:(-?\d+):(-?\d+):(-?\d+)$/.exec(id);
-  return m ? { depth: Number(m[1]), bx: Number(m[2]), bz: Number(m[3]) } : null;
+  return m ? { depth: Number(m[1]), cx: Number(m[2]), cz: Number(m[3]) } : null;
 }
 
-const inBox = (b: SlotBox, cx: number, cz: number): boolean => cx >= b.cx && cx < b.cx + b.w && cz >= b.cz && cz < b.cz + b.h;
+/** 階の座標 (x, z) の升目 */
+export const slotOf = (x: number, z: number, t: Tuning): [number, number] => [Math.floor(x / t['world.slotM']), Math.floor(z / t['world.slotM'])];
+
 
 /** 町の系統（3 × 3 升目ごと。表と裏で同じ） */
 export function wardFamily(world: number, depth: number, cx: number, cz: number, t: Tuning): string {
@@ -162,16 +163,18 @@ export function planRegion(story: StoryKey, cx: number, cz: number, t: Tuning): 
   const rect: Rect = { x0: slots.cx * L, x1: (slots.cx + slots.w) * L, z0: slots.cz * L, z1: (slots.cz + slots.h) * L };
   const kind = regionKind(world, depth, slots, t);
   const gates = gatesOf(story, slots, id, kind, t);
-  // 階段室: 区域はかならず 1 つの超ブロックの中にある
-  const bx = fdiv(slots.cx, 2), bz = fdiv(slots.cz, 2);
+  // 上下の階へ移る所（升目ごとに、下りが 1 つと、上の階から着く所が 1 つ）と、上の階から落ちてくる人が着く部屋（升目ごとに 1 つ）。
+  // いちばん上の階の上から着く所は、始まりの升目だけ（上の扉に錠）
   const airlocks: AirlockEnd[] = [];
-  const dn = downSlot(world, depth, bx, bz);
-  if (inBox(slots, dn[0], dn[1])) airlocks.push({ id: airlockId(depth, bx, bz), role: 'down', slot: dn, to: { world, depth: depth + 1, variant: 0 } });
-  const up = downSlot(world, depth - 1, bx, bz);
-  if (inBox(slots, up[0], up[1])) airlocks.push({ id: airlockId(depth - 1, bx, bz), role: 'up', slot: up, to: depth >= 1 ? { world, depth: depth - 1, variant: 0 } : null });
   const landings: LandingEnd[] = [];
-  const ls = landingSlot(world, depth, bx, bz);
-  if (inBox(slots, ls[0], ls[1])) landings.push({ id: landingId(depth, bx, bz), slot: ls });
+  for (let i = 0; i < slots.w; i++) for (let j = 0; j < slots.h; j++) {
+    const sx = slots.cx + i, sz = slots.cz + j;
+    airlocks.push({ id: airlockId(depth, sx, sz), kind: connectorKind(world, depth, sx, sz, t), role: 'down', slot: [sx, sz], to: { world, depth: depth + 1, variant: 0 } });
+    if (depth >= 1 || (sx === START_SLOT[0] && sz === START_SLOT[1])) {
+      airlocks.push({ id: airlockId(depth - 1, sx, sz), kind: depth >= 1 ? connectorKind(world, depth - 1, sx, sz, t) : 'stairs', role: 'up', slot: [sx, sz], to: depth >= 1 ? { world, depth: depth - 1, variant: 0 } : null });
+    }
+    landings.push({ id: landingId(depth, sx, sz), slot: [sx, sz] });
+  }
   return { story, id, slots, rect, kind, seed: hashAll(world, 'region', depth, slots.cx, slots.cz), ward: wardFamily(world, depth, slots.cx, slots.cz, t), gates, airlocks, landings };
 }
 

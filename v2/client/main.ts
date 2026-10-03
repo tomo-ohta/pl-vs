@@ -28,7 +28,7 @@ import { ClientGame } from './game/ClientGame.ts';
 import { IS_MOBILE } from './device.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
-import { downSlot, WorldPlanner } from '../core/gen/world/plan.ts';
+import { START_SLOT, WorldPlanner } from '../core/gen/world/plan.ts';
 import { WorldSession } from '../core/stream/session.ts';
 import { WorkerSource } from './world/WorkerSource.ts';
 import { restoreRegionCarry, saveRegionCarry, watchRegionCarry } from './game/carryStore.ts';
@@ -186,12 +186,12 @@ if (worldMode) {
   const source = new WorkerSource(tuning, { dress: !params.has('nodress') });
   const planner = new WorldPlanner(tuning);
   const story = { world: seed, depth, variant: 0 };
-  const [sx, sz] = downSlot(seed, depth - 1, 0, 0);
+  const [sx, sz] = START_SLOT;
   await source.prefetch(planner.at(story, sx, sz));
   // 置いた物が残る（I09）: 区域ごとに保存する（区域を入れた直後に戻し、外す直前と置くたびに書く）
   const carryKey = (story: { depth: number; variant: number }, rid: string): string => `${seed}:${story.depth}.${story.variant}:${rid}:${tuningVersion(tuning)}`;
   const session = new WorldSession(seed, depth, {
-    tuning, source, physics: () => new PhysicsWorld(R, 1 / tuning['physics.tickHz']), ready: (w) => game.storyReady(w),
+    tuning, source, physics: () => new PhysicsWorld(R, 1 / tuning['physics.tickHz']), ready: (w, id) => game.regionReady(w, id),
     regionAdded: (w, id, L) => restoreRegionCarry(w.sim, L, carryKey(w.story, id)),
     regionRemoving: (w, id, L) => saveRegionCarry(w.sim, L, carryKey(w.story, id)),
   });

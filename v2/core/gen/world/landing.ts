@@ -1,5 +1,5 @@
 /**
- * 隠しの穴から落ちてくる人が着く部屋（docs/endless-world.md 13 章）: 超ブロックごとに 1 つ（plan.ts の landingSlot）。
+ * 上の階から落ちてくる人が着く部屋（docs/endless-world.md 13・14 章）: 升目ごとに 1 つ（plan.ts）。
  * 部屋の天井の真ん中に穴を開け、その上に暗い縦穴（world.hole.shaftM）を立てる。隠しの穴の縦穴（secrets/index.ts）と同じ大きさ。
  * 落ちる人は、隠しの穴の縦穴の途中（world.hole.transferM の深さ）で、この縦穴の同じ所へ移り（WorldSession）、天井の穴から部屋へ落ちる。
  *
@@ -8,9 +8,11 @@
  * - 天井の照明のうち、穴に掛かる物は外す
  */
 import type { Tuning } from '../../config/tuning.ts';
+import { hashAll, Rng } from '../../math/rng.ts';
 import type { Rect } from '../../world/footprint.ts';
 import { box, type RegionLandingCell } from '../../world/layout.ts';
 import { GenError, snap, type GeoBuild, type Placed } from '../floor/geometry.ts';
+import { dropShaft, lowerBounds, storyBelow } from './drop.ts';
 
 const overlaps = (a: Rect, b: Rect): boolean => a.x0 < b.x1 - 0.05 && a.x1 > b.x0 + 0.05 && a.z0 < b.z1 - 0.05 && a.z1 > b.z0 + 0.05;
 
@@ -18,7 +20,7 @@ const overlaps = (a: Rect, b: Rect): boolean => a.x0 < b.x1 - 0.05 && a.x1 > b.x
 export function placeLanding(g: GeoBuild, hosts: readonly Placed[], t: Tuning): RegionLandingCell[] {
   const reg = g.p.region;
   if (!reg?.landings?.length) return [];
-  const half = t['world.hole.sizeM'] / 2;
+  const half = t['world.landing.sizeM'] / 2;
   const shaftM = t['world.hole.shaftM'];
   const out: RegionLandingCell[] = [];
   const all = [...new Set([...g.cellsToBuild, ...hosts])];
@@ -62,7 +64,83 @@ export function placeLanding(g: GeoBuild, hosts: readonly Placed[], t: Tuning): 
     g.keep(pl.cellId, { min: [x - half - 0.6, y0, z - half - 0.6], max: [x + half + 0.6, ceil, z + half + 0.6] });
     g.reserved.add(pl.cellId);
     g.fixedSize.add(pl.cellId);
-    out.push({ id: ld.id, cell: pl.cellId, anchor: [x, ceil + shaftM, z], zone: { min: [x - half, ceil - 0.2, z - half], max: [x + half, ceil + shaftM, z + half] } });
+    // 沈む床で降りてくる人を乗せる床板（縦穴のいちばん上で待つ）
+    const ph = half - 0.12;
+    const lift = `${pl.cellId}:landLift`;
+    g.out.entities.push({ id: lift, type: 'dropLift', cell: pl.cellId, params: { box: { min: [x - ph, ceil + shaftM - 0.2, z - ph], max: [x + ph, ceil + shaftM, z + ph] }, floorY: y0 + 0.02, speed: t['world.hole.liftSpeed'], idleSec: 4, mat: 'metal' } });
+    out.push({ id: ld.id, cell: pl.cellId, anchor: [x, ceil + shaftM, z], zone: { min: [x - half, ceil - 0.2, z - half], max: [x + half, ceil + shaftM, z + half] }, lift });
   }
   return out;
 }
+
+/**
+ * 床の穴（v1 の Hole。14 章）: 部屋の床に開いた穴。落ちると 1 つ下の階の同じ升目の着く部屋へ（暗い縦穴の途中で入れ替える）。
+ * 升目ごとに world.hole.open の確率で 1 つ（もう 1 つは world.hole.open2）。部屋か広間の、壁と開口から離れた所。穴の縁に暗い枠と、
+ * 欠けた床の破片。仕掛け・異変は置かない（穴の部屋そのものが見どころ）
+ */
+export function placeOpenHoles(g: GeoBuild, hosts: readonly Placed[], t: Tuning): void {
+  const reg = g.p.region;
+  if (!reg) return;
+  const size = t['world.hole.openSizeM'], half = size / 2;
+  const all = [...new Set([...g.cellsToBuild, ...hosts])];
+  const r = new Rng(hashAll(g.p.seed, 'openHoles'));
+  const slots: [number, number][] = [];
+  for (let i = 0; i * reg.slotM < reg.rect.x1 - reg.rect.x0 - 1; i++) for (let j = 0; j * reg.slotM < reg.rect.z1 - reg.rect.z0 - 1; j++) slots.push([Math.round(reg.rect.x0 / reg.slotM) + i, Math.round(reg.rect.z0 / reg.slotM) + j]);
+  let n = 0;
+  for (const slot of slots) {
+    const want = Number(r.chance(t['world.hole.open'])) + Number(r.chance(t['world.hole.open2']));
+    for (let k = 0; k < want; k++) {
+      const cands = r.shuffle(hosts.filter((pl) => {
+        if ((pl.kind !== 'room' && pl.kind !== 'hall') || pl.node.story !== 0 || g.reserved.has(pl.cellId) || g.fixedSize.has(pl.cellId)) return false;
+        const cx = (pl.rect.x0 + pl.rect.x1) / 2, cz = (pl.rect.z0 + pl.rect.z1) / 2;
+        if (cx < slot[0] * reg.slotM || cx >= (slot[0] + 1) * reg.slotM || cz < slot[1] * reg.slotM || cz >= (slot[1] + 1) * reg.slotM) return false;
+        const rects = pl.rects ?? [pl.rect];
+        // 下に別の区画（下の階・下がった床）が重なる部屋は使わない
+        return !all.some((o) => o !== pl && o.y < pl.y - 0.05 && (o.rects ?? [o.rect]).some((q) => rects.some((w) => overlaps(q, w))));
+      }));
+      for (const pl of cands) {
+        const big = (pl.rects ?? [pl.rect]).reduce((a, b) => ((b.x1 - b.x0) * (b.z1 - b.z0) > (a.x1 - a.x0) * (a.z1 - a.z0) ? b : a));
+        if ((big.x1 - big.x0) * (big.z1 - big.z0) < 30 || Math.min(big.x1 - big.x0, big.z1 - big.z0) < size + 3.2) continue;
+        const ops = g.openings.get(pl.cellId) ?? [];
+        const m = half + 1.6;
+        let spot: [number, number] | null = null;
+        for (let tries = 0; tries < 12 && !spot; tries++) {
+          const x = snap(r.float(big.x0 + m, big.x1 - m)), z = snap(r.float(big.z0 + m, big.z1 - m));
+          if (ops.every((o) => Math.hypot(o.pos[0] - x, o.pos[2] - z) > half + 2.4)) spot = [x, z];
+        }
+        if (!spot) continue;
+        const [x, z] = spot;
+        const hole: Rect = { x0: x - half, x1: x + half, z0: z - half, z1: z + half };
+        const y = pl.y;
+        pl.opts = { ...(pl.opts ?? {}), floorHoles: [...(pl.opts?.floorHoles ?? []), { min: [hole.x0, y - 0.3, hole.z0], max: [hole.x1, y + 0.05, hole.z1] }] };
+        const ds = dropShaft(`${pl.cellId}:hole${n}`, hole, y, y - 0.25, storyBelow(g.p.key.depth, g.p.key.variant), t);
+        n++;
+        const rim = r.pick(['metalDark', 'floorConcrete', 'wallDark'] as const);
+        (pl.post ??= []).push((cell) => {
+          // 穴の縁（床の厚みの切り口）と、欠けた床の破片
+          cell.boxes.push(
+            box([hole.x0 - 0.06, y - 0.25, hole.z0 - 0.06], [hole.x1 + 0.06, y + 0.01, hole.z0], rim),
+            box([hole.x0 - 0.06, y - 0.25, hole.z1], [hole.x1 + 0.06, y + 0.01, hole.z1 + 0.06], rim),
+            box([hole.x0 - 0.06, y - 0.25, hole.z0], [hole.x0, y + 0.01, hole.z1], rim),
+            box([hole.x1, y - 0.25, hole.z0], [hole.x1 + 0.06, y + 0.01, hole.z1], rim),
+            box([hole.x0, y - 0.25, hole.z0], [hole.x1, y - 0.24, hole.z1], 'void', false),
+          );
+          cell.boxes.push(...ds.boxes.map((b) => ({ ...b, min: [b.min[0], b.min[1], b.min[2]] as [number, number, number], max: [b.max[0], Math.min(b.max[1], y - 0.25), b.max[2]] as [number, number, number] })));
+          for (let i = 0; i < 4; i++) {
+            const a = r.float(0, Math.PI * 2), d = half + r.float(0.15, 0.7), s = r.float(0.08, 0.22);
+            const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+            cell.boxes.push(box([px - s, y, pz - s], [px + s, y + r.float(0.02, 0.06), pz + s], cell.palette.floor, false));
+          }
+          lowerBounds(cell, ds.minY);
+        });
+        g.out.exits.push(ds.exit);
+        g.keep(pl.cellId, { min: [hole.x0 - 0.7, y - 0.3, hole.z0 - 0.7], max: [hole.x1 + 0.7, y + pl.height, hole.z1 + 0.7] });
+        g.reserved.add(pl.cellId);
+        g.fixedSize.add(pl.cellId);
+        break;
+      }
+    }
+  }
+  void GenError;
+}
+

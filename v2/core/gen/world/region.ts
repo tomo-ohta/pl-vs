@@ -28,7 +28,7 @@ export function regionContext(plan: RegionPlan, t: Tuning): RegionContext {
   return {
     id: plan.id, kind: plan.kind, rect: { ...plan.rect }, margin: t['world.marginM'], slotM: t['world.slotM'],
     gates: plan.gates.map((g) => ({ id: g.id, side: g.side, line: g.line, at: g.at })),
-    airlocks: plan.airlocks.map((a) => ({ id: a.id, role: a.role, slot: [a.slot[0], a.slot[1]], to: a.to ? storyId(a.to) : null })),
+    airlocks: plan.airlocks.map((a) => ({ id: a.id, kind: a.kind, role: a.role, slot: [a.slot[0], a.slot[1]], to: a.to ? storyId(a.to) : null })),
     landings: (plan.landings ?? []).map((l) => ({ id: l.id, slot: [l.slot[0], l.slot[1]] })),
   };
 }

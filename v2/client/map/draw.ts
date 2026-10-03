@@ -51,7 +51,7 @@ export interface DrawCell {
 }
 
 export interface DrawDoor { x: number; z: number; dir: number; width: number; kind: 'door' | 'opening' | 'secret' | 'open' }
-export interface DrawMark { x: number; z: number; kind: 'here' | 'exit' | 'note' | 'x' | 'blank' | 'landmark' | 'stairs'; text?: string; color?: string }
+export interface DrawMark { x: number; z: number; kind: 'here' | 'exit' | 'up' | 'note' | 'x' | 'blank' | 'landmark' | 'stairs'; text?: string; color?: string }
 export interface DrawGhost { rects: Rect[][]; marks: DrawMark[]; trail: number[]; color: string }
 
 export interface DrawInput {
@@ -94,28 +94,28 @@ export interface DrawResult { scale: number; toPx(x: number, z: number): [number
 
 interface Palette {
   bg: string; visited: string; seen: string; current: string; secret: string; edge: string; edgeCurrent: string; shade: string;
-  door: string; open: string; trail: string; text: string; blank: string; blankHatch: string; exit: string; landmark: string; player: string;
+  door: string; open: string; trail: string; text: string; blank: string; blankHatch: string; exit: string; up: string; landmark: string; player: string;
 }
 const PALETTES: Record<DrawStyle, Palette> = {
   hud: {
     bg: 'rgba(10,12,18,0.62)', visited: '#4a5263', seen: '#2c313c', current: '#6d7790', secret: '#6b4f8a', edge: 'rgba(230,232,238,0.35)', edgeCurrent: '#ffffff',
     shade: 'rgba(5,6,10,0.45)', door: '#cfd6e4', open: '#ffe28a', trail: 'rgba(242,193,78,0.85)', text: '#e6e8ee', blank: '#f1eee4', blankHatch: 'rgba(120,110,90,0.35)',
-    exit: '#7dffa6', landmark: '#ff6a5a', player: '#f2c14e',
+    exit: '#7dffa6', up: '#7fd8ff', landmark: '#ff6a5a', player: '#f2c14e',
   },
   panel: {
     bg: '#07080c', visited: '#505a6e', seen: '#2a2f3a', current: '#7a86a2', secret: '#7a5aa0', edge: 'rgba(236,233,224,0.4)', edgeCurrent: '#ffffff',
     shade: 'rgba(4,5,8,0.5)', door: '#cfd6e4', open: '#ffe28a', trail: 'rgba(242,193,78,0.8)', text: '#ece9e0', blank: '#f1eee4', blankHatch: 'rgba(120,110,90,0.35)',
-    exit: '#7dffa6', landmark: '#ff6a5a', player: '#f2c14e',
+    exit: '#7dffa6', up: '#7fd8ff', landmark: '#ff6a5a', player: '#f2c14e',
   },
   sign: {
     bg: '#e9e6dc', visited: '#bfc6cf', seen: '#bfc6cf', current: '#bfc6cf', secret: '#bfc6cf', edge: '#2b3340', edgeCurrent: '#2b3340',
     shade: 'rgba(0,0,0,0)', door: '#2b3340', open: '#2b3340', trail: '#c0392b', text: '#1d232c', blank: '#ffffff', blankHatch: 'rgba(0,0,0,0.08)',
-    exit: '#1f8f4e', landmark: '#c0392b', player: '#d0021b',
+    exit: '#1f8f4e', up: '#1f5f8f', landmark: '#c0392b', player: '#d0021b',
   },
   paper: {
     bg: '#efe7d2', visited: 'rgba(80,70,55,0.12)', seen: 'rgba(80,70,55,0.12)', current: 'rgba(80,70,55,0.12)', secret: 'rgba(80,70,55,0.12)', edge: 'rgba(60,50,40,0.75)', edgeCurrent: 'rgba(60,50,40,0.75)',
     shade: 'rgba(0,0,0,0)', door: 'rgba(60,50,40,0.75)', open: 'rgba(60,50,40,0.75)', trail: 'rgba(170,40,30,0.7)', text: '#3a2f25', blank: '#fffdf6', blankHatch: 'rgba(0,0,0,0.06)',
-    exit: '#a8281e', landmark: '#a8281e', player: '#a8281e',
+    exit: '#a8281e', up: '#a8281e', landmark: '#a8281e', player: '#a8281e',
   },
 };
 
@@ -321,7 +321,7 @@ export function drawMap(ctx: Ctx2D, input: DrawInput, view: DrawView): DrawResul
 }
 
 function drawMark(ctx: Ctx2D, m: DrawMark, [x, y]: [number, number], P: Palette, scale: number, dpr: number, rot: number, time: number): void {
-  const color = m.color ?? (m.kind === 'exit' ? P.exit : m.kind === 'landmark' ? P.landmark : P.text);
+  const color = m.color ?? (m.kind === 'exit' ? P.exit : m.kind === 'up' ? P.up : m.kind === 'landmark' ? P.landmark : P.text);
   const s = Math.max(4 * dpr, scale * 0.4);
   ctx.save();
   ctx.translate(x, y);
@@ -345,6 +345,16 @@ function drawMark(ctx: Ctx2D, m: DrawMark, [x, y]: [number, number], P: Palette,
       ctx.moveTo(-s, -s * 0.6);
       ctx.lineTo(s, -s * 0.6);
       ctx.lineTo(0, s * 0.8);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'up': {
+      // 上の階へ: 上向きの三角
+      ctx.beginPath();
+      ctx.moveTo(-s, s * 0.6);
+      ctx.lineTo(s, s * 0.6);
+      ctx.lineTo(0, -s * 0.8);
       ctx.closePath();
       ctx.fill();
       break;

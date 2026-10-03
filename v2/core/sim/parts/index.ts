@@ -17,3 +17,5 @@ import './warp/index.ts';
 import './structure/index.ts';
 import './rooms/index.ts';
 import './map/index.ts';
+// 果てしない階の移る所（エレベーター・案内板・着く部屋の床板）
+import './world.ts';

@@ -308,10 +308,16 @@ export class ClientGame {
     }
   }
 
-  /** 向こうの階を見せられるか（区域を全部作り終えた。session の ready） */
+  /** 向こうの階を見せられるか（区域を全部作り終えた） */
   storyReady(w: StoryWorld): boolean {
     const v = this.beyondViews.get(w);
     return !!v && v.allReady() && w.regions.every((r) => v.regionReady(r.plan.id));
+  }
+
+  /** 向こうの階の区域を見せられるか（session の ready。移る先の区域だけ作り終えていればよい） */
+  regionReady(w: StoryWorld, id: string): boolean {
+    const v = this.beyondViews.get(w) ?? (this.story?.world === w ? this.story : null);
+    return !!v && v.regionReady(id);
   }
 
   /** 階を移った: 描画を入れ替え、カメラを同じだけずらす（同じ形の階段室の中なので見た目は変わらない） */

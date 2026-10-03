@@ -17,8 +17,8 @@ import { opening } from '../../../world/build.ts';
 import type { Rect } from '../../../world/footprint.ts';
 import { DOOR_H, DOOR_W, WALL_T, type RegionAirlockCell, type RegionGateCell } from '../../../world/layout.ts';
 import { themePalette } from '../../../world/palettes.ts';
-import { airlockAnchor, airlockShape, placeAirlock } from '../../world/airlock.ts';
-import { placeLanding } from '../../world/landing.ts';
+import { airlockAnchor, airlockShape, airlockSpawn, hostFront, placeAirlock } from '../../world/airlock.ts';
+import { placeLanding, placeOpenHoles } from '../../world/landing.ts';
 import { GenError, GeoBuild, snap, type FloorGeometry, type Placed } from '../geometry.ts';
 import { rarityRank, type FloorProfile } from '../profile.ts';
 import type { SkelNode } from '../skeleton.ts';
@@ -134,7 +134,7 @@ export function buildPatchwork(p: FloorProfile, rng: Rng, t: Tuning): FloorGeome
   const carved: { leaf: Leaf; module: Rect; door: Vec3; side: Dir; aIndex: number }[] = [];
   const ar = rng.fork('airlocks');
   reg.airlocks.forEach((a, ai) => {
-    const shape = airlockShape(a.id, t);
+    const shape = airlockShape(a.id, t, a.kind);
     const W = shape.width, L = shape.length;
     const sc = [(a.slot[0] + 0.5) * reg.slotM, (a.slot[1] + 0.5) * reg.slotM];
     const inSlot = (lf: Leaf): boolean => { const r = lf.rects[0]!; return sc[0]! >= r.x0 - reg.slotM / 2 && sc[0]! <= r.x1 + reg.slotM / 2 && sc[1]! >= r.z0 - reg.slotM / 2 && sc[1]! <= r.z1 + reg.slotM / 2; };
@@ -282,18 +282,19 @@ export function buildPatchwork(p: FloorProfile, rng: Rng, t: Tuning): FloorGeome
   for (const c of carved) {
     const a = reg.airlocks[c.aIndex]!;
     const host = placedOf.get(c.leaf)!;
-    const shape = airlockShape(a.id, t);
+    const shape = airlockShape(a.id, t, a.kind);
     const anchor = airlockAnchor(a.role, c.door, c.side, shape);
     const cellId = `air${c.aIndex}`;
-    const pa = placeAirlock(a.id, a.role, cellId, host.cellId, anchor, shape, a.to, t['world.airlock.closeSec']);
+    const pa = placeAirlock(a.id, a.role, cellId, host.cellId, anchor, shape, a.to, t['world.airlock.closeSec'], t);
     g.addOpening(host.cellId, pa.hostOpening);
     g.out.portals.push(pa.portal);
-    g.out.entities.push(...pa.entities);
+    g.out.entities.push(...pa.entities, ...pa.hostEntities);
+    g.keep(host.cellId, hostFront(pa.hostOpening));
     if (pa.exit) g.out.exits.push(pa.exit);
     g.finishers.push((gb) => gb.out.cells.push({ cell: pa.cell, kind: 'stairs', openings: pa.openings, node: -1 }));
     sealed.add(cellId);
     g.reserved.add(cellId);
-    airlocks.push({ id: a.id, role: a.role, cell: cellId, anchor: pa.anchor, live: pa.live, sealed: pa.sealed, to: a.to });
+    airlocks.push({ id: a.id, kind: a.kind, role: a.role, cell: cellId, anchor: pa.anchor, live: pa.live, sealed: pa.sealed, to: a.to, ...(pa.car ? { car: pa.car } : {}) });
   }
 
   // ---------------------------------------------------------------- 境目の扉（区域の辺の上の部屋の壁に直接）
@@ -312,12 +313,9 @@ export function buildPatchwork(p: FloorProfile, rng: Rng, t: Tuning): FloorGeome
   });
 
   // ---------------------------------------------------------------- 出てくる位置
-  const up = airlocks.find((a) => a.role === 'up');
-  if (up) {
-    const q = up.anchor.q;
-    const lp = rotQ([0, 0.02, WALL_T + 0.7], q), f = rotQ([0, 0, 1], q);
-    g.out.spawn = { pos: [snap(lp[0] + up.anchor.offset[0]), up.anchor.offset[1] + 0.02, snap(lp[2] + up.anchor.offset[2])], yaw: Math.atan2(-f[0], -f[2]), cell: up.cell };
-  } else if (gates.length) {
+  const up = airlocks.find((a) => a.role === 'up' && a.kind !== 'lift') ?? airlocks.find((a) => a.role === 'up');
+  if (up) g.out.spawn = airlockSpawn(up, t);
+  else if (gates.length) {
     const o = gates[0]!.opening, v = rotQ([0, 0, 1], o.dir);
     g.out.spawn = { pos: [snap(o.pos[0] - v[0] * 1.2), 0.02, snap(o.pos[2] - v[2] * 1.2)], yaw: Math.atan2(v[0], v[2]), cell: gates[0]!.cell };
   } else {
@@ -327,6 +325,7 @@ export function buildPatchwork(p: FloorProfile, rng: Rng, t: Tuning): FloorGeome
   const down = airlocks.find((a) => a.role === 'down');
   // 隠しの穴から落ちてくる人が着く部屋（天井の穴と縦穴）
   const landings = placeLanding(g, rooms, t);
+  placeOpenHoles(g, rooms, t);
   const out = g.finish(null);
   if (down) out.mainTo = down.cell;
   out.region = { gates, airlocks, ...(landings.length ? { landings } : {}) };

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultTuning } from '../core/config/tuning.ts';
-import { downSlot, planRegion, regionSlots, WorldPlanner, type RegionPlan, type StoryKey } from '../core/gen/world/plan.ts';
+import { planRegion, regionSlots, WorldPlanner, type RegionPlan, type StoryKey } from '../core/gen/world/plan.ts';
 
 const t = defaultTuning();
 const N = 16;
@@ -66,8 +66,9 @@ test('境目の扉は両側の区域で同じ id・同じ位置・逆の向き�
   }
 });
 
-test('階段室: 超ブロックごとに下りが 1 つ。下の階の同じ升目の区域に着き、そこから同じ超ブロックの下りは別の升目', () => {
+test('上下の階へ移る所: 升目ごとに下りが 1 つ（階段室かエレベーター）。下の階の同じ升目に着き、どの区域にも下りと上りがある', () => {
   const world = 9;
+  const kinds = new Map<string, number>();
   for (const depth of [0, 1, 2, 6]) {
     const upper = regionsIn({ world, depth, variant: 0 });
     const lower = regionsIn({ world, depth: depth + 1, variant: 0 });
@@ -76,25 +77,27 @@ test('階段室: 超ブロックごとに下りが 1 つ。下の階の同じ升
       assert.ok(!downs.has(a.id), `${a.id} が 2 つ`);
       downs.set(a.id, p);
       assert.deepEqual(a.to, { world, depth: depth + 1, variant: 0 });
+      kinds.set(a.kind, (kinds.get(a.kind) ?? 0) + 1);
     }
-    // 範囲の中の超ブロックの数だけ
-    assert.equal(downs.size, (N / 2) * (N / 2));
+    // 範囲の中の升目の数だけ
+    assert.equal(downs.size, N * N);
+    for (const p of upper.values()) assert.equal(p.airlocks.filter((a) => a.role === 'down').length, p.slots.w * p.slots.h, `${p.id} の下り`);
+    for (const p of lower.values()) assert.equal(p.landings.length, p.slots.w * p.slots.h, `${p.id} の着く部屋`);
     for (const [id, p] of downs) {
       const a = p.airlocks.find((x) => x.id === id)!;
       const below = lower.get(planRegion({ world, depth: depth + 1, variant: 0 }, a.slot[0], a.slot[1], t).id)!;
       const up = below.airlocks.find((x) => x.id === id);
       assert.ok(up && up.role === 'up', `${id} が下の階に着かない`);
       assert.deepEqual(up.slot, a.slot);
+      assert.equal(up.kind, a.kind, '上と下で同じ種類');
       assert.deepEqual(up.to, { world, depth, variant: 0 });
-      // 下の階のその超ブロックの下りは別の升目
-      const bx = Math.floor(a.slot[0] / 2), bz = Math.floor(a.slot[1] / 2);
-      assert.notDeepEqual(downSlot(world, depth + 1, bx, bz), a.slot);
     }
   }
-  // いちばん上の階に着く階段室は、上の扉が開かない
+  assert.ok((kinds.get('stairs') ?? 0) > 0 && (kinds.get('lift') ?? 0) > 0, `種類 ${[...kinds]}`);
+  // いちばん上の階に着く階段室は始まりの升目だけで、上の扉が開かない
   const top = regionsIn({ world, depth: 0, variant: 0 });
   const ups = [...top.values()].flatMap((p) => p.airlocks.filter((a) => a.role === 'up'));
-  assert.ok(ups.length > 0 && ups.every((a) => a.to === null));
+  assert.ok(ups.length === 1 && ups[0]!.to === null && ups[0]!.kind === 'stairs');
 });
 
 test('計画は歩いた順・裏表に左右されない（覚え書きを使っても同じ）', () => {

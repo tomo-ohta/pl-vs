@@ -87,7 +87,7 @@ export function sceneOfMap(map: FloorMap, o: MapSceneOptions = {}): DrawInput {
     doors.push({ x: p.x, z: p.z, dir: p.dir, width: p.width, kind: p.secret ? 'secret' : p.kind === 'opening' ? 'opening' : open ? 'open' : 'door' });
   }
   const marks: DrawMark[] = [];
-  for (const x of info.exits) if (x.cell && map.drawn(x.cell) && info.byId.get(x.cell)?.layer === layer) marks.push({ x: x.x, z: x.z, kind: 'exit' });
+  for (const x of info.exits) if (x.cell && map.drawn(x.cell) && info.byId.get(x.cell)?.layer === layer) marks.push({ x: x.x, z: x.z, kind: x.up ? 'up' : 'exit', ...(x.label ? { text: x.label } : {}) });
   for (const l of info.landmarks) if (map.drawn(l.cell)) marks.push({ x: l.x, z: l.z, kind: 'landmark', text: l.name });
   // 区画の地図の名前（CellLayout.map.label）
   for (const c of info.cells) {

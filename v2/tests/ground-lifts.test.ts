@@ -13,7 +13,7 @@ import { disposeSim, entitiesOf, idle, labRooms, mainPathFloors, newSim, press, 
 const center = (b: { min: number[]; max: number[] }): [number, number, number] => [(b.min[0]! + b.max[0]!) / 2, b.max[1]!, (b.min[2]! + b.max[2]!) / 2];
 const hintOf = (floor: Parameters<typeof entitiesOf>[0]): BotHint => entitiesOf(floor, 'constant').find((e) => e.params.bot)!.params.bot as unknown as BotHint;
 
-test('沈む床: 止まって立つと沈み、底で止まっていると下のフロアへ。歩くと戻る・通り抜ける人は沈まない', async () => {
+test('沈む床: 止まって立つと沈み、深く沈むと戻らずに暗い縦穴を下りる（1 つ下の階へ）。浅いうちは歩くと戻る・通り抜ける人は沈まない', async () => {
   const rooms = labRooms('sinkFloor', { exit: 'opposite', sizes: [{ w: 6.0, d: 7.0 }] });
   assert.ok(rooms.length >= 6, `${rooms.length}`);
   for (const room of rooms) {
@@ -22,18 +22,21 @@ test('沈む床: 止まって立つと沈み、底で止まっていると下の
     const sim = await newSim(room.floor);
     sim.teleport(0, [top[0], 0.02, top[2]], 0);
     idle(sim, 3);
-    assert.ok(sim.outputOf(lift.id, 't') > 0.2, `${room.tag}: 沈む`);
+    // 沈んだ深さ（m）
+    const sunk = (): number => sim.outputOf(lift.id, 't') * Math.abs(Number(lift.params.travel));
+    assert.ok(sunk() > 0.5, `${room.tag}: 沈む`);
     // 歩き回ると戻る
     for (let i = 0; i < 4; i++) { runTo(sim, [top[0] + 0.5, 0, top[2]], { maxSec: 0.6, stopAt: 0.05 }); runTo(sim, [top[0] - 0.5, 0, top[2]], { maxSec: 0.6, stopAt: 0.05 }); }
-    const t1 = sim.outputOf(lift.id, 't');
-    assert.ok(t1 < 0.2, `${room.tag}: 歩くと戻る（t=${t1.toFixed(2)}）`);
+    assert.ok(sunk() < 0.3, `${room.tag}: 歩くと戻る（${sunk().toFixed(2)} m）`);
     sim.teleport(0, [top[0], sim.players[0]!.pos[1] + 0.02, top[2]], 0);
-    // 底まで沈んで止まっている → floor.goto
-    sim.drainEvents();
-    idle(sim, T['ground.sink.depthM'] / T['ground.sink.speed'] + T['ground.sink.gotoSec'] + 2);
-    const go = sim.drainEvents().filter((e) => e.type === 'cue' && e.data?.name === 'floor.goto');
-    assert.equal(go.length, 1, `${room.tag}: 下のフロアへ`);
-    assert.ok(sim.players[0]!.pos[1] < -T['ground.sink.depthM'] + 0.1, `${room.tag}: 底`);
+    // 1.2 m より深く沈んだら、もう戻らない（暗い縦穴を下りて 1 つ下の階へ。14 章。階を移るのは WorldSession）
+    idle(sim, 1.2 / T['ground.sink.speed'] + 1.5);
+    const t2 = sim.outputOf(lift.id, 't');
+    for (let i = 0; i < 3; i++) { runTo(sim, [top[0] + 0.4, 0, top[2]], { maxSec: 0.4, stopAt: 0.05 }); runTo(sim, [top[0] - 0.4, 0, top[2]], { maxSec: 0.4, stopAt: 0.05 }); }
+    assert.ok(sim.outputOf(lift.id, 't') > t2, `${room.tag}: 深く沈んだら歩いても戻らない`);
+    assert.ok(sim.players[0]!.pos[1] < -2, `${room.tag}: 縦穴を下りていく`);
+    const ex = room.floor.exits.find((x) => x.shaft?.lift === lift.id);
+    assert.ok(ex && ex.to, `${room.tag}: 落ちる所（1 つ下の階）`);
     disposeSim(sim);
     // 通り抜ける（歩く人）は沈まない
     const s2 = await newSim(room.floor);

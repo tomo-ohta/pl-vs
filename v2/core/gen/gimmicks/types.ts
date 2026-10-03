@@ -12,7 +12,7 @@ import type { AABB } from '../../math/aabb.ts';
 import type { Rng } from '../../math/rng.ts';
 import type { Dir, Vec3 } from '../../math/vec.ts';
 import type { Rect } from '../../world/footprint.ts';
-import type { Box, CellLayout, EntitySpec, PortalSpec, WallOpening, Zone } from '../../world/layout.ts';
+import type { Box, CellLayout, EntitySpec, FloorExit, PortalSpec, WallOpening, Zone } from '../../world/layout.ts';
 import type { DressKind } from '../dress/types.ts';
 import type { Rarity } from '../floor/profile.ts';
 
@@ -81,6 +81,8 @@ export interface GimmickContext {
   cells?(): readonly CellLayout[];
   /** 区画の中身（家具）を置かない（省略は仕掛けの区画）。双子の区画の見た目を揃えるため */
   noDress?(cellId?: string): void;
+  /** フロアの出口を足す（落ちる所の縦穴。14 章）。取り消すと消える */
+  addExit?(x: FloorExit): void;
 }
 
 /** 段階 4（carry）: 手がかりを置ける区画 */
