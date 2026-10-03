@@ -13,11 +13,17 @@ import type { Box, EntitySpec, WallOpening, Zone } from '../../world/layout.ts';
 import { reachOpenings } from '../reach.ts';
 import { attachSecret, THROUGH_DESTS, type AttachOptions, type PlacedSecret, type RareKind, type SecretDest } from '../secrets/index.ts';
 import '../gimmicks/index.ts';
-import { gimmickDefs, type ClueCell, type GimmickContext, type GimmickDef, type GimmickSlot, type SecretMode, type SecretOffer } from '../gimmicks/types.ts';
+import { gimmickDefs, type ClueCell, type GimmickContext, type GimmickAxis, type GimmickDef, type GimmickSlot, type SecretMode, type SecretOffer } from '../gimmicks/types.ts';
 import { frontOf, inward } from '../gimmicks/util.ts';
 import type { Vec3 } from '../../math/vec.ts';
 import type { FloorGeometry, GeoCell } from './geometry.ts';
 import { rarityRank, type FloorProfile } from './profile.ts';
+
+/** 箱の列の写し（取り消し用。箱の中身も写す） */
+const copyBoxes = (boxes: readonly Box[]): Box[] => boxes.map((b) => ({ ...b, min: [...b.min], max: [...b.max] }));
+
+/** 体を動かす仕掛けの軸（行き止まりの部屋では、越えた先に報酬が要る） */
+const ACTION_AXES: readonly GimmickAxis[] = ['move', 'floor', 'body', 'gravity'];
 
 export interface PlacedGimmick { id: string; def: string; cell: string; main: boolean }
 
@@ -196,6 +202,12 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
     const clue = (): ClueCell[] => clueCellsFor(geo, g, slots.slice(0, slots.indexOf(g)), result.gimmicks);
     for (const cand of order) { built = tryBuild(cand, slot, g, geo, r, t, p, depth, clue); if (built) { def = cand; break; } }
     if (!built) continue;
+    // 行き止まりの部屋（開口が 1 つ）の仕掛けは、こなした先に必ず報酬（隠しの扉）: 差し出した隠しの元のうち重いものを必ず付ける。
+    // 体を動かす仕掛けが隠しの元を出さなかったら、行き止まりには組まない（越えた先に何も無い）
+    if (g.openings.length <= 1 && !built.offers.some((o) => o.required)) {
+      if (built.offers.length) built.offers.reduce((a, b) => (b.weight > a.weight ? b : a)).required = true;
+      else if (def.axes.some((a) => ACTION_AXES.includes(a))) { built.restore(); continue; }
+    }
     // 隠しが無いと成り立たない仕掛けは、ここで隠しを付ける（付けられなければ仕掛けごと取り消す）
     const required = built.offers.filter((o) => o.required);
     // 隠しが無いと成り立たない仕掛けが、途中で組むのをやめて隠しの元を出さなかったときは取り消す
@@ -334,7 +346,8 @@ function regionEntriesConnected(geo: FloorGeometry, cell: string, doorsBefore: s
 /** 仕掛けを組む。区画の開口どうしが歩いてつながらなければ取り消して null */
 function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeometry, rng: Rng, t: Tuning, p: FloorProfile, depth: number, clue?: () => ClueCell[]): Built | null {
   const id = `g:${def.id}:${g.cell.id}`;
-  const snapshot = { boxes: g.cell.boxes.slice(), lights: g.cell.lights.map((l) => ({ ...l })), zones: g.cell.zones.slice(), entities: geo.entities.length, doors: JSON.stringify(geo.entities.filter((e) => e.type === 'door')) };
+  // 箱は写しを取る（仕掛けが今ある箱を書き換える: 照明の板を仕掛けの灯りに結ぶ kind など。取り消すときに元へ戻す）
+  const snapshot = { boxes: copyBoxes(g.cell.boxes), lights: g.cell.lights.map((l) => ({ ...l })), zones: g.cell.zones.slice(), entities: geo.entities.length, doors: JSON.stringify(geo.entities.filter((e) => e.type === 'door')) };
   // 穴の仕掛けは区画の外形の下端を下げる（pit.ts の pitShell）ので、取り消すときに戻す
   const boundsMinY = g.cell.bounds.min[1];
   const myKeep: AABB[] = [];
@@ -365,7 +378,7 @@ function tryBuild(def: GimmickDef, slot: GimmickSlot, g: GeoCell, geo: FloorGeom
       addToCell(cellId: string, b: Box): Box {
         const o = geo.cells.find((x) => x.cell.id === cellId);
         if (!o) throw new Error(`区画がありません: ${cellId}`);
-        if (!touched.has(cellId)) touched.set(cellId, { g: o, boxes: o.cell.boxes.slice() });
+        if (!touched.has(cellId)) touched.set(cellId, { g: o, boxes: copyBoxes(o.cell.boxes) });
         o.cell.boxes.push(b);
         added++;
         return b;

@@ -4,14 +4,14 @@
  * 行き止まりの部屋の床ほぼ全部が深い穴（ground.collapse.depthM）の上の床板。普段はただの床で、奥の台の上に光る装置がある。
  * 装置に触れると（E / タップ）警報が鳴って照明が赤くなり、装置の足元から入口へ向かって床が崩れてくる。
  * - 目標: 入口の床まで逃げ切る。崩れの前線の速さは、走れば間に合い・歩くと捕まるように部屋の奥行きから決める（ground.collapse.margin）
- * - 失敗: 穴の底へ落ちる。底の階段で入口の床へ戻れる（閉じ込めない）。しばらくで床板は戻り、また装置に触れられる
+ * - 失敗: 底の見えない穴へ落ちる（14 章）。1 つ下の階へ。しばらくで床板は戻る
  * - 隠し（collapse.deep）: 装置の下の穴の底の壁（入口と向かいの壁）に扉。存在型 = 最初からある（床板の下で見えない。落ちれば歩いて行ける）/
  *   出現型 = 帰らずに装置の近くに居続け、崩れる床と一緒に装置の下へ落ちると現れる（帰らずに奥へ進むと、崩れた先の下へ）
  */
 import type { Dir } from '../../../math/vec.ts';
 import type { Rect } from '../../../world/footprint.ts';
 import { box, DOOR_W } from '../../../world/layout.ts';
-import { buildPit, planPit } from '../pit.ts';
+import { buildPit, catwalkSecret, planCatwalk, planPit } from '../pit.ts';
 import { defineGimmick } from '../types.ts';
 import { aabbJson, rectGap, unreachableSpot } from '../util.ts';
 import { botHint, gridTiles, linkRoomLights } from './common.ts';
@@ -25,7 +25,7 @@ defineGimmick({
     const t = ctx.tuning;
     const y = s.cell.floorY;
     const depth = t['ground.collapse.depthM'];
-    const plan = planPit(ctx, { depth, preferAlongEntry: true });
+    const plan = planPit(ctx, { depth, preferAlongEntry: true, drop: true });
     if (!plan) return;
     const F = plan.frame;
     const landD = t['gimmick.pit.landingM'];
@@ -40,12 +40,18 @@ defineGimmick({
       if (up - P < F.u0 + 0.9 || up + P > F.u1 - 0.9) continue;
       const r = F.rect(up - P, vp - P, up + P, vp + P);
       if (plan.solidTop.some((q) => rectGap(q, r) < 0.9)) continue;
-      if (unreachableSpot(plan.hole, [...plan.bottomBlocks, r], plan.foot) !== null) continue;
+      if (!plan.drop && unreachableSpot(plan.hole, [...plan.bottomBlocks, r], plan.foot) !== null) continue;
       ped = r;
       break;
     }
     if (!ped) return;
     const up = F.u(ped.x0, ped.z0) + (F.u(ped.x1, ped.z1) - F.u(ped.x0, ped.z0)) / 2;
+    // 下の細い足場（BG02「帰らずに奥へ」）: 装置の手前の下（帰らずに装置のそばに居ると、崩れる床と一緒に足場の上へ落ちる）。
+    // 行き止まりの部屋の奥の報酬なので、落ちる穴では必ず置く（置けない・装置の台に当たるなら、この部屋には組まない）
+    if (plan.drop) {
+      plan.catwalk = planCatwalk(ctx, plan.hole, F, landD, F.depth - 0.4, plan.landings.map((l) => l.rect), up, { force: true, va: vp - 2.6, vb: vp - 0.6 });
+      if (!plan.catwalk || plan.catwalk.rects.some((r) => rectGap(r, ped!) < 0.3)) return;
+    }
     // 照明: 普段の照明（崩れている間は消える）と、警報の赤い灯り（崩れている間だけ点く）。穴の底の灯り（buildPit）は結び付けない
     const normal = ctx.addEntity('lightNormal', { type: 'lamp', params: { on: true, rate: 6 }, inputs: { on: { from: `${ctx.id}.floor.active`, invert: true } } });
     linkRoomLights(ctx, normal);
@@ -98,7 +104,10 @@ defineGimmick({
         bot: botHint([{ at: [...(() => { const p = F.point(up, vp - 0.8); return [p[0], y, p[1]] as [number, number, number]; })()], look: [pcx, y + 1.15, pcz], wait: 2.5 }], { only: 'secret' }),
       },
     });
-    if (at !== null) {
+    if (plan.drop) {
+      // 落ちる穴: 運よく下の細い足場に落ちれば、その先の壁の扉へ（落ちなければ 1 つ下の階）
+      if (plan.catwalk) ctx.offerSecret(catwalkSecret(plan.catwalk, 'collapse.deep', '装置の下の床板の隙間から、冷たい風'));
+    } else if (at !== null) {
       // 出現型: 崩れているとき、装置の近く（奥の壁から 2.6 m）の穴の底へ落ちる
       const zone = F.rect(F.u0, F.depth - 2.6, F.u1, F.depth);
       const fell = ctx.addEntity('fellDeep', { type: 'fallSensor', params: { aabb: aabbJson({ min: [zone.x0, y - depth - 0.2, zone.z0], max: [zone.x1, y - 0.6, zone.z1] }), minSpeed: 2.0 } });

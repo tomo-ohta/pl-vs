@@ -32,25 +32,47 @@ defineGimmick({
     if (laneLow) uMin = Math.max(uMin, Math.max(...lu) + W / 2 + 0.5);
     else uMax = Math.min(uMax, Math.min(...lu) - W / 2 - 0.5);
     if (uMax - uMin < 0) return;
-    // 本当の道: 入口の床の縁 → 折れ点 → 出口の床の縁（u・v の折れ線）
+    // 本当の道: 入口の床の縁 → 折れ点 → 出口の床の縁（u・v の折れ線）。入口の床の縁から出口の床の縁へまっすぐ進むと、
+    // どこかで道を外れる（体が道に掛からない）折れ方にする（まっすぐ進んで渡れてしまうなら引き直す）
     const turns = uMax - uMin < 1.3 ? 0 : v1 - v0 >= 6 ? 2 : 1;
     const U = (): number => ctx.rng.float(uMin, uMax);
-    let u = U();
-    const pts: [number, number][] = [[u, v0 - 0.2]];
-    for (let k = 1; k <= turns; k++) {
-      const vk = v0 + ((v1 - v0) * k) / (turns + 1) + ctx.rng.float(-0.4, 0.4);
-      pts.push([u, vk]);
-      let nu = U();
-      for (let g = 0; g < 6 && Math.abs(nu - u) < 1.6; g++) nu = U();
-      if (Math.abs(nu - u) < 1.2) nu = u < (uMin + uMax) / 2 ? Math.min(uMax, u + 1.6) : Math.max(uMin, u - 1.6);
-      u = nu;
-      pts.push([u, vk]);
-    }
-    pts.push([u, v1 + 0.2]);
-    // 道の床板（細い板。下は空いていて、落ちても底を歩いて階段へ）
+    // 道の床板（細い板。体の真ん中が板の上にあるときだけ乗れる。下は底の見えない縦穴）
     const rectOf = (a: [number, number], b: [number, number]): Rect => F.rect(Math.min(a[0], b[0]) - W / 2, Math.min(a[1], b[1]) - (a[0] === b[0] ? 0 : W / 2), Math.max(a[0], b[0]) + W / 2, Math.max(a[1], b[1]) + (a[0] === b[0] ? 0 : W / 2));
-    const walk: Rect[] = [];
-    for (let i = 1; i < pts.length; i++) walk.push(rectOf(pts[i - 1]!, pts[i]!));
+    let pts: [number, number][] = [];
+    let walk: Rect[] = [];
+    // まっすぐ進んだ人が、道の外を 1.2 m 続けて歩く（段差で道へ戻れないほど落ちる）なら false
+    const straightOk = (): boolean => {
+      const a = pts[0]!, b = pts[pts.length - 1]!;
+      const step = Math.hypot(b[0] - a[0], b[1] - a[1]) / 60;
+      let off = 0;
+      for (let k = 0; k <= 60; k++) {
+        const [x, z] = F.point(a[0] + ((b[0] - a[0]) * k) / 60, a[1] + ((b[1] - a[1]) * k) / 60);
+        off = walk.some((w) => x > w.x0 - 0.1 && x < w.x1 + 0.1 && z > w.z0 - 0.1 && z < w.z1 + 0.1) ? 0 : off + step;
+        if (off >= 1.2) return false;
+      }
+      return true;
+    };
+    // 折れ方: 折れ点 2 つなら、横へ出て元の列へ戻る（まっすぐ進むと真ん中の区間の間ずっと道の外）。1 つなら、部屋の片側から反対側へ
+    const span = uMax - uMin;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const lowFirst = ctx.rng.chance(0.5);
+      const side = (lo: boolean): number => (lo ? uMin + ctx.rng.float(0, 0.25) * span : uMax - ctx.rng.float(0, 0.25) * span);
+      const us = turns === 2 ? [side(lowFirst), side(!lowFirst)] : turns === 1 ? [side(lowFirst), side(!lowFirst)] : [U()];
+      if (turns === 2) us.push(Math.max(uMin, Math.min(uMax, us[0]! + ctx.rng.float(-0.4, 0.4))));
+      let u = us[0]!;
+      pts = [[u, v0 - 0.2]];
+      for (let k = 1; k <= turns; k++) {
+        const vk = v0 + ((v1 - v0) * k) / (turns + 1) + ctx.rng.float(-0.4, 0.4);
+        pts.push([u, vk]);
+        u = us[k]!;
+        pts.push([u, vk]);
+      }
+      pts.push([u, v1 + 0.2]);
+      walk = [];
+      for (let i = 1; i < pts.length; i++) walk.push(rectOf(pts[i - 1]!, pts[i]!));
+      if (!straightOk()) break;
+      if (attempt === 7) return;
+    }
     // 道が階段の上の固い所（入口・出口の床を除く）に掛からない
     const stairs = plan.solidTop.filter((q) => !plan.landings.some((l) => l.rect === q));
     if (walk.some((w) => stairs.some((q) => rectGap(q, w) < 0.4))) return;
@@ -84,7 +106,7 @@ defineGimmick({
     }
     buildPit(ctx, plan);
     const B: Box[] = [];
-    for (const r of walk) B.push(box([r.x0, y - 0.2, r.z0], [r.x1, y, r.z1], s.cell.palette.floor));
+    for (const r of walk) { const b = box([r.x0, y - 0.2, r.z0], [r.x1, y, r.z1], s.cell.palette.floor); b.narrow = true; B.push(b); }
     // 誘導灯: 本当の道の角と途中（spacing ごと）。道の脇に立つ細い柱と光る頭
     const beacons: { pos: number[]; order: number; fake: boolean }[] = [];
     const sp = t['sense.beacon.spacingM'];

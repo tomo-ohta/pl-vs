@@ -9,7 +9,7 @@ import { boxGeo, hashStr, lightAt, nearCamera, seeded, setBaked, withBaked } fro
 
 interface Aabb { min: number[]; max: number[] }
 
-// ---------------------------------------------------------------- 走ると抜ける床板（蝶番で下へ開く）
+// ---------------------------------------------------------------- 抜ける床板（蝶番で下へ開く）
 defineView('trapTile', (spec, ctx) => {
   const b = spec.params.box as unknown as Aabb;
   const mat = (spec.params.mat as MatId | undefined) ?? 'floorTile';
@@ -29,6 +29,7 @@ defineView('trapTile', (spec, ctx) => {
     if (e.type !== 'cue' || e.entity !== spec.id || !ctx.audio || !nearCamera(ctx, c)) return;
     if (e.data?.name === 'trap.open') ctx.audio.play('clank', { pos: c, gain: 0.7 });
     else if (e.data?.name === 'trap.close') ctx.audio.play('knock', { pos: c, gain: 0.3 });
+    else if (e.data?.name === 'trap.creak') ctx.audio.play('creak', { pos: c, gain: 0.5 });
   });
   return {
     update(s) {

@@ -385,6 +385,22 @@ defineView('crumbleTile', (spec, ctx) => {
   mesh.position.set(...c);
   ctx.root.add(mesh);
   setBaked(g, lightAt(ctx, [c[0], c[1] + 0.3, c[2]]));
+  // 見せかけの床板（崩れる床の道でない所）: うっすらとひび（乗るとすぐ抜ける。よく見れば分かる）
+  const extra: THREE.BufferGeometry[] = [];
+  if (spec.params.crack) {
+    const crackMat = ctx.materials.get('void');
+    const seed = Math.abs(Math.round((c[0] * 73.1 + c[2] * 31.7) * 10)) % 997;
+    for (let k = 0; k < 3; k++) {
+      const len = Math.min(size[0], size[2]) * (0.35 + ((seed * (k + 3)) % 40) / 100);
+      const cg = boxGeometry([len, 0.004, 0.012], 'void');
+      setBaked(cg, [0, 0, 0]);
+      extra.push(cg);
+      const m = new THREE.Mesh(cg, crackMat);
+      m.position.set((((seed * (k + 7)) % 50) / 100 - 0.25) * size[0], size[1] / 2 + 0.002, (((seed * (k + 11)) % 50) / 100 - 0.25) * size[2]);
+      m.rotation.y = ((seed * (k + 1)) % 360) * (Math.PI / 180);
+      mesh.add(m);
+    }
+  }
   let t = 0;
   return {
     update(s, dt) {
@@ -406,7 +422,7 @@ defineView('crumbleTile', (spec, ctx) => {
         mesh.visible = true;
       }
     },
-    dispose() { mesh.removeFromParent(); g.dispose(); },
+    dispose() { mesh.removeFromParent(); g.dispose(); for (const x of extra) x.dispose(); },
   };
 });
 

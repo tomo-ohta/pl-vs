@@ -16,8 +16,8 @@ import type { Rect } from '../../world/footprint.ts';
 import { box, DOOR_W, type Box, type MatId } from '../../world/layout.ts';
 import { carveMaze, edgeKey, mazePath, openDegree, treeDistance } from './maze.ts';
 import { defineGimmick, type GimmickContext } from './types.ts';
-import { buildPit, pitInner, pitSecret, pitShell, planPit } from './pit.ts';
-import { aabbJson, cutFloorSlab, doorZone, freeWallSpan, frontOf, innerRect, padLines, pitBoxes, rectD, rectW, unreachableSpot } from './util.ts';
+import { addSoffit, buildDropPit, buildPit, catwalkSecret, pitSecret, planCatwalk, planPit } from './pit.ts';
+import { aabbJson, cutFloorSlab, doorZone, freeWallSpan, frontOf, innerRect, padLines, rectD, rectGap, rectW, unreachableSpot, wallFrame } from './util.ts';
 
 const snap = (v: number): number => Math.round(v * 20) / 20;
 
@@ -39,10 +39,20 @@ function darken(ctx: GimmickContext): string {
   return dark;
 }
 
+/** 傾く床の部屋の物の組（いつも同じ棚 2 つと球、にしない） */
+const TILT_SETS: { id: string; mats: string[]; size: [number, number]; ball: number; shelves: [number, number][] }[] = [
+  { id: 'storage', mats: ['boxCardboard', 'boxCardboard', 'boxCardboard', 'furnitureLight'], size: [0.32, 0.55], ball: 0.05, shelves: [[0, 1], [1, 2], [2, 3], [3, 1]] },
+  { id: 'office', mats: ['furnitureLight', 'furnitureDark', 'plasticBlue', 'boxCardboard'], size: [0.4, 0.7], ball: 0, shelves: [[0, 2], [1, 3], [2, 2]] },
+  { id: 'warehouse', mats: ['woodPanel', 'metal', 'boxCardboard', 'woodPanel'], size: [0.45, 0.85], ball: 0.18, shelves: [[0, 3], [1, 2], [2, 1], [3, 1]] },
+  { id: 'playroom', mats: ['plasticRed', 'plasticBlue', 'plasticYellow', 'boxCardboard'], size: [0.3, 0.5], ball: 0.55, shelves: [[0, 3], [1, 1]] },
+  { id: 'archive', mats: ['boxCardboard', 'furnitureDark', 'woodPanel'], size: [0.35, 0.6], ball: 0, shelves: [[1, 1], [2, 2], [3, 3]] },
+];
+
 defineGimmick({
   id: 'tiltRoom', name: '傾く床', axes: ['floor'], kinds: ['room', 'hall'], minSize: [6, 6], weight: 1, intensity: 2, physics: true, offersSecret: true, onMainPath: true,
   build(ctx) {
     const s = ctx.slot;
+    const t = ctx.tuning;
     const y = s.cell.floorY;
     const r0 = innerRect(s);
     // 開口のある壁の側は 1.35 m 空ける（扉の前は普通の床）
@@ -57,38 +67,50 @@ defineGimmick({
     const wd = ctx.rng.pick(across.length ? across : walls);
     const span = freeWallSpan(s, wd, 2.6, 0.5);
     if (!span) return;
+    // 落ちる溝（14 章）: 開口も隠しも無い壁と板の間（gimmick.tilt.trenchM）。傾きすぎて滑り落ちると、底の見えない穴へ（1 つ下の階）
+    const trench = walls.filter((d) => d !== wd);
+    const tw = t['gimmick.tilt.trenchM'];
+    const inset = (d: Dir): number => (trench.includes(d) ? tw : 0.17);
+    const plate: Rect = { x0: hole.x0 + inset(3), x1: hole.x1 - inset(1), z0: hole.z0 + inset(2), z1: hole.z1 - inset(0) };
+    if (rectW(plate) < 3.6 || rectD(plate) < 3.6) return;
     cutFloorSlab(s, hole);
-    for (const b of pitBoxes(s, hole, 1.2)) ctx.addBox(b);
-    const plate: Rect = { x0: hole.x0 + 0.17, x1: hole.x1 - 0.17, z0: hole.z0 + 0.17, z1: hole.z1 - 0.17 };
+    buildDropPit(ctx, hole, null);
     // 到達判定では傾く床を平らな床として扱う（傾いても上を歩ける）
     ctx.reachAssist(box([plate.x0, y - 0.2, plate.z0], [plate.x1, y, plate.z1], s.cell.palette.floor));
-    // 立てる範囲は穴の壁の内側いっぱい（板との隙間から落ちない）
-    const walk: Rect = { x0: hole.x0 + 0.15, x1: hole.x1 - 0.15, z0: hole.z0 + 0.15, z1: hole.z1 - 0.15 };
-    // 傾きの最大: 開口の前の普通の床と、板の縁の段差が 0.33 m を超えない（傾いても段を越えて出入りできる）。
-    // 浅い傾きでも物が滑るよう、物と板の摩擦は小さく
-    const halfMax = Math.max(rectW(walk), rectD(walk)) / 2;
-    const maxDeg = Math.min(11, (Math.atan(0.33 / halfMax) * 180) / Math.PI);
+    // 立てる範囲: 開口と隠しの側は穴の壁の内側いっぱい（板との隙間から落ちない）。溝の側は板の縁まで（その先は落ちる）
+    const wi = (d: Dir): number => (trench.includes(d) ? tw : 0.15);
+    const walk: Rect = { x0: hole.x0 + wi(3), x1: hole.x1 - wi(1), z0: hole.z0 + wi(2), z1: hole.z1 - wi(0) };
+    // 傾き: 最大 gimmick.tilt.maxDeg。ゆっくり傾くので、立ち止まらずに渡れば大きくは傾かない。端に立ち続けると大きく傾き、
+    // gimmick.tilt.slipDeg を超えると低い方へ滑る
+    const maxDeg = t['gimmick.tilt.maxDeg'];
     // 物が滑り出す傾き: 最大の slideAt 倍（少し寄っただけでは滑らず、端に立ち続けると滑る）。摩擦は板と物で同じ値（Rapier は平均を使う）
-    const mu = Math.tan((ctx.tuning['gimmick.tilt.slideAt'] * maxDeg * Math.PI) / 180);
-    ctx.addEntity('plate', { type: 'tiltFloor', params: { rect: { ...plate }, walkRect: { ...walk }, y, thickness: 0.2, maxDeg, rateDeg: 4, returnDeg: 2, mat: ctx.rng.pick(['floorWood', 'floorLino', 'floorTile'] as const), friction: mu } });
-    // 万一、板の下に落ちたら入口の前へ
-    const back = s.entrance ? frontOf(s.entrance, 0.8) : [(hole.x0 + hole.x1) / 2, y, hole.z0 - 0.8];
-    ctx.addEntity('pitBack', { type: 'respawnZone', params: { aabb: aabbJson({ min: [hole.x0, y - 1.25, hole.z0], max: [hole.x1, y - 0.7, hole.z1] }), to: [back[0]!, y + 0.05, back[2]!], toYaw: 0 } });
-    // 物の山: 隠しの壁の前（幅 2.4 m・奥行き 1.6 m）。壁際には背の高い棚を 2 つ（入口の上まで隠す。傾けると滑ってどく）
-    const at = Math.min(Math.max(span.at, span.a0 + 1.3), span.a1 - 1.3);
+    const mu = Math.tan((t['gimmick.tilt.slideAt'] * maxDeg * Math.PI) / 180);
+    ctx.addEntity('plate', { type: 'tiltFloor', params: { rect: { ...plate }, walkRect: { ...walk }, y, thickness: 0.2, maxDeg, rateDeg: t['gimmick.tilt.rateDeg'], returnDeg: 3, slipDeg: t['gimmick.tilt.slipDeg'], slipSpeed: t['gimmick.tilt.slipSpeed'], mat: ctx.rng.pick(['floorWood', 'floorLino', 'floorTile'] as const), friction: mu } });
+    // 物の組（部屋ごとに違う）: 隠しの壁の前の山・壁際の棚（0〜3 つ）・ほかに散らばる物（あったり無かったり）
+    const set = ctx.rng.pick(TILT_SETS);
+    const at = Math.min(Math.max(span.at, span.a0 + 1.6), span.a1 - 1.6);
     const wall = wd === 0 ? plate.z1 : wd === 2 ? plate.z0 : wd === 1 ? plate.x1 : plate.x0;
     const sg = wd === 0 || wd === 1 ? -1 : 1;
     const along = (a0: number, a1: number, n0: number, n1: number, y0: number, y1: number): { min: number[]; max: number[] } => {
       const w0 = Math.min(wall + sg * n0, wall + sg * n1), w1 = Math.max(wall + sg * n0, wall + sg * n1);
       return wd === 0 || wd === 2 ? { min: [a0, y0, w0], max: [a1, y1, w1] } : { min: [w0, y0, a0], max: [w1, y1, a1] };
     };
-    const shelfMat = ctx.rng.pick(['furnitureDark', 'shelfMetal', 'woodPanel'] as const);
-    ctx.addEntity('screen', { type: 'propPile', params: { items: [{ ...along(at - 1.08, at - 0.04, 0.06, 0.56, y + 0.02, y + 2.12), mat: shelfMat, kind: 'shelf' }, { ...along(at + 0.04, at + 1.08, 0.06, 0.56, y + 0.02, y + 2.12), mat: shelfMat, kind: 'shelf' }], density: 160, friction: mu } });
-    const pileR = along(at - 1.2, at + 1.2, 0.62, 1.7, y + 0.05, y + 1.3);
-    const pile = ctx.addEntity('pile', { type: 'propPile', params: { region: { min: pileR.min, max: pileR.max }, count: ctx.rng.int(14, 20), size: [0.32, 0.55], mats: ['boxCardboard', 'furnitureLight', 'plasticBlue', 'boxCardboard'], density: 200, friction: mu, ballRatio: 0.3, layers: 2 } });
-    // ほかの所にも少し（転がして遊べる）
-    ctx.addEntity('scatter', { type: 'propPile', params: { region: aabbJson({ min: [plate.x0 + 0.5, y + 0.05, plate.z0 + 0.5], max: [plate.x1 - 0.5, y + 0.6, plate.z1 - 0.5] }), count: ctx.rng.int(5, 9), size: [0.25, 0.4], mats: ['boxCardboard', 'plasticRed'], density: 200, friction: mu, ballRatio: 0.5, layers: 1 } });
-    const near = along(at - 1.2, at + 1.2, 0, 1.7, y - 0.6, y + 2.5);
+    const nShelf = ctx.rng.weighted(set.shelves, ([, w]) => w)[0];
+    if (nShelf > 0) {
+      const shelfMat = ctx.rng.pick(['furnitureDark', 'shelfMetal', 'woodPanel'] as const);
+      const W = 1.04, gap = 0.08, total = nShelf * W + (nShelf - 1) * gap;
+      const items = [...Array(nShelf).keys()].map((i) => {
+        const a0 = at - total / 2 + i * (W + gap);
+        return { ...along(a0, a0 + W, 0.06, 0.56, y + 0.02, y + ctx.rng.float(1.6, 2.12)), mat: shelfMat, kind: 'shelf' };
+      });
+      ctx.addEntity('screen', { type: 'propPile', params: { items, density: 160, friction: mu } });
+    }
+    const pileR = along(at - 1.3, at + 1.3, 0.62, 1.7, y + 0.05, y + 1.3);
+    const pile = ctx.addEntity('pile', { type: 'propPile', params: { region: { min: pileR.min, max: pileR.max }, count: ctx.rng.int(nShelf ? 10 : 16, nShelf ? 18 : 24), size: set.size, mats: set.mats, density: 200, friction: mu, ballRatio: set.ball, layers: 2 } });
+    if (ctx.rng.chance(0.6)) {
+      ctx.addEntity('scatter', { type: 'propPile', params: { region: aabbJson({ min: [plate.x0 + 0.5, y + 0.05, plate.z0 + 0.5], max: [plate.x1 - 0.5, y + 0.6, plate.z1 - 0.5] }), count: ctx.rng.int(3, 8), size: [set.size[0] * 0.8, set.size[1] * 0.8], mats: set.mats, density: 200, friction: mu, ballRatio: set.ball, layers: 1 } });
+    }
+    const near = along(at - 1.3, at + 1.3, 0, 1.7, y - 0.6, y + 2.5);
     const count = ctx.addEntity('count', { type: 'countSensor', params: { aabb: near, of: pile, belowRatio: 0.3 } });
     ctx.offerSecret({ hook: 'tilt.clearProps', modes: ['present', 'appear'], weight: 1.2, revealOutput: `${count}.below`, doorway: { dir: wd, at, y, width: 1.0, height: 2.0 }, floorY: y - 0.3, tell: '物の隙間から漏れる光' });
     ctx.keepOut({ min: [hole.x0, y - 1.2, hole.z0], max: [hole.x1, y + 3, hole.z1] });
@@ -96,10 +118,10 @@ defineGimmick({
 });
 
 /**
- * 細い道: 部屋を横切る深い溝（gimmick.narrow.depthM）を、入口の延長線の細い梁で渡る。落ちると溝の底。
- * 溝の中の階段で入口側へ戻る（閉じ込めない）。階段の下の端の先は 0.9 m 空ける（以前は溝の端まで段が並び、
- * 一段目が奥の壁に突き当たって体が乗れず、底から上れなかった）。溝の両端の壁は部屋の壁の厚みの中（壁沿いの縁を歩いて渡れない）。
- * 隠し: 階段と反対の横の壁の底（fall.below・存在型）
+ * 細い道: 部屋を横切る、底の見えない落ちる溝（14 章。走って跳んでも届かない長さ）を、入口の延長線の細い梁で渡る。
+ * 梁は体の真ん中が上にあるときだけ乗れる（端に体が掛かっただけでは乗れない）。落ちると 1 つ下の階へ。
+ * 溝の両端の壁は部屋の壁の厚みの中（壁沿いの縁を歩いて渡れない）。
+ * 隠し（fall.below）: 運よく梁の横の下の細い足場（gimmick.pit.catwalkChance）に落ちれば、その先の壁の扉へ
  */
 defineGimmick({
   id: 'narrowPath', name: '細い道', axes: ['floor', 'body'], kinds: ['room', 'hall'], minSize: [4, 7], weight: 1.2, intensity: 2, offersSecret: true, onMainPath: true,
@@ -112,13 +134,14 @@ defineGimmick({
     // 軸は入口の壁に垂直（入口から奥へ）。入口と出口が斜めにずれていても、溝は入口と出口の間を横切る
     const e0 = s.entrance!;
     const axis: 'x' | 'z' = e0.dir === 0 || e0.dir === 2 ? 'z' : 'x';
-    // 入口から奥へ進む向き（開口の dir は外向き）
-    const sign: 1 | -1 = e0.dir === 0 || e0.dir === 1 ? -1 : 1;
     const r = innerRect(s);
     const len = axis === 'x' ? rectW(r) : rectD(r);
-    const L = Math.min(6.0, len - 2 * 1.4);
+    // 溝の長さ: 走って跳んでも届かない（gimmick.pit.minGapM 以上）
+    const L = Math.min(7.0, len - 2 * 1.4);
     if (L < 3.9) return;
-    const depth = t['gimmick.narrow.depthM'];
+    // 跳んで届く長さなら、溝の上に低い下がり壁（跳んで渡れない）
+    const soffit = L < t['gimmick.pit.minGapM'];
+    if (soffit && s.cell.height < t['gimmick.pit.soffitM'] + 0.15) return;
     const mid = axis === 'x' ? (r.x0 + r.x1) / 2 : (r.z0 + r.z1) / 2;
     const hole: Rect = axis === 'x' ? { x0: snap(mid - L / 2), x1: snap(mid + L / 2), z0: r.z0, z1: r.z1 } : { x0: r.x0, x1: r.x1, z0: snap(mid - L / 2), z1: snap(mid + L / 2) };
     // 溝は部屋の端から端まで横切る。横の壁の開口（広間の 3 つ目・4 つ目の出入り口）の前が溝にならないこと（出た途端に落ちない）
@@ -128,45 +151,30 @@ defineGimmick({
       const at = axis === 'x' ? o.pos[0] : o.pos[2];
       if (at + o.width / 2 + 0.8 > h0 && at - o.width / 2 - 0.8 < h1) return;
     }
-    // 階段: 段数 n（n + 1 回の段差で床へ上がる）。踏み面は溝の長さから、下の端の先に 0.9 m 残して決める
-    const inner = pitInner(ctx, hole);
-    const a0 = axis === 'x' ? inner.x0 : inner.z0, a1 = axis === 'x' ? inner.x1 : inner.z1;
-    const n = Math.max(1, Math.ceil(depth / t['gimmick.pit.stairRise']) - 1);
-    const rise = depth / (n + 1);
-    const tread = Math.min(t['gimmick.pit.stairTread'] * 1.4, (a1 - a0 - 0.9) / n);
-    if (tread < 0.22) return;
     cutFloorSlab(s, hole);
-    pitShell(ctx, hole, depth);
-    // 梁: 入口の位置の延長線（幅 0.42〜0.6 m）
+    // 梁: 入口の位置の延長線（幅 0.42〜0.6 m）。細い足場（体の真ん中が上にあるときだけ乗れる）
     const across = axis === 'x' ? e0.pos[2] : e0.pos[0];
     const bw = ctx.rng.float(0.42, 0.6) / 2;
-    ctx.addBox(axis === 'x' ? box([hole.x0, y - 0.15, across - bw], [hole.x1, y, across + bw], 'metal') : box([across - bw, y - 0.15, hole.z0], [across + bw, y, hole.z1], 'metal'));
-    // 溝から戻る階段: 梁から遠い横の壁沿い（幅 1.0 m）に、入口側の縁へ上がる。上の段（j = 0）が入口側
-    const lo = axis === 'x' ? inner.z0 : inner.x0, hi = axis === 'x' ? inner.z1 : inner.x1;
-    const stairSide = Math.abs(across - lo) > Math.abs(across - hi) ? 'lo' : 'hi';
-    const c0 = stairSide === 'lo' ? lo : hi - 1.0, c1 = c0 + 1.0;
-    const top0 = sign > 0 ? a0 : a1; // 入口側の溝の内側の縁
-    for (let j = 0; j < n; j++) {
-      const p = top0 + sign * j * tread, q = top0 + sign * (j + 1) * tread;
-      const [s0, s1] = [Math.min(p, q), Math.max(p, q)];
-      ctx.addBox(axis === 'x' ? box([s0, y - depth, c0], [s1, y - rise * (j + 1), c1], s.cell.palette.floor) : box([c0, y - depth, s0], [c1, y - rise * (j + 1), s1], s.cell.palette.floor));
-    }
-    // 落ちた先の灯り（底をぼんやり照らす）
-    const bx = axis === 'x' ? mid : (lo + hi) / 2, bz = axis === 'x' ? (lo + hi) / 2 : mid;
-    s.cell.lights.push({ pos: [bx, y - depth + 1.6, bz], color: 0xbfd0e0, intensity: 0.35, distance: 6 });
-    // 隠しの入口: 階段と反対の横の壁の底（存在型）
-    const secretSide: Dir = axis === 'x' ? (stairSide === 'lo' ? 0 : 2) : (stairSide === 'lo' ? 1 : 3);
-    ctx.offerSecret({ hook: 'fall.below', modes: ['present'], weight: 1.2, doorway: { dir: secretSide, at: mid, y: y - depth, width: 1.0, height: 2.0 }, tell: '下から聞こえる音・底の灯り' });
-    // 溝の両側 1.2 m にも家具を置かない（階段の上の端から床へ出る所を塞がない）
-    ctx.keepOut(axis === 'x' ? { min: [hole.x0 - 1.2, y - depth, hole.z0], max: [hole.x1 + 1.2, y + 3, hole.z1] } : { min: [hole.x0, y - depth, hole.z0 - 1.2], max: [hole.x1, y + 3, hole.z1 + 1.2] });
+    const beam = axis === 'x' ? box([hole.x0, y - 0.15, across - bw], [hole.x1, y, across + bw], 'metal') : box([across - bw, y - 0.15, hole.z0], [across + bw, y, hole.z1], 'metal');
+    beam.narrow = true;
+    ctx.addBox(beam);
+    // 溝は底の見えない落ちる穴（落ちたら 1 つ下の階）。運よく梁の横の下の細い足場に落ちれば、隠しへ
+    const F = wallFrame(hole, e0.dir);
+    const side = ctx.rng.chance(0.5) ? 1 : -1;
+    const catwalk = planCatwalk(ctx, hole, F, 0, F.depth, [], (axis === 'x' ? F.u(hole.x0, across) : F.u(across, hole.z0)) + side * 0.95);
+    buildDropPit(ctx, hole, catwalk);
+    if (soffit) addSoffit(ctx, hole);
+    if (catwalk) ctx.offerSecret(catwalkSecret(catwalk, 'fall.below', '梁の下の暗がりに、細い足場が見える'));
+    // 溝の両側 1.2 m にも家具を置かない
+    ctx.keepOut(axis === 'x' ? { min: [hole.x0 - 1.2, y - 4, hole.z0], max: [hole.x1 + 1.2, y + 3, hole.z1] } : { min: [hole.x0, y - 4, hole.z0 - 1.2], max: [hole.x1, y + 3, hole.z1 + 1.2] });
   },
 });
 
 /**
- * 細い梁の網: 細長い部屋の床全部が深い溝。入口の壁・出口の壁沿いだけ固い床（端から端まで）。
- * 溝の上に分かれ目の足場（細い柱で支える）を碁盤の目に並べ、細い梁でつなぐ。梁は木の形（どの足場へも道は 1 本。
- * 行き止まりがある）に、回り道を少し足す。入口の床から出る梁・出口の床へ渡る梁はそれぞれ 1 本だけ。
- * 落ちたら溝の底の階段（入口の壁の隣の壁沿い）で入口の床へ戻ってやり直し。隠し: 溝の底の壁の扉（fall.below・存在型）
+ * 細い梁の網: 細長い部屋の床全部が、底の見えない落ちる穴（14 章）。入口の壁・出口の壁沿いだけ固い床（端から端まで）。
+ * 穴の上に分かれ目の足場（細い柱で支える）を碁盤の目に並べ、細い梁（体の真ん中が上にあるときだけ乗れる）でつなぐ。
+ * 梁は木の形（どの足場へも道は 1 本。行き止まりがある）に、回り道を少し足す。入口の床から出る梁・出口の床へ渡る梁はそれぞれ 1 本だけ。
+ * 落ちたら 1 つ下の階へ。隠し（fall.below）: 運よく下の細い足場に落ちれば、その先の壁の扉へ
  */
 defineGimmick({
   id: 'beamNetwork', name: '細い梁の網', axes: ['floor', 'body'], kinds: ['room', 'hall'], minSize: [5.6, 7.4], weight: 1.2, intensity: 2, offersSecret: true, onMainPath: true,
@@ -176,7 +184,7 @@ defineGimmick({
     const t = ctx.tuning;
     const y = s.cell.floorY;
     const depth = t['gimmick.narrow.depthM'];
-    const plan = planPit(ctx, { depth, strips: true });
+    const plan = planPit(ctx, { depth, strips: true, drop: true });
     if (!plan) return;
     const F = plan.frame;
     const landD = t['gimmick.pit.landingM'];
@@ -248,7 +256,9 @@ defineGimmick({
       const cxp = (q.x0 + q.x1) / 2, czp = (q.z0 + q.z1) / 2;
       posts.push({ x0: cxp - 0.12, x1: cxp + 0.12, z0: czp - 0.12, z1: czp + 0.12 });
     }
-    if (unreachableSpot(plan.hole, [...plan.bottomBlocks, ...posts], plan.foot) !== null) return;
+    if (!plan.drop && unreachableSpot(plan.hole, [...plan.bottomBlocks, ...posts], plan.foot) !== null) return;
+    // 下の細い足場が柱に当たるなら、足場は付けない
+    if (plan.catwalk && posts.some((p) => plan.catwalk!.rects.some((r) => rectGap(p, r) < 0.25))) plan.catwalk = null;
     buildPit(ctx, plan);
     plan.bottomBlocks.push(...posts);
     const bw = t['gimmick.beams.widthM'];
@@ -257,7 +267,8 @@ defineGimmick({
       const q = rectOf[2 + i]!;
       ctx.addBox(box([q.x0, y - 0.15, q.z0], [q.x1, y, q.z1], platMat));
       const pr = posts[i]!;
-      ctx.addBox(box([pr.x0, y - depth, pr.z0], [pr.x1, y - 0.15, pr.z1], 'metalDark'));
+      // 柱: 落ちる穴では暗い所の上まで
+      ctx.addBox(box([pr.x0, plan.drop ? y - t['gimmick.pit.litM'] : y - depth, pr.z0], [pr.x1, y - 0.15, pr.z1], 'metalDark'));
     }
     // 梁: 2 つの節の向かい合う縁の間。横の位置は、足場の側の真ん中（入口・出口・横の床は足場に合わせる）
     for (const k of tree) {
@@ -279,7 +290,10 @@ defineGimmick({
         const [u0, u1] = ub[0]! >= ua[1]! - 1e-6 ? [ua[1]!, ub[0]!] : [ub[1]!, ua[0]!];
         beam = F.rect(u0, vc - bw / 2, u1, vc + bw / 2);
       }
-      ctx.addBox(box([beam.x0, y - 0.12, beam.z0], [beam.x1, y, beam.z1], 'metal'));
+      // 細い梁: 体の真ん中が上にあるときだけ乗れる（14 章）
+      const bb = box([beam.x0, y - 0.12, beam.z0], [beam.x1, y, beam.z1], 'metal');
+      bb.narrow = true;
+      ctx.addBox(bb);
     }
     const offer = pitSecret(ctx, plan, 'fall.below', '溝の底から聞こえる水の音・底の灯り');
     if (offer) ctx.offerSecret(offer);

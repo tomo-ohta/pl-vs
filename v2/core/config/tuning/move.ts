@@ -61,11 +61,13 @@ export const MOVE_TUNING = {
   'move.stretch.stillSec': num(1.0, 0.3, 4, '伸びる廊下: 立ち止まってから前へ滑り始めるまでの秒数'),
   'move.stretch.glide': num(1.3, 0.5, 3, '伸びる廊下: 立ち止まっている間に前へ滑る速さ（m/s）'),
 
-  // ---- 溝・穴を渡る部屋: 走ると抜ける床 [M43]・見えない足場 [M44]・吊り橋 [M15]・振り子 [M39] ----
+  // ---- 溝・穴を渡る部屋: 抜ける床 [M43]・見えない足場 [M44]・吊り橋 [M15]・振り子 [M39] ----
   'move.chasm.depthM': num(2.7, 2.2, 3.05, '溝・穴の部屋: 穴の深さ（m。3.1 m 以上は隠し部屋が隣の区画の下に入り込む）'),
-  'move.chasm.tileM': num(1.0, 0.6, 1.6, '走ると抜ける床: 床板の大きさ（m）'),
-  'move.chasm.trapSpeed': num(4.0, 3.2, 5.4, '走ると抜ける床: これより速く動くと床板が開く（m/s。歩く 3.0 と走る 5.5 の間）'),
-  'move.chasm.trapOpenSec': num(3, 1, 10, '走ると抜ける床: 開いた床板が閉じるまで（秒）'),
+  'move.chasm.tileM': num(1.0, 0.6, 1.6, '抜ける床: 床板の大きさ（m）'),
+  'move.chasm.trapSpeed': num(2.1, 1.7, 2.8, '抜ける床: これより速く動くと床板が軋んで開く（m/s。しゃがみ歩き 1.5 と歩く 3.0 の間）'),
+  'move.chasm.trapCreakSec': num(0.12, 0, 0.5, '抜ける床: 速く動き続けて開くまでの軋み（秒）'),
+  'move.chasm.trapStillSec': num(2.0, 0.8, 6, '抜ける床: 床板の上で立ち止まって開くまで（秒）'),
+  'move.chasm.trapOpenSec': num(3, 1, 10, '抜ける床: 開いた床板が閉じるまで（秒）'),
   'move.chasm.ghostCellM': num(0.95, 0.9, 1.4, '見えない足場: 足場の 1 升の大きさ（m）'),
   'move.chasm.bridgeW': num(0.85, 0.75, 1.4, '吊り橋: 橋板の幅（m）'),
   'move.chasm.swayGain': num(4, 0.5, 20, '吊り橋: 歩くより速く動いたときに揺れが大きくなる強さ（度 / 秒 /（m/s）²）'),
@@ -120,7 +122,7 @@ export const MOVE_TUNING = {
   'move.atrium.ropeSpeed': num(1.1, 0.4, 3, 'ロープ渡り: つかまって進む速さ（m/s）'),
   'move.atrium.zipAccel': num(3, 0.5, 10, 'ジップライン: 加速（m/s²）'),
   'move.atrium.zipMax': num(6, 2, 12, 'ジップライン: 速さの上限（m/s）'),
-  'move.atrium.cartDeg': num(28, 15, 40, '台車: 坂の傾き（度）'),
+  'move.atrium.cartAccel': num(2.5, 0.5, 8, '台車: 押されて走る加速（m/s²）'),
   'move.atrium.cartMax': num(7, 2, 12, '台車: 速さの上限（m/s）'),
   'move.atrium.carWait': num(3, 1, 10, 'ゴンドラ: 乗り場で待つ秒数'),
 
@@ -148,7 +150,7 @@ export const MOVE_TUNING = {
   'move.ball.bubbleAccel': num(4.5, 1, 10, 'バブル: 操作の向きへの加速（m/s²）'),
   'move.ball.vmax': num(5, 2, 9, '球: 速さの上限（m/s）'),
   'move.ball.throwSpeed': num(2.6, 1, 6, '玉乗り: この速さより速く壁にぶつかると振り落とされる（m/s）'),
-  'move.ball.paintSlow': num(0.3, 0.1, 0.8, '球に乗る部屋: 塗りたてのペンキの床を歩く速さの倍率'),
+  'move.ball.paintSlow': num(0.15, 0.05, 0.8, '球に乗る部屋: 塗りたてのペンキの床を歩く速さの倍率'),
 
   // ---- 身体の大きさが変わる部屋（sizeRoom）: 身体の大きさ [M07]・縮小して通る穴 [M45] ----
   'move.size.small': num(0.34, 0.2, 0.6, '大きさの門「小」: 身体の大きさの倍率（ネズミの穴 0.7 m を立ったまま通れる）'),

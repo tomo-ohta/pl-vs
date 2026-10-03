@@ -250,6 +250,7 @@ export class Sim implements PlayerWorld {
           continue;
         }
         const a: AABB = { min: [...b.min], max: [...b.max] };
+        if (b.narrow) a.narrow = true;
         this.colliders.addStatic(a);
         rr.statics.push(a);
       }

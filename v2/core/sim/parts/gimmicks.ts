@@ -31,7 +31,8 @@ definePart<CrumbleState>({
     const top = { min: [b.min[0] - 0.05, b.max[1] - 0.05, b.min[2] - 0.05] as Vec3, max: [b.max[0] + 0.05, b.max[1] + 0.5, b.max[2] + 0.05] as Vec3 };
     const on = ctx.players.some((p) => playerIn(p, top));
     if (s.phase === 0) {
-      s.t = on ? s.t + ctx.dt : 0;
+      // latch: 一度乗ったら、離れても止まらない（崩れる床の道。来た道が崩れていく）
+      s.t = on || (pBool(ctx.spec, 'latch', false) && s.t > 0) ? s.t + ctx.dt : 0;
       if (s.t >= pNum(ctx.spec, 'standSec', 0.35)) { s.phase = 1; s.t = 0; ctx.cue('crumble.shake', aabbCenter(b)); }
     } else if (s.phase === 1) {
       s.t += ctx.dt;

@@ -1,9 +1,10 @@
 /**
  * 深い溝・穴を渡る部屋（4 種）。部屋の形は pit.ts（崩れる床・細い梁の網と同じ）: 部屋の床ほぼ全体が深い穴で、開口の前だけ固い床。
- * 落ちたら穴の底の階段で入口の床へ戻ってやり直し（閉じ込めない）。どれも隠し: 穴の底の壁の扉（存在型。落ちた人だけが見つける）
+ * 穴は底の見えない落ちる穴（14 章）: 落ちたら 1 つ下の階へ。隠し: 運よく下の細い足場に落ちれば、その先の壁の扉（存在型）
  *
- * - trapdoorFloor 走ると抜ける床 [M43]: 床一面の床板。走る（速く動く）か跳んで着地すると、その床板が蝶番で開いて下へ落ちる。
- *     ゆっくり歩けば渡れる（崩れる床 crumbleFloor の逆: こちらは「急ぐと落ちる」）。「走らないでください」の札
+ * - trapdoorFloor 抜ける床 [M43]: 床一面の床板。しゃがみ歩きより速く動くと軋んで、すぐ蝶番で開いて下へ落ちる。跳んで着地しても、
+ *     上で立ち止まっても開く: しゃがんで、止まらずに渡る（崩れる床 crumbleFloor の逆: こちらは「急ぐと落ちる」）。
+ *     ふつうに歩くと落ちる。入口の床の脇に「静かに」の札
  * - ghostBridge 見えない足場 [M44]: 見えない足場（描かない当たり判定）が曲がりくねって向こう岸へ続く。足場の上にだけ埃が積もっている。
  *     行き止まりの枝もある
  * - swayBridge 吊り橋 [M15]: 細い吊り橋。歩くと横に揺れ、揺れは速く歩くほど大きい（走ると振り落とされる）。立ち止まると収まる
@@ -14,15 +15,16 @@
 import type { Rect } from '../../../world/footprint.ts';
 import { box, kinded } from '../../../world/layout.ts';
 import { carveMaze, edgeKey, gridNeighbors, mazePath } from '../maze.ts';
-import { buildPit, pitSecret, planPit, type PitPlan } from '../pit.ts';
+import { addSoffit, buildPit, farSideSecret, pitSecret, planPit, type PitPlan } from '../pit.ts';
 import { defineGimmick, type GimmickContext } from '../types.ts';
 import { fillRects } from '../util.ts';
 import { stripsFits } from './common.ts';
+import { botHint, type BotStepSpec } from '../ground/common.ts';
 
 
 /** 穴の部屋の共通: 計画・穴・底の隠し */
 function chasm(ctx: GimmickContext, strips: boolean, hook: string, tell: string): PitPlan | null {
-  const plan = planPit(ctx, { depth: ctx.tuning['move.chasm.depthM'], strips, preferAlongEntry: !strips });
+  const plan = planPit(ctx, { depth: ctx.tuning['move.chasm.depthM'], strips, preferAlongEntry: !strips, drop: true });
   if (!plan) return null;
   buildPit(ctx, plan);
   const offer = pitSecret(ctx, plan, hook, tell);
@@ -70,7 +72,7 @@ function bridgeU(plan: PitPlan, w: number, side: number): { u: number; lo: numbe
 }
 
 defineGimmick({
-  id: 'trapdoorFloor', name: '走ると抜ける床', axes: ['floor', 'move'], kinds: ['room', 'hall'], minSize: [4.8, 6], minHeight: 2.4, weight: 0.8, intensity: 2, offersSecret: true, onMainPath: true,
+  id: 'trapdoorFloor', name: '抜ける床', axes: ['floor', 'move'], kinds: ['room', 'hall'], minSize: [4.8, 6], minHeight: 2.4, weight: 0.8, intensity: 2, offersSecret: true, onMainPath: true,
   fits: (s) => !!s.entrance && !!s.exit,
   build(ctx) {
     const s = ctx.slot;
@@ -87,16 +89,31 @@ defineGimmick({
       for (let a = 0; a < nx; a++) for (let b = 0; b < nz; b++) {
         const x0 = r.x0 + ((r.x1 - r.x0) * a) / nx, x1 = r.x0 + ((r.x1 - r.x0) * (a + 1)) / nx;
         const z0 = r.z0 + ((r.z1 - r.z0) * b) / nz, z1 = r.z0 + ((r.z1 - r.z0) * (b + 1)) / nz;
-        ctx.addEntity(`t${i++}`, { type: 'trapTile', params: { box: { min: [x0 + gap, y - 0.1, z0 + gap], max: [x1 - gap, y, z1 - gap] }, mat: s.cell.palette.floor, speed: t['move.chasm.trapSpeed'], openSec: t['move.chasm.trapOpenSec'], hinge: (a + b) % 2 } });
+        ctx.addEntity(`t${i++}`, { type: 'trapTile', params: { box: { min: [x0 + gap, y - 0.1, z0 + gap], max: [x1 - gap, y, z1 - gap] }, mat: s.cell.palette.floor, speed: t['move.chasm.trapSpeed'], creakSec: t['move.chasm.trapCreakSec'], stillSec: t['move.chasm.trapStillSec'], openSec: t['move.chasm.trapOpenSec'], hinge: (a + b) % 2 } });
       }
     }
     // 到達判定では床板を床として扱う（ゆっくりなら上を歩ける）
     for (const r of fillRects(plan.hole, plan.solidTop)) ctx.reachAssist(box([r.x0, y - 0.1, r.z0], [r.x1, y, r.z1], s.cell.palette.floor));
     // 戻る階段の手すり: 床板と接する縁（階段の口へ床板から落ちず、入口の床から下りる）
-    railAround(ctx, plan.lane, plan.solidTop.filter((r) => r !== plan.lane), plan.hole);
-    // 「走らないでください」の札（入口の床の脇の壁）
-    const e = plan.entry;
+    if (!plan.drop) railAround(ctx, plan.lane, plan.solidTop.filter((r) => r !== plan.lane), plan.hole);
     const F = plan.frame;
+    // 歩く人（試験）: 入口の床の縁から、しゃがんでまっすぐ出口の床の縁へ（出口が横の壁なら、角で曲がる）
+    {
+      const landD = t['gimmick.pit.landingM'];
+      const P = (u: number, v: number): [number, number, number] => { const [x, z] = F.point(u, v); return [x, y, z]; };
+      const ex = s.exit!.pos, en = s.entrance!.pos;
+      const eu0 = F.u(en[0], en[2]);
+      const xu = F.u(ex[0], ex[2]), xv = F.v(ex[0], ex[2]);
+      const opposite = xv > F.depth - 0.5;
+      // 出口の床の縁の点（向かいの壁: 出口の床の手前 / 横の壁: 出口の前の床の縁）
+      const path: [number, number, number][] = opposite
+        ? [P(eu0, landD - 0.3), P(eu0, landD + 0.1), P(xu, F.depth - landD - 0.1), P(xu, F.depth - landD + 0.3)]
+        : (() => { const side = xu < (F.u0 + F.u1) / 2 ? F.u0 + landD : F.u1 - landD, out = xu < (F.u0 + F.u1) / 2 ? side - 0.4 : side + 0.4; return [P(eu0, landD - 0.3), P(eu0, landD + 0.1), P(eu0, xv), P(side, xv), P(out, xv)]; })();
+      const cross = (pts: [number, number, number][]): BotStepSpec[] => pts.map((p, k) => (k === 0 ? { at: p } : { at: p, through: true }));
+      ctx.addEntity('route', { type: 'constant', params: { value: 0, bot: [botHint(cross(path), { enterAt: [en[0], en[2]], exitAt: [ex[0], ex[2]] }), botHint(cross(path.slice().reverse()), { enterAt: [ex[0], ex[2]], exitAt: [en[0], en[2]] })] } });
+    }
+    // 「静かに」の札（入口の床の脇の壁）
+    const e = plan.entry;
     const eu = [F.u(e.x0, e.z0), F.u(e.x1, e.z1)].sort((p, q) => p - q) as [number, number];
     const signU = (eu[0] + eu[1]) / 2 + (eu[1] - eu[0]) * 0.32;
     const sr = F.rect(signU - 0.22, 0, signU + 0.22, 0.03);
@@ -112,7 +129,7 @@ defineGimmick({
     const s = ctx.slot;
     const t = ctx.tuning;
     const y = s.cell.floorY;
-    const plan = planPit(ctx, { depth: t['move.chasm.depthM'], strips: true });
+    const plan = planPit(ctx, { depth: t['move.chasm.depthM'], strips: true, drop: true });
     if (!plan) return;
     const F = plan.frame;
     const landD = t['gimmick.pit.landingM'];
@@ -165,7 +182,7 @@ defineGimmick({
     const s = ctx.slot;
     const t = ctx.tuning;
     const y = s.cell.floorY;
-    const plan = planPit(ctx, { depth: t['move.chasm.depthM'], strips: true });
+    const plan = planPit(ctx, { depth: t['move.chasm.depthM'], strips: true, drop: true });
     if (!plan) return;
     const F = plan.frame;
     const landD = t['gimmick.pit.landingM'];
@@ -196,7 +213,8 @@ defineGimmick({
     const s = ctx.slot;
     const t = ctx.tuning;
     const y = s.cell.floorY;
-    const plan = planPit(ctx, { depth: t['move.chasm.depthM'], strips: true });
+    // 固い床どうしが跳んで届くなら、振り子の払う所の外にだけ低い下がり壁（払う所を跳ぶ人は振り子に払われる）
+    const plan = planPit(ctx, { depth: t['move.chasm.depthM'], strips: true, drop: true, soffit: 'manual' });
     if (!plan) return;
     const F = plan.frame;
     const landD = t['gimmick.pit.landingM'];
@@ -215,12 +233,19 @@ defineGimmick({
     buildPit(ctx, plan);
     // 橋（固い）
     const br = F.rect(b.u - w / 2, L0, b.u + w / 2, L1);
-    ctx.addBox(box([br.x0, y - 0.18, br.z0], [br.x1, y, br.z1], 'metal'));
+    // 細い橋（体の真ん中が上にあるときだけ乗れる。振り子に押されると落ちる）
+    const bridge = box([br.x0, y - 0.18, br.z0], [br.x1, y, br.z1], 'metal');
+    bridge.narrow = true;
+    ctx.addBox(bridge);
     const h = s.cell.height;
     const pivotY = y + h - 0.08;
     const bobY = 0.95; // 一番下での板の真ん中（橋の上から）
     const len = pivotY - (y + bobY);
     const amp = Math.asin(Math.min(0.95, reach / len));
+    if (plan.soffit === 'manual') {
+      const sweep = len * Math.sin(amp) + bobHalf[2]! + 0.1;
+      addSoffit(ctx, plan.hole, F.rect(b.u - sweep, -1, b.u + sweep, F.depth + 1));
+    }
     const swing = (() => { const a = F.point(0, 0), c = F.point(1, 0); return [c[0] - a[0], 0, c[1] - a[1]]; })();
     const along = (() => { const a = F.point(0, 0), c = F.point(0, 1); return [c[0] - a[0], 0, c[1] - a[1]]; })();
     const half = [Math.abs(swing[0]!) * bobHalf[2]! + Math.abs(along[0]!) * bobHalf[0]!, bobHalf[1]!, Math.abs(swing[2]!) * bobHalf[2]! + Math.abs(along[2]!) * bobHalf[0]!];
@@ -241,7 +266,8 @@ defineGimmick({
       const rideOr = ctx.addEntity('rideAny', { type: 'or', params: {}, inputs: Object.fromEntries(ids.slice(0, 8).map((id, i) => [String.fromCharCode(97 + i), `${id}.ride`])) });
       const rode = ctx.addEntity('rode', { type: 'timer', params: { onDelay: t['move.chasm.rideSec'], offDelay: 0 }, inputs: { in: `${rideOr}.out` } });
       const hold = ctx.addEntity('rodeLatch', { type: 'latch', params: {}, inputs: { set: `${rode}.out` } });
-      const bottom = pitSecret(ctx, plan, 'pendulum.ride', '振り子の板の上に、誰かの足跡');
+      // 落ちる穴では、出口の床の横の壁の扉（渡った先。振り子に乗ると現れる）
+      const bottom = plan.drop ? farSideSecret(plan, 'pendulum.ride', '振り子の板の上に、誰かの足跡') : pitSecret(ctx, plan, 'pendulum.ride', '振り子の板の上に、誰かの足跡');
       if (bottom) ctx.offerSecret({ ...bottom, modes: ['appear'], revealOutput: `${hold}.out` });
     }
     const fall = pitSecret(ctx, plan, 'fall.below', '橋の下から聞こえる環境音・底の灯り');

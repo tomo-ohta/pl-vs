@@ -47,7 +47,7 @@ export function wallPoint(ctx: GimmickContext, d: Dir, at: number, out: number):
 export function lightPit(ctx: GimmickContext, depth: number): PitPlan | null {
   const s = ctx.slot;
   if (!s.entrance || !s.exit || s.exit.dir !== (s.entrance.dir + 2) % 4) return null;
-  return planPit(ctx, { depth, strips: true });
+  return planPit(ctx, { depth, strips: true, drop: true });
 }
 
 export { buildPit };

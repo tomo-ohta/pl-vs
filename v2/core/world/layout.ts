@@ -45,6 +45,8 @@ export interface Box {
   kind?: string;
   /** 複数の箱で 1 つの物（椅子・鉢植え）。描画と乱れの判定でまとめて扱う */
   propGroup?: string;
+  /** 細い足場（梁・細い道・下の細い足場）: 体の真ん中が上にあるときだけ乗れる（14 章） */
+  narrow?: boolean;
   /** 描画専用の環境マスク（v1 と同じ: kind, 中心, 半幅, 床の高さ） */
   environment?: [number, number, number, number];
   /** 出現型の隠し（v2-plan.md 4.1）: この組が「現れた」ときだけ描画・当たり判定に入る */

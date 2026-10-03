@@ -1,41 +1,25 @@
 /**
- * 溝・穴を渡る部屋: 走ると抜ける床・見えない足場・吊り橋・振り子の通路。
- * 歩いて渡れる（落ちない）・穴の底のどこからでも入口の床へ戻れる・それぞれの規則（走ると開く・速いと揺れて落ちる・
+ * 溝・穴を渡る部屋: 抜ける床・見えない足場・吊り橋・振り子の通路。
+ * 遊び方どおりに渡れる（落ちない）・穴は底の見えない落ちる穴（落ちたら 1 つ下の階へ）・それぞれの規則（ふつうに歩くと開く・速いと揺れて落ちる・
  * 当たると弾かれる・板に乗ると隠し）・生成したフロアに出て、渡れる・決定的
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultTuning } from '../core/config/tuning.ts';
-import { Rng } from '../core/math/rng.ts';
 import type { Dir, Vec3 } from '../core/math/vec.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
 import '../core/sim/parts/index.ts';
 import { Sim } from '../core/sim/sim.ts';
 import { IDLE_COMMAND } from '../core/sim/types.ts';
-import { WALL_T } from '../core/world/layout.ts';
 import { walkTo } from './helpers/bot.ts';
 import { walkThrough } from './move-helpers.ts';
 import { labRoom, type LabRoom } from './helpers/gimmick-lab.ts';
 import { findRooms, regenerate } from './helpers/gimmick-rooms.ts';
+import { dropSpots, fallsDown } from './helpers/drop.ts';
 
 const t = defaultTuning();
 const SIZES: { w: number; d: number; kind: 'room' | 'hall' }[] = [{ w: 6.6, d: 8.0, kind: 'room' }, { w: 8.6, d: 15.0, kind: 'hall' }];
-
-/** 穴の底の、体が入る点 */
-function fallSpots(sim: Sim, room: LabRoom, n: number, seed: number): Vec3[] {
-  const y = Math.min(...room.cell.boxes.filter((b) => b.solid && b.max[1] < -1).map((b) => b.max[1]));
-  const r = room.slot.rect;
-  const rng = new Rng(seed);
-  const out: Vec3[] = [];
-  for (let i = 0; i < 400 && out.length < n; i++) {
-    const x = rng.float(r.x0 + WALL_T + 0.4, r.x1 - WALL_T - 0.4), z = rng.float(r.z0 + WALL_T + 0.4, r.z1 - WALL_T - 0.4);
-    const under = sim.colliders.query(x - 0.12, y - 0.1, z - 0.12, x + 0.12, y + 0.05, z + 0.12).some((b) => Math.abs(b.max[1] - y) < 1e-3);
-    const body = sim.colliders.query(x - 0.37, y + 0.05, z - 0.37, x + 0.37, y + 1.7, z + 0.37).some((b) => b.max[1] > y + 0.05 && b.min[1] < y + 1.7);
-    if (under && !body) out.push([x, y + 0.02, z]);
-  }
-  return out;
-}
 
 const CASES: { def: string; exits: ('opposite' | 'side')[] }[] = [
   { def: 'trapdoorFloor', exits: ['opposite', 'side'] },
@@ -45,7 +29,7 @@ const CASES: { def: string; exits: ('opposite' | 'side')[] }[] = [
 ];
 
 for (const c of CASES) {
-  test(`${c.def}（実験室）: 入口の向き 4 つ × 出口 × 大きさで、落ちずに渡れる・落ちても入口の床へ戻れる`, async () => {
+  test(`${c.def}（実験室）: 入口の向き 4 つ × 出口 × 大きさで、落ちずに渡れる・穴へ落ちると縦穴を落ちる`, async () => {
     const R = await loadRapier();
     const fails: string[] = [];
     const dirs = new Set<number>();
@@ -67,16 +51,15 @@ for (const c of CASES) {
         else if (minY < -0.5) fails.push(`${tag}: 渡る途中で落ちた`);
         sim.physics?.dispose();
       }
+      // 抜ける床は穴の上が床板で埋まっている（落ちる所は専用の試験）
+      if (c.def === 'trapdoorFloor') continue;
       const probe = new Sim(room.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
-      const spots = fallSpots(probe, room, 2, seed + entry * 10);
+      const spots = dropSpots(probe, room.cell, 2, seed + entry * 10);
       probe.physics?.dispose();
       if (spots.length < 2) fails.push(`${tag}: 落ちる点が無い`);
       for (const p of spots) {
         const sim = new Sim(room.floor, { tuning: t, physics: new PhysicsWorld(R, 1 / 60) });
-        sim.teleport(0, p, 0);
-        for (let i = 0; i < 10; i++) sim.step([{ ...IDLE_COMMAND }]);
-        const res = walkTo(sim, 'room', room.inside, 90);
-        if (!res.ok || Math.abs(sim.players[0]!.pos[1]) > 0.1) fails.push(`${tag} (${p.map((v) => v.toFixed(1)).join(', ')}): 入口の床へ戻れない ${res.reason}`);
+        if (!fallsDown(sim, room.floor, p, 0)) fails.push(`${tag} (${p.map((v) => v.toFixed(1)).join(', ')}): 縦穴を落ちない（y=${sim.players[0]!.pos[1].toFixed(2)}）`);
         sim.physics?.dispose();
       }
     }
@@ -93,18 +76,30 @@ function forward(room: LabRoom): { yaw: number; f: Vec3 } {
   return { yaw: Math.atan2(-f[0] / l, -f[2] / l), f: [f[0] / l, 0, f[2] / l] };
 }
 
-test('走ると抜ける床: 歩けば開かず、走ると床板が開いて落ちる', () => {
+test('抜ける床: しゃがんで止まらずに渡れば開かない。ふつうに歩くと軋んで開き、縦穴へ落ちる。上で立ち止まっても開く', () => {
   const room = labRoom('trapdoorFloor', { w: 6.6, d: 8.0, entry: 2, exit: 0, seed: 3 })!;
   const { yaw } = forward(room);
-  const walk = new Sim(room.floor, { tuning: t });
-  walk.teleport(0, [room.inside[0], 0.02, room.inside[2]], yaw);
-  assert.ok(walkTo(walk, 'room', room.exitInside!, 60).ok);
-  assert.ok(!walk.drainEvents().some((e) => e.type === 'cue' && e.data?.name === 'trap.open'), '歩けば開かない');
-  const run = new Sim(room.floor, { tuning: t });
-  run.teleport(0, [room.inside[0], 0.02, room.inside[2]], yaw);
+  const opened = (sim: Sim): boolean => sim.drainEvents().some((e) => e.type === 'cue' && e.data?.name === 'trap.open');
+  // 歩く人（しゃがんで渡る手順）
+  const crouch = new Sim(room.floor, { tuning: t });
+  crouch.teleport(0, [room.inside[0], 0.02, room.inside[2]], yaw);
+  assert.ok(walkTo(crouch, 'room', room.exitInside!, 60).ok);
+  assert.ok(!opened(crouch) && Math.abs(crouch.players[0]!.pos[1]) < 0.1, 'しゃがんで渡れば開かない');
+  // ふつうに歩く・走る
+  for (const dash of [false, true]) {
+    const sim = new Sim(room.floor, { tuning: t });
+    sim.teleport(0, [room.inside[0], 0.02, room.inside[2]], yaw);
+    let minY = 0;
+    for (let i = 0; i < 150; i++) { sim.step([{ ...IDLE_COMMAND, yaw, moveY: 1, dash }]); minY = Math.min(minY, sim.players[0]!.pos[1]); }
+    assert.ok(opened(sim) && minY < -6, `${dash ? '走る' : '歩く'}と落ちる（${minY.toFixed(2)}）`);
+  }
+  // しゃがんで床板の上へ出て、立ち止まる
+  const stop = new Sim(room.floor, { tuning: t });
+  stop.teleport(0, [room.inside[0], 0.02, room.inside[2]], yaw);
   let minY = 0;
-  for (let i = 0; i < 120; i++) { run.step([{ ...IDLE_COMMAND, yaw, moveY: 1, dash: true }]); minY = Math.min(minY, run.players[0]!.pos[1]); }
-  assert.ok(run.drainEvents().some((e) => e.type === 'cue' && e.data?.name === 'trap.open') && minY < -1.5, `走ると落ちる（${minY.toFixed(2)}）`);
+  for (let i = 0; i < 70; i++) stop.step([{ ...IDLE_COMMAND, yaw, moveY: 1, crouch: true }]);
+  for (let i = 0; i < 60 * (t['move.chasm.trapStillSec'] + 1.5); i++) { stop.step([{ ...IDLE_COMMAND, yaw, crouch: true }]); minY = Math.min(minY, stop.players[0]!.pos[1]); }
+  assert.ok(minY < -1.5, `立ち止まると落ちる（${minY.toFixed(2)}）`);
 });
 
 test('見えない足場: 足場は描かない当たり判定で、その上にだけ埃がある', () => {
@@ -123,7 +118,9 @@ test('吊り橋: 歩けば揺れは小さく渡れる。走ると大きく揺れ
   const walk = new Sim(room.floor, { tuning: t });
   walk.teleport(0, [cx, 0.02, room.inside[2]], yaw);
   let maxAmp = 0, minY = 0;
-  for (let i = 0; i < 180; i++) { walk.step([{ ...IDLE_COMMAND, yaw, moveY: 1 }]); maxAmp = Math.max(maxAmp, walk.outputOf(bridge.id, 'amp')); minY = Math.min(minY, walk.players[0]!.pos[1]); }
+  // 出口の床まで歩く（部屋の外へは出ない）
+  const ex = room.exitInside!;
+  for (let i = 0; i < 180 && Math.hypot(walk.players[0]!.pos[0] - ex[0], walk.players[0]!.pos[2] - ex[2]) > 0.4; i++) { walk.step([{ ...IDLE_COMMAND, yaw, moveY: 1 }]); maxAmp = Math.max(maxAmp, walk.outputOf(bridge.id, 'amp')); minY = Math.min(minY, walk.players[0]!.pos[1]); }
   assert.ok(minY > -0.3 && maxAmp < 2, `歩けば渡れる（揺れ ${maxAmp.toFixed(1)}°・${minY.toFixed(2)}）`);
   let fell = 0;
   for (const phase of [0, 20, 40]) {

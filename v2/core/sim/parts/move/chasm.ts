@@ -1,7 +1,8 @@
 /**
  * 移動と身体の部品: 溝・穴の上を渡る仕掛け。
- * - trapTile: 走ると抜ける床板。上で速く動く（speed m/s より速い）か、跳んで着地すると、蝶番で下へ開く（openSec 秒で閉じる。
- *     中に人がいる間は閉じない）
+ * - trapTile: 抜ける床板。上で速く動く（speed m/s より速い。しゃがみ歩きより速い）と軋み、creakSec 続くと蝶番で下へ開く。
+ *     跳んで着地しても、上で立ち止まって stillSec たっても開く（しゃがんで、止まらずに渡る）。openSec 秒で閉じる
+ *     （中に人がいる間は閉じない）
  * - swayBridge: 吊り橋。橋板は面（SupportSurface）で、横に傾いて揺れる。揺れは上を歩く速さで大きくなり（走ると大きい）、
  *     立ち止まると収まる。傾きの分だけ横へ押す（大きく揺れると橋から落ちる）
  * - pendulum: 振り子の板（当たり判定の箱）。軸 pivot から長さ len で、向き swing（水平）に角度 amp で揺れる。
@@ -12,10 +13,10 @@ import { aabbCenter, type AABB } from '../../../math/aabb.ts';
 import { clamp, type Vec3 } from '../../../math/vec.ts';
 import type { Json } from '../../../world/layout.ts';
 import { definePart, pAabb, pNum, playerIn, pVec, type PartContext } from '../../part.ts';
-import { bodyAabb } from '../../player.ts';
+import { bodyAabb, PLAYER } from '../../player.ts';
 
-// ---------------------------------------------------------------- 走ると抜ける床板
-interface TrapState { open: number; t: number; angle: number; air: { [player: string]: number }; [k: string]: Json | undefined }
+// ---------------------------------------------------------------- 抜ける床板
+interface TrapState { open: number; t: number; angle: number; air: { [player: string]: number }; creak?: number; still?: number; [k: string]: Json | undefined }
 
 definePart<TrapState>({
   type: 'trapTile',
@@ -26,23 +27,31 @@ definePart<TrapState>({
   },
   step(s, ctx) {
     const b = pAabb(ctx.spec, 'box');
-    const top: AABB = { min: [b.min[0] - 0.02, b.max[1] - 0.05, b.min[2] - 0.02], max: [b.max[0] + 0.02, b.max[1] + 0.3, b.max[2] + 0.02] };
+    // 体が少しでも掛かっていれば床板の上とみなす（継ぎ目の上・床板の縁に立っていても、掛かっている床板はどれも開く）
+    const R = PLAYER.radius - 0.05;
+    const top: AABB = { min: [b.min[0] - R, b.max[1] - 0.05, b.min[2] - R], max: [b.max[0] + R, b.max[1] + 0.3, b.max[2] + R] };
     const speedMax = pNum(ctx.spec, 'speed', 4.0);
     if (!s.open) {
+      let fast = false, still = false, landedAny = false;
       for (const p of ctx.players) {
-        const over = p.pos[0] > b.min[0] && p.pos[0] < b.max[0] && p.pos[2] > b.min[2] && p.pos[2] < b.max[2];
         // 宙にいた時間（跳んで着地したかを見る）
         if (!p.onGround) s.air[p.id] = (s.air[p.id] ?? 0) + ctx.dt;
         const landed = p.onGround && (s.air[p.id] ?? 0) > pNum(ctx.spec, 'airSec', 0.3);
         if (p.onGround) s.air[p.id] = 0;
-        if (!over || !playerIn(p, top)) continue;
+        if (!playerIn(p, top)) continue;
         const hs = Math.hypot(p.vel[0], p.vel[2]);
-        if (hs > speedMax || landed) {
-          s.open = 1; s.t = 0;
-          ctx.setCollider('tile', null);
-          ctx.cue('trap.open', aabbCenter(b), { by: landed ? 'land' : 'run' });
-          break;
-        }
+        if (landed) landedAny = true;
+        if (hs > speedMax) fast = true;
+        else if (hs < 0.3) still = true;
+      }
+      // 速く動いている間は軋み（初めに 1 回音）、続くと開く。止まっている間も数える
+      if (fast && !s.creak) ctx.cue('trap.creak', aabbCenter(b));
+      s.creak = fast ? (s.creak ?? 0) + ctx.dt : 0;
+      s.still = still ? (s.still ?? 0) + ctx.dt : 0;
+      if (landedAny || (fast && s.creak >= pNum(ctx.spec, 'creakSec', 0)) || (still && s.still >= pNum(ctx.spec, 'stillSec', Infinity))) {
+        s.open = 1; s.t = 0; s.creak = 0; s.still = 0;
+        ctx.setCollider('tile', null);
+        ctx.cue('trap.open', aabbCenter(b), { by: landedAny ? 'land' : fast ? 'run' : 'still' });
       }
     } else {
       s.t += ctx.dt;

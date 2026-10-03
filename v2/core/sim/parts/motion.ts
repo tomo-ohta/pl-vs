@@ -181,6 +181,16 @@ definePart<TiltState>({
     }
     s.gx = approach(s.gx, tx, speed * ctx.dt);
     s.gz = approach(s.gz, tz, speed * ctx.dt);
+    // 滑る: 傾きが slipDeg を超えると、乗っている人が低い方へ滑る（最大の傾きで slipSpeed m/s。歩いて登るのがやっと）。14 章
+    const slip = (pNum(ctx.spec, 'slipDeg', 90) * Math.PI) / 180;
+    const ang = Math.hypot(s.gx, s.gz);
+    if (ang > slip && max > slip) {
+      const k = Math.min(1, (ang - slip) / (max - slip)) * pNum(ctx.spec, 'slipSpeed', 3.5);
+      for (const p of ctx.players) {
+        if (p.surfaceId !== `${ctx.id}:top`) continue;
+        p.carry = [p.carry[0] + (s.gx / ang) * k, p.carry[1], p.carry[2] + (s.gz / ang) * k];
+      }
+    }
     const top: Vec3 = [cx, y, cz];
     const pose = tiltPose(top, s.gx, s.gz, th);
     s.normal = pose.normal;

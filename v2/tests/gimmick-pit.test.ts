@@ -1,7 +1,7 @@
 /**
- * 穴・溝の部屋（崩れる床 crumbleFloor・細い道 narrowPath・細い梁の網 beamNetwork）:
- * 入口から出口まで渡れる・穴の底のどこに落ちても入口の床へ歩いて戻れる（階段が入口の床に届く）・
- * 床板は乗り続けると落ちて、しばらくで戻る・梁の網には行き止まりがある・穴の底の隠しへ入れる・決定的
+ * 穴・溝の部屋（崩れる床 crumbleFloor・細い道 narrowPath・細い梁の網 beamNetwork）。穴は底の見えない落ちる穴（14 章）:
+ * 入口から出口まで渡れる・穴の上のどこから落ちても縦穴を落ちる（1 つ下の階へ）・崩れる床は道の床板が離れても崩れ、見せかけの床板は
+ * すぐ抜け、しばらくで戻る・梁の網には行き止まりがある・下の細い足場から隠しへ入れる・決定的
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,6 +15,7 @@ import { IDLE_COMMAND } from '../core/sim/types.ts';
 import { WALL_T } from '../core/world/layout.ts';
 import { walkTo } from './helpers/bot.ts';
 import { findRooms, regenerate, type GimmickRoom } from './helpers/gimmick-rooms.ts';
+import { dropSpots, fallsDown } from './helpers/drop.ts';
 
 const t = defaultTuning();
 // 段階 4 で仕掛けが 100 種を超えたので、穴の仕掛けを出やすくして集める（gimmick.w.<id>）
@@ -25,18 +26,14 @@ const ROOMS = {
   beamNetwork: findRooms('beamNetwork', 8, { maxWorld: 1200, ...boost('beamNetwork', 20) }),
 };
 
-/** 穴の底の高さ（区画のいちばん低い当たり判定の箱の上面） */
-const bottomOf = (room: GimmickRoom): number => Math.min(...room.cell.boxes.filter((b) => b.solid && b.max[1] < room.cell.floorY - 1).map((b) => b.max[1]));
-
-/** 穴の底の、体が入る（段・柱・壁に掛からない）点を n 個（決まった乱数で） */
+/** 溝の底（立ち止まると見える道は、底と階段のある溝のまま）の、体が入る点を n 個 */
 function fallSpots(sim: Sim, room: GimmickRoom, n: number, seed: number): [number, number, number][] {
   const fr = room.cell.footprint.reduce((a, x) => ((x.x1 - x.x0) * (x.z1 - x.z0) > (a.x1 - a.x0) * (a.z1 - a.z0) ? x : a));
-  const y = bottomOf(room);
+  const y = Math.min(...room.cell.boxes.filter((b) => b.solid && b.max[1] < room.cell.floorY - 1).map((b) => b.max[1]));
   const rng = new Rng(seed);
   const out: [number, number, number][] = [];
   for (let i = 0; i < 400 && out.length < n; i++) {
     const x = rng.float(fr.x0 + WALL_T + 0.4, fr.x1 - WALL_T - 0.4), z = rng.float(fr.z0 + WALL_T + 0.4, fr.z1 - WALL_T - 0.4);
-    // 底の上に立てて、体の高さに何も無い
     const under = sim.colliders.query(x - 0.12, y - 0.1, z - 0.12, x + 0.12, y + 0.05, z + 0.12).some((b) => Math.abs(b.max[1] - y) < 1e-3);
     const body = sim.colliders.query(x - 0.37, y + 0.05, z - 0.37, x + 0.37, y + 1.7, z + 0.37).some((b) => b.max[1] > y + 0.05 && b.min[1] < y + 1.7);
     if (under && !body) out.push([x, y + 0.02, z]);
@@ -66,40 +63,21 @@ for (const def of ['crumbleFloor', 'narrowPath', 'beamNetwork'] as const) {
     assert.deepEqual(fails, []);
   });
 
-  test(`${def}: 穴の底のどこに落ちても、階段で入口の床へ戻れる`, async () => {
+  test(`${def}: 穴の上のどこから落ちても、底の見えない縦穴を落ちる（1 つ下の階へ）`, async () => {
     const fails: string[] = [];
     let n = 0;
-    // 入口の向き（区画から外向き。0:+Z 1:+X 2:-Z 3:-X）と、階段の側（入口から見て左右）
-    const dirs = new Set<number>(), sides = new Set<string>();
     for (const room of ROOMS[def]) {
-      const b = room.cell.bounds, a = room.entry.aabb;
-      const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2, px = (a.min[0] + a.max[0]) / 2, pz = (a.min[2] + a.max[2]) / 2;
-      const dir = room.entry.dir % 2 === 1 ? (px > cx ? 1 : 3) : (pz > cz ? 0 : 2);
-      dirs.add(dir);
-      const steps = room.cell.boxes.filter((x) => x.solid && x.mat === room.cell.palette.floor && x.min[1] < room.cell.floorY - 1 && x.max[1] < room.cell.floorY - 0.05 && x.max[1] > bottomOf(room) + 0.05);
-      if (steps.length) {
-        const sx = steps.reduce((s0, x) => s0 + (x.min[0] + x.max[0]) / 2, 0) / steps.length, sz = steps.reduce((s0, x) => s0 + (x.min[2] + x.max[2]) / 2, 0) / steps.length;
-        // 入口から奥へ向いたときの右手が +: 奥の向き (fx, fz)、右 = (-fz, fx)
-        const [fx, fz] = dir === 0 ? [0, -1] : dir === 2 ? [0, 1] : dir === 1 ? [-1, 0] : [1, 0];
-        sides.add(((sx - cx) * -fz + (sz - cz) * fx) > 0 ? 'right' : 'left');
-      }
       const probe = await newSim(room);
-      const spots = fallSpots(probe, room, def === 'beamNetwork' ? 4 : 3, room.floor.seed);
+      const spots = dropSpots(probe, room.cell, 3, room.floor.seed);
       probe.physics?.dispose();
-      assert.ok(spots.length >= 2, `${room.cell.id}: 底に落ちる点がある`);
       for (const p of spots) {
         n++;
         const sim = await newSim(room);
-        sim.teleport(0, p, 0);
-        for (let i = 0; i < 10; i++) sim.step([{ ...IDLE_COMMAND }]);
-        const res = walkTo(sim, room.cell.id, [room.inside[0], room.cell.floorY, room.inside[2]], 90);
-        const pl = sim.players[0]!;
-        if (!res.ok || Math.abs(pl.pos[1] - room.cell.floorY) > 0.1) fails.push(`${room.floor.id} ${room.cell.id} (${p.map((v) => v.toFixed(1)).join(', ')}): ${res.reason || `入口の床に上がれない y=${pl.pos[1].toFixed(2)}`}`);
+        if (!fallsDown(sim, room.floor, p, room.cell.floorY)) fails.push(`${room.floor.id} ${room.cell.id} (${p.map((v) => v.toFixed(1)).join(', ')}): 縦穴を落ちない（y=${sim.players[0]!.pos[1].toFixed(2)}）`);
         sim.physics?.dispose();
       }
     }
-    console.log(`  ${def}: 落ちた点 ${n}、入口の向き ${[...dirs].sort().join(',')}、階段の側 ${[...sides].sort().join(',')}`);
-    // 入口の向き 4 つ・階段の左右を全部試すのは gimmick-lab.test.ts（生成の偶然に頼らない）
+    assert.ok(n >= 3, `${def}: 落ちた点 ${n}`);
     assert.deepEqual(fails, []);
   });
 }
@@ -124,34 +102,35 @@ test('立ち止まると見える道（appearPath）: 溝の底から、入口�
   assert.deepEqual(fails, []);
 });
 
-test('崩れる床: 乗り続けると揺れて落ち、穴の底へ落ちる。離れていればしばらくで戻る', async () => {
+test('崩れる床: 道の床板は乗ると少しで揺れて落ち、離れても止まらない。見せかけの床板は乗るとすぐ抜ける。しばらくで戻る', async () => {
+  let checked = 0;
   for (const room of ROOMS.crumbleFloor.slice(0, 6)) {
     const tiles = room.floor.entities.filter((e) => e.type === 'crumbleTile' && e.cell === room.cell.id);
-    assert.ok(tiles.length >= 6, `${room.cell.id}: 床板 ${tiles.length}`);
-    // 真ん中に立った体（幅 0.7 m）が、ほかの床板・固い床に掛からない床板（段階 4 で生成が変わり、真ん中の床板が細い切れ端になることがあった）
-    const solidTop = room.cell.boxes.filter((x) => x.solid && Math.abs(x.max[1] - room.cell.floorY) < 1e-3);
-    const fits = (e: (typeof tiles)[number]): boolean => {
-      const bb = e.params.box as { min: number[]; max: number[] }, cx = (bb.min[0]! + bb.max[0]!) / 2, cz = (bb.min[2]! + bb.max[2]!) / 2, R = 0.36;
-      const others = [...solidTop, ...tiles.filter((x) => x !== e).map((x) => x.params.box as { min: number[]; max: number[] })];
-      return !others.some((x) => x.min[0]! < cx + R && x.max[0]! > cx - R && x.min[2]! < cz + R && x.max[2]! > cz - R);
-    };
-    const tile = tiles.slice(Math.floor(tiles.length / 2)).concat(tiles).find(fits) ?? tiles[Math.floor(tiles.length / 2)]!;
-    const b = tile.params.box as { min: number[]; max: number[] };
+    const road = tiles.filter((e) => !e.params.crack), decoy = tiles.filter((e) => e.params.crack);
+    assert.ok(road.length >= 4, `${room.cell.id}: 道の床板 ${road.length}`);
+    const center = (e: (typeof tiles)[number]): [number, number, number] => { const b = e.params.box as { min: number[]; max: number[] }; return [(b.min[0]! + b.max[0]!) / 2, room.cell.floorY + 0.02, (b.min[2]! + b.max[2]!) / 2]; };
+    // 道の床板: 0.15 秒乗って離れても、少しで落ちる
+    const tile = road[Math.floor(road.length / 2)]!;
     const sim = await newSim(room);
-    sim.teleport(0, [(b.min[0]! + b.max[0]!) / 2, room.cell.floorY + 0.02, (b.min[2]! + b.max[2]!) / 2], 0);
-    // 床板の真ん中に立ち続ける（ほかの床板にも掛かるので、まわりの床板も落ちる）
-    for (let i = 0; i < 60 * 3; i++) sim.step([{ ...IDLE_COMMAND }]);
-    assert.ok(sim.outputOf(tile.id, 'fallen') > 0.5, `${room.cell.id}: 床板が落ちた`);
-    // 穴の底か、底へ下りる階段の低い段（床板が階段の脇なら段に落ちる。担当 sense が「底ちょうど」から緩めた。仕掛けが増えて選ばれる部屋が変わった）
-    assert.ok(Math.abs(sim.players[0]!.pos[1] - bottomOf(room)) < 0.1 || (sim.players[0]!.onGround && sim.players[0]!.pos[1] < room.cell.floorY - 1.0), `${room.cell.id}: 穴の底へ落ちた（y=${sim.players[0]!.pos[1].toFixed(2)}）`);
-    // 入口の床へ戻って待つ → 戻る
+    sim.teleport(0, center(tile), 0);
+    for (let i = 0; i < 9; i++) sim.step([{ ...IDLE_COMMAND }]);
     sim.teleport(0, room.inside, room.yaw);
+    for (let i = 0; i < 60 * 2; i++) sim.step([{ ...IDLE_COMMAND }]);
+    assert.ok(sim.outputOf(tile.id, 'fallen') > 0.5, `${room.cell.id}: 道の床板は離れても落ちる`);
+    // しばらくで戻る
     for (let i = 0; i < 60 * (t['gimmick.crumble.respawnSec'] + 1); i++) sim.step([{ ...IDLE_COMMAND }]);
     assert.ok(sim.outputOf(tile.id, 'fallen') < 0.5, `${room.cell.id}: 床板が戻った`);
-    // 床板を歩いて渡るだけ（1 枚 0.33 秒ほど）では揺れ始めない床板が多い
-    assert.ok(t['gimmick.crumble.standSec'] * 0.85 > 0.3);
+    // 見せかけの床板: 乗るとすぐ抜けて、縦穴を落ちる
+    if (decoy.length) {
+      const d = decoy[0]!;
+      sim.teleport(0, center(d), 0);
+      for (let i = 0; i < 30; i++) sim.step([{ ...IDLE_COMMAND }]);
+      assert.ok(sim.outputOf(d.id, 'fallen') > 0.5 && sim.players[0]!.pos[1] < room.cell.floorY - 0.5, `${room.cell.id}: 見せかけの床板はすぐ抜ける`);
+      checked++;
+    }
     sim.physics?.dispose();
   }
+  assert.ok(checked >= 2, `見せかけの床板 ${checked}`);
 });
 
 test('細い梁の網: 足場の梁に行き止まりがあり、入口の床・出口の床から出る梁は 1 本ずつ', () => {
@@ -170,31 +149,29 @@ test('細い梁の網: 足場の梁に行き止まりがあり、入口の床・
   }
 });
 
-test('穴の底の隠し（crumble.fall・fall.below）: 底から隠し場所へ歩いて入れる', async () => {
+test('下の細い足場の隠し（crumble.fall・fall.below）: 足場に落ちれば、足場の先の扉から隠し場所へ歩いて入れる', async () => {
   let n = 0;
   const fails: string[] = [];
   for (const room of [...ROOMS.crumbleFloor, ...ROOMS.narrowPath, ...ROOMS.beamNetwork]) {
-    const sec = room.r.gimmicks?.secrets.find((s) => s.host === room.cell.id && (s.hook === 'crumble.fall' || s.hook === 'fall.below'));
+    const sec = room.r.gimmicks?.secrets.find((x) => x.host === room.cell.id && (x.hook === 'crumble.fall' || x.hook === 'fall.below'));
     if (!sec) continue;
     n++;
     const door = room.floor.portals.find((p) => p.cells[0] === room.cell.id && p.cells[1] === sec.cell)!;
-    assert.ok(door.aabb.min[1] < room.cell.floorY - 1.5, `${sec.id}: 入口は穴の底`);
-    const probe = await newSim(room);
-    // 段階 4 で足した: 階段（底より高く床より低い段）から 1.2 m 以上離れた所に落ちる（階段の脇は床板の下で頭がつかえ、
-    // 歩く人が階段を上ってから脇へ下りようとして止まる。落ちた先から隠しへ歩けることは、階段から離れた所で確かめる）
-    const yb = bottomOf(room);
-    const steps = room.cell.boxes.filter((b) => b.solid && b.max[1] > yb + 0.1 && b.max[1] < room.cell.floorY - 0.1 && b.min[1] <= yb + 0.01);
-    const far = (p: [number, number, number]): boolean => !steps.some((b) => p[0] > b.min[0] - 1.2 && p[0] < b.max[0] + 1.2 && p[2] > b.min[2] - 1.2 && p[2] < b.max[2] + 1.2);
-    const cands = fallSpots(probe, room, 8, 7);
-    const spot = cands.find(far) ?? cands[0]!;
-    probe.physics?.dispose();
+    const cy = room.cell.floorY - t['gimmick.pit.catwalkDepthM'];
+    assert.ok(Math.abs(door.aabb.min[1] - cy) < 0.05, `${sec.id}: 入口は下の細い足場の高さ`);
+    const walk = room.cell.boxes.filter((b) => b.narrow && Math.abs(b.max[1] - cy) < 1e-3);
+    assert.ok(walk.length >= 2, `${sec.id}: 下の細い足場`);
+    // 足場の上に落ちる（真ん中の上から）
+    const w = walk[0]!;
     const sim = await newSim(room);
-    sim.teleport(0, spot, 0);
-    const res = walkTo(sim, sec.cell, undefined, 90);
+    sim.teleport(0, [(w.min[0] + w.max[0]) / 2, cy + 1.2, (w.min[2] + w.max[2]) / 2], 0);
+    for (let i = 0; i < 40; i++) sim.step([{ ...IDLE_COMMAND }]);
+    if (Math.abs(sim.players[0]!.pos[1] - cy) > 0.05) { fails.push(`${sec.id}: 足場に乗れない（y=${sim.players[0]!.pos[1].toFixed(2)}）`); sim.physics?.dispose(); continue; }
+    const res = walkTo(sim, sec.cell, undefined, 60);
     if (!res.ok) fails.push(`${room.floor.id} ${sec.id}: ${res.reason}`);
     sim.physics?.dispose();
   }
-  assert.ok(n >= 3, `穴の底の隠し: ${n}`);
+  assert.ok(n >= 2, `下の細い足場の隠し: ${n}`);
   assert.deepEqual(fails, []);
 });
 

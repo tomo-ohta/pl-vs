@@ -5,6 +5,8 @@ import { toWorld } from './vec.ts';
 export interface AABB {
   min: Vec3;
   max: Vec3;
+  /** 細い足場（梁・細い道）: 体の真ん中が上にあるときだけ乗れる（端に体が掛かっただけでは乗れない。14 章） */
+  narrow?: boolean;
 }
 
 export function aabb(min: Vec3, max: Vec3): AABB {

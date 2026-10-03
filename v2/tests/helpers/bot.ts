@@ -28,7 +28,7 @@ export interface WalkResult { ok: boolean; reason: string; seconds: number; rout
  * - doneIf: `部品.出力` が入っていれば手順を飛ばす（もう解けている）
  * - replanSec: この区画では道をこの間隔で引き直す（動く床）
  */
-export interface BotStep { at: [number, number, number]; look?: [number, number, number]; wait?: number; until?: string; crouch?: boolean; through?: boolean }
+export interface BotStep { at: [number, number, number]; look?: [number, number, number]; wait?: number; until?: string; crouch?: boolean; through?: boolean; hold?: [number, number] }
 export interface BotHint { steps: BotStep[]; enterAt?: [number, number]; exitAt?: [number, number]; only?: 'secret'; doneIf?: string; replanSec?: number }
 
 const outputRef = (sim: Sim, ref: string): number => { const i = ref.lastIndexOf('.'); return sim.outputOf(ref.slice(0, i), ref.slice(i + 1)); };
@@ -162,6 +162,8 @@ function surfacesAt(sim: Sim, x: number, z: number, yTop: number, S: number, yLo
   for (const b of sim.colliders.query(x - S, yLow, z - S, x + S, yTop + 0.4, z + S)) {
     if (b.max[1] > yTop + 0.36) continue; // 上にある物は足場にならない
     if (b.max[0] <= x - S || b.min[0] >= x + S || b.max[2] <= z - S || b.min[2] >= z + S) continue;
+    // 細い足場（narrow）: 体の真ん中が上にあるときだけ乗れる（14 章。端は余裕を見て 0.04 m 内側）
+    if (b.narrow && (x < b.min[0] + 0.04 || x > b.max[0] - 0.04 || z < b.min[2] + 0.04 || z > b.max[2] - 0.04)) continue;
     out.push(b.max[1]);
   }
   for (const s of sim.surfaces) if (inRect(s.rect, x, z)) { const y = surfaceY(s, x, z); if (y <= yTop + 0.36) out.push(y); }
@@ -516,6 +518,22 @@ function buildLegs(sim: Sim, floor: FloorLayout, from: string, targetCell: strin
     legs.push({ x: x + d[0]! * ka, y, z: z + d[1]! * ka, via: true });
     cell = p.cells[0] === cell ? p.cells[1] : p.cells[0];
   }
+  // 行き先の区画の中の、入る開口と出る開口の決まった手順（params.bot の enterAt・exitAt）で、出る開口が行き先の近くにあるもの（崩れる床・吹き抜けを渡って、向こうの床で止まる）
+  if (goal) {
+    const prevP = steps.length ? steps[steps.length - 1]!.portal ?? null : null;
+    const start = steps.length === 0 ? sim.players[0]!.pos : null;
+    const hints = floor.entities.filter((e) => e.cell === cell && e.params.bot).flatMap((e) => (Array.isArray(e.params.bot) ? e.params.bot : [e.params.bot]) as unknown as BotHint[])
+      .filter((h) => h.enterAt && h.exitAt && h.steps?.length && h.only !== 'secret' && Math.hypot(h.exitAt[0] - goal[0], h.exitAt[1] - goal[2]) < 3.2);
+    let pick: BotHint | undefined;
+    if (prevP) { const [px, , pz] = center(prevP); pick = hints.find((h) => Math.hypot(h.enterAt![0] - px, h.enterAt![1] - pz) < 1.2); }
+    else if (start) pick = hints.slice().sort((a, b) => Math.hypot(a.enterAt![0] - start[0], a.enterAt![1] - start[2]) - Math.hypot(b.enterAt![0] - start[0], b.enterAt![1] - start[2]))[0];
+    // 区画の中から歩き始めるなら: 手順の入る開口の近く・手順の初めの高さ（穴の底からは使わない）にいて、出る開口より入る開口に近いときだけ。
+    // 行き先も、入る開口より出る開口に近いときだけ（手順の途中の点へ行くときは使わない）
+    const d2 = (a: readonly number[], x: number, z: number): number => Math.hypot(a[0]! - x, a[1]! - z);
+    const usable = (h: BotHint): boolean => !start || (d2(h.enterAt!, start[0], start[2]) < 3.5 && Math.abs(start[1] - h.steps[0]!.at[1]) < 0.6 &&
+      (!h.exitAt || (d2(h.enterAt!, start[0], start[2]) < d2(h.exitAt, start[0], start[2]) && d2(h.exitAt, goal[0], goal[2]) < d2(h.enterAt!, goal[0], goal[2]))));
+    if (pick && usable(pick)) for (const st of pick.steps) legs.push({ x: st.at[0], y: st.at[1], z: st.at[2], hint: st });
+  }
   if (goal) legs.push({ x: goal[0], y: goal[1], z: goal[2] });
   return { legs, ids: steps.map((x) => x.portal ? x.portal.id : `warp:${x.link!.from}>${x.link!.to}`) };
 }
@@ -559,6 +577,10 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
         hc.pitch = Math.atan2(ey, Math.hypot(ex, ez));
         hc.interact = { yaw: hc.yaw, pitch: hc.pitch };
         hintPressed = true;
+      } else if (h.hold) {
+        // 待つ間、向きと前への操作を保つ（ロープ渡り）
+        hc.yaw = h.hold[0];
+        hc.moveY = h.hold[1];
       }
       sim.step([hc]);
       hintT += sim.dt;
@@ -772,7 +794,12 @@ export function walkTo(sim: Sim, targetCell: string, goal?: [number, number, num
     }
     lastCell = cellAtPos(floor, player.pos)?.id ?? lastCell;
     // 仕掛けの解き方の手順の立つ所に着いた: 次の tick から調べる・待つ
-    if (L.hint && dist < 0.3 && path.length <= 1 && Math.abs(player.pos[1] - L.y) < 1.2) { hintT = 0; path = []; continue; }
+    if (L.hint && dist < 0.3 && path.length <= 1 && Math.abs(player.pos[1] - L.y) < 1.2) {
+      // 何もしない通り道の点（崩れる床の道）: 止まらずに次へ
+      const h = L.hint;
+      if (!h.look && !h.wait && !h.until && !h.hold && !h.crouch && !h.through) { leg++; stuck = 0; bestD = Infinity; legT = 0; path = []; continue; }
+      hintT = 0; path = []; continue;
+    }
     // 目標の点に着いた（区間の終わりは高さも合っていること: 穴の底の扉の真上の床板の上では着いていない）
     // 途中の曲がり角の点は 0.2 m まで寄る（家具の角を内側で回らない。structure）。押す力の中（坂・滑り台・流れ）や寄れずに止まっているときは 0.3 m（move の滑り台）
     // 段差（階段・坂）の途中の点は 0.3 m（上り下りで足元の高さが変わり、0.2 m まで寄れないことがある）

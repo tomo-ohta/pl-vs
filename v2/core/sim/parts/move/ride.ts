@@ -3,8 +3,10 @@
  * - pathRide: 折れ線 path に沿って人を運ぶ。乗るのは調べる（E / タップ）。乗っている間、位置と速度は部品が決める（足元 = 線の点 + foot）。
  *     mode zip: ジップライン。線の始まりでつかまると、加速しながら終わりまで滑る（終わりで手を離す）。誰もいないと取っ手は始まりへ戻る
  *     mode rope: ロープ渡り。どちらの端でもつかまれる。線に沿う向きの操作でゆっくり進む（両手でつかまっている）。端で岸へ上がる
- *     mode cart: 台車。坂の上で乗ると、坂で加速して終わりの車止めまで転がる。誰もいないと台車は始まりへ戻る
- *     どの mode も、跳ぶ操作で手を離す（落ちても穴の底の階段で戻れる所にだけ置く）
+ *     mode cart: 台車。坂の上で乗ると、坂で加速して終わりの車止めまで転がる。誰もいないと台車は始まりへ戻る。
+ *       both: 両方の端で乗れる（今いる端から向こうの端へ。accel で押されて走る）。誰も乗らずに returnSec たち、向こうの端の
+ *       乗り場（端から callM）に人が待っていれば、空のままそちらへ転がる（呼ばなくても来る）。始まりへは戻らない
+ *     zip・rope は跳ぶ操作で手を離す（落ちる）
  * - cableCar: ゴンドラ。二つの乗り場の間を、待つ → 動く をくり返す箱の床。動いている間は床がゆっくり 1 回転し、乗っている人も
  *     一緒に回る（景色が回る）。動いている間は乗り口の柵が閉じる
  */
@@ -52,7 +54,7 @@ export function nearestS(L: Polyline, q: Readonly<Vec3>): number {
 }
 
 // ---------------------------------------------------------------- 線に沿う乗り物
-interface RideState { rider: string; s: number; v: number; idle: number; [k: string]: Json | undefined }
+interface RideState { rider: string; s: number; v: number; idle: number; dir?: number; [k: string]: Json | undefined }
 
 const lineOf = (ctx: PartContext): Polyline => polyline(ctx.spec.params.path as number[][]);
 
@@ -82,11 +84,11 @@ function release(ctx: PartContext, s: RideState, p: PlayerState | undefined, at?
 
 definePart<RideState>({
   type: 'pathRide',
-  outputs: ['riding', 's', 'v'],
+  outputs: ['riding', 's', 'v', 'done', 'atA', 'atB'],
   init(ctx) {
     const L = lineOf(ctx);
     setBoard(ctx, L, 0);
-    return { rider: '', s: 0, v: 0, idle: 0 };
+    return { rider: '', s: 0, v: 0, idle: 0, done: 0, dir: 1 };
   },
   step(s, ctx) {
     const L = lineOf(ctx);
@@ -94,14 +96,28 @@ definePart<RideState>({
     const foot = pVec(ctx.spec, 'foot', [0, -2.0, 0]);
     let p = s.rider ? ctx.players.find((x) => x.id === s.rider) : undefined;
     if (s.rider && (!p || p.ride !== ctx.id)) { release(ctx, s, p); p = undefined; }
+    const both = mode === 'cart' && !!ctx.spec.params.both;
     if (!s.rider) {
       const who = ctx.interactedBy();
-      const atStart = s.s < 0.05;
-      if (who && !who.ride && (mode === 'rope' || atStart)) {
-        s.rider = who.id; who.ride = ctx.id; s.v = 0;
+      const atStart = s.s < 0.05, atEnd = s.s > L.len - 0.05;
+      if (who && !who.ride && (mode === 'rope' || atStart || (both && atEnd))) {
+        s.rider = who.id; who.ride = ctx.id; s.v = 0; s.done = 0;
+        s.dir = both && atEnd ? -1 : 1;
         if (mode === 'rope') s.s = nearestS(L, [who.pos[0] - foot[0], who.pos[1] - foot[1], who.pos[2] - foot[2]]);
         p = who;
         ctx.cue('ride.board', [who.pos[0], who.pos[1] + 1, who.pos[2]]);
+      } else if (both) {
+        // 誰も乗っていない: 向こうの端の乗り場で人が待っていれば、空のままそちらへ（着いたら止まる）
+        const callM = pNum(ctx.spec, 'callM', 2.2);
+        const near = (q: Vec3): boolean => ctx.players.some((x) => !x.ride && Math.hypot(x.pos[0] - q[0], x.pos[2] - q[2]) < callM && Math.abs(x.pos[1] - q[1]) < 1.2);
+        const a = L.pts[0]!, b = L.pts[L.pts.length - 1]!;
+        if (s.v !== 0) {
+          s.s = clamp(s.s + s.v * ctx.dt, 0, L.len);
+          if (s.s <= 0 || s.s >= L.len) s.v = 0;
+        } else if ((atStart && near(b) && !near(a)) || (atEnd && near(a) && !near(b))) {
+          s.idle += ctx.dt;
+          if (s.idle > pNum(ctx.spec, 'returnSec', 3)) { s.v = (atStart ? 1 : -1) * pNum(ctx.spec, 'returnSpeed', 2.5); s.idle = 0; }
+        } else s.idle = 0;
       } else if (mode !== 'rope' && s.s > 0) {
         // 誰も乗っていない: しばらくすると始まりへ戻る（取っ手・台車を引き戻す綱）
         s.idle += ctx.dt;
@@ -119,22 +135,30 @@ definePart<RideState>({
         const along = h > 1e-6 ? (d[0] * t[0] + d[1] * t[2]) / h : 0;
         s.v = Math.abs(along) > 0.2 ? Math.sign(along) * pNum(ctx.spec, 'speed', 1.1) * Math.min(1, Math.abs(along)) : 0;
         s.s = clamp(s.s + s.v * ctx.dt, 0, L.len);
+      } else if (both) {
+        // 台車（両方の端）: 押されて向こうの端へ（速さは向きの符号付き）
+        const dir = s.dir ?? 1;
+        s.v = dir * Math.min(pNum(ctx.spec, 'vmax', 7), Math.abs(s.v) + pNum(ctx.spec, 'accel', 2.5) * ctx.dt);
+        s.s = clamp(s.s + s.v * ctx.dt, 0, L.len);
       } else {
         // 台車: 坂で加速し、平らな所では転がり抵抗でゆっくりになる（止まりきらない速さは残す）
         const a = -9.8 * t[1] - pNum(ctx.spec, 'roll', 0.6);
         s.v = clamp(s.v + a * ctx.dt, pNum(ctx.spec, 'vmin', 1.2), pNum(ctx.spec, 'vmax', 7));
         s.s += s.v * ctx.dt;
       }
-      const end = s.s >= L.len - 1e-4, start = mode === 'rope' && s.s <= 1e-4 && s.v < 0;
+      const back = both && (s.dir ?? 1) < 0;
+      // ロープは進む向きの端でだけ岸へ上がる（向こうの端でつかまった直後は上がらない）
+      const end = back ? s.s <= 1e-4 : s.s >= L.len - 1e-4 && (mode !== 'rope' || s.v > 0), start = mode === 'rope' && s.s <= 1e-4 && s.v < 0;
       const { p: q, t: tt } = pointAt(L, s.s);
       p.pos = [q[0] + foot[0], q[1] + foot[1], q[2] + foot[2]];
       p.vel = [tt[0] * s.v, tt[1] * s.v, tt[2] * s.v];
       p.onGround = false;
       if (end || start) {
         if (end) ctx.cue(mode === 'cart' ? 'cart.bump' : 'ride.arrive', [q[0], q[1], q[2]]);
+        s.done = 1;
         const at = end ? (ctx.spec.params.endAt as number[] | undefined) : (ctx.spec.params.startAt as number[] | undefined);
         release(ctx, s, p, at ? [at[0]!, at[1]!, at[2]!] : undefined);
-        if (end && !at) p.vel = [tt[0] * Math.min(s.v, 2), 0, tt[2] * Math.min(s.v, 2)];
+        if (end && !at) p.vel = [tt[0] * Math.max(-2, Math.min(s.v, 2)), 0, tt[2] * Math.max(-2, Math.min(s.v, 2))];
         s.s = clamp(s.s, 0, L.len);
         s.v = 0;
       } else if (p.input.jump && mode !== 'cart') {
@@ -146,6 +170,11 @@ definePart<RideState>({
     ctx.output('riding', s.rider ? 1 : 0);
     ctx.output('s', s.s);
     ctx.output('v', s.v);
+    // 端まで乗って降りた（次に乗るまで 1。歩く人が待つのに使う）
+    ctx.output('done', s.done ? 1 : 0);
+    // 空の乗り物が端に止まっている（歩く人が待つのに使う）
+    ctx.output('atA', !s.rider && s.v === 0 && s.s < 0.05 ? 1 : 0);
+    ctx.output('atB', !s.rider && s.v === 0 && s.s > L.len - 0.05 ? 1 : 0);
   },
 });
 
@@ -188,7 +217,7 @@ function carBoxes(spec: { params: { [k: string]: Json } }, c: Readonly<Vec3>, mo
 
 definePart<CarState>({
   type: 'cableCar',
-  outputs: ['moving', 'angle', 'riders'],
+  outputs: ['moving', 'angle', 'riders', 'atA', 'atB'],
   init(ctx) {
     const at = cableCarAt(ctx.spec, 0);
     for (const [k, b] of Object.entries(carBoxes(ctx.spec, at.pos, at.moving))) ctx.setCollider(k, b);
@@ -222,5 +251,9 @@ definePart<CarState>({
     ctx.output('moving', at.moving ? 1 : 0);
     ctx.output('angle', at.angle);
     ctx.output('riders', riders);
+    // 乗り場に止まっている（a / b）
+    const pa = pVec(ctx.spec, 'a', [0, 0, 0]), pb = pVec(ctx.spec, 'b', [0, 0, 0]);
+    ctx.output('atA', !at.moving && Math.hypot(at.pos[0] - pa[0], at.pos[2] - pa[2]) < 0.2 ? 1 : 0);
+    ctx.output('atB', !at.moving && Math.hypot(at.pos[0] - pb[0], at.pos[2] - pb[2]) < 0.2 ? 1 : 0);
   },
 });

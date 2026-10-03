@@ -31,7 +31,7 @@ const onlyTwo = (s: GimmickSlot): boolean => s.openings.length === 2;
 function planRoom(ctx: GimmickContext, depth: number): PitPlan | null {
   const s = ctx.slot;
   if (!apart(s)) return null;
-  return planPit(ctx, { depth, strips: facing(s) });
+  return planPit(ctx, { depth, strips: facing(s), drop: true });
 }
 
 /** 階段の通り（lane）を避けた、入口の壁に沿った範囲 */

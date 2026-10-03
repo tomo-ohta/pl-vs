@@ -1,6 +1,6 @@
 /**
  * 光の床の部屋（beamFloor・spotRide・lightBands・lookBridge）: 4 つの向きで組める・規則どおりに渡れる・規則を破ると落ちる・
- * 落ちたら階段で入口の床へ戻れる・決定的
+ * 落ちたら底の見えない縦穴（1 つ下の階へ）・下の細い足場の先に隠しがあることもある・決定的
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,9 +17,9 @@ const DIRS: Dir[] = [0, 1, 2, 3];
 /** 入口の壁に沿う部屋の幅 w・奥行き d（入口から出口へ） */
 const size = (dir: Dir, w: number, d: number): { w: number; d: number } => (dir % 2 === 0 ? { w, d } : { w: d, d: w });
 
-test('光の床: 入口の向き 4 つ・部屋の大きさで組める（穴・固い床・床板・隠しの元）', () => {
+test('光の床: 入口の向き 4 つ・部屋の大きさで組める（穴・固い床・床板・下の細い足場の隠しの元）', () => {
   for (const def of DEFS) {
-    let built = 0;
+    let built = 0, offered = 0;
     for (const dir of DIRS) for (const [w, d] of [[6, 8], [8, 11], [5.2, 7]] as const) {
       const room = labRoom(def, { ...size(dir, w, d), entry: dir, exit: ((dir + 2) % 4) as Dir, seed: 3 + dir });
       if (!room) continue;
@@ -27,9 +27,15 @@ test('光の床: 入口の向き 4 つ・部屋の大きさで組める（穴・
       const lf = entitiesOf(room.floor, 'lightFloor');
       assert.equal(lf.length, 1, `${def}: 光の床の部品`);
       assert.ok((lf[0]!.params.tiles as number[][]).length >= 2, `${def}: 床板`);
-      assert.ok(room.offers.some((o) => o.modes.includes('present')), `${def}: 穴の底の隠しの元`);
+      // 隠しの元は、下の細い足場があるときだけ（足場の高さの扉）
+      const off = room.offers.filter((o) => o.modes.includes('present'));
+      assert.ok(off.every((o) => o.required && Math.abs(o.doorway.y - (room.cell.floorY - T['gimmick.pit.catwalkDepthM'])) < 1e-3), `${def}: 隠しの元は下の細い足場の先`);
+      if (off.length) offered++;
     }
     assert.ok(built >= 8, `${def}: 組めた部屋 ${built}`);
+    // 下の細い足場は半分くらいの部屋に（seed を変えて数える）
+    for (let seed = 1; seed <= 8; seed++) if (labRoom(def, { w: 6, d: 8, entry: 0, exit: 2, seed })?.offers.length) offered++;
+    assert.ok(offered >= 1, `${def}: 下の細い足場の隠し ${offered}`);
   }
 });
 
@@ -42,19 +48,16 @@ async function crossing(def: string, dir: Dir): Promise<{ sim: Sim; a: [number, 
   return { sim, a: [room.inside[0], room.inside[2]], b: [room.exitInside![0], room.exitInside![2]], y: room.cell.floorY, floor: room.floor.entities.find((e) => e.type === 'lightFloor')!.id };
 }
 
-test('照らした所だけある床: 懐中電灯で前を照らして歩けば渡れる・消していると落ちる・落ちたら階段で戻れる', async () => {
+test('照らした所だけある床: 懐中電灯で前を照らして歩けば渡れる・消していると落ちる・落ちたら縦穴（1 つ下の階へ）', async () => {
   for (const dir of DIRS) {
     const c = (await crossing('beamFloor', dir))!;
     assert.ok(goTo(c.sim, c.b[0], c.b[1], { pitch: -0.8, flashlight: true }) && !fell(c.sim, c.y), `向き ${dir}: 照らして渡れる`);
     const d = (await crossing('beamFloor', dir))!;
     goTo(d.sim, d.b[0], d.b[1], { pitch: -0.8, flashlight: false, maxSec: 6 });
     assert.ok(fell(d.sim, d.y), `向き ${dir}: 懐中電灯を消していると落ちる`);
-    stand(d.sim, 1);
-    // 戻るときは懐中電灯を消して（照らした床の上を通る道を選ばず、階段だけで）
-    senseBotOptions.flashlight = false;
-    const back = walkTo(d.sim, d.sim.floor.cells[0]!.id, [d.a[0], d.y, d.a[1]], 60);
-    senseBotOptions.flashlight = true;
-    assert.ok(back.ok && Math.abs(d.sim.players[0]!.pos[1] - d.y) < 0.1, `向き ${dir}: 階段で入口の床へ戻れる（${back.reason}）`);
+    let minY = Infinity;
+    for (let i = 0; i < 90; i++) { stand(d.sim, 1 / 60); minY = Math.min(minY, d.sim.players[0]!.pos[1]); }
+    assert.ok(minY < d.y - 6, `向き ${dir}: 縦穴を落ちる（${minY.toFixed(2)}）`);
   }
 });
 

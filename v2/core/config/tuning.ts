@@ -96,6 +96,11 @@ export const TUNING_SPEC = {
   'gimmick.buildTries': num(3, 1, 8, '選んだ仕掛けがその部屋に組めないとき、次の候補を試す数（大きな仕掛けで部屋を空けない）', true),
   'gimmick.repeatMul': num(0.35, 0, 1, '同じフロアに同じ仕掛けがすでにあるとき、1 つごとに重みに掛ける倍率（同じものが続かないように）'),
   'gimmick.tilt.slideAt': num(0.55, 0.1, 1, '傾く床: 物が滑り出す傾き（最大の傾きに対する割合。摩擦をこの傾きに合わせる）'),
+  'gimmick.tilt.maxDeg': num(24, 6, 40, '傾く床: 傾きの最大（度）'),
+  'gimmick.tilt.rateDeg': num(4, 1, 15, '傾く床: 傾く速さ（度/秒。立ち止まらずに渡れば大きくは傾かない）'),
+  'gimmick.tilt.slipDeg': num(13, 5, 40, '傾く床: この傾きを超えると、乗っている人が低い方へ滑る（度）'),
+  'gimmick.tilt.slipSpeed': num(3.5, 0.5, 8, '傾く床: 最大の傾きで滑る速さ（m/s。歩いて登るのがやっと）'),
+  'gimmick.tilt.trenchM': num(0.9, 0.6, 1.6, '傾く床: 開口も隠しも無い壁と板の間の、落ちる溝の幅（m）'),
 
   // ---- 仕掛けの作り（各仕掛けの数値。core/gen/gimmicks。仕掛けの担当がここに足す）----
   // 導く光の迷路（guideLight）
@@ -117,14 +122,20 @@ export const TUNING_SPEC = {
   'gimmick.pit.landingM': num(1.7, 1.3, 2.5, '穴の部屋: 開口の前の固い床の奥行き（m）'),
   'gimmick.pit.stairRise': num(0.24, 0.15, 0.33, '穴の部屋: 戻る階段の 1 段の高さの上限（m）'),
   'gimmick.pit.stairTread': num(0.3, 0.24, 0.45, '穴の部屋: 戻る階段の踏み面（m）'),
+  'gimmick.pit.litM': num(3.4, 2.6, 6, '落ちる穴（14 章）: 穴の側壁のうち部屋の壁の続きの深さ（m。その下は暗い縦穴）'),
+  'gimmick.pit.minGapM': num(5.6, 3, 9, '落ちる穴: 開口の前の固い床どうしがこれより近ければ、穴の上に低い下がり壁を付ける（m。走って跳んでも届かない間）'),
+  'gimmick.pit.soffitM': num(2.05, 1.95, 2.4, '落ちる穴: 低い下がり壁の高さ（床から m。跳ぶと頭がつかえて遠くへ跳べない。歩いては通れる）'),
+  'gimmick.pit.catwalkChance': num(0.5, 0, 1, '落ちる穴: 穴の中に下の細い足場（隠しへの道）がある確率'),
+  'gimmick.pit.catwalkDepthM': num(2.4, 1.6, 3, '落ちる穴: 下の細い足場の深さ（床から m）'),
   // 崩れる床（crumbleFloor）
   'gimmick.crumble.depthM': num(2.8, 2.5, 3.05, '崩れる床: 穴の深さ（m。3.1 m 以上にすると隠し部屋が隣の区画の下に入り込む）'),
   'gimmick.crumble.tileM': num(0.9, 0.6, 1.5, '崩れる床: 床板の大きさ（m）'),
   'gimmick.crumble.gapM': num(0.09, 0.02, 0.2, '崩れる床: 床板の隙間（下の暗い穴が見える）'),
-  'gimmick.crumble.standSec': num(0.4, 0.1, 2, '崩れる床: 床板に乗り続けてから揺れ始めるまで（秒。歩いて渡れば 1 枚あたり約 0.33 秒）'),
-  'gimmick.crumble.shakeSec': num(0.75, 0.2, 3, '崩れる床: 揺れてから落ちるまで（秒）'),
+  'gimmick.crumble.standSec': num(0.3, 0.1, 2, '崩れる床: 道の床板に乗ってから揺れ始めるまで（秒。離れても止まらない。歩いて渡れば 1 枚あたり約 0.33 秒）'),
+  'gimmick.crumble.shakeSec': num(0.45, 0.2, 3, '崩れる床: 揺れてから落ちるまで（秒）'),
+  'gimmick.crumble.decoyChance': num(0.65, 0, 1, '崩れる床: 道でない所が、見せかけの床板（ひび。乗るとすぐ抜ける）である確率（残りは抜けている）'),
+  'gimmick.crumble.restChance': num(0.5, 0, 1, '崩れる床: 道の真ん中に一息つける崩れない床板がある確率'),
   'gimmick.crumble.respawnSec': num(7, 2, 60, '崩れる床: 落ちた床板が戻るまで（秒。落ちて階段を上るあいだに戻る）'),
-  'gimmick.crumble.safeRatio': num(0.08, 0, 0.3, '崩れる床: 崩れない床板の割合（入口の床と同じ材質。一息つける。並べて道にはしない）'),
   // 細い道（narrowPath）・細い梁の網（beamNetwork）
   'gimmick.narrow.depthM': num(2.6, 2.1, 3.05, '細い道・梁の網: 溝の深さ（m）'),
   'gimmick.beams.widthM': num(0.46, 0.3, 0.8, '細い梁の網: 梁の幅（m）'),

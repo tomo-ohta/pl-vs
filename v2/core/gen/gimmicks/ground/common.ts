@@ -204,10 +204,11 @@ export function soffit(ctx: GimmickContext, r: Rect, clearH: number): void {
 // ---------------------------------------------------------------- 歩く人への解き方の手順（tests/helpers/bot.ts の BotHint）
 
 /** through: 立つ所まで道を探さず、しゃがんでまっすぐ進む（腰の高さのバーの下をくぐる） */
-export interface BotStepSpec { at: Vec3; look?: Vec3; wait?: number; until?: string; crouch?: boolean; through?: boolean }
+/** hold: 待つ間に向きと前への操作を保つ（ロープ渡りで前へ進む。[yaw, moveY]） */
+export interface BotStepSpec { at: Vec3; look?: Vec3; wait?: number; until?: string; crouch?: boolean; through?: boolean; hold?: [number, number] }
 
 /** params.bot の値（JSON） */
-export function botHint(steps: BotStepSpec[], o: { enterAt?: [number, number]; only?: 'secret'; doneIf?: string; replanSec?: number } = {}): Json {
+export function botHint(steps: BotStepSpec[], o: { enterAt?: [number, number]; exitAt?: [number, number]; only?: 'secret'; doneIf?: string; replanSec?: number } = {}): Json {
   const out: { [k: string]: Json } = {
     steps: steps.map((st) => {
       const x: { [k: string]: Json } = { at: [...st.at] };
@@ -216,10 +217,12 @@ export function botHint(steps: BotStepSpec[], o: { enterAt?: [number, number]; o
       if (st.until) x.until = st.until;
       if (st.crouch) x.crouch = true;
       if (st.through) x.through = true;
+      if (st.hold) x.hold = [...st.hold];
       return x;
     }),
   };
   if (o.enterAt) out.enterAt = [...o.enterAt];
+  if (o.exitAt) out.exitAt = [...o.exitAt];
   if (o.only) out.only = o.only;
   if (o.doneIf) out.doneIf = o.doneIf;
   if (o.replanSec) out.replanSec = o.replanSec;

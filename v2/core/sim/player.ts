@@ -763,6 +763,10 @@ let landedOnRise = false;
  * ここでは押さない（重なりは次の tick の depenetrate が最小の量で直す）。
  * v1 は動いた向きで面を決めていたので、角をかすめると箱の反対側まで飛んで続く箱も突き抜け、下向きの移動では背の高い棚の上へ乗った
  */
+/** 細い足場の端の余裕（体の真ん中が上面からこれだけはみ出しても乗っている） */
+const NARROW_M = 0.08;
+const pre1 = (p: PlayerState): number => p.pos[1];
+
 function moveAxis(p: PlayerState, axis: 0 | 1 | 2, delta: number, near: AABB[]): boolean {
   if (axis === 1) landedOnRise = false;
   if (delta === 0) return false;
@@ -779,6 +783,8 @@ function moveAxis(p: PlayerState, axis: 0 | 1 | 2, delta: number, near: AABB[]):
     for (const c of near) {
       if (minX < c.max[0] && maxX > c.min[0] && minY < c.max[1] && maxY > c.min[1] && minZ < c.max[2] && maxZ > c.min[2]) {
         if (axis === 1) {
+          // 細い足場（narrow）: 体の真ん中が上面の上に無ければ乗れない（体の端が掛かっただけで渡れる幅にしない。14 章）
+          if (c.narrow && (q[0] < c.min[0] - NARROW_M || q[0] > c.max[0] + NARROW_M || q[2] < c.min[2] - NARROW_M || q[2] > c.max[2] + NARROW_M) && pre1(p) >= c.max[1] - 0.05) continue;
           // 縦も動く前にいた側で決める: 上から降りた（足が上面から段差以内）なら上に乗る / せり上がる床に押し上げられる / 下から頭を打つ。
           // 横から重なっていた箱（背の高い棚・机の天板の横）には乗らない（v1 は下向きの移動なら高さに関係なく上面へ乗せていた）
           const pre = p.pos[1];
