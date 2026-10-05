@@ -40,6 +40,29 @@
         "v2"
       ],
       "port": 5174
+    },
+    {
+      "name": "spark-samples",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8000",
+        "--directory",
+        "experiments/spark-samples"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "v2-splat-props",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "experiments/v2-splat-props"
+      ],
+      "port": 5175
     }
   ]
 }
