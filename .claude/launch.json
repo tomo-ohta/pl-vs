@@ -1,7 +1,68 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "v1-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "-w", "v1"], "port": 5173 },
-    { "name": "v1-preview-pages", "runtimeExecutable": "npm", "runtimeArgs": ["exec", "-w", "v1", "--", "vite", "preview", "--base", "/pl-vs/", "--port", "4173", "--strictPort"], "port": 4173 }
+    {
+      "name": "v1-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "v1"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "v1-preview-pages",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "exec",
+        "-w",
+        "v1",
+        "--",
+        "vite",
+        "preview",
+        "--base",
+        "/pl-vs/",
+        "--port",
+        "4173",
+        "--strictPort"
+      ],
+      "port": 4173
+    },
+    {
+      "name": "v2-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "v2"
+      ],
+      "port": 5174
+    },
+    {
+      "name": "spark-samples",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8000",
+        "--directory",
+        "experiments/spark-samples"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "v2-splat-props",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "experiments/v2-splat-props"
+      ],
+      "port": 5175
+    }
   ]
 }

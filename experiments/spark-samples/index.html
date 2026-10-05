@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Spark 検証サンプル</title>
+    <link rel="stylesheet" href="./common/styles.css" />
+    <style>
+      body {
+        overflow: auto;
+        background: #15140f;
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 48px 20px 64px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+        font-weight: 600;
+      }
+      .lead {
+        margin: 0 0 32px;
+        color: var(--ink-dim);
+        font-size: 14px;
+        line-height: 1.8;
+      }
+      a.sample {
+        display: block;
+        padding: 18px 20px;
+        margin-bottom: 14px;
+        background: var(--panel-solid);
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--accent);
+        border-radius: 0 8px 8px 0;
+        color: var(--ink);
+        text-decoration: none;
+      }
+      a.sample:hover,
+      a.sample:focus-visible {
+        border-color: var(--accent);
+        outline: none;
+      }
+      a.sample strong {
+        display: block;
+        font-size: 17px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      a.sample span {
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--ink-dim);
+      }
+      .note {
+        margin-top: 28px;
+        font-size: 12px;
+        line-height: 1.8;
+        color: var(--ink-dim);
+      }
+      code {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Spark 検証サンプル</h1>
+      <p class="lead">
+        見た目は 3D Gaussian Splatting、ゲームの処理は透明な箱、という分け方がブラウザで成立するかを確かめるための2本です。
+        撮影データが無くても動くよう、部屋と小物はコードで生成した仮の素材を使っています。
+      </p>
+      <a class="sample" href="./01-two-rooms/">
+        <strong>部屋2つとドア1枚</strong>
+        <span>スプラットの部屋を歩き、ドアを開けて隣の部屋へ。ドアに近づくと隣を読み込み、離れると破棄します。</span>
+      </a>
+      <a class="sample" href="./02-mesh-room-splat-props/">
+        <strong>メッシュの部屋とスプラットの小物</strong>
+        <span>照明を焼き込んだメッシュの部屋に、スプラットの小物を置きます。色合わせ、接地の影、ガラスとの重なり、複製の重さを確認します。</span>
+      </a>
+      <p class="note">
+        ファイルを直接開くと動きません。このフォルダで <code>npx serve .</code> や
+        <code>python3 -m http.server 8000</code> を実行し、表示されたアドレスを開いてください。
+      </p>
+    </main>
+  </body>
+</html>

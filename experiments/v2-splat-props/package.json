@@ -1,0 +1,14 @@
+{
+  "name": "v2-splat-props",
+  "private": true,
+  "version": "0.0.0",
+  "description": "検証用: v2 の部屋はそのまま、小物だけを Spark のスプラットにして見え方を確かめる（v2 のファイルは変更しない）",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host --port 5175 --strictPort",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sparkjsdev/spark": "2.3.1"
+  }
+}
