@@ -79,8 +79,12 @@ export class CameraRig {
   suppressed = false;
   /** 拡大（1 = そのまま。タブレットのカメラのズーム。画角を tan(画角/2)/zoom にする） */
   zoom = 1;
-  private zoomNow = 1;
   baseFov: number;
+  /**
+   * 写真の視点に重ねる（タブレットの写真から移った直後。docs/tablet.md）: k = 1 で、カメラの位置・向き・縦の画角（度）を写真のとおりにし、
+   * k を 0 へ下げると普通のカメラ（手持ちの揺れ・遅れ・画角）へ戻る。null で重ねない
+   */
+  hold: { pos: THREE.Vector3; quat: THREE.Quaternion; fov: number; k: number } | null = null;
   /** 表示値（デバッグ用） */
   readonly out = { y: 0, roll: 0, yaw: 0, pitch: 0, fov: 0 };
 
@@ -94,7 +98,6 @@ export class CameraRig {
   private gaitStep = 0;
   private bobY = 0;
   private bobRoll = 0;
-  private fovNow = 0;
   // 位相の起点（見た目だけ。世界の生成と同期には関わらないので Math.random でよい）
   private readonly phase = [0, 1, 2, 3, 4].map(() => Math.random() * TAU);
   private readonly zoomPeriod = CAMERA_FEEL.zoomSecMin + Math.random() * (CAMERA_FEEL.zoomSecMax - CAMERA_FEEL.zoomSecMin);
@@ -187,12 +190,18 @@ export class CameraRig {
     if (sup) this.camera.rotation.set(s.pitch, s.yaw, 0, 'YXZ');
     else this.camera.rotation.set(o.pitch, o.yaw, o.roll, 'YXZ');
     this.applyGravity(dt, s, sup ? 0 : o.y);
-    const f = sup ? 0 : o.fov;
-    if (f !== this.fovNow || this.zoom !== this.zoomNow) {
-      this.fovNow = f;
-      this.zoomNow = this.zoom;
-      const base = this.baseFov + f;
-      this.camera.fov = this.zoom === 1 ? base : (2 * Math.atan(Math.tan((base * Math.PI) / 360) / Math.max(1, this.zoom)) * 180) / Math.PI;
+    const base = this.baseFov + (sup ? 0 : o.fov);
+    let fovDeg = this.zoom === 1 ? base : (2 * Math.atan(Math.tan((base * Math.PI) / 360) / Math.max(1, this.zoom)) * 180) / Math.PI;
+    // 写真の視点に重ねる
+    const h = this.hold;
+    if (h && h.k > 0) {
+      const k = Math.min(1, h.k);
+      this.camera.position.lerp(h.pos, k);
+      this.camera.quaternion.slerp(h.quat, k);
+      fovDeg += (h.fov - fovDeg) * k;
+    }
+    if (Math.abs(fovDeg - this.camera.fov) > 1e-6) {
+      this.camera.fov = fovDeg;
       this.camera.updateProjectionMatrix();
     }
   }

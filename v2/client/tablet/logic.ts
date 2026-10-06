@@ -1,5 +1,6 @@
 /**
- * タブレットの決まり（DOM・three.js を使わない。Node の試験 tests/tablet-logic.test.ts で確かめる）: アプリの一覧と、探索のダイアル。
+ * タブレットの決まり（DOM・three.js を使わない。Node の試験 tests/tablet-logic.test.ts で確かめる）: アプリの一覧と、探索のダイアル・
+ * 写真の場所（撮った所と視点）と、写真から移るときの写真の見せ方と画角。
  */
 
 /** ホーム画面のアプリ（並び順どおり） */
@@ -80,4 +81,40 @@ export function formatTaken(ms: number, seconds = false): string {
   const d = new Date(ms);
   const p = (n: number): string => String(n).padStart(2, '0');
   return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}${seconds ? `:${p(d.getSeconds())}` : ''}`;
+}
+
+/**
+ * 写真の場所（撮った瞬間。docs/tablet.md）: 写真・SNS の投稿から「探索」で、ここに同じ視点で着く。
+ * feet・yaw・crouch はプレイヤー（置く所）、eye・cam*・fov はカメラ（見え方）。sig は場所の印（core/gen/world/roomId.ts の
+ * spotSignature。移る前に比べ、違えば世界の作りが変わったので行けない）
+ */
+export interface PhotoSpot {
+  depth: number;
+  variant: number;
+  feet: [number, number, number];
+  yaw: number;
+  crouch: boolean;
+  eye: [number, number, number];
+  camYaw: number;
+  camPitch: number;
+  camRoll: number;
+  /** 縦の画角（度。ズーム込み） */
+  fov: number;
+  sig: string;
+}
+
+/**
+ * 写真を画面いっぱいに覆うように見せたとき（はみ出しは切る）に、それと重なる世界の縦の画角（度）。
+ * 写真の縦横比 photoAspect が画面 viewAspect より細いと、写真の上下が切れるので、縦の画角を狭める
+ */
+export function revealFov(fov: number, photoAspect: number, viewAspect: number): number {
+  const t = Math.tan((fov * Math.PI) / 360) * Math.min(1, photoAspect / Math.max(1e-6, viewAspect));
+  return (2 * Math.atan(t) * 180) / Math.PI;
+}
+
+/** 大きさ w × h の絵を、矩形 r を覆うように置く（縦横比はそのまま・真ん中合わせ・はみ出しは切る）: 置く位置と大きさ */
+export function coverRect(w: number, h: number, r: { x0: number; y0: number; x1: number; y1: number }): { x: number; y: number; w: number; h: number } {
+  const rw = r.x1 - r.x0, rh = r.y1 - r.y0;
+  const k = Math.max(rw / Math.max(1, w), rh / Math.max(1, h));
+  return { x: r.x0 + (rw - w * k) / 2, y: r.y0 + (rh - h * k) / 2, w: w * k, h: h * k };
 }

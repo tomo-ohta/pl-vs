@@ -208,6 +208,8 @@ export class AudioEngine {
   private listenerPitch = 0;
   private unsubscribeSettings: (() => void) | null = null;
   private assetsLoaded = false;
+  /** 環境音の絞り（0..1。写真から移る演出で絞って戻す: fadeAmbient） */
+  private ambientFade = 1;
   private readonly boundResume = (): void => { void this.tryResume(); };
   private readonly boundVisibility = (): void => this.onVisibility();
 
@@ -359,9 +361,15 @@ export class AudioEngine {
     // 音量スライダーは聴感に合わせて 2 乗
     ramp(this.master, this.volumes.masterVolume ** 2);
     // 環境音は -3 dB（第20回の 2 回目。足音に対して大きすぎ、空調の部屋で足音が埋もれていた）
-    ramp(this.ambientBus, this.hidden ? 0 : this.volumes.ambientVolume ** 2 * AMBIENT_TRIM);
+    ramp(this.ambientBus, this.hidden ? 0 : this.volumes.ambientVolume ** 2 * AMBIENT_TRIM * this.ambientFade);
     ramp(this.sfxBus, this.volumes.sfxVolume ** 2);
     if (this.uiBus && this.uiOut) { ramp(this.uiOut, this.volumes.masterVolume ** 2); ramp(this.uiBus, this.volumes.sfxVolume ** 2); }
+  }
+
+  /** 環境音を level（0..1）へ sec 秒で絞る・戻す（タブレットの写真から移る演出。音量の設定はそのまま掛かる） */
+  fadeAmbient(level: number, sec: number): void {
+    this.ambientFade = Math.max(0, Math.min(1, level));
+    this.applyVolumes(sec);
   }
 
   /**

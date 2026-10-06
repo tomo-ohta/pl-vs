@@ -80,6 +80,15 @@ export const TUNING_SPEC = {
   'rarity.w.legendary': num(4, 0, 100, 'Legendary の重み'),
   'rarity.w.mythic': num(6.5, 0, 100, 'Mythic の重み'),
 
+  // ---- タブレットの写真から移る演出（docs/tablet.md）----
+  'tablet.travel.raiseSec': num(0.55, 0.1, 3, '写真から移る: タブレットを顔の前へ上げる時間（秒）'),
+  'tablet.travel.holdMinSec': num(0.8, 0, 5, '写真から移る: 視界いっぱいの写真を見せる最短の時間（秒。読み込みが早くてもこれだけは見せる）'),
+  'tablet.travel.lowerSec': num(1.6, 0.2, 6, '写真から移る: 着いてからタブレットを手元へ戻す時間（秒。ゆっくり）'),
+  'tablet.travel.viewKeep': num(0.4, 0, 0.95, '写真から移る: 下ろし始めから写真の視点（位置・向き・画角）のまま保つ割合。残りで普通の視点へ戻す'),
+  'tablet.travel.fit': num(0.97, 0.8, 1.05, '写真から移る: 顔の前の距離（画面が視界いっぱいになる距離の倍率。1 未満で縁が見えない）'),
+  'tablet.travel.fadeOutSec': num(0.8, 0.05, 5, '写真から移る: 環境音を絞る時間（秒）'),
+  'tablet.travel.fadeInSec': num(1.8, 0.05, 6, '写真から移る: 着いてから環境音を戻す時間（秒）'),
+
   // ---- 仕掛けの置き方（gimmicks-and-structures.md 4.2・4.5）----
   'gimmick.chance.main': num(0.36, 0, 1, '本道の上の部屋に仕掛けを置く確率'),
   'gimmick.chance.side': num(0.45, 0, 1, '脇道の部屋（行き止まり・寄り道）に置く確率'),

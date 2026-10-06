@@ -8,7 +8,7 @@ import { defaultTuning } from '../core/config/tuning.ts';
 import { dressCell } from '../core/gen/dress/index.ts';
 import { localId } from '../core/gen/world/namespace.ts';
 import { WorldPlanner } from '../core/gen/world/plan.ts';
-import { cellIndexAt, decodeRoomId, encodeRoomId, isRoomCell, ROOM_CELLS, ROOM_ID_BASE, roomCellOk, roomIdOf, type RoomRef } from '../core/gen/world/roomId.ts';
+import { cellIndexAt, decodeRoomId, encodeRoomId, isRoomCell, ROOM_CELLS, ROOM_ID_BASE, roomCellOk, roomIdOf, spotSignature, type RoomRef } from '../core/gen/world/roomId.ts';
 import { Rng } from '../core/math/rng.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
@@ -190,5 +190,46 @@ test('ルーム ID: 移る先の階が、階段室の向こうに用意した階
   for (let k = 0; k < 5 && !moved; k++) { frame(); moved = s.commitGoto(); }
   assert.ok(moved, '移れる');
   assert.equal(s.storyId, '1.0');
+  s.active.sim.physics?.dispose();
+});
+
+test('写真の場所: 場所の印は同じ区画なら同じ・違う区画なら違う。区画の外は null（seed の違いは写真の seed で見る）', () => {
+  const src = syncSource(t, { dress: dressCell });
+  const P = new WorldPlanner(t);
+  const story = { world: 5, depth: 1, variant: 0 };
+  const L = src.get(P.at(story, 0, 0))!;
+  const rooms = L.cells.filter((c) => isRoomCell(L, c) && c.role !== 'secret');
+  const mid = (c: (typeof rooms)[number]): number[] => { const f = c.footprint[0]!; return [(f.x0 + f.x1) / 2, c.floorY, (f.z0 + f.z1) / 2]; };
+  const a = spotSignature(L, mid(rooms[0]!)), b = spotSignature(L, mid(rooms[1]!));
+  assert.ok(a && b && a !== b);
+  assert.equal(spotSignature(src.get(P.at(story, 0, 0))!, mid(rooms[0]!)), a, '作り直しても同じ');
+  // 穴に落ちている途中（床より下）でも、横の位置の区画
+  const low = mid(rooms[0]!); low[1] = low[1]! - 2.5;
+  assert.equal(spotSignature(L, low), a);
+  assert.equal(spotSignature(L, [1e5, 0, 1e5]), null);
+});
+
+test('写真の場所へ移る: 撮った所（足元・向き・しゃがみ）にそのまま置き、移ったあともその床に立つ', async () => {
+  const R = await loadRapier();
+  const src = syncSource(t, { dress: dressCell });
+  const P = new WorldPlanner(t);
+  const s = new WorldSession(5, 0, { tuning: t, source: src, physics: () => new PhysicsWorld(R, 1 / 60) });
+  for (let k = 0; k < 10; k++) s.step([{ ...IDLE_COMMAND }]);
+  const story = { world: 5, depth: 2, variant: 0 };
+  const plan = P.at(story, 1, 0);
+  const L = src.get(plan)!;
+  const c = L.cells.find((x) => isRoomCell(L, x) && x.role !== 'secret' && x.role !== 'connector' && Math.min(...x.footprint.map((f) => Math.min(f.x1 - f.x0, f.z1 - f.z0))) > 3)!;
+  const f = c.footprint[0]!;
+  const pos: [number, number, number] = [(f.x0 + f.x1) / 2, c.floorY, (f.z0 + f.z1) / 2];
+  assert.ok(s.prepareGotoPose(story, plan, pos, 1.25, true), '用意できる');
+  assert.ok(s.commitGoto(), '移れる');
+  const p = s.active.sim.players[0]!;
+  assert.deepEqual([p.pos[0], p.pos[2]], [pos[0], pos[2]]);
+  assert.equal(p.yaw, 1.25);
+  assert.equal(p.crouching, true, 'しゃがんだまま');
+  for (let k = 0; k < 30; k++) s.step([{ ...IDLE_COMMAND, crouch: true, yaw: 1.25 }]);
+  assert.equal(s.storyId, '2.0');
+  assert.ok(p.onGround && Math.hypot(p.pos[0] - pos[0], p.pos[2] - pos[2]) < 0.3 && Math.abs(p.pos[1] - c.floorY) < 0.3, `撮った所に立つ（${p.pos.map((v) => v.toFixed(2))}）`);
+  assert.equal(cellIndexAt(s.active.regionLayout(plan.id)!, p.pos), L.cells.indexOf(c));
   s.active.sim.physics?.dispose();
 });

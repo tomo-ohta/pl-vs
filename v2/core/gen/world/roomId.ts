@@ -156,3 +156,24 @@ export function cellIndexAt(L: FloorLayout, p: readonly number[]): number {
   });
   return best;
 }
+
+/**
+ * 写真の場所の印（タブレットの写真から移る。docs/tablet.md）: 足元 p を含む区画の id・足跡・床と天井の高さから作る短い文字。
+ * 撮ったときと移るときで比べ、違えば世界の作りが変わった（その場所はもう無い）とみなす。足元が区画の高さの外（穴の中に落ちている
+ * など）なら、横の位置を含む区画のうち床の高さが近いもの。どの区画にも無ければ null
+ */
+export function spotSignature(L: FloorLayout, p: readonly number[]): string | null {
+  let i = cellIndexAt(L, p);
+  if (i < 0) {
+    let best = Infinity;
+    L.cells.forEach((c, k) => {
+      if (!c.footprint.some((f) => p[0]! >= f.x0 && p[0]! <= f.x1 && p[2]! >= f.z0 && p[2]! <= f.z1)) return;
+      const d = Math.abs(c.floorY - p[1]!);
+      if (d < best) { best = d; i = k; }
+    });
+  }
+  if (i < 0) return null;
+  const c = L.cells[i]!;
+  const fp = c.footprint.map((f) => [f.x0, f.z0, f.x1, f.z1].map((v) => v.toFixed(2)).join(',')).join(';');
+  return (hashAll('spot', c.id, fp, c.floorY.toFixed(2), c.height.toFixed(2)) >>> 0).toString(36);
+}

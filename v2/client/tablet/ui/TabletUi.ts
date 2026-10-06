@@ -6,9 +6,11 @@
  * - 押す: down → up（12 px 以上動いたらドラッグ）。ホイールは指の下の物（無ければアプリの既定: カメラのズーム）
  * - 戻る: アプリ → ホーム、ギャラリーの写真 → 一覧、SNS の投稿 → タイムライン。タブレットをしまっても、開いていたアプリのまま
  * - SNS: 投稿のタイムライン（今は自分の投稿だけ。投稿者名・投稿日時・ルーム ID・画像）。ギャラリーの写真の「投稿」で載る（写しを持つので
- *   写真を消しても残る。同じ写真は 1 回だけ）。投稿を押すと大きく見て「探索」（撮った部屋へワープ）・「キャンセル」・「削除」
+ *   写真を消しても残る。同じ写真は 1 回だけ）。投稿を押すと大きく見て「探索」（撮った所へ移る）・「キャンセル」・「削除」
+ * - 写真から移る（ギャラリー・SNS の「探索」）: hooks.travel に頼む。演出（タブレットを顔の前へ上げ、写真を視界いっぱいに見せたまま
+ *   読み込み、着いたら下ろす）は TabletController。その間、画面は写真だけ（setTravelView）
  */
-import { APPS, DIAL_DIGITS, DialModel, formatTaken, type AppId } from '../logic.ts';
+import { APPS, coverRect, DIAL_DIGITS, DialModel, formatTaken, type AppId, type PhotoSpot } from '../logic.ts';
 import type { PhotoMeta, PhotoStore } from '../PhotoStore.ts';
 import type { PostAuthor, PostMeta, PostStore } from '../PostStore.ts';
 import { SCREEN_PX } from '../TabletModel.ts';
@@ -29,6 +31,10 @@ export interface TabletUiHooks {
   checkRoom(id: number): Promise<boolean>;
   /** 番号の部屋へ移る（演出つき） */
   warp(id: number): void;
+  /** 写真の場所へ移る（ギャラリー・SNS の「探索」。演出は TabletController。失敗したら travelFailed が呼ばれる） */
+  travel(req: TravelRequest): void;
+  /** 写真の場所がまだあるか（世界の作りが変わっていないか） */
+  checkSpot(spot: PhotoSpot): Promise<boolean>;
   /** 地図を (x, y, w, h) に描く（描いた倍率 px/m と中心。地図が無ければ null） */
   drawMap(g: G, x: number, y: number, w: number, h: number, view: MapView): { scale: number; center: [number, number] } | null;
   /** 設定を開く（メニュー） */
@@ -44,6 +50,17 @@ export interface TabletUiHooks {
   readonly seed: number;
   sound(kind: 'tap' | 'back' | 'open' | 'error'): void;
 }
+
+/** 写真から移る頼み（どの画面から・写真の場所・部屋の番号・写真の絵と縦横比） */
+export interface TravelRequest {
+  kind: 'gallery' | 'sns';
+  spot: PhotoSpot;
+  roomId: number;
+  image: ImageBitmap;
+  aspect: number;
+}
+
+type Rect = { x0: number; y0: number; x1: number; y1: number };
 
 interface Target {
   id: string;
@@ -110,6 +127,12 @@ export class TabletUi {
   /** 投稿した写真の id（ギャラリーの「投稿済み」） */
   private postedIds = new Set<number>();
   private posting = false;
+  /** ギャラリーの写真の「探索」の状態（通信エラー） */
+  private photoStatus: ExploreStatus = { kind: 'idle' };
+  /** 写真の場所があるか（'photo:<id>' / 'post:<id>' → 確かめ中・ある・無い） */
+  private readonly spotChecks = new Map<string, 'pending' | 'ok' | 'gone'>();
+  /** 写真から移る間に画面いっぱいに見せる写真（rect: 顔の前で視界に重なる所。絵の px） */
+  private travelView: { image: ImageBitmap; rect: Rect | null; alpha: number } | null = null;
 
   constructor(hooks: TabletUiHooks, canvas: HTMLCanvasElement = document.createElement('canvas')) {
     this.hooks = hooks;
@@ -138,6 +161,35 @@ export class TabletUi {
     return true;
   }
 
+  /** 写真から移る間、画面を写真だけにする（null で戻す） */
+  setTravelView(v: { image: ImageBitmap } | null): void {
+    this.travelView = v ? { image: v.image, rect: null, alpha: 1 } : null;
+    this.invalidate();
+  }
+
+  /** 写真から元の画面へ溶かす（1 = 写真だけ … 0 = 元の画面。0.02 以上変わったら描き直す） */
+  setTravelAlpha(a: number): void {
+    const tv = this.travelView;
+    if (!tv || Math.abs(tv.alpha - a) < 0.02) return;
+    tv.alpha = a;
+    this.invalidate();
+  }
+
+  /** 写真を置く所（顔の前で視界に重なる所。絵の px。1 px 以上変わったら描き直す） */
+  setTravelRect(r: Rect): void {
+    const tv = this.travelView;
+    if (!tv) return;
+    const o = tv.rect;
+    if (o && Math.abs(o.x0 - r.x0) + Math.abs(o.x1 - r.x1) + Math.abs(o.y0 - r.y0) + Math.abs(o.y1 - r.y1) < 1) return;
+    tv.rect = r;
+    this.invalidate();
+  }
+
+  /** 写真から移れなかった（その画面に通信エラー） */
+  travelFailed(kind: 'gallery' | 'sns', text: string): void {
+    this.fail(kind, text);
+  }
+
   /** 画面のうち見えている所（カメラの位置へ上げる間に変わる。2 px 以上変わったら描き直す） */
   setCameraSafe(r: { x0: number; y0: number; x1: number; y1: number }): void {
     const c = this.cameraSafe;
@@ -159,6 +211,8 @@ export class TabletUi {
     this.targets = [];
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.globalAlpha = 1;
+    const tv = this.travelView;
+    if (tv && tv.alpha >= 1) { this.drawTravel(g, tv); return; }
     if (this.app === 'camera') {
       g.clearRect(0, 0, W, H);
       this.drawCamera(g);
@@ -176,6 +230,32 @@ export class TabletUi {
       }
     }
     this.drawToast(g);
+    // 写真から移る: 手元へ戻しきる前に、写真から元の画面へ溶かす（その間は押せない）
+    if (tv) {
+      g.globalAlpha = tv.alpha;
+      this.drawTravel(g, tv);
+      g.globalAlpha = 1;
+      this.targets = [];
+    }
+  }
+
+  /**
+   * 写真から移る間の画面: 顔の前で視界に重なる所（rect）を覆うように写真（はみ出しは切る）。視界の外（下ろすときに見える所）は、
+   * 同じ写真をぼかして暗くした物で埋める
+   */
+  private drawTravel(g: G, tv: { image: ImageBitmap; rect: Rect | null }): void {
+    const a = g.globalAlpha;
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, W, H);
+    const all = coverRect(tv.image.width, tv.image.height, { x0: 0, y0: 0, x1: W, y1: H });
+    g.save();
+    if ('filter' in g) g.filter = 'blur(14px)';
+    g.globalAlpha = a * 0.5;
+    g.drawImage(tv.image, all.x, all.y, all.w, all.h);
+    g.restore();
+    g.globalAlpha = a;
+    const c = coverRect(tv.image.width, tv.image.height, tv.rect ?? { x0: 0, y0: 0, x1: W, y1: H });
+    g.drawImage(tv.image, c.x, c.y, c.w, c.h);
   }
 
   private add(t: Target): Target {
@@ -508,23 +588,53 @@ export class TabletUi {
 
   /** 移動（探索）: ダイアルの番号の部屋へ */
   private go(): void {
-    this.travel('explore', this.dial.value, () => { this.dialTouched = false; });
+    this.warpById(this.dial.value, () => { this.dialTouched = false; });
   }
 
-  private statusOf(which: 'explore' | 'sns'): ExploreStatus {
-    return which === 'explore' ? this.explore : this.snsStatus;
+  private statusOf(which: 'explore' | 'sns' | 'gallery'): ExploreStatus {
+    return which === 'explore' ? this.explore : which === 'sns' ? this.snsStatus : this.photoStatus;
   }
 
-  private setStatus(which: 'explore' | 'sns', st: ExploreStatus): void {
+  private setStatus(which: 'explore' | 'sns' | 'gallery', st: ExploreStatus): void {
     if (which === 'explore') this.explore = st;
-    else this.snsStatus = st;
+    else if (which === 'sns') this.snsStatus = st;
+    else this.photoStatus = st;
   }
 
   /**
-   * 番号の部屋へ移る（探索の「移動」・SNS の「探索」）: 部屋があるか確かめ（接続中…）、あれば移る（演出は hooks.warp）。
-   * 無ければその画面に通信エラー。onWarp: 移り始める直前
+   * 写真から移れない理由（移れれば ''）: 部屋の番号が無い・別の seed・番号の無い遊び方・場所の記録が無い / 世界の作りが変わった
+   * （2026-10-06 ユーザーの決定: 移れないようにする）。場所があるかは開いたときに確かめる（確かめ中も押せない）
    */
-  private travel(which: 'explore' | 'sns', id: number, onWarp?: () => void): void {
+  private travelReason(key: string, m: { roomId: number | null; seed: number; spot?: PhotoSpot }): string {
+    if (m.roomId === null) return 'この写真には部屋の番号がありません';
+    if (m.seed !== this.hooks.seed) return `別の世界（seed ${m.seed}）の写真なので、ここからは行けません`;
+    if (!this.hooks.roomsAvailable()) return 'この場所からは探索できません';
+    if (!m.spot) return 'この写真の場所はもう見つかりません';
+    let st = this.spotChecks.get(key);
+    if (!st) {
+      st = 'pending';
+      this.spotChecks.set(key, st);
+      void this.hooks.checkSpot(m.spot).then((ok) => { this.spotChecks.set(key, ok ? 'ok' : 'gone'); this.invalidate(); }, () => { this.spotChecks.delete(key); this.invalidate(); });
+    }
+    if (st === 'pending') return '場所を確かめています…';
+    if (st === 'gone') return 'この写真の場所はもう見つかりません';
+    return '';
+  }
+
+  /** 写真の場所へ移る（ギャラリー・SNS の「探索」）: すぐ演出と移動へ（番号の入力は通さない） */
+  private startTravel(kind: 'gallery' | 'sns', m: { roomId: number | null; spot?: PhotoSpot; w: number; h: number }, img: ImageBitmap | null): void {
+    if (!img || !m.spot || m.roomId === null) return;
+    this.setStatus(kind, { kind: 'idle' });
+    this.hooks.sound('tap');
+    this.hooks.travel({ kind, spot: m.spot, roomId: m.roomId, image: img, aspect: m.w / Math.max(1, m.h) });
+  }
+
+  /**
+   * 番号の部屋へ移る（探索の「移動」）: 部屋があるか確かめ（接続中…）、あれば移る（演出は hooks.warp。電源が落ちる）。
+   * 無ければ画面に通信エラー。onWarp: 移り始める直前
+   */
+  private warpById(id: number, onWarp?: () => void): void {
+    const which = 'explore';
     if (this.statusOf(which).kind === 'checking' || !this.hooks.roomsAvailable()) return;
     this.hooks.sound('tap');
     if (id < 1000) { this.fail(which, `ROOM ${id} は見つかりません（4 桁以上）`); return; }
@@ -539,7 +649,7 @@ export class TabletUi {
     }, () => this.fail(which, '通信エラー：接続できません'));
   }
 
-  private fail(which: 'explore' | 'sns', s: string): void {
+  private fail(which: 'explore' | 'sns' | 'gallery', s: string): void {
     this.setStatus(which, { kind: 'error', text: s, at: this.now });
     if (which === 'explore') this.dial.fresh = true;
     this.hooks.sound('error');
@@ -740,8 +850,9 @@ export class TabletUi {
     text(g, p.author.name, 96, iy + 15, { size: 26, weight: 700, max: 520 });
     text(g, `${formatTaken(p.postedAt)} 投稿 ・ 撮影 ${formatTaken(p.takenAt)} ・ ${p.place}`, 96, iy + 41, { size: 22, color: COLOR.dim, max: 680 });
     text(g, p.roomId !== null ? `ROOM ${p.roomId}` : 'ROOM —', W - 32, iy + 26, { size: 32, weight: 700, mono: true, align: 'right', color: COLOR.accent });
-    // 探索できない理由（番号が無い・別の世界・番号の無い遊び方）か、移る用意の状態
-    const reason = p.roomId === null ? 'この写真には部屋の番号がありません' : p.seed !== this.hooks.seed ? `別の世界（seed ${p.seed}）の写真なので、ここからは行けません` : !this.hooks.roomsAvailable() ? 'この場所からは探索できません' : '';
+    // 探索できない理由（番号が無い・別の世界・番号の無い遊び方・場所が無い）か、通信エラー
+    const img2 = this.postImageOf(p);
+    const reason = this.travelReason(`post:${p.id}`, p) || (img2 ? '' : '写真を読み込んでいます…');
     const sy = iy + 84;
     if (this.snsStatus.kind !== 'idle') this.drawTravelStatus(g, this.snsStatus, sy);
     else if (reason) text(g, reason, W / 2, sy, { size: 24, align: 'center', color: COLOR.dim, max: W - 60 });
@@ -761,7 +872,7 @@ export class TabletUi {
       void this.hooks.posts.remove(id).then(() => this.showToast('投稿を削除しました'));
     });
     this.button(g, 'post:cancel', 'キャンセル', W - 24 - 300 - 16 - 240, by, 240, bh, { size: 30, disabled: busy }, () => { this.hooks.sound('back'); this.closePost(); });
-    this.button(g, 'post:go', '探索', W - 24 - 300, by, 300, bh, { accent: true, size: 34, disabled: busy || !!reason }, () => this.travel('sns', p.roomId!, () => { this.post = null; }));
+    this.button(g, 'post:go', '探索', W - 24 - 300, by, 300, bh, { accent: true, size: 34, disabled: busy || !!reason }, () => this.startTravel('sns', p, img2));
   }
 
   // ---------------------------------------------------------------- ギャラリー
@@ -833,6 +944,7 @@ export class TabletUi {
 
   private openPhoto(p: PhotoMeta & { thumb: Blob }): void {
     this.detail = p;
+    this.photoStatus = { kind: 'idle' };
     this.detailImage = 'loading';
     this.deleteArmAt = -1e9;
     this.hooks.sound('open');
@@ -846,7 +958,7 @@ export class TabletUi {
 
   private drawPhoto(g: G, p: PhotoMeta & { thumb: Blob }): void {
     this.header(g, p.roomId !== null ? `ROOM ${p.roomId}` : p.place || '写真', '', '‹ 一覧');
-    const x = 24, y = CONTENT_Y, w = W - 48, h = 470;
+    const x = 24, y = CONTENT_Y, w = W - 48, h = 440;
     fillRR(g, x, y, w, h, 18, '#07090c');
     const img = this.detailImage instanceof ImageBitmap ? this.detailImage : this.thumbOf(p);
     if (img) {
@@ -858,12 +970,18 @@ export class TabletUi {
     text(g, info, 32, y + h + 40, { size: 26, color: COLOR.dim, max: W - 64 });
     const armed = this.now - this.deleteArmAt < 3000;
     if (armed) this.animate(3050);
-    const by = y + h + 76, bh = 72;
-    const canGo = p.roomId !== null && p.seed === this.hooks.seed && this.hooks.roomsAvailable();
-    // 右から: 投稿（1 回だけ）・この部屋へ・削除
+    // 探索できない理由か、通信エラー
+    const full = this.detailImage instanceof ImageBitmap ? this.detailImage : null;
+    const reason = this.travelReason(`photo:${p.id}`, p) || (full ? '' : '写真を読み込んでいます…');
+    const sy = y + h + 84;
+    if (this.photoStatus.kind !== 'idle') this.drawTravelStatus(g, this.photoStatus, sy);
+    else if (reason) text(g, reason, W / 2, sy, { size: 24, align: 'center', color: COLOR.dim, max: W - 60 });
+    const by = H - 22 - 72, bh = 72;
+    // 右から: 投稿（1 回だけ）・探索（撮った所へすぐ移る）・削除
     const posted = this.postedIds.has(p.id);
-    const postX = W - 24 - 260, goX = postX - 16 - 260, delX = (canGo ? goX : postX) - 16 - 300;
-    this.button(g, 'photo:post', this.posting ? '投稿中…' : posted ? '投稿済み' : '投稿', postX, by, 260, bh, { accent: !posted, disabled: posted || this.posting, size: 30 }, () => this.postPhoto(p));
+    const postX = W - 24 - 260, goX = postX - 16 - 260, delX = goX - 16 - 300;
+    this.button(g, 'photo:post', this.posting ? '投稿中…' : posted ? '投稿済み' : '投稿', postX, by, 260, bh, { disabled: posted || this.posting, size: 30 }, () => this.postPhoto(p));
+    this.button(g, 'photo:go', '探索', goX, by, 260, bh, { accent: true, size: 32, disabled: !!reason }, () => this.startTravel('gallery', p, full));
     this.button(g, 'photo:delete', armed ? 'もう一度押すと削除' : '削除', delX, by, 300, bh, { danger: armed, size: 28 }, () => {
       if (!armed) { this.deleteArmAt = this.now; this.hooks.sound('tap'); this.invalidate(); return; }
       this.deleteArmAt = -1e9;
@@ -874,15 +992,6 @@ export class TabletUi {
       this.hooks.sound('back');
       void this.hooks.photos.remove(id).then(() => this.showToast('削除しました'));
       this.invalidate();
-    });
-    if (canGo) this.button(g, 'photo:go', 'この部屋へ', goX, by, 260, bh, { size: 30 }, () => {
-      this.dial.set(p.roomId!);
-      this.dialTouched = true;
-      this.explore = { kind: 'idle' };
-      this.detail = null;
-      this.detailImage = null;
-      this.hooks.sound('open');
-      this.setApp('explore');
     });
   }
 
@@ -896,7 +1005,7 @@ export class TabletUi {
       try {
         const image = await this.hooks.photos.image(p.id);
         if (!image) throw new Error('写真がありません');
-        await this.hooks.posts.add({ postedAt: Date.now(), author: this.hooks.author(), photoId: p.id, roomId: p.roomId, seed: p.seed, place: p.place, takenAt: p.takenAt, w: p.w, h: p.h, look: p.look }, image, p.thumb);
+        await this.hooks.posts.add({ postedAt: Date.now(), author: this.hooks.author(), photoId: p.id, roomId: p.roomId, seed: p.seed, place: p.place, takenAt: p.takenAt, w: p.w, h: p.h, look: p.look, ...(p.spot ? { spot: p.spot } : {}) }, image, p.thumb);
         this.postedIds.add(p.id);
         this.showToast('SNS に投稿しました');
       } catch (e) {

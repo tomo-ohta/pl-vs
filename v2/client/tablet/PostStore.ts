@@ -6,6 +6,7 @@
  */
 import { STORAGE_PREFIX } from '../env.ts';
 import { ImageStore } from './ImageStore.ts';
+import type { PhotoSpot } from './logic.ts';
 
 export interface PostAuthor {
   /** 遊ぶ人の id（端末ごと。localPlayerId） */
@@ -32,6 +33,8 @@ export interface PostMeta {
   w: number;
   h: number;
   look: 'clean' | 'video';
+  /** 撮った所と視点（元の写真から写す。無ければ移れない） */
+  spot?: PhotoSpot;
 }
 
 export class PostStore extends ImageStore<PostMeta> {
