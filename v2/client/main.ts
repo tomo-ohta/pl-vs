@@ -10,6 +10,7 @@
  * - `?shape=<型>` フロアの形の型を決めて作る（どのフロアも。core/gen/floor/themes.ts の PatternId。例: spiral・tower・station）
  * - 駅の車両（F35）で次のフロアへ着いたときは、次のフロアの車両の中（trainRide の params.arrive）に出る
  * - 開発用: window.game（ClientGame）。ペインが隠れて rAF が止まるときは game.stepOnce() で 1 tick ずつ進める
+ * - 作り込む小物（client/props）: `?props=0` で箱のまま。`?dev=1` などの見本では P で 形の関数の物 ↔ 箱 を切り替える（見比べ）
  * - 果てしない階（docs/endless-world.md）: ふつうに遊ぶときは、階が無限の平面（区域を流し込む）。見本・実験場・?shape=・?floor=1 は今までのフロア
  */
 import './ui/style.css';
@@ -59,7 +60,7 @@ let depth = Math.max(0, Number(params.get('depth') ?? 0) | 0);
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const ui = mountUi(document.body);
-const game = new ClientGame({ canvas, ui, tuning });
+const game = new ClientGame({ canvas, ui, tuning, props: params.get('props') !== '0' });
 const rec = new RecOverlay(ui.recParent);
 new SettingsPanel(game.settings, { slot: ui.settingsSlot });
 // REC 表示は遊んでいる間だけ（一時停止の画面の下に透けないように。v1 と同じ）
@@ -131,6 +132,17 @@ if (devTour) {
     ui.setHint(text);
     clearTimeout(hintTimer);
     hintTimer = window.setTimeout(() => ui.setHint(''), 6000);
+  });
+}
+
+// 作り込む小物の見比べ（P: 形の関数の物 ↔ 箱）。見本・?dev=1 のときだけ
+if (devTour) {
+  addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyP' || e.repeat || game.paused) return;
+    game.props.setEnabled(!game.props.isEnabled);
+    ui.setHint(game.props.isEnabled ? '小物: 形の関数の物' : '小物: 箱（いままでの作り）');
+    clearTimeout(hintTimer);
+    hintTimer = window.setTimeout(() => ui.setHint(''), 3000);
   });
 }
 

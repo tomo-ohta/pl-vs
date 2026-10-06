@@ -2,7 +2,7 @@
  * 棚の商品（スプラット）: ペットボトル・缶・袋菓子・紙パック・カップ麺。局所の座標は商品の底の中心が原点、正面が +z。
  * 並べる関数は本棚と同じく棚板の上面 y = 0・棚の向き x・正面 +z。
  */
-import { ellipsoid, fbm, LOOK, lin, mix3, quad, Rand, revolve, scale3, superellipsoid, surface, type Look, type Surfels, type V3 } from '../surfel.ts';
+import { ellipsoid, fbm, LOOK, lin, mix3, quad, Rand, revolve, scale3, superellipsoid, surface, type Look, type ShapeSink, type V3 } from '../shape.ts';
 
 type Xf = (p: V3) => V3;
 const at = (xf: Xf, o: V3): Xf => (p) => xf([p[0] + o[0], p[1] + o[1], p[2] + o[2]]);
@@ -31,7 +31,7 @@ const DRINKS: { liquid: number; alpha: number; label: number; accent: number; ca
 ];
 
 /** 500 ml のペットボトル（透ける本体・中身・巻いたラベル・ふた） */
-export function petBottle(S: Surfels, R: Rand, xf: Xf, kind = R.int(0, DRINKS.length - 1)): void {
+export function petBottle(S: ShapeSink, R: Rand, xf: Xf, kind = R.int(0, DRINKS.length - 1)): void {
   const k = DRINKS[kind]!;
   const H = 0.205;
   const body = (t: number): [number, number] => {
@@ -61,7 +61,7 @@ export function petBottle(S: Surfels, R: Rand, xf: Xf, kind = R.int(0, DRINKS.le
 const CANS = [[0xc0202a, 0xf0f0f0], [0x1a3a8a, 0xd0d8e0], [0x2a8a3a, 0xf0e070], [0xf0c020, 0x1a1a1a], [0x6a2a8a, 0xe0d0f0], [0xd8dadc, 0xc02020]];
 
 /** 350 ml の缶（印刷した胴・金属の上下・プルタブ） */
-export function can(S: Surfels, R: Rand, xf: Xf, kind = R.int(0, CANS.length - 1)): void {
+export function can(S: ShapeSink, R: Rand, xf: Xf, kind = R.int(0, CANS.length - 1)): void {
   const [base, accent] = CANS[kind]!;
   const seed = R.range(0, 100);
   const prof = (t: number): [number, number] => {
@@ -81,7 +81,7 @@ export function can(S: Surfels, R: Rand, xf: Xf, kind = R.int(0, CANS.length - 1
 }
 
 /** 袋菓子（つやのある袋・しわ・上下の圧着の帯・中身の窓） */
-export function snackBag(S: Surfels, R: Rand, xf: Xf): void {
+export function snackBag(S: ShapeSink, R: Rand, xf: Xf): void {
   const col = lin(R.pick([0xd8202a, 0x1a6ad0, 0xf0b020, 0x2a9a3a, 0x8a2ab0, 0xe86a1a]));
   const acc = lin(R.pick([0xf8f0d0, 0xffe040, 0x101010]));
   const W = 0.085, Hb = 0.12, D = 0.035;
@@ -110,7 +110,7 @@ export function snackBag(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** 1 L の紙パック（三角屋根） */
-export function carton(S: Surfels, R: Rand, xf: Xf): void {
+export function carton(S: ShapeSink, R: Rand, xf: Xf): void {
   const c = lin(R.pick([0x2a6ad0, 0x2a9a3a, 0xe0a020, 0xd02a6a]));
   const w = 0.035, h = 0.195, top = 0.235;
   const look: Look = { ...LOOK.matte, rough: 0.55, mat: 1 };
@@ -126,7 +126,7 @@ export function carton(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** カップ麺（逆さの円すい台 + ふた） */
-export function cupNoodle(S: Surfels, R: Rand, xf: Xf): void {
+export function cupNoodle(S: ShapeSink, R: Rand, xf: Xf): void {
   const c = lin(R.pick([0xc0202a, 0xf0b020, 0x2a6ad0]));
   revolve(S, [0, 0, 0], (t) => [0.034 + t * 0.012, t * 0.1], {
     spacing: 0.0055, look: { ...LOOK.plastic, rough: 0.45 }, rand: R, xf,
@@ -138,7 +138,7 @@ export function cupNoodle(S: Surfels, R: Rand, xf: Xf): void {
 export type GoodsKind = 'drinks' | 'cans' | 'snacks' | 'mixed' | 'cartons';
 
 /** 棚の段に商品を並べる（同じ商品を数個ずつ続ける。正面の列だけ） */
-export function goodsRow(S: Surfels, R: Rand, xf: Xf, o: { x0: number; x1: number; zFront: number; maxH: number; kind: GoodsKind }): void {
+export function goodsRow(S: ShapeSink, R: Rand, xf: Xf, o: { x0: number; x1: number; zFront: number; maxH: number; kind: GoodsKind }): void {
   let x = o.x0 + 0.01;
   while (x < o.x1 - 0.04) {
     const pick = o.kind === 'mixed' ? R.pick(['drinks', 'cans', 'snacks', 'cartons', 'noodles'] as const) : o.kind;
@@ -160,7 +160,7 @@ export function goodsRow(S: Surfels, R: Rand, xf: Xf, o: { x0: number; x1: numbe
  * 自販機の見本の列（v2 の vending の光る面の前。局所: 光る面の中心の下端が原点、x が幅、+z が手前、y が上）。
  * 段ごとに缶とペットボトルの見本（少し小さく）・値札・押しボタン
  */
-export function vendingDisplay(S: Surfels, R: Rand, xf: Xf, o: { width: number; rows: number[]; perRow: number }): void {
+export function vendingDisplay(S: ShapeSink, R: Rand, xf: Xf, o: { width: number; rows: number[]; perRow: number }): void {
   const step = o.width / o.perRow;
   // 見本の窓の奥の板（光る面の前を覆う。見本が逆光の影にならないように）と、段ごとの上の照明の帯
   const yb = o.rows[0]! - 0.035, yt = o.rows[o.rows.length - 1]! + 0.21;

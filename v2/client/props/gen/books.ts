@@ -3,7 +3,7 @@
  * 局所の座標: 棚板の上面が y = 0、棚の向きが x（x0..x1）、正面（背表紙の側）が +z（zFront）。xf で部屋へ置く。
  * 見える面だけ作る（背表紙・天・列の端や傾いた本の表紙）。
  */
-import { LOOK, lin, mix3, quad, Rand, scale3, surface, type Look, type Surfels, type V3 } from '../surfel.ts';
+import { LOOK, lin, mix3, quad, Rand, scale3, surface, type Look, type ShapeSink, type V3 } from '../shape.ts';
 
 type Xf = (p: V3) => V3;
 
@@ -29,7 +29,7 @@ interface BookSpec {
 }
 
 /** 本 1 冊。place は本の局所（x: 0..t、y: 0..h、z: −d..0 が奥→背表紙）→ 棚の局所 */
-function book(S: Surfels, R: Rand, xf: Xf, b: BookSpec, place: (p: V3) => V3, covers: { left: boolean; right: boolean; top: boolean }): void {
+function book(S: ShapeSink, R: Rand, xf: Xf, b: BookSpec, place: (p: V3) => V3, covers: { left: boolean; right: boolean; top: boolean }): void {
   const X = (p: V3): V3 => xf(place(p));
   const look: Look = b.kind === 'hard' ? { ...LOOK.matte, rough: 0.75 } : b.kind === 'binder' ? LOOK.plastic : { ...LOOK.plastic, rough: 0.3 };
   const sp = 0.004;
@@ -107,7 +107,7 @@ function pickBook(R: Rand, maxH: number, maxD: number): BookSpec {
 export interface RowOpts { x0: number; x1: number; zFront: number; zBack: number; maxH: number; binders?: boolean }
 
 /** 棚の段 1 つ分の本を並べる（シリーズ・すき間・傾き・平積み） */
-export function bookRow(S: Surfels, R: Rand, xf: Xf, o: RowOpts): void {
+export function bookRow(S: ShapeSink, R: Rand, xf: Xf, o: RowOpts): void {
   const maxD = o.zFront - o.zBack - 0.01;
   let x = o.x0 + R.range(0, 0.02);
   let series: BookSpec | null = null;
@@ -161,7 +161,7 @@ export function bookRow(S: Surfels, R: Rand, xf: Xf, o: RowOpts): void {
 }
 
 /** 机の上の開いた本（ページが反った見開き） */
-export function openBook(S: Surfels, R: Rand, xf: Xf): void {
+export function openBook(S: ShapeSink, R: Rand, xf: Xf): void {
   const W = 0.16, H = 0.23;
   for (const side of [-1, 1]) {
     surface(S, {

@@ -28,14 +28,14 @@ import { innerFaces, type Face } from '../../../../v2/core/gen/dress/geom.ts';
 import { bed, cabinet, cone as v2cone, desk, lamp as v2lamp, lowTable, officeChair, plant as v2plant, planter as v2planter, plinth, shelfIsland, sofa, vitrine, wallShelf, waterCooler, type ShelfFill } from '../../../../v2/core/gen/dress/props.ts';
 import { bench, counter, sinkRow, urinalRow, vending } from '../../../../v2/core/gen/dress/furniture.ts';
 import { place, type Rand, type Surfels, type V3 } from './surfel.ts';
-import { dracaena, ficus, pothos, sansevieria, shrub, succulent } from './gen/plants.ts';
-import { bear, cat, rabbit } from './gen/plush.ts';
-import { bookRow, openBook } from './gen/books.ts';
-import { goodsRow, type GoodsKind } from './gen/goods.ts';
-import { cushion, curtain, duvet, futon, pillow, throwBlanket, towelStack } from './gen/fabric.ts';
-import { binTrash, paperStack, scattered } from './gen/paper.ts';
-import { cone, coolerBottle, deskLamp, extinguisher, sculpture, toiletRoll, trophy, vaseFlowers, wallClock } from './gen/objects.ts';
-import { urinal, vesselSink } from './gen/porcelain.ts';
+import { dracaena, ficus, pothos, sansevieria, shrub, succulent } from '../../../../v2/client/props/gen/plants.ts';
+import { bear, cat, rabbit } from '../../../../v2/client/props/gen/plush.ts';
+import { bookRow, openBook } from '../../../../v2/client/props/gen/books.ts';
+import { goodsRow, type GoodsKind } from '../../../../v2/client/props/gen/goods.ts';
+import { cushion, curtain, duvet, futon, pillow, throwBlanket, towelStack } from '../../../../v2/client/props/gen/fabric.ts';
+import { binTrash, paperStack, scattered } from '../../../../v2/client/props/gen/paper.ts';
+import { cone, coolerBottle, deskLamp, extinguisher, sculpture, toiletRoll, trophy, vaseFlowers, wallClock } from '../../../../v2/client/props/gen/objects.ts';
+import { urinal, vesselSink } from '../../../../v2/client/props/gen/porcelain.ts';
 
 export interface Exhibit {
   id: string;

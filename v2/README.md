@@ -5,6 +5,7 @@
 - **全体計画（決まったこと・進め方）: [`docs/v2-plan.md`](docs/v2-plan.md)**
 - 引き継ぎ方と移植台帳: [`docs/inheritance-plan.md`](docs/inheritance-plan.md)
 - 特殊ギミックとフロア構造（案の一覧と実装方式）: [`docs/gimmicks-and-structures.md`](docs/gimmicks-and-structures.md)
+- 作り込む小物（植物・棚の中身・寝具・便器などを形の関数で作る）: [`docs/props.md`](docs/props.md)
 - v1 の元: `../v1/`（凍結。タグ `v1-final`）
 - 共通素材: `../shared/public/`（開発時は Vite の publicDir。本番は v1 と同じ /pl-vs/ の素材を読む予定）
 
@@ -23,6 +24,7 @@ v2/
 │   ├─ gen/dress/         区画の中身（家具・設備。テーマ × 区画の種類）
 │   └─ lab/               段階 1 の実験場
 ├─ client/     Vite + three.js（描画・音・入力・UI。シミュレーションの結果を見せるだけ）
+│   └─ props/             作り込む小物（形の関数・区画の箱から見つける・Worker で作る・近い所から差し替える。docs/props.md）
 ├─ tests/      node --test（*.test.ts を Node がそのまま実行。tests/helpers/bot.ts は歩く人）
 └─ tools/check-boundaries.mjs  core/ が three・client・vite を import していないかの確認
 ```
@@ -47,10 +49,12 @@ URL の指定（開発用）:
 | `?dev=1` | ふつうのフロアでも G で仕掛けを見て回れる |
 | `?tune=キー=値,…` | 調整表の上書き（例: `?tune=secrets.perFloorMean=3`） |
 | `?nodress=1` | 区画の中身（家具）を置かない |
+| `?props=0` | 作り込む小物を形の関数の物にしない（箱のまま。見比べ用）。見本・`?dev=1` では P で切り替え |
 | `?lab=1` | 段階 1 の実験場 |
 
 - 果てしない階の開発用: `window.session`（core/stream/session.ts の WorldSession。`session.active` が今の階の StoryWorld）。
   区域は Worker で作り、作った区域を `[区域]` で console に出す
+- 作り込む小物の開発用: `game.props.stats()`（区切り・小物・三角形・GPU の量）・`game.props.setEnabled(false)`（箱に戻す）
 - import は拡張子 `.ts` まで書く（Vite と Node の両方でそのまま動かすため）。
 - 本番ビルドで `VITE_ASSET_BASE=/pl-vs/` を渡すと、素材を複写せず v1 と同じ素材を読む（`BASE_PATH=/pl-vs/v2/` と一緒に使う）。
 

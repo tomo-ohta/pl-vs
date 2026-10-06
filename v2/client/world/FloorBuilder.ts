@@ -14,6 +14,8 @@
  * - ライトマップ（mid / high。v1 の RoomBuilder と同じ流れ。Lightmap.ts の冒頭）: 区画ごとにアトラスを作って Worker で焼き、届いたら
  *   頂点焼き込みからクロスフェードする。見えている区画から先に焼く。部品で入切する照明のある区画は焼かない
  *   （照明の入切は頂点焼き込みの混ぜ合わせで出す。ライトマップは 1 通りしか持てない）
+ * - 作り込む小物（client/props。PropHooks）: 植物・棚の中身・寝具・便器などの箱は、区切り（タイル）ごとの別のメッシュにして、
+ *   形の関数で作った物ができたら隠す（遠い所・作る前は箱のまま。当たり判定は箱のまま）。差し替え中だけ出す箱（流しの下を抜いた台）も別に作る
  * - 形の特別扱い（BoxShapes.ts）: 水面（water / waterShallow）は上面だけ、水たまり（puddle）は不定形の輪郭、傾けた箱（Box.slope。
  *   階段の手すり）は剪断。水面のメッシュは原点を箱の底に置く（材質の水深 = メッシュの座標の y なので、床に沈めた水槽でも
  *   「底 .. 水面」が水深になる）。傾けた箱は焼き込みの遮蔽物に入れず（外接の箱が大きすぎる）、ライトマップの対象にもしない
@@ -45,7 +47,7 @@ export interface ManagedLight {
 }
 
 /** 焼き込み陰影を混ぜるメッシュ: 全部の照明ありの値と、照明ごとの「その照明なし」の値 */
-interface BlendMesh { mesh: THREE.Mesh; on: Float32Array; offs: { lamp: string; off: Float32Array }[] }
+export interface BlendMesh { mesh: THREE.Mesh; on: Float32Array; offs: { lamp: string; off: Float32Array }[] }
 
 /** 区画のライトマップ（検証用に状態を持つ） */
 export interface CellLightmap {
@@ -60,6 +62,38 @@ export interface CellLightmap {
   /** 焼くのにかかった時間（Worker・依頼から反映まで） */
   workerMs?: number;
   latencyMs?: number;
+}
+
+/**
+ * 作り込む小物の差し替え（client/props/PropManager.ts が受け持つ）。FloorBuilder は箱を区切りごとのメッシュに分けて渡すだけ
+ */
+export interface PropHooks {
+  /** 区画（frame 'group' の区画は局所の座標の写し）の差し替えの計画。hide: 隠す箱 → 区切りの鍵、add: 差し替え中だけ出す箱 → 区切りの鍵 */
+  plan(cell: CellLayout): PropCellPlan | null;
+  /** 区画ができた（built.props がある区画だけ）/ 捨てた */
+  attach(built: BuiltCell): void;
+  detach(built: BuiltCell): void;
+}
+
+export interface PropCellPlan {
+  hide: Map<Box, string>;
+  add: Map<Box, string>;
+  /** PropManager の持ち物（区切りごとの作り方） */
+  data: unknown;
+}
+
+/** 区画の作り込む小物の受け皿 */
+export interface CellProps {
+  plan: PropCellPlan;
+  /** 形の関数の物を入れる所（区画の座標そのまま。区画の Group の中で -floorY） */
+  root: THREE.Group;
+  /** 区切りごとの元の箱のメッシュ（作った物を出したら隠す）と、差し替え中だけ出す箱のメッシュ（最初は隠す） */
+  placeholders: Map<string, THREE.Mesh[]>;
+  adds: Map<string, THREE.Mesh[]>;
+  /** 小物の焼き込み陰影（差し替える箱を遮蔽物から除いた物。初めて使うときに作る）。offs は照明ごとの「その照明なし」 */
+  lighting(): { on: SurfaceLighting; offs: Map<string, SurfaceLighting> };
+  /** 材質の上書き（区画の render の霧・色が抜ける異変） */
+  overrides: { fog?: { color: number; near: number; far: number }; colorMask?: [number, number, number] };
 }
 
 export interface BuiltCell {
@@ -83,6 +117,8 @@ export interface BuiltCell {
   triangles: number;
   /** 局所の座標で作った区画（CellLayout.frame 'group'）の写し方。焼き込みは局所の座標なので、明るさを測るときは戻す */
   frame?: UvFrame;
+  /** 作り込む小物（差し替える箱がある区画だけ） */
+  props?: CellProps;
 }
 
 export interface BuiltFloor {
@@ -113,6 +149,8 @@ export class FloorBuilder {
   tier: QualityTierId | undefined;
   /** 素材の部屋ごとの写し（materialKey）を使っている区画の数。0 になったら releaseRoom（区域をまたいで同じ鍵を使う区画がある） */
   private readonly roomRefs = new Map<string, number>();
+  /** 作り込む小物の差し替え（無ければ箱のまま。変えたら次に作る区画から効く） */
+  props: PropHooks | null = null;
 
   constructor(materials: MaterialLibrary, opts: FloorBuilderOptions = {}) {
     this.materials = materials;
@@ -174,6 +212,8 @@ export class FloorBuilder {
     } else built = yield* this.buildCellGen(seed, cell, disposables, neighbors);
     const key = cell.materialKey ?? cell.id;
     this.roomRefs.set(key, (this.roomRefs.get(key) ?? 0) + 1);
+    const props = built.props ? this.props : null;
+    props?.attach(built);
     let done = false;
     return {
       built,
@@ -181,6 +221,7 @@ export class FloorBuilder {
       dispose: () => {
         if (done) return;
         done = true;
+        props?.detach(built);
         built.group.removeFromParent();
         for (const g of disposables) g.dispose();
         const lm = built.lightmap;
@@ -198,7 +239,13 @@ export class FloorBuilder {
     group.position.y = fy;
     const matKey = cell.materialKey ?? cell.id;
     const cellSeed = hashAll(seed, 'cell', matKey);
-    const drawn = cell.boxes.filter((b) => !SKIP_KINDS.has(b.kind ?? '') && b.max[0] - b.min[0] > 1e-4 && b.max[1] - b.min[1] > 1e-4 && b.max[2] - b.min[2] > 1e-4);
+    const solidBox = (b: Box): boolean => !SKIP_KINDS.has(b.kind ?? '') && b.max[0] - b.min[0] > 1e-4 && b.max[1] - b.min[1] > 1e-4 && b.max[2] - b.min[2] > 1e-4;
+    const drawn = cell.boxes.filter(solidBox);
+    // 作り込む小物の計画（差し替える箱は区切りごとの別のメッシュに。差し替え中だけ出す箱を足す）
+    let propPlan: PropCellPlan | null = null;
+    try { propPlan = this.props?.plan(cell) ?? null; } catch (e) { console.warn(`[FloorBuilder] 小物の計画に失敗: ${cell.id}`, e); }
+    if (propPlan && !propPlan.hide.size && !propPlan.add.size) propPlan = null;
+    const propAdds = propPlan ? [...propPlan.add.keys()].filter(solidBox) : [];
     // 隣の区画の照明器具（描かない。光源としてだけ焼き込みに入れる。遮蔽には使わない）
     const borrowed: Box[] = [];
     const borrowedLights: LightSpec[] = [];
@@ -218,11 +265,16 @@ export class FloorBuilder {
     const allLights = [...cell.lights, ...borrowedLights];
     const bakeOn = new SurfaceLighting(lit(all, allLights));
     const bakeOff = new Map<string, SurfaceLighting>();
-    for (const id of lampIds) {
-      const boxes = all.map((b) => (b.kind === `lamp:${id}` ? { ...b, mat: 'lightOff' as MatId } : b));
-      bakeOff.set(id, new SurfaceLighting(lit(boxes, allLights.filter((l) => l.lampId !== id))));
-    }
+    const offLighting = (boxes: Box[], id: string): SurfaceLighting => new SurfaceLighting(lit(boxes.map((b) => (b.kind === `lamp:${id}` ? { ...b, mat: 'lightOff' as MatId } : b)), allLights.filter((l) => l.lampId !== id)));
+    for (const id of lampIds) bakeOff.set(id, offLighting(all, id));
     const lampList = [...lampIds];
+    // 小物の焼き込み陰影: 差し替える箱を遮蔽物から除く（箱の中に作る物が箱の陰で暗くならないように）。差し替え中だけ出す箱は入れる
+    let propLit: { on: SurfaceLighting; offs: Map<string, SurfaceLighting> } | null = null;
+    const propLighting = (): { on: SurfaceLighting; offs: Map<string, SurfaceLighting> } => {
+      if (propLit) return propLit;
+      const keep = [...all.filter((b) => !propPlan?.hide.has(b)), ...propAdds];
+      return (propLit = { on: new SurfaceLighting(lit(keep, allLights)), offs: new Map(lampList.map((id) => [id, offLighting(keep, id)])) });
+    };
 
     // ライトマップの対象（外殻と大きな家具の面）とアトラス
     const lmCfg = this.tier ? LIGHTMAP_TIER[this.tier] : undefined;
@@ -231,7 +283,7 @@ export class FloorBuilder {
     const lmTargets: Box[] = [];
     if (lmWanted) {
       for (const b of drawn) {
-        if (b.kind?.startsWith('lamp:') || b.revealGroup || b.concealGroup || b.slope) continue;
+        if (b.kind?.startsWith('lamp:') || b.revealGroup || b.concealGroup || b.slope || propPlan?.hide.has(b)) continue;
         const sf = SURFACES[b.mat];
         if (isLightmapTarget(b, !!sf?.emission, !!sf?.decal)) { targetOf.set(b, lmTargets.length); lmTargets.push(b); }
       }
@@ -253,15 +305,18 @@ export class FloorBuilder {
     };
     let triangles = 0;
     let slice = performance.now();
-    for (const b of drawn) {
+    for (const b of [...drawn, ...propAdds]) {
       // 3 ms ごとに止まる（大きな区画を 1 フレームで作らない）
       if (performance.now() - slice > 3) { yield; slice = performance.now(); }
       const lamp = b.kind?.startsWith('lamp:') ? b.kind.slice(5) : null;
+      const propTile = propPlan?.hide.get(b), addTile = propPlan?.add.get(b);
       const variants: { mat: MatId; kind: string; grp: string }[] = lamp
         ? [{ mat: b.mat, kind: 'lampOn', grp: lamp }, { mat: 'lightOff', kind: 'lampOff', grp: lamp }]
         : b.revealGroup ? [{ mat: b.mat, kind: 'reveal', grp: b.revealGroup }]
           : b.concealGroup ? [{ mat: b.mat, kind: 'conceal', grp: b.concealGroup }]
-            : [{ mat: b.mat, kind: 'static', grp: '' }];
+            : propTile !== undefined ? [{ mat: b.mat, kind: 'prop', grp: propTile }]
+              : addTile !== undefined ? [{ mat: b.mat, kind: 'propAdd', grp: addTile }]
+                : [{ mat: b.mat, kind: 'static', grp: '' }];
       for (const v of variants) {
         const box: Box = v.mat === b.mat ? b : { ...b, mat: v.mat };
         // 双子の箱（warp）: 模様の基準の位置で作ってから今の位置へ写す（傾けた箱は写さない）
@@ -278,11 +333,13 @@ export class FloorBuilder {
         attachSurfaceAppearance(g, appearanceSeed(seed, matKey, box.mat));
         // 傾けた箱は、傾けた後の外接の箱を「自分の箱」として焼く（近くの器具・遮蔽物の絞り込みの中心と大きさ）
         const own = slopeBounds(box);
-        bakeOn.bake(g, own);
+        // 差し替え中だけ出す箱は、差し替える箱を除いた焼き込みで（元の箱の中にあるので、元の箱の陰に入らないように）
+        const L = v.kind === 'propAdd' ? propLighting() : { on: bakeOn, offs: bakeOff };
+        L.on.bake(g, own);
         // 照明ごとの「なし」の焼き込みを別の属性に（結合のため全部の箱に同じ属性を付ける）
         for (const id of lampList) {
           const tmp = g.clone();
-          bakeOff.get(id)!.bake(tmp, own);
+          L.offs.get(id)!.bake(tmp, own);
           g.setAttribute(`bakedOff_${id}`, tmp.getAttribute('bakedLight'));
           tmp.dispose();
         }
@@ -297,6 +354,17 @@ export class FloorBuilder {
     }
 
     const built: BuiltCell = { id: cell.id, layout: cell, group, bounds: cell.bounds, reveal: new Map(), conceal: new Map(), lampPanels: new Map(), blend: [], lamps: lampList, lighting: { on: bakeOn, offs: bakeOff }, triangles };
+    if (propPlan) {
+      // 形の関数の物は区画の座標で作る（区画の Group は床の高さにあるので、その分を戻す）
+      const root = new THREE.Group();
+      root.name = `props:${cell.id}`;
+      root.position.y = -fy;
+      root.updateMatrix();
+      root.matrixAutoUpdate = false;
+      group.add(root);
+      const o = materialOverridesFor(cell.render, cell.palette);
+      built.props = { plan: propPlan, root, placeholders: new Map(), adds: new Map(), lighting: propLighting, overrides: { ...(o.fog ? { fog: o.fog } : {}), ...(o.colorMask ? { colorMask: o.colorMask } : {}) } };
+    }
     const lmMeshes: { mesh: THREE.Mesh; ranges: number[] }[] = [];
     for (const [key, b] of buckets) {
       if (performance.now() - slice > 3) { yield; slice = performance.now(); }
@@ -327,6 +395,8 @@ export class FloorBuilder {
       }
       if (b.kind === 'reveal') { mesh.visible = false; push(built.reveal, b.group, mesh); }
       else if (b.kind === 'conceal') push(built.conceal, b.group, mesh);
+      else if (b.kind === 'prop') push(built.props!.placeholders, b.group, mesh);
+      else if (b.kind === 'propAdd') { mesh.visible = false; push(built.props!.adds, b.group, mesh); }
       else if (b.kind === 'lampOn' || b.kind === 'lampOff') {
         const e = built.lampPanels.get(b.group) ?? { on: [], off: [] };
         (b.kind === 'lampOn' ? e.on : e.off).push(mesh);

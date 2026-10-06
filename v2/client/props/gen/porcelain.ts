@@ -1,14 +1,14 @@
 /**
  * 陶器の設備（スプラット）: 置き型の洗面ボウルと蛇口、壁掛けの小便器。白い釉薬（クリアコート）と金属の蛇口。
  */
-import { LOOK, lin, Rand, revolve, scale3, superellipsoid, surface, tube, type Surfels, type V3 } from '../surfel.ts';
+import { LOOK, lin, Rand, revolve, scale3, superellipsoid, surface, tube, type ShapeSink, type V3 } from '../shape.ts';
 
 type Xf = (p: V3) => V3;
 const glaze = LOOK.ceramic;
 const chrome = { rough: 0.08, metal: 1, opacity: 1.6, mat: 3 };
 
 /** 置き型の洗面ボウル（局所: 底の中心が原点）と、後ろに立つ蛇口 */
-export function vesselSink(S: Surfels, R: Rand, xf: Xf): void {
+export function vesselSink(S: ShapeSink, R: Rand, xf: Xf): void {
   const white = lin(0xf4f3ef);
   const prof = (t: number): [number, number] => [0.07 + 0.13 * Math.sin((t * Math.PI) / 2), t * 0.13];
   revolve(S, [0, 0, 0], prof, { spacing: 0.005, look: glaze, rand: R, xf, color: (_u, v) => scale3(white, 0.92 + 0.08 * v) });
@@ -31,7 +31,7 @@ export function vesselSink(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** 壁掛けの小便器（局所: 壁の面が z = 0、床が y = 0、正面 +z）。前の下側が開いた器 */
-export function urinal(S: Surfels, R: Rand, xf: Xf): void {
+export function urinal(S: ShapeSink, R: Rand, xf: Xf): void {
   const white = lin(0xf3f2ee);
   const c: V3 = [0, 0.86, 0];
   const r: V3 = [0.18, 0.31, 0.36];

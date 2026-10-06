@@ -1,8 +1,8 @@
 /**
- * ぬいぐるみ（スプラット）。布の面（不透明）+ 毛羽（法線の外へ少し浮かせた半透明の小さな粒）。
+ * ぬいぐるみ。胴・頭・手足を滑らかにつないだ布の面 + 毛羽（粒の受けがあるときだけ。法線の外へ少し浮かせた半透明の小さな粒）。
  * 目はつやのあるビーズ、鼻は刺しゅう、首にはリボン。局所の座標は足元の中心が原点、正面が +z。
  */
-import { blobby, ellipsoid, fbm, LOOK, lin, mix3, norm, Rand, scale3, tube, type BlobPart, type Surfels, type V3 } from '../surfel.ts';
+import { blobby, ellipsoid, fbm, LOOK, lin, mix3, norm, Rand, scale3, tube, type BlobPart, type ShapeSink, type V3 } from '../shape.ts';
 
 type Xf = (p: V3) => V3;
 
@@ -17,19 +17,21 @@ function rot(c: V3, ax: number, az: number, xf: Xf): Xf {
   };
 }
 
-/** 直前に置いた粒（from..）に毛羽を足す */
-function fuzz(S: Surfels, R: Rand, from: number, len: number, density = 0.9, opacity = 0.5): void {
-  const to = S.n;
+/** 直前に置いた粒（from..）に毛羽を足す（粒の受けがあるときだけ。メッシュには毛羽は無い） */
+function fuzz(S: ShapeSink, R: Rand, from: number, len: number, density = 0.9, opacity = 0.5): void {
+  const sp = S.splats;
+  if (!sp) return;
+  const to = sp.n;
   for (let i = from; i < to; i++) {
     if (R.next() > density) continue;
-    const n: V3 = [S.normal[i * 3]!, S.normal[i * 3 + 1]!, S.normal[i * 3 + 2]!];
+    const n: V3 = [sp.normal[i * 3]!, sp.normal[i * 3 + 1]!, sp.normal[i * 3 + 2]!];
     const off = R.range(0.2, 1) * len;
     const tilt = norm([n[0] + R.range(-0.7, 0.7), n[1] + R.range(-0.7, 0.7), n[2] + R.range(-0.7, 0.7)]);
-    const p: V3 = [S.center[i * 3]! + n[0] * off, S.center[i * 3 + 1]! + n[1] * off, S.center[i * 3 + 2]! + n[2] * off];
+    const p: V3 = [sp.center[i * 3]! + n[0] * off, sp.center[i * 3 + 1]! + n[1] * off, sp.center[i * 3 + 2]! + n[2] * off];
     const k = R.range(0.92, 1.15);
-    const c: V3 = [S.albedo[i * 3]! * k, S.albedo[i * 3 + 1]! * k, S.albedo[i * 3 + 2]! * k];
+    const c: V3 = [sp.albedo[i * 3]! * k, sp.albedo[i * 3 + 1]! * k, sp.albedo[i * 3 + 2]! * k];
     const t: V3 = [R.range(-1, 1), R.range(-1, 1), R.range(-1, 1)];
-    S.push(p, tilt, t, S.scale[i * 2]! * 0.75, S.scale[i * 2 + 1]! * 0.3, c, LOOK.fabric, opacity);
+    sp.push(p, tilt, t, sp.scale[i * 2]! * 0.75, sp.scale[i * 2 + 1]! * 0.3, c, LOOK.fabric, opacity);
   }
 }
 
@@ -40,24 +42,24 @@ const nap = (color: (d: V3, p: V3) => V3) => (d: V3, p: V3): V3 => scale3(color(
  * 胴・頭・手足を滑らかにつないだ 1 つの布の面（継ぎ目に丸い肉が付く。縫い合わせたぬいぐるみの形）。
  * fur は部位ごとの毛羽の長さ（スプラットだけ。メッシュには出ない）
  */
-function body(S: Surfels, R: Rand, xf: Xf, parts: (BlobPart & { fur?: number })[]): void {
+function body(S: ShapeSink, R: Rand, xf: Xf, parts: (BlobPart & { fur?: number })[]): void {
   blobby(S, parts.map((q) => ({ ...q, color: nap(q.color) })), {
     k: 0.018, spacing: 0.0055, look: LOOK.fabric, rand: R, xf,
     after: (i, from) => fuzz(S, R, from, parts[i]!.fur ?? 0.004),
   });
 }
 
-function bead(S: Surfels, R: Rand, xf: Xf, c: V3, r: number, hex = 0x0c0a09): void {
+function bead(S: ShapeSink, R: Rand, xf: Xf, c: V3, r: number, hex = 0x0c0a09): void {
   ellipsoid(S, c, [r, r, r * 0.8], { spacing: 0.0018, look: { ...LOOK.glossy, rough: 0.08 }, rand: R, xf, color: () => lin(hex) });
 }
 
 /** 縫い目・刺しゅうの線 */
-function stitch(S: Surfels, R: Rand, xf: Xf, path: (t: number) => V3, hex: number, r = 0.0016): void {
+function stitch(S: ShapeSink, R: Rand, xf: Xf, path: (t: number) => V3, hex: number, r = 0.0016): void {
   tube(S, path, () => r, { spacing: 0.0015, look: LOOK.fabric, rand: R, xf, color: () => lin(hex) });
 }
 
 /** クマ（座った姿・高さ約 0.4 m）。fur は毛の色、patch はお腹・口元・足の裏 */
-export function bear(S: Surfels, R: Rand, xf: Xf, fur = 0x9b6a43, patch = 0xd9b88f, ribbon = 0xb4232c): void {
+export function bear(S: ShapeSink, R: Rand, xf: Xf, fur = 0x9b6a43, patch = 0xd9b88f, ribbon = 0xb4232c): void {
   const F = lin(fur), P = lin(patch);
   // 胴（正面の下側にお腹の明るい布）・頭・口元・耳・腕（少し前へ傾ける）・脚（前へ投げ出す。足の裏は明るい布）
   body(S, R, xf, [
@@ -91,7 +93,7 @@ export function bear(S: Surfels, R: Rand, xf: Xf, fur = 0x9b6a43, patch = 0xd9b8
 }
 
 /** ウサギ（座った姿・耳まで約 0.42 m）。白い毛、耳の内側は薄い桃色 */
-export function rabbit(S: Surfels, R: Rand, xf: Xf): void {
+export function rabbit(S: ShapeSink, R: Rand, xf: Xf): void {
   const W = lin(0xf2efe8), Pk = lin(0xe8b4b8);
   // 胴・頭・口元・長い耳（少し外へ開いて後ろへ倒す。内側は桃色）・足・腕・丸いしっぽ
   body(S, R, xf, [
@@ -112,7 +114,7 @@ export function rabbit(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** ネコ（座った姿・約 0.32 m）。灰色の縞（トラ猫）と長いしっぽ */
-export function cat(S: Surfels, R: Rand, xf: Xf): void {
+export function cat(S: ShapeSink, R: Rand, xf: Xf): void {
   const G = lin(0x8d8a84), D = lin(0x4a4744), Wh = lin(0xe8e4dc);
   const tabby = (d: V3, p: V3): V3 => {
     if (d[2] > 0.55 && d[1] < 0.2) return Wh;
@@ -136,7 +138,7 @@ export function cat(S: Surfels, R: Rand, xf: Xf): void {
   }
   ellipsoid(S, [0, 0.242, 0.1], [0.008, 0.006, 0.005], { spacing: 0.0015, look: LOOK.fabric, rand: R, xf, color: () => lin(0xc98a86) });
   // しっぽ（床を回って前へ）
-  const from = S.n;
+  const from = S.splats?.n ?? 0;
   tube(S, (t) => { const a = Math.PI * (0.55 + t * 0.9); return [Math.cos(a) * 0.11, 0.018 + Math.sin(t * Math.PI) * 0.01, -0.02 + Math.sin(a) * 0.1]; }, (t) => 0.017 - t * 0.006, {
     spacing: 0.0045, look: LOOK.fabric, rand: R, xf, color: (_u, v) => (Math.sin(v * 30) > 0.3 ? D : G),
   });

@@ -4,6 +4,8 @@
  * - 置いてある・飛んでいる物は状態の位置と向き（poses）に描く。持ち出して置いた区画の外では、区画と一緒に隠れないよう場面の直下に移す
  * - 自分（p1）が持っている物はカメラに付けて、画面の右下（手の前）に描く。大きな物（椅子）は小さめに、下の方に
  * - 形は kind ごとに箱・円柱・球を組む（素材は CC0 の材質ライブラリの MatId）。水の入れ物は水面の高さ、運ぶと変わる物は段で形が変わる
+ * - 作り込む小物の形（ctx.props。client/props）があれば、kind・大きさ・色ごとに形の関数で作った物の写しで描く
+ *   （作り終わるまで・形の関数が無い kind は箱の組み合わせ。振る舞いは同じ）
  * - 音: 拾う・置く・投げる・落ちる・こぼれる・満ちる・変わる（AudioEngine の一発音）
  */
 import * as THREE from 'three';
@@ -11,6 +13,9 @@ import type { PartState } from '../../../core/sim/part.ts';
 import type { EntitySpec, Json, MatId } from '../../../core/world/layout.ts';
 import { defineView, type ViewContext } from '../views.ts';
 import { lightAt, onCue, Parts, withBaked } from './common.ts';
+import { SURFACES } from '../../render/MaterialLibrary.ts';
+import { hasCarryShape, type PropSpec } from '../../props/registry.ts';
+import { disposeInstance, instanceOf, relightMeshes } from '../../props/propMeshes.ts';
 import { receiverGlow } from './puzzle.ts';
 import { tileTop } from './picture.ts';
 
@@ -181,20 +186,52 @@ function handPlace(group: THREE.Group, half: V3): void {
   group.rotation.set(0.12, -0.35, 0);
 }
 
+/** 材質の見た目の色（sRGB の 16 進。光る物は光の色） */
+const matHex = (m: MatId | undefined, fb: number): number => (m && SURFACES[m] ? (SURFACES[m].emissiveColor ?? SURFACES[m].color) : fb);
+
+/** 形の関数での作り方（kind が形の関数に無ければ null）。key は同じ形の写しを使い回す鍵 */
+export function carryParts(kind: string, half: V3, mat: MatId, params: { [k: string]: Json }): { parts: { spec: PropSpec; name?: string }[]; key: string } | null {
+  if (!hasCarryShape(kind)) return null;
+  const a = { item: kind, h: half, main: matHex(mat, 0xcccccc), label: matHex(params.label as MatId | undefined, 0xd23a34), glass: matHex((params.glass as MatId | undefined) ?? 'lightWarm', 0xffd29a), dots: Number(params.dots ?? 1) };
+  const spec = (k: string, args: PropSpec['a']): PropSpec => ({ kind: k, o: [0, 0, 0], yaw: 0, s: 1, a: args, seed: 7 });
+  const parts: { spec: PropSpec; name?: string }[] = [{ spec: spec('carry', a) }];
+  // バケツの水面は別の物（高さを動かす。箱の組み合わせと同じ名前 water）
+  if (kind === 'bucket') parts.push({ spec: spec('carryWater', { h: half }), name: 'water' });
+  return { parts, key: `${kind}|${half.map((v) => v.toFixed(3))}|${a.main}|${a.label}|${a.glass}|${a.dots}` };
+}
+
 function itemView(spec: EntitySpec, ctx: ViewContext): ReturnType<Parameters<typeof defineView>[1]> {
   const half = (spec.params.half as V3 | undefined) ?? [0.15, 0.15, 0.15];
   const kind = String(spec.params.kind ?? 'box');
   const mat = (spec.params.mat as MatId | undefined) ?? 'boxCardboard';
+  // 描く物の入れ物: 箱の組み合わせ（P.group）と形の関数の物の写し（proc）を入れる
+  const g = new THREE.Group();
   let P = new Parts(ctx);
+  let proc: THREE.Object3D | null = null;
   let stage = -1;
   let relight = 0;
   let inHand = false;
+  let gen = 0;
+  let disposed = false;
   const build = (st: number): void => {
+    const my = ++gen;
     P.dispose();
     P = new Parts(ctx);
     buildShape(P, kind, half, mat, spec.params, st);
+    g.add(P.group);
+    if (proc) { disposeInstance(proc); proc = null; }
     stage = st;
     relight = 0;
+    // 運ぶと変わる物は段ごとの形
+    const forms = (spec.params.forms as string[] | undefined) ?? ['cup', 'vase', 'bird', 'key'];
+    const k = kind === 'morph' ? forms[Math.min(forms.length - 1, st)]! : kind;
+    const want = ctx.props ? carryParts(k, half, mat, spec.params) : null;
+    if (want) void ctx.props!.carryTemplate(want.parts, want.key).then((tpl) => {
+      if (!tpl || disposed || my !== gen) return;
+      proc = instanceOf(tpl);
+      g.add(proc);
+      relight = 0;
+    });
   };
   build(0);
   const cellBounds = ctx.built.cells.get(spec.cell ?? '')?.bounds ?? null;
@@ -217,7 +254,10 @@ function itemView(spec: EntitySpec, ctx: ViewContext): ReturnType<Parameters<typ
     update(s: Readonly<PartState>, dt: number) {
       const st = typeof s.stage === 'number' ? s.stage : 0;
       if (kind === 'morph' && st !== stage) build(st);
-      const g = P.group;
+      // 形の関数の物ができていれば、箱の組み合わせを隠す
+      const useProc = !!proc && !!ctx.props?.isEnabled;
+      P.group.visible = !useProc;
+      if (proc) proc.visible = useProc;
       const held = s.held === 'p1' && !!ctx.camera;
       if (held) {
         if (!inHand) { ctx.camera!.add(g); handPlace(g, half); inHand = true; relight = 0; }
@@ -230,9 +270,11 @@ function itemView(spec: EntitySpec, ctx: ViewContext): ReturnType<Parameters<typ
         q.set(p[3]!, p[4]!, p[5]!, p[6]!);
         g.quaternion.copy(q);
       }
-      const water = g.getObjectByName('water');
-      if (water) {
-        const f = typeof s.fill === 'number' ? s.fill : 0;
+      // 水面（箱の組み合わせと形の関数の物の両方）
+      const f = typeof s.fill === 'number' ? s.fill : 0;
+      for (const root of [P.group, proc]) {
+        const water = root?.getObjectByName('water');
+        if (!water) continue;
         water.visible = f > 0.01;
         water.position.y = -half[1] + 0.02 + f * half[1] * 1.7;
       }
@@ -241,10 +283,12 @@ function itemView(spec: EntitySpec, ctx: ViewContext): ReturnType<Parameters<typ
         relight = 0.3;
         const wp = new THREE.Vector3();
         g.getWorldPosition(wp);
-        P.relight(lightAt(ctx, [wp.x, wp.y, wp.z]));
+        const rgb = lightAt(ctx, [wp.x, wp.y, wp.z]);
+        P.relight(rgb);
+        if (proc) relightMeshes(proc, rgb);
       }
     },
-    dispose() { offCue(); P.dispose(); },
+    dispose() { disposed = true; offCue(); P.dispose(); if (proc) disposeInstance(proc); g.removeFromParent(); },
   };
 }
 

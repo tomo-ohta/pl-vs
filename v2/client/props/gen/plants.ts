@@ -2,7 +2,7 @@
  * 植物（スプラット）。鉢は回転体、葉は 1 枚ずつのリボン（両面・中央の葉脈・先の垂れ）。
  * 座標は局所（鉢の底の中心が原点、y が上）。xf で部屋へ置く。
  */
-import { ellipsoid, fbm, LOOK, lin, mix3, norm, Rand, revolve, scale3, surface, tube, type Look, type Surfels, type V3 } from '../surfel.ts';
+import { ellipsoid, fbm, LOOK, lin, mix3, norm, Rand, revolve, scale3, surface, tube, type Look, type ShapeSink, type V3 } from '../shape.ts';
 
 type Xf = (p: V3) => V3;
 
@@ -11,7 +11,7 @@ type Xf = (p: V3) => V3;
 export interface PotOpts { r0: number; r1: number; h: number; color: number; look?: Look; rim?: number; soil?: number }
 
 /** 丸い鉢（底の半径 r0 → 口の半径 r1、高さ h）+ 縁 + 土。返り値は土の高さ */
-export function pot(S: Surfels, R: Rand, xf: Xf, o: PotOpts): number {
+export function pot(S: ShapeSink, R: Rand, xf: Xf, o: PotOpts): number {
   const col = lin(o.color);
   const look = o.look ?? LOOK.ceramic;
   const rim = o.rim ?? 0.012;
@@ -72,7 +72,7 @@ function widthProfile(shape: LeafOpts['shape'], t: number): number {
 }
 
 /** 葉 1 枚（両面）。中心線は dir から重さで垂れる弧 */
-export function leaf(S: Surfels, R: Rand, xf: Xf, o: LeafOpts): void {
+export function leaf(S: ShapeSink, R: Rand, xf: Xf, o: LeafOpts): void {
   const N = 24;
   const pts: V3[] = [];
   const dirs: V3[] = [];
@@ -134,7 +134,7 @@ const leafGreen = (R: Rand, base: number, vein = 1.15, tip = 0x9aa83c) => {
 // ---------------------------------------------------------------- 植物の種類
 
 /** ドラセナ（幸福の木）: 太さの違う幹が 3 本、それぞれの上に細長い葉のロゼット */
-export function dracaena(S: Surfels, R: Rand, xf: Xf): void {
+export function dracaena(S: ShapeSink, R: Rand, xf: Xf): void {
   const soil = pot(S, R, xf, { r0: 0.14, r1: 0.19, h: 0.36, color: 0xb86a45 });
   const canes: [number, number, number][] = [[0.04, 0, 1.15], [-0.05, 0.03, 0.85], [0.01, -0.06, 0.62]];
   for (const [cx, cz, h] of canes) {
@@ -157,7 +157,7 @@ export function dracaena(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** ポトス: 丸い葉（ハート形・黄色の斑）が鉢の上に茂り、つるが縁から垂れる */
-export function pothos(S: Surfels, R: Rand, xf: Xf): void {
+export function pothos(S: ShapeSink, R: Rand, xf: Xf): void {
   const soil = pot(S, R, xf, { r0: 0.11, r1: 0.15, h: 0.25, color: 0xe9e4d8 });
   const variegate = (s: number, t: number, e: number, k: number): V3 => {
     const c = scale3(lin(0x3f7a24), k * (0.85 + 0.25 * t));
@@ -192,7 +192,7 @@ export function pothos(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** サンセベリア: まっすぐ立つ剣状の葉（濃い緑に明るい横縞、縁は黄色） */
-export function sansevieria(S: Surfels, R: Rand, xf: Xf): void {
+export function sansevieria(S: ShapeSink, R: Rand, xf: Xf): void {
   const soil = pot(S, R, xf, { r0: 0.12, r1: 0.15, h: 0.3, color: 0x3a3a3c, look: LOOK.plastic });
   const n = 11;
   for (let k = 0; k < n; k++) {
@@ -214,7 +214,7 @@ export function sansevieria(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** ベンジャミン（フィカスの木）: 編んだ幹・枝・小さな楕円の葉の樹冠 */
-export function ficus(S: Surfels, R: Rand, xf: Xf): void {
+export function ficus(S: ShapeSink, R: Rand, xf: Xf): void {
   const soil = pot(S, R, xf, { r0: 0.18, r1: 0.23, h: 0.42, color: 0xe2ddd2 });
   const H = 1.25;
   const bark = (_u: number, v: number, p: V3): V3 => scale3(lin(0x8c7b66), 0.75 + 0.4 * fbm(p[0] * 50, p[1] * 18 + v, p[2] * 50));
@@ -246,7 +246,7 @@ export function ficus(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** エケベリア（多肉植物）の寄せ植え: 小さな鉢に、肉厚の葉のロゼット 1〜3 個 */
-export function succulent(S: Surfels, R: Rand, xf: Xf): void {
+export function succulent(S: ShapeSink, R: Rand, xf: Xf): void {
   const soil = pot(S, R, xf, { r0: 0.055, r1: 0.075, h: 0.08, color: 0x9a6a50, rim: 0.006, soil: 0.012 });
   const rosettes: [number, number, number][] = [[0, 0, 1], [0.035, 0.025, 0.6], [-0.03, 0.03, 0.5]];
   for (const [cx, cz, s] of rosettes) {
@@ -267,7 +267,7 @@ export function succulent(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** 刈り込んだ低木（植え込みの中）: 丸い塊の表面に小さな葉をびっしり */
-export function shrub(S: Surfels, R: Rand, xf: Xf, c: V3, r: V3): void {
+export function shrub(S: ShapeSink, R: Rand, xf: Xf, c: V3, r: V3): void {
   // 中の暗い茂み（葉のすき間から向こうが透けないように）
   ellipsoid(S, c, [r[0] * 0.86, r[1] * 0.86, r[2] * 0.86], { spacing: 0.012, look: { ...LOOK.leaf, rough: 0.8 }, rand: R, xf, jitter: 0.6, color: (u, v) => scale3(lin(0x1a3314), 0.8 + 0.4 * fbm(u * 3, v * 3, 2)) });
   const area = 4 * Math.PI * Math.pow((r[0] * r[1] + r[1] * r[2] + r[0] * r[2]) / 3, 1);

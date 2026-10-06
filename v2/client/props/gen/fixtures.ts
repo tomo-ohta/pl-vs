@@ -2,7 +2,7 @@
  * 設備（形の関数）: 壁掛けの洗面器・便器（ブースの中）・壁の灯り・流し台の天板（流しと水栓・コンロ）。
  * 局所の座標: 壁の面が z = 0（正面 +z）、床が y = 0。v2 の sinkRow / booths / sconce / kitchenette と同じ寸法に合わせる。
  */
-import { ellipsoid, fbm, LOOK, lin, quad, Rand, revolve, scale3, superellipsoid, surface, tube, type Look, type Surfels, type V3 } from '../surfel.ts';
+import { ellipsoid, fbm, LOOK, lin, quad, Rand, revolve, scale3, superellipsoid, surface, tube, type Look, type ShapeSink, type V3 } from '../shape.ts';
 
 type Xf = (p: V3) => V3;
 const glaze = LOOK.ceramic;
@@ -11,7 +11,7 @@ const steel: Look = { rough: 0.32, metal: 1, opacity: 1.6, mat: 3 };
 const WHITE = 0xf4f3ef;
 
 /** 水栓の注ぎ口（台から立ち上がって前へ曲がる。base は台の上の点、reach は前へ出る長さ） */
-function spout(S: Surfels, R: Rand, xf: Xf, base: V3, rise: number, reach: number, r = 0.011): void {
+function spout(S: ShapeSink, R: Rand, xf: Xf, base: V3, rise: number, reach: number, r = 0.011): void {
   revolve(S, base, (t) => [r * 2.2 - t * r, t * 0.02], { spacing: 0.003, look: chrome, rand: R, xf, color: () => lin(0xdadada) });
   const path = (t: number): V3 => {
     if (t < 0.55) return [base[0], base[1] + 0.02 + (t / 0.55) * rise, base[2]];
@@ -27,7 +27,7 @@ function spout(S: Surfels, R: Rand, xf: Xf, base: V3, rise: number, reach: numbe
  * 壁掛けの洗面器（v2 の sinkRow の 1 つ分: 幅 0.5・奥行き 0.45・上面 0.9）。原点は器の中心の真下の壁の面・床
  * 外側の殻・平らな縁・くぼみ・排水口・水栓・下の排水管（S 字）
  */
-export function wallBasin(S: Surfels, R: Rand, xf: Xf): void {
+export function wallBasin(S: ShapeSink, R: Rand, xf: Xf): void {
   const white = lin(WHITE);
   const top = 0.9, cz = 0.245;
   // 外側（下半分の角の丸い殻）
@@ -68,7 +68,7 @@ export function wallBasin(S: Surfels, R: Rand, xf: Xf): void {
  * 洋式便器（ブースの奥の壁際。幅 0.38・奥行き 0.66・便座 0.42・タンク上端 0.8）。原点は壁の面・床・中心
  * 台座・器・便座・ふた（開いている / 閉じている）・タンク・洗浄レバー。lidUp で ふたを開ける
  */
-export function toilet(S: Surfels, R: Rand, xf: Xf, lidUp = R.chance(0.5)): void {
+export function toilet(S: ShapeSink, R: Rand, xf: Xf, lidUp = R.chance(0.5)): void {
   const white = lin(WHITE);
   const shade = (k: number) => (_u: number, v: number): V3 => scale3(white, k * (0.92 + 0.08 * Math.cos(v)));
   // 台座（床から器へ。上は器に隠れる）
@@ -107,7 +107,7 @@ export function toilet(S: Surfels, R: Rand, xf: Xf, lidUp = R.chance(0.5)): void
  * 壁の灯り（v2 の sconce: 幅 0.14・高さ 0.22・壁から 0.11）。原点は壁の面・灯りの下端の高さ（y = 0 が下端）
  * 金色の座金・腕・乳白のガラスの笠（中が光る）
  */
-export function sconce(S: Surfels, R: Rand, xf: Xf, warm = 0xffd9a0): void {
+export function sconce(S: ShapeSink, R: Rand, xf: Xf, warm = 0xffd9a0): void {
   const gold: Look = { rough: 0.25, metal: 1, opacity: 1.6, mat: 3 };
   const g = lin(0xc8a040);
   // 座金（壁に付いた円盤）
@@ -126,7 +126,7 @@ export function sconce(S: Surfels, R: Rand, xf: Xf, warm = 0xffd9a0): void {
  * 流し台の天板（ステンレス。流しの穴・流し・水栓・コンロの五徳）。原点は天板の手前の左端の下（局所 x = 0..len が天板の長さ、
  * z = 0 が壁・depth が手前、y = 0 が天板の上面）。sink は流しの位置（x の範囲）、hobs はコンロの中心の x
  */
-export function kitchenTop(S: Surfels, R: Rand, xf: Xf, o: { len: number; depth: number; sink: [number, number]; hobs: number[] }): void {
+export function kitchenTop(S: ShapeSink, R: Rand, xf: Xf, o: { len: number; depth: number; sink: [number, number]; hobs: number[] }): void {
   const [s0, s1] = o.sink;
   const sz0 = 0.12, sz1 = o.depth - 0.1;
   const brushed = (u: number, v: number): V3 => scale3(lin(0xc4c6c8), 0.86 + 0.08 * Math.sin(u * 900 + fbm(u * 30, v * 30, 2) * 3) + 0.06 * fbm(u * 8, v * 8, 4));
