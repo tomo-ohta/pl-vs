@@ -275,7 +275,19 @@ function runStage(stage: 'pre' | 'post', a: Active, env: Env, furniture: Box[]):
   }
   if (skip) env.noDress.add(cell.id);
   if (keep.length && gimmicks) gimmicks.keepOut.set(cell.id, [...(gimmicks.keepOut.get(cell.id) ?? []), ...keep]);
+  markChanged(cell, snap, a.id);
   return true;
+}
+
+/** 異変が変えた（位置・大きさ・材質・当たり判定・種類）・足した箱に印（Box.odd。描画の作り込む小物が差し替えない） */
+function markChanged(cell: CellLayout, snap: Snapshot, id: string): void {
+  const at = new Map(snap.boxes.map((b, i) => [b, i]));
+  const same = (a: readonly number[], b: readonly number[]): boolean => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+  for (const b of cell.boxes) {
+    const i = at.get(b);
+    const d = i === undefined ? null : snap.data[i]!;
+    if (!d || b.mat !== d.mat || b.solid !== d.solid || b.kind !== d.kind || !same(b.min, d.min) || !same(b.max, d.max)) b.odd ??= id;
+  }
 }
 
 /** 異変を区画に掛けられるか（大きさ・高さ・珍しさ・物理・テーマ） */

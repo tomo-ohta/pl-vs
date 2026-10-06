@@ -60,6 +60,11 @@ export interface Box {
   slope?: { axis: 'x' | 'z'; rise: number };
   /** 描画の模様の基準（warp の双子の箱）: 模様（UV）をこの写し方の逆で戻した位置で計算する。無ければ区画の uvFrame */
   uvFrame?: UvFrame;
+  /**
+   * 異変が変えた・足した箱（異変の id。gen/anomaly の runStage が付ける）。描画の作り込む小物（client/props）は、
+   * この箱と、この箱に触れる物を差し替えない（傾けた・裏返した・色を抜いた・上に積もった物と見た目を合わせるため）
+   */
+  odd?: string;
 }
 
 /**

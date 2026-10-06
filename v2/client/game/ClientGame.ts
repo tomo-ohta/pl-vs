@@ -34,6 +34,7 @@ import { PlayerFlashlight } from '../render/PlayerFlashlight.ts';
 import type { ViewContext } from '../views/index.ts';
 import { PortalRenderer } from '../world/Portals.ts';
 import { applyLampLevels, cellAt, FloorBuilder, sampleCellLight, type BuiltFloor } from '../world/FloorBuilder.ts';
+import { PropManager } from '../props/PropManager.ts';
 import { LightManager } from '../world/LightManager.ts';
 import { restoreCarry, watchCarry } from './carryStore.ts';
 import { StoryView } from '../world/StoryView.ts';
@@ -60,6 +61,8 @@ export interface GameOptions {
   canvas: HTMLCanvasElement;
   ui: UiRefs;
   tuning: Tuning;
+  /** 作り込む小物（植物・棚の中身・寝具・便器など）を形の関数の物にする（既定 true。false なら箱のまま。?props=0） */
+  props?: boolean;
 }
 
 export class ClientGame {
@@ -86,6 +89,8 @@ export class ClientGame {
   /** 階段室の向こうの階の描画（作っておく） */
   private readonly beyondViews = new Map<StoryWorld, StoryView>();
   private readonly builder: FloorBuilder;
+  /** 作り込む小物の差し替え（開発用に window.game.props から数・切り替え） */
+  readonly props: PropManager;
   /** 階を移った（main が地図・表示を替える） */
   onStoryChange: ((c: StoryChange) => void) | null = null;
   /** Sim のイベントを全部受け取る（main が置いた物の保存に使う） */
@@ -151,6 +156,9 @@ export class ClientGame {
     this.materials.configure(this.renderer);
     this.materials.setTier(this.tier);
     this.builder = new FloorBuilder(this.materials, { tier: this.tier.id });
+    // 作り込む小物（client/props）: 区画の箱を、近い所から形の関数の物に差し替える
+    this.props = new PropManager({ materials: this.materials, renderer: this.renderer, camera: this.camera, scene: this.scene, tier: this.tier });
+    if (o.props !== false) this.builder.props = this.props;
     setBevelQuality(this.tier.id);
     this.scene.fog = new THREE.Fog(0x0b0d14, 8, 46);
     this.scene.background = new THREE.Color(0x050608);
@@ -182,6 +190,7 @@ export class ClientGame {
     this.tier = this.tierFor(id);
     this.materials.setTier(this.tier);
     this.builder.tier = this.tier.id;
+    this.props.setTier(this.tier);
     setBevelQuality(this.tier.id);
     this.audio.setTier(this.tier);
     this.lightsPool.resize(this.tier.maxLights);
@@ -219,7 +228,7 @@ export class ClientGame {
   // ---------------------------------------------------------------- フロア
   /** 部品の描画の入れ物（root）から ViewContext を作る（StoryView が区域ごとに使う） */
   private viewContext(root: THREE.Group, built: BuiltFloor, sim: Sim, onEvent: NonNullable<ViewContext['onEvent']>): ViewContext {
-    return { root, materials: this.materials, built, sim, levelOf: this.lampLevel, audio: this.audio, postfx: this.postfx, camera: this.camera, scene: this.scene, onEvent, quality: () => this.tier, portals: this.portals };
+    return { root, materials: this.materials, built, sim, levelOf: this.lampLevel, audio: this.audio, postfx: this.postfx, camera: this.camera, scene: this.scene, onEvent, quality: () => this.tier, portals: this.portals, ...(this.builder.props ? { props: this.props } : {}) };
   }
 
   private storyView(world: StoryWorld | null, sim: () => Sim, name: string): StoryView {
@@ -756,6 +765,8 @@ export class ClientGame {
       });
       // 見えている区画だけ（頂点の焼き込みを毎フレーム書き直すので、見えない区画は飛ばす）
       for (const c of built.cells.values()) if (c.lamps.length && c.group.visible) applyLampLevels(c, this.lampLevel);
+      // 作り込む小物: 近い区切りを作り、遠い区切りを箱に戻す
+      this.props.update();
       this.updateRevealAnim(dt);
       this.lightsPool.update(built, this.camera.position, this.lampLevel, visible, dt);
       if (this.flashlight) {

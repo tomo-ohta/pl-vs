@@ -16,6 +16,7 @@ import type { Sim } from '../../core/sim/sim.ts';
 import type { EntitySpec, Json, MatId } from '../../core/world/layout.ts';
 import type { MaterialLibrary } from '../render/MaterialLibrary.ts';
 import type { PortalRenderer } from '../world/Portals.ts';
+import type { PropSpec } from '../props/registry.ts';
 import { surfaceBox } from '../render/SurfaceGeometry.ts';
 import { cellAt, sampleCellLight, type BuiltFloor } from '../world/FloorBuilder.ts';
 
@@ -40,6 +41,11 @@ export interface ViewContext {
   quality?(): QualityTier;
   /** 窓・枠の向こうに別の所を描く（段階 4 warp で足した。client/world/Portals.ts）。テストでは無いことがある */
   portals?: PortalRenderer;
+  /**
+   * 作り込む小物の形（client/props/PropManager。持てる物を形の関数の物で描く）。無ければ・isEnabled が false なら箱の組み合わせ。
+   * carryTemplate は種類・大きさ・色ごとに 1 回作った形（写しは client/props/propMeshes.ts の instanceOf で作る）
+   */
+  props?: { readonly isEnabled: boolean; carryTemplate(parts: { spec: PropSpec; name?: string }[], key: string): Promise<THREE.Object3D | null> };
 }
 
 export interface EntityView {

@@ -14,14 +14,15 @@ description: 3D の物（小物・植物・ぬいぐるみ・本や商品の列�
 
 | | |
 |---|---|
-| 形の部品（曲面・粒・メッシュの書き出し） | `experiments/v2-splat-props/src/showroom/surfel.ts` |
-| 形の関数の見本（植物・ぬいぐるみ・本・商品・布・紙・丸い物・陶器・設備・持てる物） | `experiments/v2-splat-props/src/showroom/gen/*.ts` |
-| メッシュにする（アトラス・v2 の材質の注入・頂点の焼き込み） | `experiments/v2-splat-props/src/showroom/meshes.ts`・`bake.ts` |
-| 見本の部屋（置き場所・見る位置・v2 の箱との見比べ） | `experiments/v2-splat-props/src/showroom/layout.ts`・`main.ts`（`npm run dev --prefix experiments/v2-splat-props` → http://localhost:5175/） |
-| ゲームの世界の小物を差し替える（v2 の箱から見つける・距離で作る / 捨てる・持てる物の描画） | `experiments/v2-splat-props/src/procedural/`（`recognize.ts`・`worldProps.ts`・`carryView.ts`。http://localhost:5175/world.html） |
+| 形の部品（曲面・メッシュの書き出し・粒の受け） | `v2/client/props/shape.ts` |
+| 形の関数の見本（植物・ぬいぐるみ・本・商品・布・紙・丸い物・陶器・設備・持てる物） | `v2/client/props/gen/*.ts` |
+| 作り方の表（種類 → 形の関数。Worker へ送れるデータ PropSpec） | `v2/client/props/registry.ts` |
+| メッシュにする（アトラス・v2 の材質の注入・頂点の焼き込み） | `v2/client/props/atlas.ts`・`propMeshes.ts` |
+| ゲームの世界の小物を差し替える（区画の箱から見つける・Worker で作る・距離で作る / 捨てる・持てる物） | `v2/client/props/plan.ts`・`PropManager.ts`・`props.worker.ts`、`v2/client/views/carry/items.ts`（設計は `v2/docs/props.md`） |
+| 見本の部屋（置き場所・見る位置・v2 の箱との見比べ・粒の表示） | `experiments/v2-splat-props/src/showroom/layout.ts`・`main.ts`・`surfel.ts`（粒の受け）（`npm run dev --prefix experiments/v2-splat-props` → http://localhost:5175/） |
 | 他の作り方の物を同じ条件で置く（比較用） | `experiments/v2-splat-props/src/showroom/evalTools.ts` |
 
-部品が v2 本体へ移されたら、そちらを正とする（この表を直す）。`experiments/` で作業するときは v2/・shared/ のファイルを変えない。
+形の部品と形の関数は v2 本体（`v2/client/props`）が正。見本の部屋（experiments）はそれを読んで、同じ形の関数をメッシュと粒の両方で見せる。
 
 部品の使い方（引数・座標の約束）は [reference/primitives.md](reference/primitives.md)、見本の関数の一覧と三角形・粒の数の実測は [reference/examples.md](reference/examples.md)。
 
@@ -95,7 +96,8 @@ description: 3D の物（小物・植物・ぬいぐるみ・本や商品の列�
 - 粒の間隔（`spacing`）が細かさを決める: 手に取る物 2〜4 mm、棚の中身 4〜6 mm、大きな布・遠くの物 8〜12 mm。メッシュの頂点はその 2.5 倍の間隔、テクスチャは粒と同じ細かさ
 - 予算を超えるときは間隔を広げる・見えない面を作らない（棚の奥・床に接する面）・同じ物の繰り返しを減らす
 - 平らな面（形が u・v の一次式の面: 本の背・箱の面・紙）は、`recordMesh` が自動で焼き込み光の分（25 cm おき）だけ頂点を置く。曲がった面だけが三角形を使う
-- ゲームの世界で数百〜千個を置くとき（`world.html` の実測）: 小物を 8 m の区切りに分け、近い区切りから作る。10 m より近くは細かく、22 m より近くは棚の中身を 2 倍粗く（`detail.spacingScale`）、霧の先（32 m より遠い状態が 1.5 秒続いたら）は捨てて元の箱に戻す。スタート付近で区切り 9 つ・三角形 約 28 万・GPU 約 62 MB。持てる物のように同じ物が何度も出る物は、種類ごとに 1 回作って形とテクスチャを共有する
+- ゲームの世界で数百〜千個を置くとき（v2 の `PropManager`。実測は `v2/docs/props.md`）: 小物を 8 m の区切りに分け、近い区切りから Worker で作る。10 m より近くは細かく、22 m より近くは棚の中身を 2 倍粗く（`detail.spacingScale`）、霧の先（32 m より遠い状態が 1.5 秒続いたら）は捨てて元の箱に戻す。画質・スマホで距離と模様の細かさ（`detail.textureScale`）を下げる。持てる物のように同じ物が何度も出る物は、種類ごとに 1 回作って形とテクスチャを共有する
+- ゲームに入れる物は、乱数の種を位置でなく名前・寸法から取る（写した部屋・鏡写しと同じ見た目にする）。異変が触った箱（`Box.odd`）の物は作り込まない
 
 ## 終わりの条件
 

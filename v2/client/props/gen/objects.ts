@@ -3,14 +3,14 @@
  * 花瓶と花・彫刻・トロフィー・トイレットペーパー。局所の座標は底の中心が原点、正面が +z。
  */
 import { leaf } from './plants.ts';
-import { boxFaces, ellipsoid, fbm, LOOK, lin, mix3, quad, Rand, revolve, scale3, surface, tube, type Look, type Surfels, type V3 } from '../surfel.ts';
+import { boxFaces, ellipsoid, fbm, LOOK, lin, mix3, quad, Rand, revolve, scale3, surface, tube, type Look, type ShapeSink, type V3 } from '../shape.ts';
 
 type Xf = (p: V3) => V3;
-const disc = (S: Surfels, R: Rand, xf: Xf, y: number, r0: number, r1: number, look: Look, color: (u: number, v: number) => V3, up = true, spacing = 0.004): void =>
+const disc = (S: ShapeSink, R: Rand, xf: Xf, y: number, r0: number, r1: number, look: Look, color: (u: number, v: number) => V3, up = true, spacing = 0.004): void =>
   surface(S, { u: [0, Math.PI * 2], v: [0, 1], spacing, look, rand: R, xf, flip: !up, pos: (u, v) => { const r = r0 + (r1 - r0) * v; return [Math.cos(u) * r, y, Math.sin(u) * r]; }, color });
 
 /** カラーコーン（円すい・白い反射帯 2 本・四角い黒い台） */
-export function cone(S: Surfels, R: Rand, xf: Xf): void {
+export function cone(S: ShapeSink, R: Rand, xf: Xf): void {
   const orange = lin(0xf05a1a), white = lin(0xf4f2ee);
   // 台（角の丸い黒い板）
   for (const [o, a, b] of [[[-0.18, 0.03, 0.18], [0.36, 0, 0], [0, 0, -0.36]], [[-0.18, 0, 0.18], [0.36, 0, 0], [0, 0.03, 0]], [[0.18, 0, -0.18], [-0.36, 0, 0], [0, 0.03, 0]], [[0.18, 0, 0.18], [0, 0, -0.36], [0, 0.03, 0]], [[-0.18, 0, -0.18], [0, 0, 0.36], [0, 0.03, 0]]] as [V3, V3, V3][]) {
@@ -24,7 +24,7 @@ export function cone(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** 消火器（赤い円筒・レバー・圧力計・ホース・ラベル） */
-export function extinguisher(S: Surfels, R: Rand, xf: Xf): void {
+export function extinguisher(S: ShapeSink, R: Rand, xf: Xf): void {
   const red = lin(0xc0141a);
   const prof = (t: number): [number, number] => { const y = t * 0.47; const r = y < 0.01 ? 0.07 + y * 0.5 : y > 0.42 ? 0.075 * Math.cos(((y - 0.42) / 0.05) * 1.2) : 0.075; return [Math.max(0.02, r), y]; };
   revolve(S, [0, 0, 0], prof, {
@@ -43,7 +43,7 @@ export function extinguisher(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** 壁掛け時計（黒い枠・白い文字盤・目盛り・針・ガラスの映り込み）。局所: 中心が原点、正面 +z */
-export function wallClock(S: Surfels, R: Rand, xf: Xf, hour = 10, minute = 8): void {
+export function wallClock(S: ShapeSink, R: Rand, xf: Xf, hour = 10, minute = 8): void {
   const Rr = 0.16;
   // 枠（ドーナツ形）
   surface(S, { u: [0, Math.PI * 2], v: [0, Math.PI * 1.5], spacing: 0.004, look: { ...LOOK.plastic, rough: 0.25 }, rand: R, xf,
@@ -72,7 +72,7 @@ export function wallClock(S: Surfels, R: Rand, xf: Xf, hour = 10, minute = 8): v
 }
 
 /** 給水機のボトル（19 L。逆さにした透ける青い容器・溝・中の水） */
-export function coolerBottle(S: Surfels, R: Rand, xf: Xf): void {
+export function coolerBottle(S: ShapeSink, R: Rand, xf: Xf): void {
   const prof = (t: number): [number, number] => {
     // 逆さ: t = 0 が首（下）、1 が底（上）
     const y = t * 0.46;
@@ -88,7 +88,7 @@ export function coolerBottle(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** 電気スタンド（丸い台・曲がる軸・円すいの笠・光る電球） */
-export function deskLamp(S: Surfels, R: Rand, xf: Xf, color = 0x2a4a3a): void {
+export function deskLamp(S: ShapeSink, R: Rand, xf: Xf, color = 0x2a4a3a): void {
   const col = lin(color);
   revolve(S, [0, 0, 0], (t) => [0.085 - t * 0.02, Math.sin(t * Math.PI / 2) * 0.025], { spacing: 0.004, look: LOOK.glossy, rand: R, xf, color: () => col });
   const arm = (t: number): V3 => [Math.sin(t * 1.2) * 0.12, 0.025 + t * 0.34, -Math.sin(t * 1.4) * 0.03];
@@ -103,7 +103,7 @@ export function deskLamp(S: Surfels, R: Rand, xf: Xf, color = 0x2a4a3a): void {
 }
 
 /** 花瓶と花（青い釉薬の花瓶・茎・チューリップのような花・葉） */
-export function vaseFlowers(S: Surfels, R: Rand, xf: Xf): void {
+export function vaseFlowers(S: ShapeSink, R: Rand, xf: Xf): void {
   const blue = lin(0x2a4a8a);
   revolve(S, [0, 0, 0], (t) => [0.05 + Math.sin(t * Math.PI * 1.1) * 0.045 - t * 0.02, t * 0.26], {
     spacing: 0.0045, look: LOOK.ceramic, rand: R, xf, color: (_u, v) => scale3(mix3(blue, lin(0x6a8ac0), Math.max(0, v - 0.7) * 2), 0.9 + 0.15 * fbm(v * 9, 0, 1)),
@@ -126,7 +126,7 @@ export function vaseFlowers(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** 彫刻（トーラスの結び目。ブロンズの金属） */
-export function sculpture(S: Surfels, R: Rand, xf: Xf): void {
+export function sculpture(S: ShapeSink, R: Rand, xf: Xf): void {
   const path = (t: number): V3 => {
     const a = t * Math.PI * 2, p = 2, q = 3;
     const r = 0.08 * (2 + Math.cos(q * a));
@@ -139,7 +139,7 @@ export function sculpture(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** トロフィー（金のカップ・取っ手・大理石の台・銘板） */
-export function trophy(S: Surfels, R: Rand, xf: Xf): void {
+export function trophy(S: ShapeSink, R: Rand, xf: Xf): void {
   const gold: Look = { rough: 0.2, metal: 1, opacity: 1.6, mat: 3 };
   const g = lin(0xd8a83a);
   // 台
@@ -153,7 +153,7 @@ export function trophy(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** トイレットペーパー（壁の金具に掛けたロール） */
-export function toiletRoll(S: Surfels, R: Rand, xf: Xf): void {
+export function toiletRoll(S: ShapeSink, R: Rand, xf: Xf): void {
   // 局所: 軸は x、中心が原点
   surface(S, { u: [0, Math.PI * 2], v: [-0.055, 0.055], spacing: 0.004, look: LOOK.paper, rand: R, xf,
     pos: (u, v) => [v, Math.cos(u) * 0.055, Math.sin(u) * 0.055], color: (u) => scale3(lin(0xf6f4ee), 0.93 + 0.07 * Math.sin(u * 40)) });
@@ -169,7 +169,7 @@ export function toiletRoll(S: Surfels, R: Rand, xf: Xf): void {
  * 床置きの消火器と台（v2 の extinguisher: 壁際の赤い箱 0.44 × 0.16 × 0.65 の所）。局所: 壁の面 z = 0・床 y = 0・中心 x = 0
  * 赤い鉄板の台（底の受けと背の板。「消火器」の白い帯）と、その中に立つ消火器
  */
-export function extinguisherStand(S: Surfels, R: Rand, xf: Xf): void {
+export function extinguisherStand(S: ShapeSink, R: Rand, xf: Xf): void {
   const red = lin(0xb81820);
   const paint: Look = { ...LOOK.glossy, rough: 0.35 };
   // 色は面の (s, t) で決める（p は部屋の座標）
@@ -184,7 +184,7 @@ export function extinguisherStand(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** バスケットのリングと網（v2 の体育館の板の前）。局所: 板の前の面 z = 0、リングの高さ y = 0、正面 +z（リングの中心は板から 0.225） */
-export function hoop(S: Surfels, R: Rand, xf: Xf): void {
+export function hoop(S: ShapeSink, R: Rand, xf: Xf): void {
   const orange = lin(0xd8541c);
   const ringR = 0.215, cz = 0.01 + ringR;
   tube(S, (t) => { const a = t * Math.PI * 2; return [Math.cos(a) * ringR, 0, cz + Math.sin(a) * ringR]; }, () => 0.009, { spacing: 0.004, look: { ...LOOK.metal, rough: 0.4 }, rand: R, xf, color: () => orange });
@@ -199,14 +199,14 @@ export function hoop(S: Surfels, R: Rand, xf: Xf): void {
 }
 
 /** 皿（白い陶器の浅い円盤・縁の帯）。原点は底の中心 */
-export function plate(S: Surfels, R: Rand, xf: Xf, r = 0.12, rim = 0x2a4a8a): void {
+export function plate(S: ShapeSink, R: Rand, xf: Xf, r = 0.12, rim = 0x2a4a8a): void {
   const white = lin(0xf6f4ee), band = lin(rim);
   revolve(S, [0, 0, 0], (t) => [0.04 + t * (r - 0.04), t < 0.55 ? 0.004 : 0.004 + Math.pow((t - 0.55) / 0.45, 2) * 0.018], { spacing: 0.004, look: LOOK.ceramic, rand: R, xf, flip: true, color: (_u, v) => (v > 0.88 && v < 0.94 ? band : white) });
   revolve(S, [0, 0, 0], (t) => [0.05 + t * (r - 0.05), t * 0.02], { spacing: 0.005, look: LOOK.ceramic, rand: R, xf, color: () => scale3(white, 0.92) });
 }
 
 /** ボールプールの玉（上から見える層だけ。色とりどりの小さな球）。局所: プールの中の床の中心、w × d、玉の上面の高さ top */
-export function ballPit(S: Surfels, R: Rand, xf: Xf, w: number, d: number, top: number): void {
+export function ballPit(S: ShapeSink, R: Rand, xf: Xf, w: number, d: number, top: number): void {
   const colors = [0xd23a34, 0xe8c23a, 0x2f6fd0, 0x3aa858, 0xf2f0ea, 0xe86a9a];
   const r = 0.04, step = r * 1.85;
   for (let z = -d / 2 + r; z <= d / 2 - r; z += step * 0.87) {

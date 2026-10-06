@@ -2,7 +2,7 @@
  * 紙（スプラット）: 書類の束・散らばった紙・丸めた紙・ごみ箱の中身。
  */
 import { can } from './goods.ts';
-import { ellipsoid, fbm, LOOK, lin, quad, Rand, scale3, surface, type Surfels, type V3 } from '../surfel.ts';
+import { ellipsoid, fbm, LOOK, lin, quad, Rand, scale3, surface, type ShapeSink, type V3 } from '../shape.ts';
 
 type Xf = (p: V3) => V3;
 
@@ -17,7 +17,7 @@ function lines(u: number, v: number, seed: number): boolean {
 }
 
 /** A4 の紙 1 枚（反り・回転）。中心 c、向き yaw、反り curl（両端が上がる量） */
-export function sheet(S: Surfels, R: Rand, xf: Xf, c: V3, yaw: number, curl = 0.006, seed = R.range(0, 100)): void {
+export function sheet(S: ShapeSink, R: Rand, xf: Xf, c: V3, yaw: number, curl = 0.006, seed = R.range(0, 100)): void {
   const w = 0.21, h = 0.297;
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
   surface(S, {
@@ -33,7 +33,7 @@ export function sheet(S: Surfels, R: Rand, xf: Xf, c: V3, yaw: number, curl = 0.
 }
 
 /** 書類の束（積んだ紙。端がそろっていない・上の数枚がずれる・側面に紙の層） */
-export function paperStack(S: Surfels, R: Rand, xf: Xf, c: V3, n = 80, yaw = 0): void {
+export function paperStack(S: ShapeSink, R: Rand, xf: Xf, c: V3, n = 80, yaw = 0): void {
   const w = 0.21, h = 0.297, t = n * 0.0001 + 0.002;
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
   const P = (x: number, y: number, z: number): V3 => [c[0] + x * cy + z * sy, c[1] + y, c[2] - x * sy + z * cy];
@@ -53,7 +53,7 @@ export function paperStack(S: Surfels, R: Rand, xf: Xf, c: V3, n = 80, yaw = 0):
 }
 
 /** 丸めた紙（しわくちゃの玉） */
-export function crumpled(S: Surfels, R: Rand, xf: Xf, c: V3, r = 0.04): void {
+export function crumpled(S: ShapeSink, R: Rand, xf: Xf, c: V3, r = 0.04): void {
   const seed = R.range(0, 50);
   ellipsoid(S, c, [r, r * 0.85, r], {
     spacing: 0.004, look: LOOK.paper, rand: R, xf,
@@ -63,7 +63,7 @@ export function crumpled(S: Surfels, R: Rand, xf: Xf, c: V3, r = 0.04): void {
 }
 
 /** 角形のごみ箱の中身（丸めた紙・空き缶）。口の高さ y、内側の大きさ s */
-export function binTrash(S: Surfels, R: Rand, xf: Xf, c: V3, s: number, y: number): void {
+export function binTrash(S: ShapeSink, R: Rand, xf: Xf, c: V3, s: number, y: number): void {
   const n = R.int(4, 7);
   for (let k = 0; k < n; k++) crumpled(S, R, xf, [c[0] + R.range(-s / 3, s / 3), y - 0.05 + R.range(-0.03, 0.03) + k * 0.006, c[2] + R.range(-s / 3, s / 3)], R.range(0.03, 0.045));
   // 空き缶（傾けて）
@@ -72,7 +72,7 @@ export function binTrash(S: Surfels, R: Rand, xf: Xf, c: V3, s: number, y: numbe
 }
 
 /** 散らばった紙（床に数枚。反りと回転） */
-export function scattered(S: Surfels, R: Rand, xf: Xf, c: V3, n = 5, spread = 0.5): void {
+export function scattered(S: ShapeSink, R: Rand, xf: Xf, c: V3, n = 5, spread = 0.5): void {
   for (let k = 0; k < n; k++) sheet(S, R, xf, [c[0] + R.range(-spread, spread), c[1] + k * 0.0012, c[2] + R.range(-spread, spread)], R.range(0, Math.PI * 2), R.range(0.006, 0.02));
 }
 
@@ -80,7 +80,7 @@ export function scattered(S: Surfels, R: Rand, xf: Xf, c: V3, n = 5, spread = 0.
  * 掲示板に画鋲で留めた紙（縦の面。局所: 板の面が z = 0、正面 +z）。中心 (cx, cy)、幅 w × 高さ h。
  * 下の角が少し浮いて反る・文字の行・上の画鋲。
  */
-export function pinnedSheet(S: Surfels, R: Rand, xf: Xf, cx: number, cy: number, w = 0.21, h = 0.297, seed = R.range(0, 100)): void {
+export function pinnedSheet(S: ShapeSink, R: Rand, xf: Xf, cx: number, cy: number, w = 0.21, h = 0.297, seed = R.range(0, 100)): void {
   const tilt = R.range(-0.04, 0.04);
   const ct = Math.cos(tilt), st = Math.sin(tilt);
   const lift = R.range(0.004, 0.014);

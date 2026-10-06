@@ -1,6 +1,6 @@
-# 形の部品の使い方（surfel.ts）
+# 形の部品の使い方（shape.ts）
 
-場所: `experiments/v2-splat-props/src/showroom/surfel.ts`。形の関数は `(S: Surfels, R: Rand, xf: (p: V3) => V3, …) => void` の形で書く。
+場所: `v2/client/props/shape.ts`。形の関数は `(S: ShapeSink, R: Rand, xf: (p: V3) => V3, …) => void` の形で書く（S は曲面の書き出し先。見本の部屋は粒の受けも付けた `Surfels`）。
 
 ## 約束
 
@@ -71,8 +71,9 @@
 
 ## 細かさとメッシュだけの作成
 
-- `detail.spacingScale`（既定 1）: すべての曲面の間隔に掛ける倍率。遠くの物・数の多い物を粗く作るときに、形の関数の前後で一時的に変える（`world.html` は既定 1.5、棚の中身の遠い区切りは 3）
-- `S.patches = []` でメッシュの曲面を記録、`S.noSplats = true` で粒を作らない（メッシュだけ。形の関数は同じ）
+- `detail.spacingScale`（既定 1）: すべての曲面の間隔に掛ける倍率。遠くの物・数の多い物を粗く作るときに、形の関数の前後で一時的に変える（v2 のゲームは high で 1.5、棚の中身の遠い区切りは 3。`PROP_LOD`）
+- `detail.textureScale`（既定 1）: 模様（テクスチャ）だけの細かさの倍率（1 以下。GPU の量を減らす。v2 の mid 0.75・low 0.65）
+- `S.patches`（既定 `[]`）にメッシュの曲面を書き足す。`S.splats` に粒の受け（SplatSink）を付けると粒も置く（見本の部屋だけ。v2 のゲームはメッシュだけ）
 - 平らな面は自動で頂点を減らす（`isAffine`。`skip` のある面・閉じた面は除く）
 
 ## 道具

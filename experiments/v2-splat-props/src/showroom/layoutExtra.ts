@@ -18,12 +18,12 @@ import { booths, longTable, sinkRow, vending } from '../../../../v2/core/gen/dre
 import { board, extinguisher as v2extinguisher, papers, sconce as v2sconce } from '../../../../v2/core/gen/dress/decor.ts';
 import type { Exhibit, V2Shape } from './layout.ts';
 import { place, type Rand, type Surfels, type V3 } from './surfel.ts';
-import { kitchenTop, sconce, toilet, wallBasin } from './gen/fixtures.ts';
-import { pinnedSheet } from './gen/paper.ts';
-import { curtain, pillow } from './gen/fabric.ts';
-import { vendingDisplay } from './gen/goods.ts';
-import { ballPit, extinguisherStand, hoop, plate } from './gen/objects.ts';
-import { bucketWater, CARRY_GEN, cup, type CarryColors } from './gen/carry.ts';
+import { kitchenTop, sconce, toilet, wallBasin } from '../../../../v2/client/props/gen/fixtures.ts';
+import { pinnedSheet } from '../../../../v2/client/props/gen/paper.ts';
+import { curtain, pillow } from '../../../../v2/client/props/gen/fabric.ts';
+import { vendingDisplay } from '../../../../v2/client/props/gen/goods.ts';
+import { ballPit, extinguisherStand, hoop, plate } from '../../../../v2/client/props/gen/objects.ts';
+import { bucketWater, CARRY_GEN, cup, type CarryColors } from '../../../../v2/client/props/gen/carry.ts';
 
 
 export interface ExtraApi {

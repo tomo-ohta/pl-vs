@@ -2,7 +2,7 @@
  * 布もの（スプラット）: 掛け布団・枕・クッション・ひざ掛け・カーテン・たたんだタオル・布団。
  * しわ・たるみ・ふくらみはノイズと形の関数で出す。
  */
-import { fbm, LOOK, lin, mix3, Rand, scale3, superellipsoid, surface, tube, type Look, type Surfels, type V3 } from '../surfel.ts';
+import { fbm, LOOK, lin, mix3, Rand, scale3, superellipsoid, surface, tube, type Look, type ShapeSink, type V3 } from '../shape.ts';
 
 type Xf = (p: V3) => V3;
 
@@ -10,7 +10,7 @@ type Xf = (p: V3) => V3;
  * マットレスの上の掛け布団。マットレスの上面（x0..x1 × z0..z1、高さ top）を覆い、両脇と足元に垂れる。
  * 枕の側（z0）は折り返して白いシーツが見える。局所 = 部屋の座標（xf は通常そのまま）
  */
-export function duvet(S: Surfels, R: Rand, xf: Xf, o: { x0: number; x1: number; z0: number; z1: number; top: number; color: number; pattern?: boolean }): void {
+export function duvet(S: ShapeSink, R: Rand, xf: Xf, o: { x0: number; x1: number; z0: number; z1: number; top: number; color: number; pattern?: boolean }): void {
   const hang = 0.26, thick = 0.05;
   const W = o.x1 - o.x0;
   const col = lin(o.color);
@@ -58,7 +58,7 @@ export function duvet(S: Surfels, R: Rand, xf: Xf, o: { x0: number; x1: number; 
 }
 
 /** 枕（角の丸いふくらんだ形・縫い目・しわ）。中心 c、向きは x が幅 */
-export function pillow(S: Surfels, R: Rand, xf: Xf, c: V3, w = 0.62, d = 0.42, color = 0xf3f0ea): void {
+export function pillow(S: ShapeSink, R: Rand, xf: Xf, c: V3, w = 0.62, d = 0.42, color = 0xf3f0ea): void {
   const col = lin(color);
   superellipsoid(S, c, [w / 2, 0.065, d / 2], 0.55, 0.25, {
     spacing: 0.007, look: LOOK.fabric, rand: R, xf,
@@ -72,7 +72,7 @@ export function pillow(S: Surfels, R: Rand, xf: Xf, c: V3, w = 0.62, d = 0.42, c
 }
 
 /** 四角いクッション（縁のパイピング・中央のくぼみ）。中心 c、傾き tilt（x 軸まわり）。向きは z が厚み */
-export function cushion(S: Surfels, R: Rand, xf: Xf, c: V3, size = 0.42, color = 0xb84a3a, tilt = -0.25, pattern = false): void {
+export function cushion(S: ShapeSink, R: Rand, xf: Xf, c: V3, size = 0.42, color = 0xb84a3a, tilt = -0.25, pattern = false): void {
   const col = lin(color);
   const ct = Math.cos(tilt), st = Math.sin(tilt);
   const X: Xf = (p) => { const y = p[1] - c[1], z = p[2] - c[2]; return xf([p[0], c[1] + y * ct - z * st, c[2] + y * st + z * ct]); };
@@ -93,7 +93,7 @@ export function cushion(S: Surfels, R: Rand, xf: Xf, c: V3, size = 0.42, color =
 }
 
 /** ひざ掛け（ソファの肘掛けに掛けた毛布。ニットの縞と房） */
-export function throwBlanket(S: Surfels, R: Rand, xf: Xf, o: { x: number; z0: number; z1: number; top: number; inner: number; outer: number; color: number; innerDrop?: number }): void {
+export function throwBlanket(S: ShapeSink, R: Rand, xf: Xf, o: { x: number; z0: number; z1: number; top: number; inner: number; outer: number; color: number; innerDrop?: number }): void {
   const col = lin(o.color);
   const W = o.z1 - o.z0;
   const drop = o.innerDrop ?? 0.32;
@@ -111,7 +111,7 @@ export function throwBlanket(S: Surfels, R: Rand, xf: Xf, o: { x: number; z0: nu
 }
 
 /** カーテン（レールから下がるひだのある布）。x0..x1 の幅、y0（下端）..y1（上端）、z は壁からの位置 */
-export function curtain(S: Surfels, R: Rand, xf: Xf, o: { x0: number; x1: number; y0: number; y1: number; z: number; color: number; gather?: number }): void {
+export function curtain(S: ShapeSink, R: Rand, xf: Xf, o: { x0: number; x1: number; y0: number; y1: number; z: number; color: number; gather?: number }): void {
   const col = lin(o.color);
   const W = o.x1 - o.x0;
   const folds = Math.round(W / 0.14);
@@ -131,7 +131,7 @@ export function curtain(S: Surfels, R: Rand, xf: Xf, o: { x0: number; x1: number
 }
 
 /** たたんだタオルの山（パイル地のざらつき・色違い） */
-export function towelStack(S: Surfels, R: Rand, xf: Xf, c: V3, n = 4): void {
+export function towelStack(S: ShapeSink, R: Rand, xf: Xf, c: V3, n = 4): void {
   const colors = [0xf2efe8, 0x9fc4d8, 0xe8d0a8, 0xb8d8b0, 0xf2efe8, 0xd8a8b0];
   let y = c[1];
   for (let k = 0; k < n; k++) {
@@ -147,7 +147,7 @@ export function towelStack(S: Surfels, R: Rand, xf: Xf, c: V3, n = 4): void {
 }
 
 /** 床に敷いた布団（綴じの点・角の丸い厚い敷布団 + 掛け布団を半分たたんで重ねる） */
-export function futon(S: Surfels, R: Rand, xf: Xf, c: V3, color = 0x3a5a8a): void {
+export function futon(S: ShapeSink, R: Rand, xf: Xf, c: V3, color = 0x3a5a8a): void {
   const col = lin(color), white = lin(0xf2efe8);
   superellipsoid(S, [c[0], c[1] + 0.045, c[2]], [0.48, 0.045, 0.95], 0.25, 0.12, {
     spacing: 0.01, look: LOOK.fabric, rand: R, xf,

@@ -1,6 +1,6 @@
 # 見本の形の関数と実測の数
 
-場所: `experiments/v2-splat-props/src/showroom/gen/`。新しい物は、近い見本を読んで同じ書き方で作る。
+場所: `v2/client/props/gen/`。新しい物は、近い見本を読んで同じ書き方で作る。ゲームに出すときは `registry.ts` に種類・`plan.ts` で見つけ方・`v2/tests/props.test.ts` に見本を足す。
 数は見本の部屋の実測（2026-10-05。三角形は「同じ形のメッシュ」、粒はスプラット）。
 
 | 種類 | 関数（ファイル） | 見どころの技法 | 三角形 | 粒 |
@@ -26,9 +26,10 @@
 - ベッド・ソファの上: v2 の `bed` / `sofa` の柔らかい箱を外し、上面の高さに合わせて布を置く
 - 展示物の登録: `add({ id, name, room, group, note, gen, own, proxy, collider, compare, view })`。`view` は立つ位置と見る点（N / B で移る）
 
-## ゲームの世界で差し替える見本（world.html）
+## ゲームの世界で差し替える（v2 の client/props。設計は v2/docs/props.md）
 
-- 見つける: `src/procedural/recognize.ts` の `planCell(cell)` が、区画の箱の propGroup と形（大きさ・材質・並び・向き）から `{ label, hide, add, gen, seed }` の一覧を作る。`hide` は隠す元の箱、`add` は差し替え中だけ足す箱（流しの下を抜いた台）、`gen` は部屋の座標に置いた形の関数
-- 元の箱を分ける: 描画の写しで `hide` の箱に印（revealGroup）を付けて区画を作らせると、元の箱が小物ごとの別のメッシュになる。当たり判定は元のまま
-- 照明: 区画ごとに 1 回 `exhibitLighting(写し, 隣)` を作って、区切りの間で使い回す（印の付いた元の箱は遮蔽に入れない）
-- 持てる物: v2 の描画の登録（`defineView`）をそのページの中でだけ上書きし、v2 の振る舞い（位置・持つ・水・運ぶと変わる・音）を写したうえで、見た目だけ形の関数の物にする
+- 見つける: `plan.ts` の `planCell(cell)` が、区画の箱の propGroup と形（大きさ・材質・並び・向き）から `{ label, hide, add, spec }` の一覧を作る。`hide` は隠す元の箱、`add` は差し替え中だけ足す箱（流しの下を抜いた台）、`spec` は作り方のデータ（PropSpec。Worker へ送る）
+- 元の箱を分ける: `FloorBuilder` が `hide` の箱を区切り（8 m）ごとの別のメッシュにする（`CellProps.placeholders`）。作った物を出したら隠す。当たり判定は元のまま
+- 照明: 区画ごとに 1 回、差し替える箱を遮蔽物から除いた SurfaceLighting を作って区切りの間で使い回す（`CellProps.lighting`）。入切する照明の区画は「その照明なし」も焼いて混ぜる
+- 持てる物: `views/carry/items.ts` が kind・大きさ・色ごとに 1 回作った形（`PropManager.carryTemplate`）の写しを置く。振る舞い（位置・持つ・水・運ぶと変わる・音）は今までどおり
+- 異変と写し: 異変が触った箱（`Box.odd`）と触れる物は差し替えない。乱数の種は propGroup の名前（区画名・写しの印を除く）か寸法から。warp の双子は元の位置で見つけて写す

@@ -3,7 +3,7 @@
  * v2 の buildShape と同じ大きさ・同じ見分けの手がかり（荷物の色の札・重りの点の数・電球の色）を保つ。
  * 色は v2 の材質の色（hex）を受け取る: main = params.mat、label = params.label、glass = params.glass。
  */
-import { fbm, LOOK, lin, mix3, quad, Rand, revolve, scale3, superellipsoid, surface, tube, ellipsoid, boxFaces, type Look, type Surfels, type V3 } from '../surfel.ts';
+import { fbm, LOOK, lin, mix3, quad, Rand, revolve, scale3, superellipsoid, surface, tube, ellipsoid, boxFaces, type Look, type ShapeSink, type V3 } from '../shape.ts';
 import { bear } from './plush.ts';
 import { leaf } from './plants.ts';
 
@@ -14,7 +14,7 @@ const chrome: Look = { rough: 0.12, metal: 1, opacity: 1.6, mat: 3 };
 const gold: Look = { rough: 0.25, metal: 1, opacity: 1.6, mat: 3 };
 
 /** 段ボールの荷物: 段ボールの面（むら・角のつぶれ）・上のガムテープ・色の帯と上の色の札（どの受けに合うかの手がかり） */
-export function parcel(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function parcel(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const kraft = lin(c.main), tag = lin(c.label), tape = lin(0xc9a86a);
   const seed = R.range(0, 50);
   // 色は面の (s, t) で決める（p は部屋の座標なので、模様の位置には使わない。むらのノイズだけに使う）
@@ -44,7 +44,7 @@ export function parcel(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void
 }
 
 /** 閉じた本（表紙・背の丸み・小口の紙の層）。背は −z（v2 と同じ） */
-export function closedBook(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function closedBook(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const cover = lin(c.main), paper = lin(0xece4cc);
   const look: Look = { ...LOOK.matte, rough: 0.7 };
   const t = 0.004;
@@ -61,7 +61,7 @@ export function closedBook(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): 
 }
 
 /** バケツ（すぼまった筒・縁の巻き・取っ手・耳）。水面は bucketWater（別の物にして v2 の水の高さで動かす） */
-export function bucket(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function bucket(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const r = Math.min(h[0], h[2]), col = lin(c.main);
   const plastic: Look = { ...LOOK.plastic, rough: 0.4 };
   const prof = (t: number): [number, number] => [r * 0.8 + t * r * 0.2, -h[1] + t * 2 * h[1]];
@@ -75,13 +75,13 @@ export function bucket(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void
 }
 
 /** バケツの水面（原点が水面の中心。v2 の水の高さの式で上下させる） */
-export function bucketWater(S: Surfels, R: Rand, xf: Xf, h: V3): void {
+export function bucketWater(S: ShapeSink, R: Rand, xf: Xf, h: V3): void {
   const r = Math.min(h[0], h[2]) * 0.86;
   surface(S, { u: [0, Math.PI * 2], v: [0, 1], spacing: 0.006, look: { ...LOOK.clear, opacity: 0.7, rough: 0.05 }, rand: R, xf, pos: (u, v) => [Math.cos(u) * v * r, 0, Math.sin(u) * v * r], color: () => lin(0x4a7ea8) });
 }
 
 /** 丸い腰掛け（木の座・3 本の脚・足掛けの輪） */
-export function stool(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function stool(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const r = Math.min(h[0], h[2]), col = lin(c.main);
   const top = h[1];
   revolve(S, [0, top - 0.04, 0], (t) => { const a = t * Math.PI / 2; return [r * (0.92 + 0.08 * Math.sin(a)), Math.sin(a) * 0.04 * t]; }, { spacing: 0.006, look: LOOK.glossy, rand: R, xf, color: () => col });
@@ -95,7 +95,7 @@ export function stool(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void 
 }
 
 /** 電球（洋なし形のガラス・光る色・口金のねじ・先の接点）。glass の色で光る */
-export function bulb(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function bulb(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const r = Math.min(h[0], h[2]) * 0.95;
   const glow: Look = { ...LOOK.clear, opacity: 0.95, rough: 0.12, emit: lin(c.glass, 1.6) };
   const y0 = -h[1] + 0.35 * 2 * h[1];
@@ -105,7 +105,7 @@ export function bulb(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
 }
 
 /** ボール（球に 2 色の帯の模様・つや）。原点が中心、半径 h[0] */
-export function ball(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function ball(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const col = lin(c.main), white = lin(0xf2f0ea);
   const tilt = R.range(0, Math.PI);
   ellipsoid(S, [0, 0, 0], [h[0], h[0], h[0]], {
@@ -115,7 +115,7 @@ export function ball(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
 }
 
 /** ボウリングのピン（白い回転体・首の赤い 2 本の帯） */
-export function pin(S: Surfels, R: Rand, xf: Xf, h: V3): void {
+export function pin(S: ShapeSink, R: Rand, xf: Xf, h: V3): void {
   const H = 2 * h[1], R0 = h[0];
   const prof = (t: number): [number, number] => {
     const y = t * H;
@@ -133,7 +133,7 @@ export function pin(S: Surfels, R: Rand, xf: Xf, h: V3): void {
 }
 
 /** 立てる鏡（楕円の枠・鏡の面・脚と台） */
-export function mirror(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function mirror(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const fr = lin(c.main);
   const cy = h[1] * 0.2, rx = h[0] * 0.92, ry = h[1] * 0.72;
   tube(S, (t) => { const a = t * Math.PI * 2; return [Math.cos(a) * rx, cy + Math.sin(a) * ry, 0]; }, () => 0.014, { spacing: 0.005, look: { ...LOOK.glossy, rough: 0.3 }, rand: R, xf, color: () => fr });
@@ -146,7 +146,7 @@ export function mirror(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void
 }
 
 /** 鉄の重り（角の丸い塊・上の取っ手・前の白い点の数が重さ） */
-export function weight(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function weight(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const iron = lin(c.main === 0x2a2c2e ? 0x3a3c3e : c.main), dots = Math.max(1, Math.round(c.dots));
   superellipsoid(S, [0, -h[1] * 0.12, 0], [h[0], h[1] * 0.85, h[2]], 0.35, 0.3, {
     spacing: 0.006, look: { rough: 0.6, metal: 0.8, opacity: 1.6, mat: 3 }, rand: R, xf,
@@ -165,7 +165,7 @@ export function weight(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void
 }
 
 /** 電気スタンド（床置きの小さな物: 丸い台・柱・布の笠） */
-export function standLamp(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function standLamp(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const shade = lin(c.main);
   revolve(S, [0, -h[1], 0], (t) => [h[0] * (0.6 - t * 0.12), Math.sin(t * Math.PI / 2) * 0.03], { spacing: 0.005, look: chrome, rand: R, xf, color: () => lin(0x3a3a3a) });
   tube(S, (t) => [0, -h[1] + 0.03 + t * (2 * h[1] * 0.68), 0], () => 0.009, { spacing: 0.004, look: chrome, rand: R, xf, color: () => lin(0x5a5a5a) });
@@ -174,7 +174,7 @@ export function standLamp(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): v
 }
 
 /** 小さな鉢植え（色の鉢・土・丸く茂る葉） */
-export function pottedSmall(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function pottedSmall(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const potC = lin(c.main === 0x45692c ? 0xb86a45 : c.main);
   const H = 2 * h[1], rp = Math.min(h[0], h[2]) * 0.8;
   const potH = H * 0.4;
@@ -195,7 +195,7 @@ export function pottedSmall(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors):
 }
 
 /** たたんだ傘（ひだのある布・軸・先・曲がった柄・留め帯） */
-export function umbrella(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function umbrella(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const col = lin(c.main);
   const H = 2 * h[1];
   const cloth: Look = { ...LOOK.fabric, rough: 0.6, mat: 1 };
@@ -210,7 +210,7 @@ export function umbrella(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): vo
 }
 
 /** 手提げの鞄（角の丸い胴・ふたの縁・2 本の持ち手・金具） */
-export function bag(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function bag(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const col = lin(c.main);
   const leather: Look = { ...LOOK.plastic, rough: 0.5, mat: 1 };
   const bodyH = h[1] * 0.75;
@@ -220,14 +220,14 @@ export function bag(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
 }
 
 /** ぬいぐるみの小物（クマを物の高さに縮める。毛の色 = 材質の色） */
-export function toy(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function toy(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const k = (2 * h[1]) / 0.42;
   const fur = c.main, patch = mixHex(c.main, 0xf4eee0, 0.55);
   bear(S, R, (p) => xf([p[0] * k, -h[1] + p[1] * k, p[2] * k]), fur, patch, 0xf2f0ea);
 }
 
 /** マグカップ（筒・内側・底・縁・取っ手） */
-export function cup(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function cup(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const r = h[0], col = lin(c.main);
   revolve(S, [0, -h[1], 0], (t) => [r * (0.86 + 0.14 * Math.sin(t * Math.PI / 2)), t * 2 * h[1]], { spacing: 0.004, look: LOOK.ceramic, rand: R, xf, color: () => col });
   revolve(S, [0, -h[1], 0], (t) => [r * (0.8 + 0.14 * Math.sin(t * Math.PI / 2)), 0.006 + t * (2 * h[1] - 0.006)], { spacing: 0.004, look: LOOK.ceramic, rand: R, xf, flip: true, color: () => scale3(col, 0.85) });
@@ -237,7 +237,7 @@ export function cup(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
 }
 
 /** 小さな花瓶（膨らんだ胴・細い首・口の縁・釉薬のつや） */
-export function smallVase(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function smallVase(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const col = lin(c.main), r = h[0];
   revolve(S, [0, -h[1], 0], (t) => [Math.max(0.004, r * (0.55 + 0.45 * Math.sin(Math.min(1, t * 1.6) * Math.PI) * (t < 0.62 ? 1 : 0) + (t >= 0.62 ? 0.35 + (t - 0.62) * 0.5 : 0) - (t < 0.62 ? 0 : 0.0))), t * 2 * h[1]], {
     spacing: 0.004, look: LOOK.ceramic, rand: R, xf, color: (_u, v) => scale3(col, 0.85 + 0.2 * v),
@@ -247,7 +247,7 @@ export function smallVase(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): v
 }
 
 /** 鳥の置物（陶器の胴・頭・くちばし・尾・羽・小さな台） */
-export function bird(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function bird(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const col = lin(c.main), beak = lin(0xe0a830);
   const base = -h[1];
   revolve(S, [0, base, 0], (t) => [h[0] * (0.7 - t * 0.1), t * 0.018], { spacing: 0.004, look: LOOK.ceramic, rand: R, xf, color: () => lin(0x6a4a30) });
@@ -262,7 +262,7 @@ export function bird(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
 }
 
 /** 古い鍵（輪・軸・歯。金色） */
-export function key(S: Surfels, R: Rand, xf: Xf, h: V3): void {
+export function key(S: ShapeSink, R: Rand, xf: Xf, h: V3): void {
   const g = lin(0xc9a45c);
   const ry = h[1] * 0.45;
   tube(S, (t) => { const a = t * Math.PI * 2; return [Math.sin(a) * h[0] * 0.45, ry + Math.cos(a) * h[0] * 0.45, 0]; }, () => h[0] * 0.11, { spacing: 0.003, look: gold, rand: R, xf, color: () => g });
@@ -271,7 +271,7 @@ export function key(S: Surfels, R: Rand, xf: Xf, h: V3): void {
 }
 
 /** オルゴールの木の箱（ふたの合わせ目・角の金具・横の巻きねじ） */
-export function musicBox(S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
+export function musicBox(S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors): void {
   const wood = lin(c.main);
   boxFaces(S, [-h[0], -h[1], -h[2]], [h[0], h[1], h[2]], '+x-x+y-y+z-z', (f, s, t, p) => {
     // ふたの合わせ目（側面の高さ 72% の所）。木目は面の s に沿って
@@ -291,7 +291,7 @@ const mixHex = (a: number, b: number, t: number): number => {
 };
 
 /** kind → 形の関数（無い kind は v2 の形のまま） */
-export const CARRY_GEN: Record<string, (S: Surfels, R: Rand, xf: Xf, h: V3, c: CarryColors) => void> = {
+export const CARRY_GEN: Record<string, (S: ShapeSink, R: Rand, xf: Xf, h: V3, c: CarryColors) => void> = {
   parcel, book: closedBook, bucket, stool, bulb, ball, pin: (S, R, xf, h) => pin(S, R, xf, h), mirror, weight,
   lamp: standLamp, plant: pottedSmall, umbrella, bag, toy, cup, vase: smallVase, bird, key: (S, R, xf, h) => key(S, R, xf, h), box: musicBox,
 };
