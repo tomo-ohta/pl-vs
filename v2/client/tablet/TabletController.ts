@@ -4,7 +4,8 @@
  * - 描き方: 別の場面とカメラ（近くの物用）に置き、PostFX の ViewmodelPass で世界の絵の上に重ねる（壁に埋まらない。ビデオの
  *   にじみ・走査線は世界と同じく掛かる）。本体は今いる所の焼き込みの明るさ × 露出の追従で照らし、画面は自分で光る
  * - 動き: 出す（下から持ち上げる 0.42 s）・しまう（下ろす 0.32 s）。持っている間は呼吸と、歩く揺れ・振り向きに少し遅れてついてくる。
- *   カメラのときは顔の前まで上げ、画面が視界いっぱいになる（画面の透けた所から世界が見える = カメラの映像）
+ *   カメラのときは顔の前まで上げ、画面が視界の狭い向きの 9 割ほどを覆う（残りに黒い縁が見える。本体は視界を覆ったまま。
+ *   画面の透けた所から世界が見える = カメラの映像）。写真から移るときも同じ所まで上げる
  * - 操作（PC・Pointer Lock 中）: マウスで画面の上の指のカーソルを動かす（視点は止める）・左クリックで押す・ホイール・右クリックか
  *   Backspace で戻る・数字キー（探索）。カメラのときはマウスで狙い、クリックでシャッター・ホイールでズーム。
  *   スマホ（と Pointer Lock を使わないマウス）: 画面を直接タップ・ドラッグ（光線を画面に当てる）。カメラのときはボタンの上だけ受け取る
@@ -12,7 +13,7 @@
  * - 出す・しまうキーは input/keymap.ts の 'tablet'（既定 Tab）。スマホは右の「端末」ボタン
  * - 写真から移る（ギャラリー・SNS の「探索」。docs/tablet.md）: 覗き込む音 → タブレットを顔の前へ上げ、写真を視界いっぱいに見せる
  *   （押した瞬間から移る先を読み込み、その間ずっと写真。環境音を絞る）→ 着いたら世界を写真の視点に重ね、タブレットをゆっくり手元へ
- *   戻しながら普通の視点へ（環境音を戻す）。下ろし終えるまで視点と移動は止める
+ *   戻しながら普通の視点へ（環境音を戻す）。下ろし終えるまで視点と移動は止める。移れたら、手元へ戻したあと Tab と同じようにしまう
  */
 import * as THREE from 'three';
 import type { ArrivalView, ClientGame, HeldDevice } from '../game/ClientGame.ts';
@@ -54,6 +55,8 @@ const HIDDEN: Pose = [0.05, -0.34, -0.27, -1.25, 0.12, 0.22];
 const HELD: Pose = [0, -0.05, -0.262, -0.22, 0, 0];
 
 const ease = (x: number): number => x * x * (3 - 2 * x);
+/** 本体の真ん中（姿勢の原点）から画面の面まで（m。TabletModel の screen.position.z） */
+const SURFACE = TABLET.T / 2 + 0.00016;
 const approach = (v: number, t: number, step: number): number => (v < t ? Math.min(t, v + step) : Math.max(t, v - step));
 
 export class TabletController implements HeldDevice {
@@ -86,6 +89,8 @@ export class TabletController implements HeldDevice {
   private v = 0;
   /** 写真から移る間（上げる・見せたまま読み込む・下ろす）。result: 移れたか（読み込み中は null） */
   private trip: { phase: 'raise' | 'hold' | 'lower'; t: number; kind: 'gallery' | 'sns'; result: boolean | null } | null = null;
+  /** 写真から移り終えて、しまう時刻（this.t。null はしまわない） */
+  private stowAt: number | null = null;
   private hintTimer = 0;
   private lastHint = '';
 
@@ -359,12 +364,14 @@ export class TabletController implements HeldDevice {
       if (g.rig.hold) g.rig.hold.k = ease(Math.min(1, this.v / Math.max(0.01, keep)));
       // 手元へ戻しきる前（残りの 3 割）に、写真から元の画面（ギャラリー・SNS の投稿）へ溶かす
       this.ui.setTravelAlpha(ease(Math.min(1, this.v / 0.3)));
-      if (this.v <= 0) this.endTrip();
+      if (this.v <= 0) this.endTrip(!!tr.result);
     }
   }
 
-  private endTrip(): void {
+  /** 写真から移り終えた（手元へ戻した）。移れたら、少し置いて Tab と同じようにしまう。行けなかったときは出したまま（通信エラーを読める） */
+  private endTrip(arrived: boolean): void {
     const g = this.game;
+    if (arrived) this.stowAt = this.t + g.tuning['tablet.travel.stowDelaySec'];
     this.trip = null;
     this.v = 0;
     this.warping = false;
@@ -444,6 +451,11 @@ export class TabletController implements HeldDevice {
   update(dt: number): void {
     const g = this.game;
     this.t += dt;
+    // 写真から移り終えた: Tab と同じようにしまう
+    if (this.stowAt !== null && this.t >= this.stowAt) {
+      this.stowAt = null;
+      if (this.want && !this.trip) this.close();
+    }
     this.a = approach(this.a, this.want ? 1 : 0, dt / (this.want ? 0.42 : 0.32));
     this.c = approach(this.c, this.want && this.ui.app === 'camera' && !this.trip ? 1 : 0, dt / 0.34);
     this.stepTrip(dt);
@@ -458,18 +470,17 @@ export class TabletController implements HeldDevice {
     const aspect = g.camera.aspect || 1;
     if (cam.fov !== g.rig.baseFov || cam.aspect !== aspect) { cam.fov = g.rig.baseFov; cam.aspect = aspect; cam.updateProjectionMatrix(); }
     const tan = Math.tan((cam.fov * Math.PI) / 360);
-    // カメラの位置: 画面が視界いっぱい（短い辺に合わせ、縁がわずかに見える）
-    const dFit = Math.min(TABLET.SW / (2 * tan * aspect), TABLET.SH / (2 * tan)) * 1.035;
-    const camPose: Pose = [0, 0, -dFit, 0, 0, 0];
+    // 顔の前（カメラ・写真から移る）: 画面が視界の狭い向きを tablet.raise.screenCover だけ覆う（残りに黒い縁）。距離は画面の面まで
+    // （本体の真ん中から画面の面までの厚み SURFACE を足す。足さないと縁が消える）
+    const dScreen = Math.min(TABLET.SW / (2 * tan * aspect), TABLET.SH / (2 * tan)) / g.tuning['tablet.raise.screenCover'];
+    const camPose: Pose = [0, 0, -(dScreen + SURFACE), 0, 0, 0];
     // 持つ位置: 細い画面（スマホの縦持ち）では、本体の幅が視界の 9 割に収まるまで離し、真ん中寄りに持つ
     const dHeld = Math.max(-HELD[2], TABLET.W / (2 * tan * aspect * 0.9));
     const far = dHeld / -HELD[2];
     const held: Pose = [HELD[0], aspect < 1 ? 0.012 : HELD[1] * far, -dHeld, HELD[3], HELD[4], HELD[5]];
     const A = ease(this.a), C = ease(this.c), V = ease(this.v);
-    // 写真から移る: 顔の前（画面が視界いっぱい。縁は見えない）
-    const dTrip = Math.min(TABLET.SW / (2 * tan * aspect), TABLET.SH / (2 * tan)) * g.tuning['tablet.travel.fit'];
-    const tripPose: Pose = [0, 0, -dTrip, 0, 0, 0];
-    const pose = HIDDEN.map((h, i) => { const hp = h + (held[i]! - h) * A; const cp = hp + (camPose[i]! - hp) * C; return cp + (tripPose[i]! - cp) * V; }) as Pose;
+    // 写真から移る: カメラと同じ顔の前
+    const pose = HIDDEN.map((h, i) => { const hp = h + (held[i]! - h) * A; const cp = hp + (camPose[i]! - hp) * C; return cp + (camPose[i]! - cp) * V; }) as Pose;
     // 持ち上げるときの弧
     const arc = Math.sin(Math.PI * A) * (1 - C);
     pose[2] += arc * 0.025;
@@ -494,11 +505,11 @@ export class TabletController implements HeldDevice {
     grp.rotation.set(pose[3], pose[4], pose[5], 'XYZ');
     // 写真から移る: 顔の前で視界に重なる所に写真を置く（絵の px）
     if (this.trip) {
-      const hw = (dTrip * tan * aspect) / TABLET.SW, hh = (dTrip * tan) / TABLET.SH;
+      const hw = (dScreen * tan * aspect) / TABLET.SW, hh = (dScreen * tan) / TABLET.SH;
       this.ui.setTravelRect({ x0: (0.5 - hw) * SCREEN_PX.w, x1: (0.5 + hw) * SCREEN_PX.w, y0: (0.5 - hh) * SCREEN_PX.h, y1: (0.5 + hh) * SCREEN_PX.h });
     }
-    // カメラのとき、画面のうち見えている所（絵の px）
-    const d = -pose[2];
+    // カメラのとき、画面のうち見えている所（絵の px。画面の面までの距離で）
+    const d = -pose[2] - SURFACE;
     const hw = (d * tan * aspect) / TABLET.SW, hh = (d * tan) / TABLET.SH;
     this.ui.setCameraSafe({
       x0: Math.max(0, 0.5 - hw) * SCREEN_PX.w, x1: Math.min(1, 0.5 + hw) * SCREEN_PX.w,
