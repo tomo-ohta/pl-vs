@@ -9,20 +9,12 @@
  */
 import * as THREE from 'three';
 import type { Json } from '../../../core/world/layout.ts';
-import { cleanName, Settings } from '../../settings/Settings.ts';
+import { playerName } from '../../settings/playerName.ts';
 import { defineFx } from './fx.ts';
 import { num, str } from './util.ts';
 
-/** 遊ぶ人の名前（?name= か、設定の名前。無ければ既定の呼び名） */
-export function playerName(): string {
-  try {
-    const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('name') : null;
-    if (q && cleanName(q)) return cleanName(q);
-    const s = typeof localStorage !== 'undefined' ? Settings.load().data.playerName : '';
-    if (s) return s;
-  } catch { /* 保存先が無い */ }
-  return 'あなた';
-}
+/** 遊ぶ人の名前（client/settings/playerName.ts） */
+export { playerName };
 
 const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
 

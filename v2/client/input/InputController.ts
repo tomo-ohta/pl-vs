@@ -200,7 +200,7 @@ export class InputController {
     }, { signal });
     this.canvas.addEventListener('mousedown', (e) => {
       if (this.mode !== 'pc') return;
-      if (e.button === 2) { if (this.locked) this.backEdge = true; return; }
+      if (e.button === 2) { this.backEdge = true; return; }
       if (e.button !== 0) return;
       if (this.locked) { this.interactEdge = true; this.clickEdge = true; this.mouseHeld = true; return; }
       // Esc でメニューを閉じた直後は（ユーザー操作扱いにならず）Pointer Lock を取り直せないので、クリックで取り直す

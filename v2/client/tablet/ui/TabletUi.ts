@@ -4,10 +4,13 @@
  * - 座標は画面の絵の px（SCREEN_PX: 1152 × 800）。描くたびに押せる所（targets）を作り直し、指（カーソル・タッチ）はそれで当てる
  * - 描き直しは、変わったとき（dirty）と動きのある間（animUntil）だけ。描き直したら TabletModel の絵を送り直す（render の戻り値）
  * - 押す: down → up（12 px 以上動いたらドラッグ）。ホイールは指の下の物（無ければアプリの既定: カメラのズーム）
- * - 戻る: アプリ → ホーム、ギャラリーの写真 → 一覧。タブレットをしまっても、開いていたアプリのまま（次に出すとそこから）
+ * - 戻る: アプリ → ホーム、ギャラリーの写真 → 一覧、SNS の投稿 → タイムライン。タブレットをしまっても、開いていたアプリのまま
+ * - SNS: 投稿のタイムライン（今は自分の投稿だけ。投稿者名・投稿日時・ルーム ID・画像）。ギャラリーの写真の「投稿」で載る（写しを持つので
+ *   写真を消しても残る。同じ写真は 1 回だけ）。投稿を押すと大きく見て「探索」（撮った部屋へワープ）・「キャンセル」・「削除」
  */
 import { APPS, DIAL_DIGITS, DialModel, formatTaken, type AppId } from '../logic.ts';
 import type { PhotoMeta, PhotoStore } from '../PhotoStore.ts';
+import type { PostAuthor, PostMeta, PostStore } from '../PostStore.ts';
 import { SCREEN_PX } from '../TabletModel.ts';
 import { appIcon, COLOR, fillRR, measure, MONO, rr, statusGlyphs, text, wallpaper, type G } from './paint.ts';
 
@@ -33,7 +36,11 @@ export interface TabletUiHooks {
   /** シャッター（撮って保存する） */
   shutter(): Promise<{ meta: PhotoMeta; thumb: Blob } | null>;
   readonly photos: PhotoStore;
-  /** 世界の seed（ギャラリーの「この部屋へ」は同じ seed の写真だけ） */
+  /** SNS の投稿 */
+  readonly posts: PostStore;
+  /** 投稿者（自分） */
+  author(): PostAuthor;
+  /** 世界の seed（ギャラリーの「この部屋へ」・SNS の「探索」は同じ seed の写真だけ） */
   readonly seed: number;
   sound(kind: 'tap' | 'back' | 'open' | 'error'): void;
 }
@@ -91,6 +98,18 @@ export class TabletUi {
   private detail: (PhotoMeta & { thumb: Blob }) | null = null;
   private detailImage: ImageBitmap | 'loading' | null = null;
   private deleteArmAt = -1e9;
+  // SNS
+  private posts: (PostMeta & { thumb: Blob })[] | null = null;
+  /** 投稿の画像（元の大きさ。見えている物だけ読み、24 枚まで覚える） */
+  private readonly postImages = new Map<number, ImageBitmap | 'loading' | 'failed'>();
+  private snsScroll = 0;
+  /** 大きく見ている投稿 */
+  private post: (PostMeta & { thumb: Blob }) | null = null;
+  private snsStatus: ExploreStatus = { kind: 'idle' };
+  private postDeleteArmAt = -1e9;
+  /** 投稿した写真の id（ギャラリーの「投稿済み」） */
+  private postedIds = new Set<number>();
+  private posting = false;
 
   constructor(hooks: TabletUiHooks, canvas: HTMLCanvasElement = document.createElement('canvas')) {
     this.hooks = hooks;
@@ -99,6 +118,7 @@ export class TabletUi {
     canvas.height = H;
     this.g = canvas.getContext('2d')!;
     hooks.photos.onChange = () => { if (this.app === 'gallery') void this.loadPhotos(); };
+    hooks.posts.onChange = () => { if (this.app === 'sns' || this.app === 'gallery') void this.loadPosts(); };
   }
 
   // ---------------------------------------------------------------- 描く
@@ -252,7 +272,8 @@ export class TabletUi {
       if (!this.dialTouched) { const r = this.hooks.place().roomId; if (r !== null) this.dial.set(r); }
       if (this.explore.kind === 'error') this.explore = { kind: 'idle' };
     }
-    if (id === 'gallery') { this.detail = null; this.detailImage = null; void this.loadPhotos(); }
+    if (id === 'gallery') { this.detail = null; this.detailImage = null; void this.loadPhotos(); void this.loadPosts(); }
+    if (id === 'sns') { this.post = null; this.snsStatus = { kind: 'idle' }; void this.loadPosts(); }
     if (id === 'camera') this.zoom = 1;
     this.invalidate();
     this.onAppChange?.(id);
@@ -261,6 +282,7 @@ export class TabletUi {
   /** 戻る（アプリ → ホーム、写真 → 一覧） */
   back(): void {
     if (this.app === 'gallery' && this.detail) { this.detail = null; this.detailImage = null; this.hooks.sound('back'); this.invalidate(); return; }
+    if (this.app === 'sns' && this.post) { this.closePost(); this.hooks.sound('back'); return; }
     if (this.app === 'home') return;
     this.hooks.sound('back');
     this.setApp('home');
@@ -375,16 +397,7 @@ export class TabletUi {
     for (let i = 0; i < DIAL_DIGITS; i++) this.drawDial(g, i, x0 + i * (DW + GAP), y0, DW, DH);
     // 状態の行
     const st = this.explore;
-    if (st.kind === 'checking') {
-      const dots = '.'.repeat(1 + (Math.floor(this.now / 250) % 3));
-      text(g, `接続中${dots}`, W / 2, 510, { size: 30, weight: 600, align: 'center', color: COLOR.accent });
-      this.animate(300);
-    } else if (st.kind === 'error') {
-      const t = this.now - st.at;
-      const jitter = t < 700 ? (Math.random() - 0.5) * 14 : 0;
-      text(g, st.text, W / 2 + jitter, 510, { size: 30, weight: 700, align: 'center', color: COLOR.danger, alpha: t < 700 && Math.random() < 0.2 ? 0.3 : 1 });
-      if (t < 700) this.animate(60);
-    }
+    this.drawTravelStatus(g, st, 510);
     const busy = st.kind === 'checking';
     const bw = 320, bh = 96, by = 572;
     if (here !== null) {
@@ -493,29 +506,59 @@ export class TabletUi {
     if (this.app === 'explore') this.go();
   }
 
-  /** 移動: 部屋があるか確かめ、あれば移る（無ければ画面に通信エラー） */
+  /** 移動（探索）: ダイアルの番号の部屋へ */
   private go(): void {
-    if (this.explore.kind === 'checking' || !this.hooks.roomsAvailable()) return;
-    const id = this.dial.value;
-    this.hooks.sound('tap');
-    if (id < 1000) { this.fail(`ROOM ${id} は見つかりません（4 桁以上）`); return; }
-    this.explore = { kind: 'checking', at: this.now };
-    this.invalidate();
-    void this.hooks.checkRoom(id).then((ok) => {
-      if (!ok) { this.fail(`通信エラー：ROOM ${id} は見つかりません`); return; }
-      this.explore = { kind: 'idle' };
-      this.dialTouched = false;
-      this.invalidate();
-      this.hooks.warp(id);
-    }, () => this.fail('通信エラー：接続できません'));
+    this.travel('explore', this.dial.value, () => { this.dialTouched = false; });
   }
 
-  private fail(s: string): void {
-    this.explore = { kind: 'error', text: s, at: this.now };
-    this.dial.fresh = true;
+  private statusOf(which: 'explore' | 'sns'): ExploreStatus {
+    return which === 'explore' ? this.explore : this.snsStatus;
+  }
+
+  private setStatus(which: 'explore' | 'sns', st: ExploreStatus): void {
+    if (which === 'explore') this.explore = st;
+    else this.snsStatus = st;
+  }
+
+  /**
+   * 番号の部屋へ移る（探索の「移動」・SNS の「探索」）: 部屋があるか確かめ（接続中…）、あれば移る（演出は hooks.warp）。
+   * 無ければその画面に通信エラー。onWarp: 移り始める直前
+   */
+  private travel(which: 'explore' | 'sns', id: number, onWarp?: () => void): void {
+    if (this.statusOf(which).kind === 'checking' || !this.hooks.roomsAvailable()) return;
+    this.hooks.sound('tap');
+    if (id < 1000) { this.fail(which, `ROOM ${id} は見つかりません（4 桁以上）`); return; }
+    this.setStatus(which, { kind: 'checking', at: this.now });
+    this.invalidate();
+    void this.hooks.checkRoom(id).then((ok) => {
+      if (!ok) { this.fail(which, `通信エラー：ROOM ${id} は見つかりません`); return; }
+      this.setStatus(which, { kind: 'idle' });
+      onWarp?.();
+      this.invalidate();
+      this.hooks.warp(id);
+    }, () => this.fail(which, '通信エラー：接続できません'));
+  }
+
+  private fail(which: 'explore' | 'sns', s: string): void {
+    this.setStatus(which, { kind: 'error', text: s, at: this.now });
+    if (which === 'explore') this.dial.fresh = true;
     this.hooks.sound('error');
     this.animate(800);
     this.invalidate();
+  }
+
+  /** 移る用意の状態の行（接続中… / 通信エラー） */
+  private drawTravelStatus(g: G, st: ExploreStatus, y: number): void {
+    if (st.kind === 'checking') {
+      const dots = '.'.repeat(1 + (Math.floor(this.now / 250) % 3));
+      text(g, `接続中${dots}`, W / 2, y, { size: 30, weight: 600, align: 'center', color: COLOR.accent });
+      this.animate(300);
+    } else if (st.kind === 'error') {
+      const t = this.now - st.at;
+      const jitter = t < 700 ? (Math.random() - 0.5) * 14 : 0;
+      text(g, st.text, W / 2 + jitter, y, { size: 30, weight: 700, align: 'center', color: COLOR.danger, alpha: t < 700 && Math.random() < 0.2 ? 0.3 : 1, max: W - 60 });
+      if (t < 700) this.animate(60);
+    }
   }
 
   // ---------------------------------------------------------------- マップ
@@ -556,12 +599,169 @@ export class TabletUi {
     this.invalidate();
   }
 
-  // ---------------------------------------------------------------- SNS（準備中）
+  // ---------------------------------------------------------------- SNS
+  private async loadPosts(): Promise<void> {
+    try {
+      this.posts = await this.hooks.posts.list();
+    } catch (e) {
+      console.warn('[SNS] 読めません', e);
+      this.posts = [];
+    }
+    this.postedIds = new Set(this.posts.map((p) => p.photoId).filter((x): x is number => x !== null));
+    if (this.post && !this.posts.some((p) => p.id === this.post!.id)) this.post = null;
+    this.invalidate();
+  }
+
+  /** 投稿の画像（元の大きさ。読み終えるまで null。24 枚を超えたら古い物を捨てる） */
+  private postImageOf(p: PostMeta & { thumb: Blob }): ImageBitmap | null {
+    const t = this.postImages.get(p.id);
+    if (t instanceof ImageBitmap) { this.postImages.delete(p.id); this.postImages.set(p.id, t); return t; }
+    if (t === undefined) {
+      this.postImages.set(p.id, 'loading');
+      void this.hooks.posts.image(p.id).then(async (blob) => {
+        try { this.postImages.set(p.id, await createImageBitmap(blob ?? p.thumb)); } catch { this.postImages.set(p.id, 'failed'); }
+        for (const [k, v] of this.postImages) {
+          if (this.postImages.size <= 24) break;
+          if (v instanceof ImageBitmap) v.close();
+          this.postImages.delete(k);
+        }
+        this.invalidate();
+      });
+    }
+    return null;
+  }
+
+  /** 投稿の画像がまだ無いときの文字 */
+  private postImageNote(id: number): string {
+    return this.postImages.get(id) === 'failed' ? '画像を読めません' : '読み込み中…';
+  }
+
+  /** 投稿者の丸い印（名前の頭の文字。色は投稿者の id から） */
+  private avatar(g: G, a: PostAuthor, x: number, y: number, s: number): void {
+    let h = 0;
+    for (const ch of a.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    g.save();
+    g.fillStyle = `hsl(${h % 360} 42% 40%)`;
+    g.beginPath(); g.arc(x + s / 2, y + s / 2, s / 2, 0, Math.PI * 2); g.fill();
+    g.restore();
+    text(g, [...a.name][0] ?? '?', x + s / 2, y + s / 2 + 1, { size: s * 0.48, weight: 700, align: 'center', color: '#fff' });
+  }
+
+  /** タイムライン（新しい順。縦に流れる） */
   private drawSns(g: G): void {
-    this.header(g, 'SNS');
-    appIcon(g, 'sns', W / 2 - 80, 230, 160);
-    text(g, '準備中', W / 2, 470, { size: 48, weight: 700, align: 'center' });
-    text(g, 'この機能はまだ使えません', W / 2, 530, { size: 28, align: 'center', color: COLOR.dim });
+    if (this.post) { this.drawPost(g, this.post); return; }
+    const list = this.posts;
+    this.header(g, 'SNS', list ? `${list.length} 件` : '');
+    if (!list) { text(g, '読み込み中…', W / 2, 420, { size: 30, align: 'center', color: COLOR.dim }); return; }
+    if (!list.length) {
+      appIcon(g, 'sns', W / 2 - 70, 210, 140);
+      text(g, 'まだ投稿がありません', W / 2, 420, { size: 36, weight: 700, align: 'center' });
+      text(g, 'ギャラリーで写真を開いて「投稿」を押すと、ここに並びます', W / 2, 476, { size: 26, align: 'center', color: COLOR.dim, max: W - 80 });
+      return;
+    }
+    const CW = 720, x0 = (W - CW) / 2, viewH = H - CONTENT_Y, GAP = 20;
+    const cards = list.map((p) => { const ih = Math.min(420, Math.round(((CW - 32) * p.h) / Math.max(1, p.w))); return { p, ih, h: 92 + ih + 18 }; });
+    const total = cards.reduce((a, c) => a + c.h + GAP, 12);
+    const maxScroll = Math.max(0, total - viewH);
+    this.snsScroll = Math.max(0, Math.min(maxScroll, this.snsScroll));
+    const scrollBy = (dy: number): void => { this.snsScroll = Math.max(0, Math.min(maxScroll, this.snsScroll + dy)); this.invalidate(); };
+    this.add({ id: 'timeline', x: 0, y: CONTENT_Y, w: W, h: viewH, wheel: (dy) => scrollBy(dy * 0.8), drag: (_dx, dy) => scrollBy(-dy) });
+    g.save();
+    g.beginPath();
+    g.rect(0, CONTENT_Y, W, viewH);
+    g.clip();
+    let y = CONTENT_Y + 12 - this.snsScroll;
+    for (const c of cards) {
+      if (y + c.h >= CONTENT_Y && y <= H) this.drawCard(g, c.p, x0, y, CW, c.ih, c.h, scrollBy);
+      y += c.h + GAP;
+    }
+    g.restore();
+    if (maxScroll > 0) {
+      const th = Math.max(60, viewH * (viewH / (viewH + maxScroll)));
+      const ty = CONTENT_Y + (viewH - th) * (this.snsScroll / maxScroll);
+      fillRR(g, W - 12, ty + 4, 6, th - 8, 3, 'rgba(255,255,255,0.28)');
+    }
+  }
+
+  /** タイムラインの 1 件（投稿者名・投稿日時・ルーム ID・画像） */
+  private drawCard(g: G, p: PostMeta & { thumb: Blob }, x: number, y: number, w: number, ih: number, h: number, scrollBy: (dy: number) => void): void {
+    const id = `post:${p.id}`;
+    const hot = this.hovered(id);
+    fillRR(g, x, y, w, h, 20, hot ? '#1f2630' : COLOR.panel);
+    if (hot) { g.save(); rr(g, x, y, w, h, 20); g.strokeStyle = 'rgba(242,193,78,0.6)'; g.lineWidth = 3; g.stroke(); g.restore(); }
+    const as = 56;
+    this.avatar(g, p.author, x + 20, y + 18, as);
+    const room = p.roomId !== null ? `ROOM ${p.roomId}` : 'ROOM —';
+    const rw = measure(g, room, 24, 700, true) + 36;
+    text(g, p.author.name, x + 20 + as + 16, y + 34, { size: 28, weight: 700, max: w - as - rw - 80 });
+    text(g, formatTaken(p.postedAt), x + 20 + as + 16, y + 64, { size: 22, color: COLOR.dim });
+    fillRR(g, x + w - 20 - rw, y + 24, rw, 44, 22, 'rgba(242,193,78,0.14)');
+    text(g, room, x + w - 20 - rw / 2, y + 47, { size: 24, weight: 700, mono: true, align: 'center', color: COLOR.accent });
+    const iy = y + 92;
+    g.save();
+    rr(g, x + 16, iy, w - 32, ih, 14);
+    g.fillStyle = '#07090c';
+    g.fill();
+    const b = this.postImageOf(p);
+    if (b) { g.clip(); this.cover(g, b, x + 16, iy, w - 32, ih); }
+    else text(g, this.postImageNote(p.id), x + w / 2, iy + ih / 2, { size: 24, align: 'center', color: COLOR.faint });
+    g.restore();
+    const top = Math.max(y, CONTENT_Y);
+    this.add({ id, x, y: top, w, h: Math.max(0, y + h - top), click: () => this.openPost(p), wheel: (dy) => scrollBy(dy * 0.8), drag: (_dx, dy) => scrollBy(-dy) });
+  }
+
+  private openPost(p: PostMeta & { thumb: Blob }): void {
+    this.post = p;
+    this.snsStatus = { kind: 'idle' };
+    this.postDeleteArmAt = -1e9;
+    this.hooks.sound('open');
+    this.invalidate();
+  }
+
+  private closePost(): void {
+    this.post = null;
+    this.snsStatus = { kind: 'idle' };
+    this.invalidate();
+  }
+
+  /** 投稿を大きく見る: 下に「探索」（撮った部屋へワープ）・「キャンセル」・「削除」 */
+  private drawPost(g: G, p: PostMeta & { thumb: Blob }): void {
+    this.header(g, '投稿', '', '‹ タイムライン');
+    const x = 24, y = CONTENT_Y, w = W - 48, h = 430;
+    fillRR(g, x, y, w, h, 18, '#07090c');
+    const img = this.postImageOf(p);
+    if (img) {
+      const k = Math.min(w / img.width, h / img.height);
+      const iw = img.width * k, ih = img.height * k;
+      g.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+    } else text(g, this.postImageNote(p.id), W / 2, y + h / 2, { size: 28, align: 'center', color: COLOR.dim });
+    const iy = y + h + 16;
+    this.avatar(g, p.author, 32, iy, 50);
+    text(g, p.author.name, 96, iy + 15, { size: 26, weight: 700, max: 520 });
+    text(g, `${formatTaken(p.postedAt)} 投稿 ・ 撮影 ${formatTaken(p.takenAt)} ・ ${p.place}`, 96, iy + 41, { size: 22, color: COLOR.dim, max: 680 });
+    text(g, p.roomId !== null ? `ROOM ${p.roomId}` : 'ROOM —', W - 32, iy + 26, { size: 32, weight: 700, mono: true, align: 'right', color: COLOR.accent });
+    // 探索できない理由（番号が無い・別の世界・番号の無い遊び方）か、移る用意の状態
+    const reason = p.roomId === null ? 'この写真には部屋の番号がありません' : p.seed !== this.hooks.seed ? `別の世界（seed ${p.seed}）の写真なので、ここからは行けません` : !this.hooks.roomsAvailable() ? 'この場所からは探索できません' : '';
+    const sy = iy + 84;
+    if (this.snsStatus.kind !== 'idle') this.drawTravelStatus(g, this.snsStatus, sy);
+    else if (reason) text(g, reason, W / 2, sy, { size: 24, align: 'center', color: COLOR.dim, max: W - 60 });
+    const busy = this.snsStatus.kind === 'checking';
+    const by = H - 22 - 72, bh = 72;
+    const armed = this.now - this.postDeleteArmAt < 3000;
+    if (armed) this.animate(3050);
+    this.button(g, 'post:delete', armed ? 'もう一度押すと削除' : '削除', 24, by, armed ? 300 : 170, bh, { danger: armed, size: 26, disabled: busy }, () => {
+      if (!armed) { this.postDeleteArmAt = this.now; this.hooks.sound('tap'); this.invalidate(); return; }
+      this.postDeleteArmAt = -1e9;
+      const id = p.id;
+      this.closePost();
+      const b = this.postImages.get(id);
+      if (b instanceof ImageBitmap) b.close();
+      this.postImages.delete(id);
+      this.hooks.sound('back');
+      void this.hooks.posts.remove(id).then(() => this.showToast('投稿を削除しました'));
+    });
+    this.button(g, 'post:cancel', 'キャンセル', W - 24 - 300 - 16 - 240, by, 240, bh, { size: 30, disabled: busy }, () => { this.hooks.sound('back'); this.closePost(); });
+    this.button(g, 'post:go', '探索', W - 24 - 300, by, 300, bh, { accent: true, size: 34, disabled: busy || !!reason }, () => this.travel('sns', p.roomId!, () => { this.post = null; }));
   }
 
   // ---------------------------------------------------------------- ギャラリー
@@ -660,7 +860,11 @@ export class TabletUi {
     if (armed) this.animate(3050);
     const by = y + h + 76, bh = 72;
     const canGo = p.roomId !== null && p.seed === this.hooks.seed && this.hooks.roomsAvailable();
-    this.button(g, 'photo:delete', armed ? 'もう一度押すと削除' : '削除', W - 24 - 300 - (canGo ? 316 : 0), by, 300, bh, { danger: armed, size: 28 }, () => {
+    // 右から: 投稿（1 回だけ）・この部屋へ・削除
+    const posted = this.postedIds.has(p.id);
+    const postX = W - 24 - 260, goX = postX - 16 - 260, delX = (canGo ? goX : postX) - 16 - 300;
+    this.button(g, 'photo:post', this.posting ? '投稿中…' : posted ? '投稿済み' : '投稿', postX, by, 260, bh, { accent: !posted, disabled: posted || this.posting, size: 30 }, () => this.postPhoto(p));
+    this.button(g, 'photo:delete', armed ? 'もう一度押すと削除' : '削除', delX, by, 300, bh, { danger: armed, size: 28 }, () => {
       if (!armed) { this.deleteArmAt = this.now; this.hooks.sound('tap'); this.invalidate(); return; }
       this.deleteArmAt = -1e9;
       const id = p.id;
@@ -671,7 +875,7 @@ export class TabletUi {
       void this.hooks.photos.remove(id).then(() => this.showToast('削除しました'));
       this.invalidate();
     });
-    if (canGo) this.button(g, 'photo:go', 'この部屋へ', W - 24 - 300, by, 300, bh, { accent: true, size: 30 }, () => {
+    if (canGo) this.button(g, 'photo:go', 'この部屋へ', goX, by, 260, bh, { size: 30 }, () => {
       this.dial.set(p.roomId!);
       this.dialTouched = true;
       this.explore = { kind: 'idle' };
@@ -680,6 +884,29 @@ export class TabletUi {
       this.hooks.sound('open');
       this.setApp('explore');
     });
+  }
+
+  /** 写真を SNS に投稿する（写真の写しを持つ。同じ写真は 1 回だけ） */
+  private postPhoto(p: PhotoMeta & { thumb: Blob }): void {
+    if (this.posting || this.postedIds.has(p.id)) return;
+    this.posting = true;
+    this.hooks.sound('tap');
+    this.invalidate();
+    void (async () => {
+      try {
+        const image = await this.hooks.photos.image(p.id);
+        if (!image) throw new Error('写真がありません');
+        await this.hooks.posts.add({ postedAt: Date.now(), author: this.hooks.author(), photoId: p.id, roomId: p.roomId, seed: p.seed, place: p.place, takenAt: p.takenAt, w: p.w, h: p.h, look: p.look }, image, p.thumb);
+        this.postedIds.add(p.id);
+        this.showToast('SNS に投稿しました');
+      } catch (e) {
+        console.warn('[SNS] 投稿できません', e);
+        this.hooks.sound('error');
+        this.showToast('投稿できませんでした', 2200, true);
+      }
+      this.posting = false;
+      this.invalidate();
+    })();
   }
 
   /** 画像を枠いっぱいに（はみ出しは切る） */

@@ -17,6 +17,8 @@ import type { InputState } from '../input/InputController.ts';
 import { keysLabel } from '../input/keymap.ts';
 import type { MapController } from '../map/MapController.ts';
 import { PhotoStore, type PhotoMeta } from './PhotoStore.ts';
+import { localPlayerId, PostStore } from './PostStore.ts';
+import { playerName } from '../settings/playerName.ts';
 import { SCREEN_PX, TABLET, TabletModel } from './TabletModel.ts';
 import { TabletUi } from './ui/TabletUi.ts';
 
@@ -48,6 +50,7 @@ export class TabletController implements HeldDevice {
   readonly model: TabletModel;
   readonly ui: TabletUi;
   readonly photos = new PhotoStore();
+  readonly posts = new PostStore();
   private readonly game: ClientGame;
   private readonly hooks: TabletHooks;
   private readonly scene = new THREE.Scene();
@@ -84,6 +87,8 @@ export class TabletController implements HeldDevice {
       openSettings: () => this.openSettings(),
       shutter: () => this.shoot(),
       photos: this.photos,
+      posts: this.posts,
+      author: () => ({ id: localPlayerId(), name: playerName() }),
       seed: hooks.seed,
       sound: (k) => game.audio.ui(k === 'tap' ? 'click' : k === 'back' ? 'cancel' : k === 'open' ? 'confirm' : 'error'),
     });

@@ -1,11 +1,13 @@
 /**
- * タブレットの決まり（client/tablet）: 探索のダイアル・撮影日時の表示・キーの割り当て・写真の保存（IndexedDB の無い所の入れ物）
+ * タブレットの決まり（client/tablet）: 探索のダイアル・撮影日時の表示・キーの割り当て・写真の保存と SNS の投稿（IndexedDB の無い所の入れ物）
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { APPS, DIAL_DIGITS, DialModel, formatTaken } from '../client/tablet/logic.ts';
 import { actionsOf, copyKeymap, DEFAULT_KEYMAP, keyLabel, keysLabel } from '../client/input/keymap.ts';
 import { PhotoStore } from '../client/tablet/PhotoStore.ts';
+import { localPlayerId, PostStore } from '../client/tablet/PostStore.ts';
+import { DEFAULT_PLAYER_NAME, playerName } from '../client/settings/playerName.ts';
 
 test('タブレット: ホーム画面のアプリはカメラ・探索・マップ・SNS・ギャラリー・設定の順', () => {
   assert.deepEqual(APPS.map((a) => a.label), ['カメラ', '探索', 'マップ', 'SNS', 'ギャラリー', '設定']);
@@ -85,3 +87,29 @@ test('写真の保存（IndexedDB の無い所）: 足す・新しい順の一�
   assert.equal(await st.image(a.id), null);
   assert.equal(changes, 3);
 });
+
+test('SNS の投稿（IndexedDB の無い所）: 新しく投稿した順・投稿した写真の id・写真を消しても投稿は残る・投稿を消す', async () => {
+  const photos = new PhotoStore(false);
+  const posts = new PostStore(false);
+  const blob = (s: string): Blob => new Blob([s], { type: 'image/jpeg' });
+  const a = await photos.add({ takenAt: 1000, roomId: 1328, seed: 1, place: 'B1F', w: 1280, h: 720, look: 'clean' }, blob('A'), blob('a'));
+  const b = await photos.add({ takenAt: 2000, roomId: 774051, seed: 1, place: 'B6F', w: 1280, h: 960, look: 'video' }, blob('B'), blob('b'));
+  const author = { id: localPlayerId(), name: playerName() };
+  assert.equal(author.id, 'local', 'localStorage の無い所では local');
+  assert.equal(author.name, DEFAULT_PLAYER_NAME);
+  const post = async (p: typeof a, at: number): Promise<number> => (await posts.add({ postedAt: at, author, photoId: p.id, roomId: p.roomId, seed: p.seed, place: p.place, takenAt: p.takenAt, w: p.w, h: p.h, look: p.look }, (await photos.image(p.id))!, blob('t'))).id;
+  const pb = await post(b, 5000);
+  const pa = await post(a, 6000);
+  const list = await posts.list();
+  assert.deepEqual(list.map((p) => p.id), [pa, pb], '新しく投稿した順（撮った順ではない）');
+  assert.deepEqual([...await posts.postedPhotoIds()].sort(), [a.id, b.id].sort());
+  // ギャラリーの写真を消しても、投稿と画像は残る
+  await photos.remove(b.id);
+  assert.equal(await (await posts.image(pb))!.text(), 'B');
+  assert.equal(list.find((p) => p.id === pb)!.roomId, 774051);
+  // 投稿を消す
+  await posts.remove(pa);
+  assert.deepEqual((await posts.list()).map((p) => p.id), [pb]);
+  assert.deepEqual([...await posts.postedPhotoIds()], [b.id]);
+});
+
