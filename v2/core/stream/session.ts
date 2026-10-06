@@ -17,6 +17,8 @@ import type { PlayerState } from '../sim/types.ts';
 import type { FloorExit, RegionAirlockCell } from '../world/layout.ts';
 import { landingId, parseAirlockId, slotOf, START_SLOT, storyId, WorldPlanner, type RegionPlan, type StoryKey } from '../gen/world/plan.ts';
 import { StoryWorld, type RegionSource, type StoryOptions, type TransferRequest } from './story.ts';
+import { openSecretOf, spawnInCell } from './spawn.ts';
+import { IDLE_COMMAND } from '../sim/types.ts';
 
 export interface SessionOptions {
   tuning: Tuning;
@@ -31,6 +33,8 @@ export interface SessionOptions {
   /** 区域を入れた直後・外す直前（StoryOptions と同じ） */
   regionAdded?: StoryOptions['regionAdded'];
   regionRemoving?: StoryOptions['regionRemoving'];
+  /** 始める部屋（ルーム ID で飛んだとき。docs/endless-world.md 15 章）: 階・区域（同期で受け取れること）・区画の id。無ければ始まりの升目の階段室の上 */
+  start?: { story: StoryKey; plan: RegionPlan; cell: string };
 }
 
 export interface StoryChange {
@@ -89,14 +93,28 @@ export class WorldSession {
   private readonly others = new Map<string, StoryWorld>();
   private changes: StoryChange[] = [];
 
-  /** 深さ depth の階から始める（始まりの升目の、上から着く階段室の上の踊り場） */
+  /** 深さ depth の階から始める（始まりの升目の、上から着く階段室の上の踊り場）。opts.start があればその部屋の中から */
   constructor(world: number, depth: number, opts: SessionOptions) {
     this.opts = opts;
     this.t = opts.tuning;
     this.planner = new WorldPlanner(opts.tuning);
-    const story: StoryKey = { world, depth, variant: 0 };
-    this.active = new StoryWorld(story, this.planner.at(story, START_SLOT[0], START_SLOT[1]), this.storyOpts());
+    const st = opts.start;
+    const story: StoryKey = st ? st.story : { world, depth, variant: 0 };
+    this.active = new StoryWorld(story, st ? st.plan : this.planner.at(story, START_SLOT[0], START_SLOT[1]), this.storyOpts());
+    if (st) this.placeInRoom(st.plan.id, st.cell);
     opts.created?.(this.active);
+  }
+
+  /** プレイヤーを今の階の区域 regionId の区画 cellId の中へ出す（開口の内側の床の上。出現型の隠し場所なら入口を開ける） */
+  private placeInRoom(regionId: string, cellId: string): void {
+    const w = this.active, L = w.regionLayout(regionId);
+    const c = L?.cells.find((x) => x.id === cellId);
+    if (!L || !c) return;
+    // 部品の当たり判定（床板・扉）は 1 tick 目に入る
+    w.sim.step([{ ...IDLE_COMMAND }]);
+    openSecretOf(w.sim, L, cellId);
+    const at = spawnInCell(w.sim, c, [...L.portals, ...w.portals]);
+    w.sim.teleport(0, at.pos, at.yaw);
   }
 
   private storyOpts(): ConstructorParameters<typeof StoryWorld>[2] {

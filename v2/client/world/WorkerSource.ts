@@ -12,7 +12,7 @@ interface Fail { type: 'error'; key: string; message: string }
 
 export class WorkerSource implements RegionSource {
   private readonly cache = new Map<string, FloorLayout>();
-  private readonly pending = new Map<string, ((l: FloorLayout) => void)[]>();
+  private readonly pending = new Map<string, ((l: FloorLayout | null) => void)[]>();
   private readonly workers: Worker[] = [];
   private next = 0;
   private readonly max: number;
@@ -37,14 +37,14 @@ export class WorkerSource implements RegionSource {
   private receive(m: Done | Fail): void {
     const waiters = this.pending.get(m.key) ?? [];
     this.pending.delete(m.key);
-    if (m.type === 'error') { console.error(`[区域] ${m.key} を作れません: ${m.message}`); return; }
+    if (m.type === 'error') { console.error(`[区域] ${m.key} を作れません: ${m.message}`); for (const f of waiters) f(null); return; }
     this.cache.set(m.key, m.layout);
     while (this.cache.size > this.max) this.cache.delete(this.cache.keys().next().value!);
     this.log?.(`[区域] ${m.key} ${m.rarity} ${m.family}/${m.pattern} 区画 ${m.cells} 作り直し ${m.attempts - 1} ${m.ms} ms`);
     for (const f of waiters) f(m.layout);
   }
 
-  private request(plan: RegionPlan, then?: (l: FloorLayout) => void): void {
+  private request(plan: RegionPlan, then?: (l: FloorLayout | null) => void): void {
     const key = this.keyOf(plan);
     const list = this.pending.get(key);
     if (list) { if (then) list.push(then); return; }
@@ -61,8 +61,8 @@ export class WorkerSource implements RegionSource {
     return null;
   }
 
-  /** 作り終わるのを待つ（最初の区域・向こうの階の最初の区域） */
-  prefetch(plan: RegionPlan): Promise<FloorLayout> {
+  /** 作り終わるのを待つ（最初の区域・ルーム ID の部屋の区域）。作れなければ null */
+  prefetch(plan: RegionPlan): Promise<FloorLayout | null> {
     const hit = this.cache.get(this.keyOf(plan));
     if (hit) return Promise.resolve(hit);
     return new Promise((res) => this.request(plan, res));

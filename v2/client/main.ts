@@ -11,6 +11,9 @@
  * - 駅の車両（F35）で次のフロアへ着いたときは、次のフロアの車両の中（trainRide の params.arrive）に出る
  * - 開発用: window.game（ClientGame）。ペインが隠れて rAF が止まるときは game.stepOnce() で 1 tick ずつ進める
  * - 果てしない階（docs/endless-world.md）: ふつうに遊ぶときは、階が無限の平面（区域を流し込む）。見本・実験場・?shape=・?floor=1 は今までのフロア
+ * - ルーム ID（docs/endless-world.md 15 章）: `?id=1234` でその部屋から始める（無い番号なら「通信エラー」→ トップページ）。
+ *   部屋を移るたびにアドレスとタブの名前を `?id=…`・`Room …` に書き換える。始める場所の指定（id・depth・variant・見本・実験場・型・?floor=1）が
+ *   無ければトップページ（仮。ルーム ID を入れる・ランダムな部屋・はじめから）
  */
 import './ui/style.css';
 import { makeTuning, parseTuneParam, tuningVersion } from '../core/config/tuning.ts';
@@ -28,14 +31,18 @@ import { ClientGame } from './game/ClientGame.ts';
 import { IS_MOBILE } from './device.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
-import { START_SLOT, WorldPlanner } from '../core/gen/world/plan.ts';
-import { WorldSession } from '../core/stream/session.ts';
+import { START_SLOT, WorldPlanner, type StoryKey } from '../core/gen/world/plan.ts';
+import { cellIndexAt, decodeRoomId, isRoomCell, roomCellOk, roomIdOf } from '../core/gen/world/roomId.ts';
+import { WorldSession, type SessionOptions } from '../core/stream/session.ts';
 import { WorkerSource } from './world/WorkerSource.ts';
 import { restoreRegionCarry, saveRegionCarry, watchRegionCarry } from './game/carryStore.ts';
 import { codexDefs } from './map/codexDefs.ts';
 import { MapController } from './map/MapController.ts';
 import { mountUi } from './ui/dom.ts';
 import { RecOverlay } from './ui/RecOverlay.ts';
+import { showConnectionError } from './ui/ConnectionError.ts';
+import { showTopPage } from './ui/TopPage.ts';
+import { RoomAddress, roomTitle, roomUrl, topUrl } from './game/roomAddress.ts';
 import { SettingsPanel } from './ui/SettingsPanel.ts';
 
 const params = new URLSearchParams(location.search);
@@ -178,20 +185,72 @@ game.onFloorExit = (_exit, _kind, to): void => {
   })();
 };
 
-const t0 = performance.now();
 // 果てしない階（ふつうに遊ぶとき）。見本・実験場・型を決めて作る・?floor=1 は今までのフロア
 const worldMode = !useLab && !showcase && !tryIds.length && !shapeParam && !params.has('floor');
+const worldSource = worldMode ? new WorkerSource(tuning, { dress: !params.has('nodress') }) : null;
+const planner = new WorldPlanner(tuning);
+
+/** ランダムな部屋の番号（深さ 0〜9 の表の階・出発点から 6 升目までの区域の、隠し場所でない部屋。区域を作って選ぶ） */
+async function randomRoom(): Promise<number | null> {
+  for (let i = 0; i < 6; i++) {
+    const story: StoryKey = { world: seed, depth: Math.floor(Math.random() * 10), variant: 0 };
+    const plan = planner.at(story, Math.floor(Math.random() * 13) - 6, Math.floor(Math.random() * 13) - 6);
+    const L = await worldSource!.prefetch(plan);
+    if (!L) continue;
+    const secret = new Set((L.region?.contents?.secrets ?? []).flatMap((x) => x.cells));
+    const ok = L.cells.map((c, k) => ({ c, k })).filter(({ c }) => isRoomCell(L, c) && c.role !== 'secret' && !secret.has(c.id));
+    if (!ok.length) continue;
+    const id = roomIdOf(seed, L, story, ok[Math.floor(Math.random() * ok.length)]!.k);
+    if (id !== null) return id;
+  }
+  return null;
+}
+
+/** 無い部屋: 「通信エラー」を出してトップページへ（このページはここで止める） */
+async function roomNotFound(id: string): Promise<never> {
+  ui.setPauseVisible(false);
+  await showConnectionError(id);
+  location.replace(topUrl());
+  return new Promise<never>(() => {});
+}
+
+// 始める場所の指定が無ければトップページ
+let startId = worldMode ? params.get('id') : null;
+const startGiven = ['id', 'depth', 'variant', 'lab', 'showcase', 'try', 'group', 'shape', 'floor'].some((k) => params.has(k));
+if (worldMode && !startGiven) {
+  const choice = await showTopPage({ seed, randomRoom });
+  if (choice.kind === 'id') {
+    startId = choice.id;
+    history.replaceState(history.state, '', roomUrl(startId));
+    document.title = roomTitle(startId);
+  }
+}
+
+const t0 = performance.now();
 if (worldMode) {
   const R = await loadRapier();
-  const source = new WorkerSource(tuning, { dress: !params.has('nodress') });
-  const planner = new WorldPlanner(tuning);
-  const story = { world: seed, depth, variant: 0 };
-  const [sx, sz] = START_SLOT;
-  await source.prefetch(planner.at(story, sx, sz));
+  const source = worldSource!;
+  // ルーム ID の部屋から: 番号 → 部屋の場所 → 区域を作って、その区画があるか確かめる
+  let start: SessionOptions['start'];
+  if (startId !== null) {
+    const ref = decodeRoomId(seed, startId);
+    if (!ref) await roomNotFound(startId);
+    const st: StoryKey = { world: seed, depth: ref!.depth, variant: ref!.variant };
+    const plan = planner.at(st, ref!.cx, ref!.cz);
+    const L = await source.prefetch(plan);
+    if (!L || !roomCellOk(L, ref!)) await roomNotFound(startId);
+    start = { story: st, plan, cell: L!.cells[ref!.cell]!.id };
+    depth = st.depth;
+    variant = st.variant;
+    document.title = roomTitle(startId);
+  } else {
+    const [sx, sz] = START_SLOT;
+    await source.prefetch(planner.at({ world: seed, depth, variant: 0 }, sx, sz));
+  }
   // 置いた物が残る（I09）: 区域ごとに保存する（区域を入れた直後に戻し、外す直前と置くたびに書く）
   const carryKey = (story: { depth: number; variant: number }, rid: string): string => `${seed}:${story.depth}.${story.variant}:${rid}:${tuningVersion(tuning)}`;
   const session = new WorldSession(seed, depth, {
-    tuning, source, physics: () => new PhysicsWorld(R, 1 / tuning['physics.tickHz']), ready: (w, id) => game.regionReady(w, id),
+    tuning, source, physics: () => new PhysicsWorld(R, 1 / tuning['physics.tickHz']), ready: (w, id) => game.regionReady(w, id), ...(start ? { start } : {}),
     regionAdded: (w, id, L) => restoreRegionCarry(w.sim, L, carryKey(w.story, id)),
     regionRemoving: (w, id, L) => saveRegionCarry(w.sim, L, carryKey(w.story, id)),
   });
@@ -214,8 +273,20 @@ if (worldMode) {
     maps.setRegion(L, null, { world: seed, depth, variant, region: plan.id, name: L.region?.name ?? '' });
   };
   syncRegion();
+  // ルーム ID: 番号の違う部屋に入ったら、アドレスとタブの名前を書き換える（階段室・エレベーターのかご・別の空間は番号なし: そのまま）
+  const address = new RoomAddress({ current: startId !== null ? Number(startId) : null });
+  const syncRoom = (): void => {
+    const sim = game.sim, s = game.session;
+    if (!sim || !s) return;
+    const p = sim.players[0]!;
+    const plan = s.active.planAt(p.pos[0], p.pos[2]);
+    const L = s.active.regionLayout(plan.id);
+    if (!L) return;
+    const id = roomIdOf(seed, L, s.active.story, cellIndexAt(L, p.pos));
+    if (id !== null) address.set(id);
+  };
   const frame0 = game.onFrame;
-  game.onFrame = (input, dt) => { syncRegion(); frame0?.(input, dt); };
+  game.onFrame = (input, dt) => { syncRegion(); syncRoom(); frame0?.(input, dt); };
   game.onStoryChange = (c) => console.info(`[階] B${c.from.depth + 1}F → B${c.to.depth + 1}F（${c.seamless ? `階段室 ${c.airlock}` : '暗転'}）`);
   // 階段室でない出口（隠しの穴・縦穴・エレベーターの仕掛け・迷路フロアの別の出口）: 暗転して、行き先の階の同じ位置に近い部屋へ
   game.onFloorExit = (_exit, kind, to): void => {
