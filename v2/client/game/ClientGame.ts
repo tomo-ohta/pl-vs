@@ -33,7 +33,7 @@ import type { UiRefs } from '../ui/dom.ts';
 import { PlayerFlashlight } from '../render/PlayerFlashlight.ts';
 import type { ViewContext } from '../views/index.ts';
 import { PortalRenderer } from '../world/Portals.ts';
-import { applyLampLevels, cellAt, FloorBuilder, type BuiltFloor } from '../world/FloorBuilder.ts';
+import { applyLampLevels, cellAt, FloorBuilder, sampleCellLight, type BuiltFloor } from '../world/FloorBuilder.ts';
 import { LightManager } from '../world/LightManager.ts';
 import { restoreCarry, watchCarry } from './carryStore.ts';
 import { StoryView } from '../world/StoryView.ts';
@@ -45,6 +45,16 @@ const TONE_MAPPINGS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMap
 /** 縦穴の中の霧の色 */
 const BLACK = new THREE.Color(0, 0, 0);
 const ENV_LERP_SEC = 0.8;
+
+/**
+ * 手に持つ物（タブレット。client/tablet/TabletController.ts）: ゲームの毎フレームに入る所。
+ * input は遊んでいる間だけ呼ぶ（持っている間の入力に直して返す: 指のカーソル・クリック・ダッシュやジャンプを止める など）。
+ * update は描く前に毎フレーム（止まっている間は dt = 0）
+ */
+export interface HeldDevice {
+  input(input: InputState, dt: number): InputState;
+  update(dt: number): void;
+}
 
 export interface GameOptions {
   canvas: HTMLCanvasElement;
@@ -86,6 +96,8 @@ export class ClientGame {
   onFloorExit: ((exitId: string, kind: string, to: string | null) => void) | null = null;
   /** 毎フレーム（入力を読んでシミュレーションを進めた後・描く前）。地図（client/map/MapController）が使う */
   onFrame: ((input: InputState, dt: number) => void) | null = null;
+  /** 手に持つ物（タブレット）。無ければ null */
+  device: HeldDevice | null = null;
 
   private readonly hemi = new THREE.HemisphereLight(0xe5e4d5, 0x6c665a, 0.1);
   private lightsPool: LightManager;
@@ -452,7 +464,9 @@ export class ClientGame {
     this.last = now;
     this.syncWorld();
     const sim = this.sim;
-    const input = this.input.poll();
+    const raw = this.input.poll();
+    // 手に持つ物（タブレット）を持っている間の入力（遊んでいる間だけ）
+    const input = sim && !this.paused && this.device ? this.device.input(raw, dt) : raw;
     // メニュー（Esc / 右上）: 開くだけ。閉じるのは一時停止の画面の「再開」（Pointer Lock はユーザー操作の中でしか取れない）
     if (input.menu && !this.paused) { this.pause(); this.ui.setPauseVisible(true); this.audio.ui('open'); }
     if (sim && !this.paused) {
@@ -744,11 +758,37 @@ export class ClientGame {
       this.postfx.setAudioNoise(this.audio.ambientLevel);
       this.ui.reticle.classList.toggle('focus', !!sim.focusedInteractable());
     }
+    this.device?.update(this.paused ? 0 : dt);
     const t0 = performance.now();
     this.materials.update(dt);
     this.renderPortals();
     this.postfx.render();
     this.materials.uploads.flush(this.renderer, performance.now() - t0);
+  }
+
+  /** 点の明るさ（焼き込んだ光。RGB。区画の外なら弱い灰色）。手に持つ物の照明に使う */
+  lightAt(at: readonly [number, number, number]): [number, number, number] {
+    const built = this.built;
+    const cell = built ? cellAt(built, at) : null;
+    return cell ? sampleCellLight(cell, [at[0], at[1], at[2]], this.lampLevel) : [0.2, 0.2, 0.2];
+  }
+
+  /**
+   * 写真を撮る（タブレットのカメラ）: 手に持つ物を除いた今の画面を描き、canvas に写して返す（横 maxWidth まで縮める）。
+   * video: ビデオの効果（にじみ・走査線・ノイズ）とレンズの癖を掛けるか（false ならタブレットのカメラらしく外す。露出の追従は残す）
+   */
+  capture(o: { video: boolean; maxWidth: number }): HTMLCanvasElement | null {
+    if (!this.sim) return null;
+    this.postfx.renderCapture({ overlay: false, video: o.video, lens: o.video ? 'asIs' : 'clean' });
+    const src = this.renderer.domElement;
+    const k = Math.min(1, o.maxWidth / Math.max(1, src.width));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(src.width * k));
+    c.height = Math.max(1, Math.round(src.height * k));
+    const g = c.getContext('2d');
+    if (!g) return null;
+    g.drawImage(src, 0, 0, c.width, c.height);
+    return c;
   }
 
   /** 窓・枠の向こうを描く（場面を描く前。区画の見え方を面ごとに替えて、終わったら戻す。段階 4 warp で足した） */

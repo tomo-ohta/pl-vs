@@ -26,6 +26,8 @@ export type PostFxPreset = FilmPreset;
 export type FrameHoldId = 'off' | '30' | '24';
 /** トーンマップ（開発用の切替。既定は v1 docs/postfx.md の比較で採用したもの） */
 export type ToneMappingId = 'aces' | 'agx';
+/** タブレットのカメラの写真の見た目: clean タブレットのカメラらしい（ビデオのにじみ・走査線・レンズの癖なし）/ video 画面と同じビデオ調 */
+export type PhotoLookId = 'clean' | 'video';
 
 export interface SettingsData {
   /** 0〜1 */
@@ -54,6 +56,8 @@ export interface SettingsData {
   toneMapping: ToneMappingId;
   /** 遊ぶ人の名前（12 文字まで。部屋の異変「自分の名前」の掲示・名札に出る。空なら既定の呼び名） */
   playerName: string;
+  /** タブレットのカメラの写真の見た目 */
+  photoLook: PhotoLookId;
 }
 
 /** 保存名（liminal2.settings.v1）。項目の意味を変えたら版を上げる */
@@ -73,6 +77,7 @@ export const DEFAULT_SETTINGS: Readonly<SettingsData> = {
   frameHold: 'off',
   toneMapping: 'agx',
   playerName: '',
+  photoLook: 'clean',
 };
 
 /** 保存先（localStorage の一部。テストでは差し替える） */
@@ -182,6 +187,7 @@ export function sanitize(d: SettingsData): SettingsData {
     vhsStrength: typeof d.vhsStrength === 'number' && Number.isFinite(d.vhsStrength) ? Math.min(2, Math.max(0, d.vhsStrength)) : DEFAULT_SETTINGS.vhsStrength,
     toneMapping,
     playerName: cleanName(d.playerName),
+    photoLook: d.photoLook === 'video' ? 'video' : 'clean',
   };
 }
 

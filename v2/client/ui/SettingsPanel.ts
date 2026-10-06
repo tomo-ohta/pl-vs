@@ -16,7 +16,7 @@
 import type { Settings, SettingsData } from '../settings/Settings.ts';
 
 type SliderKey = keyof Pick<SettingsData, 'masterVolume' | 'ambientVolume' | 'sfxVolume' | 'lookSensitivity' | 'handheld' | 'vhsStrength'>;
-type SelectKey = keyof Pick<SettingsData, 'tier' | 'postfx' | 'frameHold' | 'toneMapping' | 'cameraLag' | 'recOverlay'>;
+type SelectKey = keyof Pick<SettingsData, 'tier' | 'postfx' | 'frameHold' | 'toneMapping' | 'cameraLag' | 'recOverlay' | 'photoLook'>;
 
 interface SliderDef {
   kind: 'slider';
@@ -92,6 +92,14 @@ const ROWS: RowDef[] = [
     note: 'テープ向け',
   },
   { kind: 'select', key: 'recOverlay', label: 'REC 表示', options: ON_OFF, bool: true },
+  {
+    kind: 'select', key: 'photoLook', label: '写真の見た目',
+    options: [
+      { value: 'clean', label: 'タブレットのカメラ' },
+      { value: 'video', label: 'ビデオ調（走査線・にじみ）' },
+    ],
+    note: 'タブレット',
+  },
   { kind: 'head', label: '開発' },
   {
     kind: 'select', key: 'toneMapping', label: 'トーンマップ',

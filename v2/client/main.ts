@@ -14,6 +14,8 @@
  * - ルーム ID（docs/endless-world.md 15 章）: `?id=1234` でその部屋から始める（無い番号なら「通信エラー」→ トップページ）。
  *   部屋を移るたびにアドレスとタブの名前を `?id=…`・`Room …` に書き換える。始める場所の指定（id・depth・variant・見本・実験場・型・?floor=1）が
  *   無ければトップページ（仮。ルーム ID を入れる・ランダムな部屋・はじめから）
+ * - タブレット（client/tablet）: Tab（スマホは端末ボタン）で出す・しまう。カメラ・探索（番号の部屋へ移る。電源が落ちる演出）・
+ *   マップ・SNS（準備中）・ギャラリー・設定（メニュー）
  */
 import './ui/style.css';
 import { makeTuning, parseTuneParam, tuningVersion } from '../core/config/tuning.ts';
@@ -43,6 +45,8 @@ import { RecOverlay } from './ui/RecOverlay.ts';
 import { showConnectionError } from './ui/ConnectionError.ts';
 import { showTopPage } from './ui/TopPage.ts';
 import { RoomAddress, roomTitle, roomUrl, topUrl } from './game/roomAddress.ts';
+import { TabletController, type TabletHooks } from './tablet/TabletController.ts';
+import { PowerFx } from './ui/PowerFx.ts';
 import { SettingsPanel } from './ui/SettingsPanel.ts';
 
 const params = new URLSearchParams(location.search);
@@ -187,6 +191,11 @@ game.onFloorExit = (_exit, _kind, to): void => {
 
 // 果てしない階（ふつうに遊ぶとき）。見本・実験場・型を決めて作る・?floor=1 は今までのフロア
 const worldMode = !useLab && !showcase && !tryIds.length && !shapeParam && !params.has('floor');
+/** 今いる部屋のルーム ID（果てしない階。番号の無い所に入っても前の部屋のまま） */
+let currentRoomId: number | null = null;
+/** タブレットの「探索」: 番号の部屋があるか・その部屋へ移る（果てしない階で入れる） */
+let roomCheck: TabletHooks['checkRoom'] = async () => false;
+let roomWarp: TabletHooks['warp'] = async () => false;
 const worldSource = worldMode ? new WorkerSource(tuning, { dress: !params.has('nodress') }) : null;
 const planner = new WorldPlanner(tuning);
 
@@ -283,7 +292,46 @@ if (worldMode) {
     const L = s.active.regionLayout(plan.id);
     if (!L) return;
     const id = roomIdOf(seed, L, s.active.story, cellIndexAt(L, p.pos));
-    if (id !== null) address.set(id);
+    if (id !== null) { address.set(id); currentRoomId = id; }
+  };
+  if (startId !== null) currentRoomId = Number(startId);
+  // タブレットの「探索」: 番号 → 部屋の場所 → 区域を作って区画があるか
+  const roomTarget = async (id: number): Promise<{ story: StoryKey; plan: ReturnType<WorldPlanner['at']>; cell: string } | null> => {
+    const ref = decodeRoomId(seed, id);
+    if (!ref) return null;
+    const st: StoryKey = { world: seed, depth: ref.depth, variant: ref.variant };
+    const plan = planner.at(st, ref.cx, ref.cz);
+    const L = await source.prefetch(plan);
+    return L && roomCellOk(L, ref) ? { story: st, plan, cell: L.cells[ref.cell]!.id } : null;
+  };
+  roomCheck = async (id) => (await roomTarget(id)) !== null;
+  // 番号の部屋へ移る: 電源が落ちる → 移る先を作る（LOADING）→ 電源が入って、その部屋の開口の内側に立つ
+  const power = new PowerFx(canvas, () => game.audio.sfxInput);
+  roomWarp = async (id, onDark) => {
+    if (moving) return false;
+    const target = await roomTarget(id);
+    if (!target || moving) return false;
+    moving = true;
+    game.input.enabled = false;
+    let ok = false;
+    try {
+      const t1 = performance.now();
+      await power.off(`ROOM ${id}`);
+      onDark();
+      const s = game.session!;
+      for (let i = 0; i < 200 && !(ok = s.prepareGotoRoom(target.story, target.plan, target.cell)); i++) await sleep(50);
+      if (ok) { ok = false; for (let i = 0; i < 600 && !(ok = s.commitGoto()); i++) await sleep(30); }
+      // LOADING を少しは見せる
+      const rest = 1500 - (performance.now() - t1);
+      if (rest > 0) await sleep(rest);
+      if (ok) currentRoomId = id;
+      console.info(`[探索] ROOM ${id} へ${ok ? '' : '移れず'} ${(performance.now() - t1).toFixed(0)} ms`);
+      await power.on();
+    } finally {
+      game.input.enabled = !game.paused;
+      moving = false;
+    }
+    return ok;
   };
   const frame0 = game.onFrame;
   game.onFrame = (input, dt) => { syncRegion(); syncRoom(); frame0?.(input, dt); };
@@ -315,6 +363,16 @@ if (worldMode) {
   if (game.sim) maps.setFloor(game.sim.floor, lastReport, { world: seed, depth, variant });
 }
 console.info(`[floor] 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
+// タブレット（Tab / 端末ボタン）
+const tablet = new TabletController(game, {
+  seed,
+  roomId: () => currentRoomId,
+  placeLabel: () => `B${depth + 1}F${variant ? ' 裏' : ''}`,
+  roomsAvailable: () => !!game.session,
+  checkRoom: (id) => roomCheck(id),
+  warp: (id, onDark) => roomWarp(id, onDark),
+  maps,
+});
 game.start();
 // REC の時刻（一時停止中は止める）
 let last = performance.now();
@@ -327,5 +385,6 @@ const tickRec = (now: number): void => {
 requestAnimationFrame(tickRec);
 
 (window as unknown as { game: ClientGame }).game = game;
+(window as unknown as { tablet: TabletController }).tablet = tablet;
 // 開発用: 地図と図鑑（window.maps.map が自分の地図）
 (window as unknown as { maps: MapController }).maps = maps;

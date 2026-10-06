@@ -137,3 +137,29 @@ test('ルーム ID: 番号の部屋の中から始めると、その部屋の床
   assert.deepEqual(fails, []);
   assert.ok(n >= 30 && secrets >= 2, `部屋 ${n}・隠し場所 ${secrets}・穴の部屋 ${pits}`);
 });
+
+test('ルーム ID: 番号の部屋へ移る（タブレットの探索）: 別の階・同じ階のどちらでも、その部屋の床に立つ。捨てる階の区域は書き残す', async () => {
+  const R = await loadRapier();
+  const src = syncSource(t, { dress: dressCell });
+  const P = new WorldPlanner(t);
+  const saved: string[] = [];
+  const s = new WorldSession(5, 0, { tuning: t, source: src, physics: () => new PhysicsWorld(R, 1 / 60), regionRemoving: (w, id) => saved.push(`${w.story.depth}.${w.story.variant}:${id}`) });
+  for (let k = 0; k < 10; k++) s.step([{ ...IDLE_COMMAND }]);
+  for (const g of [{ story: { world: 5, depth: 3, variant: 1 }, cx: 1, cz: -1 }, { story: { world: 5, depth: 3, variant: 1 }, cx: -2, cz: 2 }]) {
+    const plan = P.at(g.story, g.cx, g.cz);
+    const L = src.get(plan)!;
+    const idx = L.cells.findIndex((c, i) => i > 3 && isRoomCell(L, c) && c.role !== 'secret' && c.role !== 'connector');
+    assert.ok(idx >= 0);
+    const before = saved.length;
+    assert.ok(s.prepareGotoRoom(g.story, plan, L.cells[idx]!.id), '用意できる');
+    assert.ok(s.commitGoto(), '移れる');
+    for (let k = 0; k < 30; k++) s.step([{ ...IDLE_COMMAND }]);
+    const p = s.active.sim.players[0]!;
+    const here = s.active.regionLayout(plan.id)!;
+    assert.equal(s.storyId, '3.1');
+    assert.equal(cellIndexAt(here, p.pos), idx, `${L.cells[idx]!.id} の中`);
+    assert.ok(p.onGround && Math.abs(p.pos[1] - L.cells[idx]!.floorY) < 0.3, `床に立つ（y=${p.pos[1].toFixed(2)}）`);
+    assert.ok(saved.length > before, '捨てた階の区域を書き残した');
+  }
+  s.active.sim.physics?.dispose();
+});

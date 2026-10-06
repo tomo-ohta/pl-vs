@@ -20,8 +20,12 @@
  *   map は menu と同じく、無効の間（メニュー中）も届く
  * - 視点感度は `sensitivityScale = settings.data.lookSensitivity`（Settings.onChange で追従させる）。
  * - PC で Ctrl+W / Ctrl+D 等のブラウザ既定動作は preventDefault できない（Pointer Lock 中も）。C キーを主、Ctrl を副として案内する。
+ * - キーの割り当ては `keymap`（input/keymap.ts。既定は DEFAULT_KEYMAP）。差し替えるとその割り当てで読む（将来の設定のため）。
+ * - タブレット（client/tablet）: tablet（Tab / スマホの端末ボタン。押した瞬間）・tabletBack（Backspace）・tabletEnter（Enter）・
+ *   数字キー（digits）・マウスの左ボタン（click / release / mouseHeld）・右ボタン（back）・ホイール（wheel）。どれも Pointer Lock 中だけ
  */
 import { IS_MOBILE } from '../device.ts';
+import { actionsOf, copyKeymap, type KeyAction, type KeyMap } from './keymap.ts';
 
 export interface InputState {
   /** x: 右(+) / y: 前(+)。-1..1 */
@@ -44,12 +48,30 @@ export interface InputState {
   map: boolean;
   /** タップによるインタラクト（画面座標 NDC）。無ければ null */
   tap: { x: number; y: number } | null;
+  /** タブレットを出す・しまう（Tab / 端末ボタン。押した瞬間）。無効の間も届かない */
+  tablet: boolean;
+  /** 戻る（右クリック・Backspace。押した瞬間） */
+  back: boolean;
+  /** Backspace（押した瞬間。back と一緒に立つ。数字を消すのに使う） */
+  backspace: boolean;
+  /** 決める（Enter。押した瞬間） */
+  enter: boolean;
+  /** マウスの左ボタンを押した / 離した瞬間・押している間（Pointer Lock 中） */
+  click: boolean;
+  release: boolean;
+  mouseHeld: boolean;
+  /** ホイール（下へ + 。1 段 ≈ 100） */
+  wheel: number;
+  /** 押した数字キー（順に。'0'〜'9'） */
+  digits: string;
 }
 
 export type InputMode = 'pc' | 'mobile';
 
 /** スマホの操作に使う要素（ui/dom.ts の mountUi が作る UiRefs.input をそのまま渡せる） */
 export interface InputUi {
+  /** タブレットのボタン（省略可。押すと tablet。Tab キーと同じ） */
+  tablet?: HTMLElement;
   /** スマホの操作の入れ物（PC では hidden） */
   touchRoot: HTMLElement;
   stick: HTMLElement;
@@ -77,6 +99,8 @@ export class InputController {
   mobileSensitivity = 0.004;
   /** 設定パネルの視点感度倍率（Settings.lookSensitivity）。pcSensitivity / mobileSensitivity に掛ける */
   sensitivityScale = 1;
+  /** キーの割り当て（差し替えてよい） */
+  keymap: KeyMap = copyKeymap();
   onModeChange: ((m: InputMode) => void) | null = null;
 
   private readonly canvas: HTMLCanvasElement;
@@ -92,6 +116,15 @@ export class InputController {
   private dropEdge = false;
   private menuEdge = false;
   private mapEdge = false;
+  private tabletEdge = false;
+  private backEdge = false;
+  private backspaceEdge = false;
+  private enterEdge = false;
+  private clickEdge = false;
+  private releaseEdge = false;
+  private mouseHeld = false;
+  private wheel = 0;
+  private digits = '';
   private tap: { x: number; y: number } | null = null;
   private stick = { active: false, id: -1, x: 0, y: 0, cx: 0, cy: 0 };
   private lookPointer = { id: -1, x: 0, y: 0, moved: 0, t: 0, last: 0 };
@@ -129,13 +162,22 @@ export class InputController {
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       this.keys.add(e.code);
-      if (e.code === 'Space') this.jumpEdge = true;
-      if (e.code === 'KeyE') this.interactEdge = true;
-      if (e.code === 'KeyR' && !e.repeat) this.flashlightEdge = true;
-      if (e.code === 'KeyQ' && !e.repeat) this.dropEdge = true;
-      if (e.code === 'Escape') this.menuEdge = true;
-      if (e.code === 'KeyM') this.mapEdge = true;
+      const acts = actionsOf(this.keymap, e.code);
+      const on = (a: KeyAction): boolean => acts.includes(a);
+      if (on('jump')) this.jumpEdge = true;
+      if (on('interact')) this.interactEdge = true;
+      if (on('flashlight')) this.flashlightEdge = true;
+      if (on('drop')) this.dropEdge = true;
+      if (on('menu')) this.menuEdge = true;
+      if (on('map')) this.mapEdge = true;
+      if (on('tablet')) this.tabletEdge = true;
+      if (on('tabletBack')) { this.backEdge = true; this.backspaceEdge = true; }
+      if (on('tabletEnter')) this.enterEdge = true;
+      const dm = /^(?:Digit|Numpad)(\d)$/.exec(e.code);
+      if (dm) this.digits += dm[1];
       if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+      // 遊んでいる間の Tab（フォーカスの移動）・Backspace は止める（メニューの入力欄では止めない）
+      if (this.enabled && (on('tablet') || on('tabletBack')) && !(e.target instanceof HTMLInputElement)) e.preventDefault();
       // しゃがみ中の Ctrl+移動キーがブラウザのショートカットになるのを可能な範囲で抑える（Ctrl+W 等は抑止不可）
       if (e.ctrlKey && ['KeyA', 'KeyS', 'KeyD', 'KeyE'].includes(e.code)) e.preventDefault();
       this.setMode('pc');
@@ -148,6 +190,7 @@ export class InputController {
     const { signal } = this.listeners;
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.canvas;
+      if (!this.locked) this.mouseHeld = false;
       if (!this.locked && this.mode === 'pc' && this.enabled && this.useLock) this.menuEdge = true; // Esc で解除 → メニュー
     }, { signal });
     document.addEventListener('mousemove', (e) => {
@@ -156,11 +199,25 @@ export class InputController {
       this.lookDY += e.movementY * this.pcSensitivity * this.sensitivityScale;
     }, { signal });
     this.canvas.addEventListener('mousedown', (e) => {
-      if (e.button !== 0 || this.mode !== 'pc') return;
-      if (this.locked) { this.interactEdge = true; return; }
+      if (this.mode !== 'pc') return;
+      if (e.button === 2) { if (this.locked) this.backEdge = true; return; }
+      if (e.button !== 0) return;
+      if (this.locked) { this.interactEdge = true; this.clickEdge = true; this.mouseHeld = true; return; }
       // Esc でメニューを閉じた直後は（ユーザー操作扱いにならず）Pointer Lock を取り直せないので、クリックで取り直す
       if (this.enabled && this.useLock) void this.requestLock();
     }, { signal });
+    document.addEventListener('mouseup', (e) => {
+      if (e.button !== 0 || !this.mouseHeld) return;
+      this.mouseHeld = false;
+      this.releaseEdge = true;
+    }, { signal });
+    // 右クリックはタブレットの「戻る」（メニューを出さない）
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
+    this.canvas.addEventListener('wheel', (e) => {
+      if (!this.locked) return;
+      this.wheel += e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+      e.preventDefault();
+    }, { signal, passive: false });
   }
 
   /** Pointer Lock を要求する。取得できれば true（Esc 直後などユーザー操作扱いにならない呼び出しはブラウザが拒否する） */
@@ -181,7 +238,7 @@ export class InputController {
   // ---------------------------------------------------------------- Touch
   private bindTouch(): void {
     const { signal } = this.listeners;
-    const { stick, knob, jump, dash, menu, crouch, map, flashlight, drop } = this.ui;
+    const { stick, knob, jump, dash, menu, crouch, map, flashlight, drop, tablet } = this.ui;
     const R = 66;
     const setKnob = (dx: number, dy: number) => {
       knob.style.transform = `translate(${dx}px, ${dy}px)`;
@@ -268,6 +325,7 @@ export class InputController {
     edge(map, () => (this.mapEdge = true));
     edge(flashlight, () => (this.flashlightEdge = true));
     edge(drop, () => (this.dropEdge = true));
+    edge(tablet, () => (this.tabletEdge = true));
     // しゃがみはトグル（押している間だと親指が塞がるため）。active クラスで点灯
     if (crouch) {
       crouch.addEventListener('pointerdown', (e) => {
@@ -337,8 +395,13 @@ export class InputController {
 
   /** 現在しゃがみ入力が立っているか（poll せずに参照したいとき用） */
   get crouchHeld(): boolean {
-    if (this.mode === 'pc') return this.keys.has('ControlLeft') || this.keys.has('KeyC');
+    if (this.mode === 'pc') return this.held('crouch');
     return this.touchCrouch;
+  }
+
+  /** 操作 a のキーのどれかを押しているか */
+  private held(a: KeyAction): boolean {
+    return this.keymap[a].some((k) => this.keys.has(k));
   }
 
   // ---------------------------------------------------------------- poll
@@ -346,10 +409,10 @@ export class InputController {
     let moveX = 0;
     let moveY = 0;
     if (this.mode === 'pc') {
-      if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) moveY += 1;
-      if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) moveY -= 1;
-      if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) moveX += 1;
-      if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) moveX -= 1;
+      if (this.held('forward')) moveY += 1;
+      if (this.held('back')) moveY -= 1;
+      if (this.held('right')) moveX += 1;
+      if (this.held('left')) moveX -= 1;
       const len = Math.hypot(moveX, moveY);
       if (len > 1) {
         moveX /= len;
@@ -365,7 +428,7 @@ export class InputController {
       lookDX: this.lookDX,
       lookDY: this.lookDY,
       jump: this.jumpEdge,
-      dash: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchDash,
+      dash: this.held('dash') || this.touchDash,
       crouch: this.crouchHeld,
       interact: this.interactEdge,
       flashlight: this.flashlightEdge,
@@ -373,6 +436,15 @@ export class InputController {
       menu: this.menuEdge,
       map: this.mapEdge,
       tap: this.tap,
+      tablet: this.tabletEdge,
+      back: this.backEdge,
+      backspace: this.backspaceEdge,
+      enter: this.enterEdge,
+      click: this.clickEdge,
+      release: this.releaseEdge,
+      mouseHeld: this.mouseHeld,
+      wheel: this.wheel,
+      digits: this.digits,
     };
     this.lookDX = 0;
     this.lookDY = 0;
@@ -382,10 +454,18 @@ export class InputController {
     this.dropEdge = false;
     this.menuEdge = false;
     this.mapEdge = false;
+    this.tabletEdge = false;
+    this.backEdge = false;
+    this.backspaceEdge = false;
+    this.enterEdge = false;
+    this.clickEdge = false;
+    this.releaseEdge = false;
+    this.wheel = 0;
+    this.digits = '';
     this.tap = null;
     void this.touchJump;
     if (!this.enabled) {
-      return { ...st, moveX: 0, moveY: 0, lookDX: 0, lookDY: 0, jump: false, dash: false, crouch: false, interact: false, flashlight: false, drop: false, tap: null };
+      return { ...st, moveX: 0, moveY: 0, lookDX: 0, lookDY: 0, jump: false, dash: false, crouch: false, interact: false, flashlight: false, drop: false, tap: null, tablet: false, back: false, backspace: false, enter: false, click: false, release: st.release, mouseHeld: false, wheel: 0, digits: '' };
     }
     return st;
   }
