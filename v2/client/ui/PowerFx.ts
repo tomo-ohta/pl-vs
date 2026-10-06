@@ -1,6 +1,6 @@
 /**
- * ビデオの電源が落ちる・入る演出（タブレットの「探索」で部屋を移るとき）。
- * off: 画面（ゲームの canvas）が横 1 本の線に潰れ、点になって消える → 暗い中に LOADING。
+ * ビデオの電源が落ちる・入る演出（タブレットの「探索」で部屋を移るとき・ゲームを始めるとき）。
+ * off: 画面（ゲームの canvas）が横 1 本の線に潰れ、点になって消える → 暗い中に LOADING。dark: 初めから暗い中に LOADING（始める前の読み込み）。
  * on: 線から画面が開く。間の HUD（REC・小さな地図・照準・スマホのボタン）は隠す。音は WebAudio の合成（効果音の音量に従う）
  */
 
@@ -67,6 +67,23 @@ export class PowerFx {
     document.body.append(this.root);
   }
 
+  /** 初めから真っ暗で LOADING（ゲームを始める前の読み込み。終わったら on で一人称の画面に） */
+  dark(label: string): void {
+    this.root.hidden = false;
+    document.body.classList.add('fx-power');
+    this.idEl.textContent = label;
+    this.canvas.style.opacity = '0';
+    this.loading.style.opacity = '1';
+    this.startCounter();
+  }
+
+  private startCounter(): void {
+    clearInterval(this.tcTimer);
+    let n = 0;
+    this.tcEl.textContent = '';
+    this.tcTimer = window.setInterval(() => { n++; this.tcEl.textContent = `▶▶ ${String(Math.floor(n / 10)).padStart(2, '0')}:${String((n % 10) * 6).padStart(2, '0')}`; }, 100);
+  }
+
   /** 電源が落ちる（終わると真っ暗で LOADING） */
   async off(label: string): Promise<void> {
     const c = this.canvas.style;
@@ -96,8 +113,7 @@ export class PowerFx {
     this.dot.style.transform = 'scale(0.4)';
     await sleep(420);
     this.loading.style.opacity = '1';
-    let n = 0;
-    this.tcTimer = window.setInterval(() => { n++; this.tcEl.textContent = `▶▶ ${String(Math.floor(n / 10)).padStart(2, '0')}:${String((n % 10) * 6).padStart(2, '0')}`; }, 100);
+    this.startCounter();
   }
 
   /** 電源が入る（一人称の画面に戻る） */

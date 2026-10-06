@@ -34,6 +34,10 @@ export interface TopPageOptions {
   seed: number;
   /** ランダムな部屋の番号を作る（区域を作るので時間がかかる。作れなければ null） */
   randomRoom(): Promise<number | null>;
+  /** 選んだとき（押した操作の中で呼ぶ。音の解錠・Pointer Lock を取っておけば、読み込みが終わってすぐ遊べる） */
+  onChoose?(): void;
+  /** 選んだが始められず、トップページに残るとき（ランダムな部屋を探せなかった。Pointer Lock を外す） */
+  onCancel?(): void;
 }
 
 /** トップページを出し、選ばれるまで待つ */
@@ -72,6 +76,7 @@ export function showTopPage(o: TopPageOptions): Promise<TopChoice> {
       const v = input.value.replace(/\s+/g, '');
       if (!v) { status.textContent = 'ルーム ID を入れてください'; input.focus(); return; }
       if (!/^\d+$/.test(v)) { status.textContent = 'ルーム ID は数字です'; input.focus(); return; }
+      o.onChoose?.();
       done({ kind: 'id', id: v });
     };
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
@@ -80,12 +85,14 @@ export function showTopPage(o: TopPageOptions): Promise<TopChoice> {
     root.addEventListener('click', (e) => {
       const act = (e.target as HTMLElement).closest<HTMLButtonElement>('button')?.dataset.act;
       if (act === 'go') go();
-      else if (act === 'begin') done({ kind: 'begin' });
+      else if (act === 'begin') { o.onChoose?.(); done({ kind: 'begin' }); }
       else if (act === 'random') {
         busy(true);
         status.textContent = '接続中…';
+        // 探している間に押した操作の効き目が切れないように、先に取る
+        o.onChoose?.();
         void o.randomRoom().then((id) => {
-          if (id === null) { busy(false); status.textContent = '部屋を探せませんでした。もう一度押してください'; return; }
+          if (id === null) { o.onCancel?.(); busy(false); status.textContent = '部屋を探せませんでした。もう一度押してください'; return; }
           done({ kind: 'id', id: String(id) });
         });
       }

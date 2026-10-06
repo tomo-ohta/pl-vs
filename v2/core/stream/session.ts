@@ -136,9 +136,14 @@ export class WorldSession {
     return this.others.get(typeof to === 'string' ? to : storyId(to)) ?? null;
   }
 
-  /** 作ってある移る先の階（全部。暗転して移る先も） */
+  /**
+   * 作ってある移る先の階（全部。暗転して移る先も）。暗転して移る先は、同じ階が階段室の向こう（others）にあっても別に作った物なので、
+   * 必ず入れる（入れないと描画が作られず、commitGoto が待ち続けて移れない）
+   */
   beyondWorlds(): StoryWorld[] {
-    return [...this.others.values(), ...(this.gotoWorld && !this.others.has(storyId(this.gotoWorld.to)) ? [this.gotoWorld.w] : [])];
+    const out = [...this.others.values()];
+    if (this.gotoWorld && !out.includes(this.gotoWorld.w)) out.push(this.gotoWorld.w);
+    return out;
   }
 
   /** 1 tick: 今の階を進め、区域の出し入れ・移る先の用意・入れ替え */

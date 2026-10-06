@@ -87,13 +87,22 @@ if (devTour) {
   p.innerHTML = '<b class="mono">G</b>次の仕掛けの入口へ移る（Shift+G で前へ）';
   ui.pause.help.append(p);
 }
-ui.pause.resumeLabel.textContent = '始める';
-ui.setPauseVisible(true);
+// メニューの「再開」。始めるときはメニューを出さない（読み込みの間は LOADING、終わったら電源が入って一人称の画面から。下の「遊び始める」）
 ui.pause.resume.addEventListener('click', () => {
   ui.setPauseVisible(false);
-  ui.pause.resumeLabel.textContent = '再開';
   void game.resume();
 });
+// 始めるまで入力を止める（トップページ・読み込みの間の操作がゲームに渡らないように。Pointer Lock が外れてもメニューを開かない）
+game.input.enabled = false;
+// 音はユーザー操作の中でしか鳴らし始められない: 最初の操作（トップページのボタン・クリック・タップ・キー）で解錠する
+const GESTURES = ['pointerdown', 'touchend', 'click', 'keydown'] as const;
+const firstGesture = (): void => {
+  game.audio.unlock();
+  for (const ev of GESTURES) removeEventListener(ev, firstGesture, true);
+};
+for (const ev of GESTURES) addEventListener(ev, firstGesture, true);
+// 電源が落ちる・入る演出（始める前の読み込み・タブレットの「探索」で部屋を移るとき）
+const power = new PowerFx(canvas, () => game.audio.sfxInput);
 
 /** 深さ depth（・版 variant）のフロアを作る（seed は世界の seed。見本は最初のフロアだけ） */
 let variant = Math.max(0, Number(params.get('variant') ?? 0) | 0);
@@ -227,7 +236,12 @@ async function roomNotFound(id: string): Promise<never> {
 let startId = worldMode ? params.get('id') : null;
 const startGiven = ['id', 'depth', 'variant', 'lab', 'showcase', 'try', 'group', 'shape', 'floor'].some((k) => params.has(k));
 if (worldMode && !startGiven) {
-  const choice = await showTopPage({ seed, randomRoom });
+  const choice = await showTopPage({
+    seed, randomRoom,
+    // 押した操作の中で音の解錠と Pointer Lock を取っておく（読み込みが終わったら、すぐ視点を動かして遊べる）
+    onChoose: () => { game.audio.unlock(); void game.input.requestLock(); },
+    onCancel: () => game.input.exitLock(),
+  });
   if (choice.kind === 'id') {
     startId = choice.id;
     history.replaceState(history.state, '', roomUrl(startId));
@@ -235,6 +249,8 @@ if (worldMode && !startGiven) {
   }
 }
 
+// 読み込みの間は真っ暗で LOADING（終わったら電源が入り、一人称の画面から始まる）
+power.dark(startId !== null ? `ROOM ${startId}` : useLab ? '' : `B${depth + 1}F`);
 const t0 = performance.now();
 if (worldMode) {
   const R = await loadRapier();
@@ -306,7 +322,6 @@ if (worldMode) {
   };
   roomCheck = async (id) => (await roomTarget(id)) !== null;
   // 番号の部屋へ移る: 電源が落ちる → 移る先を作る（LOADING）→ 電源が入って、その部屋の開口の内側に立つ
-  const power = new PowerFx(canvas, () => game.audio.sfxInput);
   roomWarp = async (id, onDark) => {
     if (moving) return false;
     const target = await roomTarget(id);
@@ -373,7 +388,21 @@ const tablet = new TabletController(game, {
   warp: (id, onDark) => roomWarp(id, onDark),
   maps,
 });
+// 遊び始める: メニューを出さずに、電源が入って一人称の画面から
+game.begin();
 game.start();
+void power.on().then(() => {
+  // Pointer Lock をまだ取れていない（アドレスから直接開いた・読み込みの間に Esc）: 最初のクリックで取る（InputController）。それまで案内を出す
+  const inp = game.input;
+  if (inp.mode !== 'pc' || !inp.useLock || inp.locked) return;
+  ui.setHint('クリックで視点を動かせます');
+  const locked = (): void => {
+    if (!document.pointerLockElement) return;
+    ui.setHint('');
+    document.removeEventListener('pointerlockchange', locked);
+  };
+  document.addEventListener('pointerlockchange', locked);
+});
 // REC の時刻（一時停止中は止める）
 let last = performance.now();
 const tickRec = (now: number): void => {

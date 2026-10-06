@@ -15,7 +15,7 @@ import { PhysicsWorld } from '../core/physics/world.ts';
 import '../core/sim/parts/index.ts';
 import { IDLE_COMMAND } from '../core/sim/types.ts';
 import { WorldSession } from '../core/stream/session.ts';
-import { syncSource } from '../core/stream/story.ts';
+import { syncSource, type StoryWorld } from '../core/stream/story.ts';
 
 const t = defaultTuning();
 
@@ -161,5 +161,34 @@ test('ルーム ID: 番号の部屋へ移る（タブレットの探索）: 別�
     assert.ok(p.onGround && Math.abs(p.pos[1] - L.cells[idx]!.floorY) < 0.3, `床に立つ（y=${p.pos[1].toFixed(2)}）`);
     assert.ok(saved.length > before, '捨てた階の区域を書き残した');
   }
+  s.active.sim.physics?.dispose();
+});
+
+test('ルーム ID: 移る先の階が、階段室の向こうに用意した階と同じでも、移る先は描く対象（beyondWorlds）に入り、移れる', async () => {
+  const R = await loadRapier();
+  const src = syncSource(t, { dress: dressCell });
+  const P = new WorldPlanner(t);
+  // クライアントの描画のまね: 今の階と、beyondWorlds に入っている階だけ描ける（入っていない階の描画は毎フレーム捨てる）
+  const drawn = new Set<StoryWorld>();
+  let s: WorldSession | null = null;
+  s = new WorldSession(5, 0, { tuning: t, source: src, physics: () => new PhysicsWorld(R, 1 / 60), ready: (w) => w === s?.active || drawn.has(w) });
+  const frame = (): void => { drawn.clear(); for (const w of s!.beyondWorlds()) drawn.add(w); };
+  // 下りの階段室のそば: 向こうの階 1.0 を用意させる
+  const air = s.active.regions.flatMap((r) => r.layout.region!.airlocks).find((a) => a.to === '1.0');
+  assert.ok(air, '下りの階段室');
+  s.active.sim.teleport(0, [air.anchor.offset[0], air.anchor.offset[1] + 0.2, air.anchor.offset[2]], 0);
+  for (let k = 0; k < 20; k++) { s.step([{ ...IDLE_COMMAND }]); frame(); }
+  assert.ok(s.otherStory('1.0'), '階段室の向こうの階 1.0 を用意した');
+  // 同じ階 1.0 の番号の部屋へ
+  const story = { world: 5, depth: 1, variant: 0 };
+  const plan = P.at(story, 1, -1);
+  const L = src.get(plan)!;
+  const idx = L.cells.findIndex((c) => isRoomCell(L, c) && c.role !== 'secret' && c.role !== 'connector');
+  assert.ok(s.prepareGotoRoom(story, plan, L.cells[idx]!.id), '用意できる');
+  assert.ok(s.gotoTarget && s.beyondWorlds().includes(s.gotoTarget), '移る先も描く対象');
+  let moved = false;
+  for (let k = 0; k < 5 && !moved; k++) { frame(); moved = s.commitGoto(); }
+  assert.ok(moved, '移れる');
+  assert.equal(s.storyId, '1.0');
   s.active.sim.physics?.dispose();
 });

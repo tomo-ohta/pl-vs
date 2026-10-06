@@ -302,6 +302,9 @@ export class ClientGame {
   private syncWorld(): void {
     const s = this.session;
     if (!s || !this.story) return;
+    // tick の外で移った（暗転して移る: タブレットの探索・穴・エレベーターの仕掛け。commitGoto）: 移った先の描画は、もう向こうの階に
+    // 数えられないので、下で捨てる前に入れ替える（入れ替えないと前の階の描画が残り、移った先は何も描かれず真っ暗になる）
+    for (const c of s.drainChanges()) this.swapStory(c);
     const budget = this.tuning['world.buildMs'] * (IS_MOBILE ? 0.6 : 1);
     const used = this.syncStory(this.story, budget);
     // 向こうの階: 作り始めた階に描画を付け、捨てた階の描画を捨てる。残りの時間で作る
@@ -345,6 +348,7 @@ export class ClientGame {
     prev.root.removeFromParent();
     this.scene.add(next.root);
     this.story = next;
+    const p = s.active.sim.players[0]!;
     if (c.seamless) {
       this.prevPos = [this.prevPos[0] + c.dx, this.prevPos[1] + c.dy, this.prevPos[2] + c.dz];
       this.yaw += c.dYaw;
@@ -352,7 +356,6 @@ export class ClientGame {
       this.prevCamYaw += c.dYaw;
     } else {
       // 暗転して移った: 視点をそのまま新しい所へ
-      const p = s.active.sim.players[0]!;
       this.prevPos = [...p.pos];
       this.yaw = p.yaw;
       this.pitch = 0;
@@ -361,8 +364,8 @@ export class ClientGame {
     this.flashlight?.reset();
     this.currentCell = null;
     this.enterCell(true);
-    // 照明の割り当ても、新しい階の同じ形の階段室の照明へすぐに（なめらかに替えると一瞬暗くなる）
-    const cam = new THREE.Vector3(this.camera.position.x + c.dx, this.camera.position.y + c.dy, this.camera.position.z + c.dz);
+    // 照明の割り当ても、新しい階の同じ形の階段室の照明へすぐに（なめらかに替えると一瞬暗くなる）。暗転して移ったときは着いた所の目の高さ
+    const cam = c.seamless ? new THREE.Vector3(this.camera.position.x + c.dx, this.camera.position.y + c.dy, this.camera.position.z + c.dz) : new THREE.Vector3(p.pos[0], p.pos[1] + p.eye, p.pos[2]);
     const cell = cellAt(next.built, [cam.x, cam.y - 1.5, cam.z]);
     this.lightsPool.snap(next.built, cam, this.lampLevel, cell ? new Set([cell.id]) : null);
     this.onStoryChange?.(c);
@@ -417,7 +420,18 @@ export class ClientGame {
     this.renderer.setAnimationLoop((now) => this.frame(now));
   }
 
-  /** 開始・再開（ユーザー操作の中で呼ぶ: 音の解錠と Pointer Lock） */
+  /**
+   * 遊び始める（読み込みの後。メニューを出さずに一人称の画面から）。音の解錠と Pointer Lock はユーザー操作の中でしか取れないので、
+   * 呼ぶ側がトップページのボタン・最初のクリックで別に取る
+   */
+  begin(): void {
+    // 読み込みの間に溜まった入力（視点の動き・押したキー）を捨てる
+    this.input.poll();
+    this.paused = false;
+    this.input.enabled = true;
+  }
+
+  /** 再開（ユーザー操作の中で呼ぶ: 音の解錠と Pointer Lock） */
   async resume(): Promise<void> {
     this.audio.unlock();
     this.paused = false;
@@ -460,7 +474,8 @@ export class ClientGame {
   }
 
   private frame(now: number): void {
-    const dt = Math.min(0.1, (now - this.last) / 1000);
+    // 0 未満にしない（start の直後の 1 コマ目は、rAF の時刻が start で覚えた時刻より前のことがある。負の dt だとしまったタブレットが一瞬出る）
+    const dt = Math.min(0.1, Math.max(0, (now - this.last) / 1000));
     this.last = now;
     this.syncWorld();
     const sim = this.sim;
