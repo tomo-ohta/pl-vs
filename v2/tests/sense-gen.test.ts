@@ -17,8 +17,11 @@ import { findSenseRooms, simOf, T } from './sense-util.ts';
 const IDS = [...new Set((CATALOG_BY_WS.sense ?? []).filter((e) => e.status === 'done').flatMap((e) => e.impl.filter((m) => m.kind === 'gimmick' || m.kind === 'anomaly').map((m) => m.id)))];
 const GIMMICKS = IDS.filter((id) => gimmickDef(id));
 const ANOMALIES = IDS.filter((id) => anomalyDef(id) && !gimmickDef(id));
-/** 生成の偶然で出にくい物（部屋の形の条件が厳しい）は、見本のフロアで置けることだけ確かめる */
-const RARE = new Set(['lightBands']);
+/**
+ * 生成の偶然で出にくい物（部屋の形の条件が厳しい）は、見本のフロアで置けることだけ確かめる。
+ * spotRide は 2400 フロアに 7 回ほど（2026-10-06。希少度を階によらなくしたら、900 フロアの中には出なくなった。出方の調整は段階 5）
+ */
+const RARE = new Set(['lightBands', 'spotRide']);
 
 test('担当 sense の仕掛け: ふつうのフロアに出る・歩く人が部屋を抜けられる', async () => {
   const found = findSenseRooms(GIMMICKS, 2, 900);

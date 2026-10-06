@@ -7,6 +7,7 @@
  * - 候補: 部屋・広間（入口・出口・隠し部屋を除く）のうち、仕掛けの無い区画（仕掛けは部屋の形を自分で作るので掛けない）・
  *   隠しの入口のある区画（暗がりの隠し。照明を外してある）でない区画・異変が中身を自分で埋める区画でない区画
  * - 異変の部屋: 中身を置く前の段（pre）の無い異変だけ（pre の取り消しで形が消えないように）。形の anomalies に書いた異変とだけ重ねる
+ *   （段階 4 で足した異変は、似た異変として扱う: ANOMALY_LIKE。床や壁を作り変える異変は重ねない）
  *   （浸水・軽い部屋・扉だらけのような pre のある異変の部屋には掛けない）
  * - 確率: 普通の部屋 rooms.chance.room / 広間 rooms.chance.hall / 異変の部屋 rooms.chance.anomaly。扉の無い入口は rooms.openMul 倍
  *   （扉を開けた瞬間の「こういう部屋か」を優先）。同じ形はフロアの中で rooms.repeatMul ずつ出にくい
@@ -40,7 +41,33 @@ export * from './types.ts';
 export interface PlacedShape { id: string; def: string; idea: string; name: string; cell: string }
 
 /** 調べる用: 形を組めなかったとき（形の id・区画・理由 build / reach / doors / floor / boxes / lights） */
-export const roomsDebug: { fail?: (def: string, cell: string, why: string) => void } = {};
+export const roomsDebug: {
+  fail?: (def: string, cell: string, why: string) => void;
+  /** 部屋ごとのくじ（試験・調整用）: 引いた確率・当たったか・置ける形の数・掛けた形（無ければ null） */
+  roll?: (cell: string, kind: string, chance: number, hit: boolean, pool: number, placed: string | null, info: { anomaly: string | null; w: number; d: number; h: number }) => void;
+} = {};
+
+/**
+ * 形の anomalies（重ねてよい異変）に無い異変を、似た異変として扱う（段階 4 で足した異変は、形を書いたときにはまだ無く、どの形にも
+ * 重ならなかった）。見た目・音・地図・時間だけの異変は「色の異変」、煙は「霧」、家具を動かす・足すだけの異変は「散乱」、
+ * 壁に物を掛ける異変は「時計だらけ」、家具の大きさを変える異変は「小さな家具」と同じ形に重ねてよい
+ * （家具を自分で置く形は散乱・小さな家具・時計を書いていないので、家具の要る異変は重ならない）。
+ * 床・壁・水を作り変える異変（草原・砂・雪・海・水の壁・雨漏り・欠ける・中が広い・物の海）・体を押す異変（風）・部屋ごと倒す異変（逆さま・横倒し）は重ねない
+ */
+const ANOMALY_LIKE: Readonly<Record<string, string>> = {
+  dayCycle: 'tint', lateSteps: 'tint', lightning: 'tint', mapErase: 'tint', missingColor: 'tint', mono: 'tint', rgbRoom: 'tint', slowTime: 'tint', thermal: 'tint',
+  smoke: 'fog',
+  aging: 'scatter', carryover: 'scatter', huddle: 'scatter', justLeft: 'scatter', stack: 'scatter', turningChairs: 'scatter',
+  nameplate: 'clocks', miscount: 'clocks',
+  oddScale: 'tiny',
+};
+
+/** 形 def に異変 an（post だけの異変）を重ねてよいか */
+export function shapeTakesAnomaly(def: RoomShapeDef, an: string): boolean {
+  const list = def.anomalies ?? [];
+  const like = ANOMALY_LIKE[an];
+  return list.includes(an) || (like !== undefined && list.includes(like));
+}
 
 /** 形の重み（調整表 rooms.w.<id> があればそちら） */
 export function shapeWeight(def: RoomShapeDef, t: Tuning): number {
@@ -235,7 +262,8 @@ export function shapeRooms(p: FloorProfile, geo: FloorGeometry, gimmicks: Gimmic
   // 異変が post で掛けられずに掛け替えるときも、形のある部屋では形と重ねてよい異変だけにする
   anomalies.allow = (cellId, defId) => {
     const shape = geo.cells.find((g) => g.cell.id === cellId)?.cell.shape;
-    return !shape || !!roomShapeDef(shape)?.anomalies?.includes(defId);
+    const def = shape ? roomShapeDef(shape) : undefined;
+    return !shape || (!!def && shapeTakesAnomaly(def, defId));
   };
 
   // フロアの形が作った区画（geo.reserved: 鏡写しの組など・geo.fixedSize: 大きさが見どころの区画）には掛けない
@@ -266,7 +294,7 @@ export function shapeRooms(p: FloorProfile, geo: FloorGeometry, gimmicks: Gimmic
       (!def.minRarity || rarityRank(p.rarity) >= rarityRank(def.minRarity)) &&
       (!def.frontOnly || p.key.variant === 0) &&
       (!def.water || p.family.id !== 'pool') &&
-      (!an || !!def.anomalies?.includes(an)) &&
+      (!an || shapeTakesAnomaly(def, an)) &&
       (!def.fits || def.fits(g, floor));
   };
 
@@ -350,13 +378,17 @@ export function shapeRooms(p: FloorProfile, geo: FloorGeometry, gimmicks: Gimmic
     const ent = entranceOf(g);
     let ch = an ? t['rooms.chance.anomaly'] : g.kind === 'hall' ? t['rooms.chance.hall'] : t['rooms.chance.room'];
     if (portalAt(geo, g.cell.id, ent)?.kind !== 'door') ch *= t['rooms.openMul'];
-    if (!r.chance(ch)) continue;
+    const info = (): { anomaly: string | null; w: number; d: number; h: number } => { const m = mainRect(g.cell); return { anomaly: an, w: m.x1 - m.x0, d: m.z1 - m.z0, h: g.cell.height }; };
+    if (!r.chance(ch)) { roomsDebug.roll?.(g.cell.id, g.kind, ch, false, 0, null, info()); continue; }
     const pool = defs.filter((d) => fitsCell(d, g, an));
+    const n0 = pool.length;
+    let placed: string | null = null;
     for (let k = 0; k < t['rooms.buildTries'] && pool.length; k++) {
       const def = r.weighted(pool, (d) => shapeWeight(d, t) * t['rooms.repeatMul'] ** count(d.id));
       pool.splice(pool.indexOf(def), 1);
-      if (tryBuild(def, g, an)) break;
+      if (tryBuild(def, g, an)) { placed = def.id; break; }
     }
+    roomsDebug.roll?.(g.cell.id, g.kind, ch, true, n0, placed, info());
   }
   return out;
 }

@@ -159,6 +159,11 @@ export class StoryWorld {
     for (const id of [...this.loaded.keys()]) if (!ids.has(id)) this.remove(id);
   }
 
+  /** 入っている区域を全部、外す直前と同じく書き残す（regionRemoving。置いた物の保存）。階を捨てる前に呼ぶ */
+  flush(): void {
+    for (const [id, r] of this.loaded) this.hooks.regionRemoving?.(this, id, r.layout);
+  }
+
   /** tick ごとに: 区域の出し入れ・境目の扉・階段室の入れ替えの頼み */
   update(): void {
     const t = this.t;

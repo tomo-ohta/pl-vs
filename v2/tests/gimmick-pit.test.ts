@@ -167,6 +167,19 @@ test('下の細い足場の隠し（crumble.fall・fall.below）: 足場に落�
     sim.teleport(0, [(w.min[0] + w.max[0]) / 2, cy + 1.2, (w.min[2] + w.max[2]) / 2], 0);
     for (let i = 0; i < 40; i++) sim.step([{ ...IDLE_COMMAND }]);
     if (Math.abs(sim.players[0]!.pos[1] - cy) > 0.05) { fails.push(`${sec.id}: 足場に乗れない（y=${sim.players[0]!.pos[1].toFixed(2)}）`); sim.physics?.dispose(); continue; }
+    // 足場に沿って歩く（L 字の足場では角を通る。歩く人はまっすぐ歩くので、角を切ると足場の外へ落ちる）
+    const mid = (b: (typeof walk)[number]): [number, number] => [(b.min[0] + b.max[0]) / 2, (b.min[2] + b.max[2]) / 2];
+    let along = true;
+    for (let i = 1; i < walk.length && along; i++) {
+      const [ax, az] = mid(walk[i - 1]!), [bx, bz] = mid(walk[i]!);
+      const b = walk[i]!;
+      const corner: [number, number] = b.max[0] - b.min[0] > b.max[2] - b.min[2] ? [ax, bz] : [bx, az];
+      for (const [x, z] of [corner, [bx, bz]] as const) {
+        const leg = walkTo(sim, room.cell.id, [x, cy, z], 20);
+        if (!leg.ok) { fails.push(`${room.floor.id} ${sec.id}: 足場の上を歩けない: ${leg.reason}`); along = false; break; }
+      }
+    }
+    if (!along) { sim.physics?.dispose(); continue; }
     const res = walkTo(sim, sec.cell, undefined, 60);
     if (!res.ok) fails.push(`${room.floor.id} ${sec.id}: ${res.reason}`);
     sim.physics?.dispose();

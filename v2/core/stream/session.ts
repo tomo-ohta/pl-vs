@@ -17,6 +17,8 @@ import type { PlayerState } from '../sim/types.ts';
 import type { FloorExit, RegionAirlockCell } from '../world/layout.ts';
 import { landingId, parseAirlockId, slotOf, START_SLOT, storyId, WorldPlanner, type RegionPlan, type StoryKey } from '../gen/world/plan.ts';
 import { StoryWorld, type RegionSource, type StoryOptions, type TransferRequest } from './story.ts';
+import { openSecretOf, spawnInCell } from './spawn.ts';
+import { IDLE_COMMAND } from '../sim/types.ts';
 
 export interface SessionOptions {
   tuning: Tuning;
@@ -31,6 +33,8 @@ export interface SessionOptions {
   /** 区域を入れた直後・外す直前（StoryOptions と同じ） */
   regionAdded?: StoryOptions['regionAdded'];
   regionRemoving?: StoryOptions['regionRemoving'];
+  /** 始める部屋（ルーム ID で飛んだとき。docs/endless-world.md 15 章）: 階・区域（同期で受け取れること）・区画の id。無ければ始まりの升目の階段室の上 */
+  start?: { story: StoryKey; plan: RegionPlan; cell: string };
 }
 
 export interface StoryChange {
@@ -89,14 +93,28 @@ export class WorldSession {
   private readonly others = new Map<string, StoryWorld>();
   private changes: StoryChange[] = [];
 
-  /** 深さ depth の階から始める（始まりの升目の、上から着く階段室の上の踊り場） */
+  /** 深さ depth の階から始める（始まりの升目の、上から着く階段室の上の踊り場）。opts.start があればその部屋の中から */
   constructor(world: number, depth: number, opts: SessionOptions) {
     this.opts = opts;
     this.t = opts.tuning;
     this.planner = new WorldPlanner(opts.tuning);
-    const story: StoryKey = { world, depth, variant: 0 };
-    this.active = new StoryWorld(story, this.planner.at(story, START_SLOT[0], START_SLOT[1]), this.storyOpts());
+    const st = opts.start;
+    const story: StoryKey = st ? st.story : { world, depth, variant: 0 };
+    this.active = new StoryWorld(story, st ? st.plan : this.planner.at(story, START_SLOT[0], START_SLOT[1]), this.storyOpts());
+    if (st) this.placeInRoom(this.active, st.plan.id, st.cell);
     opts.created?.(this.active);
+  }
+
+  /** プレイヤーを階 w の区域 regionId の区画 cellId の中へ出す（開口の内側の床の上。出現型の隠し場所なら入口を開ける） */
+  private placeInRoom(w: StoryWorld, regionId: string, cellId: string): void {
+    const L = w.regionLayout(regionId);
+    const c = L?.cells.find((x) => x.id === cellId);
+    if (!L || !c) return;
+    // 部品の当たり判定（床板・扉）は 1 tick 目に入る
+    w.sim.step([{ ...IDLE_COMMAND }]);
+    openSecretOf(w.sim, L, cellId);
+    const at = spawnInCell(w.sim, c, [...L.portals, ...w.portals]);
+    w.sim.teleport(0, at.pos, at.yaw);
   }
 
   private storyOpts(): ConstructorParameters<typeof StoryWorld>[2] {
@@ -118,9 +136,14 @@ export class WorldSession {
     return this.others.get(typeof to === 'string' ? to : storyId(to)) ?? null;
   }
 
-  /** 作ってある移る先の階（全部。暗転して移る先も） */
+  /**
+   * 作ってある移る先の階（全部。暗転して移る先も）。暗転して移る先は、同じ階が階段室の向こう（others）にあっても別に作った物なので、
+   * 必ず入れる（入れないと描画が作られず、commitGoto が待ち続けて移れない）
+   */
   beyondWorlds(): StoryWorld[] {
-    return [...this.others.values(), ...(this.gotoWorld && !this.others.has(storyId(this.gotoWorld.to)) ? [this.gotoWorld.w] : [])];
+    const out = [...this.others.values()];
+    if (this.gotoWorld && !out.includes(this.gotoWorld.w)) out.push(this.gotoWorld.w);
+    return out;
   }
 
   /** 1 tick: 今の階を進め、区域の出し入れ・移る先の用意・入れ替え */
@@ -290,14 +313,14 @@ export class WorldSession {
   }
 
   // ---------------------------------------------------------------- 暗転して移る（穴・エレベーターの仕掛け・縦穴・迷路フロアの別の出口）
-  private gotoWorld: { to: StoryKey; w: StoryWorld; land: { pos: Vec3; yaw: number } } | null = null;
+  private gotoWorld: { key: string; to: StoryKey; w: StoryWorld; land: { pos: Vec3; yaw: number } } | null = null;
 
   /**
    * 行き先の階 to の、点 (x, z) を持つ区域を作り始める（同期で作れなければ次に呼んだときにまた試す）。
    * 着く所は、その区域の部屋（隠し・階段室・別の空間を除く）のうち (x, z) にいちばん近い部屋の真ん中。作れたら true
    */
   prepareGoto(to: StoryKey, x: number, z: number): boolean {
-    if (this.gotoWorld && storyId(this.gotoWorld.to) === storyId(to)) return true;
+    if (this.gotoWorld && this.gotoWorld.key === storyId(to)) return true;
     const plan = this.planner.atPos(to, x, z);
     try {
       const w = new StoryWorld(to, plan, this.storyOpts());
@@ -314,7 +337,26 @@ export class WorldSession {
       const at = spots.find(([px, pz]) => clear(px, pz)) ?? [cx, cz];
       const land = { pos: [at[0], y + 0.4, at[1]] as Vec3, yaw: 0 };
       w.sim.teleport(0, land.pos, land.yaw);
-      this.gotoWorld = { to, w, land };
+      this.gotoWorld = { key: storyId(to), to, w, land };
+      this.opts.created?.(w);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * ルーム ID の部屋へ移る用意（タブレットの「探索」。docs/endless-world.md 15 章）: 階 to の区域 plan（同期で受け取れること）を作り、
+   * 区画 cellId の開口の内側に立たせる。作れたら true（commitGoto で移る。演出は呼ぶ側）
+   */
+  prepareGotoRoom(to: StoryKey, plan: RegionPlan, cellId: string): boolean {
+    const key = `${storyId(to)}#${plan.id}/${cellId}`;
+    if (this.gotoWorld?.key === key) return true;
+    try {
+      const w = new StoryWorld(to, plan, this.storyOpts());
+      this.placeInRoom(w, plan.id, cellId);
+      const p = w.sim.players[0]!;
+      this.gotoWorld = { key, to, w, land: { pos: [...p.pos] as Vec3, yaw: p.yaw } };
       this.opts.created?.(w);
       return true;
     } catch {
@@ -337,6 +379,9 @@ export class WorldSession {
     Object.assign(to, JSON.parse(JSON.stringify(from)) as PlayerState);
     to.pos = keepPos; to.vel = [0, 0, 0]; to.yaw = g.land.yaw; to.pitch = 0; to.holding = null; to.ride = null; to.surfaceId = null; to.interactedId = null; to.grav = null;
     to.respawn = { pos: [...keepPos], yaw: g.land.yaw }; to.lastGround = [...keepPos];
+    // 捨てる階の置いた物を書き残す
+    prev.flush();
+    for (const w of this.others.values()) if (w !== g.w) w.flush();
     prev.sim.physics?.dispose();
     for (const w of this.others.values()) if (w !== g.w) w.sim.physics?.dispose();
     this.others.clear();

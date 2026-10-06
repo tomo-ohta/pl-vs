@@ -91,6 +91,8 @@ export interface Skeleton {
   extraExits: { node: number; to: string }[];
   /** 鏡写し（列の真ん中で左右対称）。geometry.ts が左右で同じ大きさにする */
   mirror?: boolean;
+  /** 入口から出口へ行くのに必ず通る区画（F11 同心円の中心）。隠しの通り抜けは、ここを通らずに行き来できる 2 つの所をつながない */
+  mustPass?: number[];
   /** 天井裏の這う網の点検口のある部屋（geometry.ts / shapes/crawl.ts） */
   hatches?: number[];
   /** 骨組みの型が決めたもの: 出口・高さの段・広間（決めていれば後でいじらない） */

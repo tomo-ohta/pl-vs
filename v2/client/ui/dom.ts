@@ -28,6 +28,7 @@
  *   ui.toast('図鑑に記録: 傾く床');           // 数秒で消える知らせ
  */
 import type { InputUi } from '../input/InputController.ts';
+import { DEFAULT_KEYMAP, keyLabel, keysLabel, type KeyMap } from '../input/keymap.ts';
 
 export type PauseTab = 'map' | 'codex' | 'settings';
 export const PAUSE_TABS: readonly PauseTab[] = ['map', 'codex', 'settings'];
@@ -62,6 +63,8 @@ export interface UiRefs {
   readonly reticle: HTMLElement;
   /** 1 行の案内（書くときは setHint） */
   readonly hint: HTMLElement;
+  /** 画面の下の操作の案内（タブレットを持っている間。'' で消す） */
+  setDeviceHint(text: string): void;
   /** SettingsPanel の差し込み口（一時停止の画面の中。new SettingsPanel(settings, { slot: ui.settingsSlot })） */
   readonly settingsSlot: HTMLElement;
   readonly pause: PauseRefs;
@@ -103,11 +106,18 @@ const FLASH_SVG = '<svg class="ticon" viewBox="0 0 48 48" aria-hidden="true" fil
 /** 置く・投げる: 手と、手から離れる箱 */
 const DROP_SVG = '<svg class="ticon" viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="17" y="24" width="14" height="13" fill="currentColor" stroke="none"/><path d="M10 14q4-6 10-5h9q6 0 9 5" stroke-width="3.8"/><path d="M24 15v5M19 18l5 4 5-4" stroke-width="2.6"/><path d="M8 44h32" stroke-width="2" opacity=".6"/></svg>';
 
-/** 操作の案内（v1 の開始画面と同じ文言 + v2 の地図・懐中電灯・置く） */
-const HELP_LINES: [string, string][] = [
-  ['PC', 'WASD 移動 / マウス 視点 / Space ジャンプ / Shift ダッシュ / Ctrl または C しゃがみ / E 扉を開ける・調べる / Q 置く・投げる / R 懐中電灯 / M 地図 / Esc メニュー'],
-  ['スマホ', 'スワイプ 視点 / 左下スティック 移動 / 扉をタップ / 右下 ダッシュ・ジャンプ・しゃがむ（切替）・置く / 右上 メニュー・地図・懐中電灯'],
-];
+/** タブレット: 板の端末 */
+const TABLET_SVG = '<svg class="ticon" viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-linejoin="round"><rect x="6" y="11" width="36" height="26" rx="3.5" stroke-width="3.2"/><rect x="11" y="15.5" width="26" height="17" rx="1" fill="currentColor" stroke="none" opacity=".35"/><circle cx="24" cy="13.2" r=".9" fill="currentColor" stroke="none"/></svg>';
+
+/** 操作の案内（v1 の開始画面と同じ文言 + v2 の地図・懐中電灯・置く・タブレット）。PC のキーは割り当て（input/keymap.ts）から作る */
+function helpLines(m: Readonly<KeyMap> = DEFAULT_KEYMAP): [string, string][] {
+  const k = (a: Parameters<typeof keysLabel>[1]): string => keysLabel(m, a);
+  return [
+    ['PC', `${k('forward')}${k('left')}${k('back')}${k('right')} 移動 / マウス 視点 / ${k('jump')} ジャンプ / ${k('dash')} ダッシュ / ${m.crouch.map(keyLabel).reverse().join(' または ')} しゃがみ / ${k('interact')} 扉を開ける・調べる / ${k('drop')} 置く・投げる / ${k('flashlight')} 懐中電灯 / ${k('map')} 地図 / ${k('tablet')} タブレット / ${k('menu')} メニュー`],
+    ['スマホ', 'スワイプ 視点 / 左下スティック 移動 / 扉をタップ / 右下 ダッシュ・ジャンプ・しゃがむ（切替）・置く / 右上 メニュー・地図・懐中電灯・端末（タブレット）'],
+  ];
+}
+const HELP_LINES = helpLines();
 const TAB_LABEL: Record<PauseTab, string> = { map: '地図', codex: '図鑑', settings: '設定' };
 const FOOT_TEXT: Record<PauseTab, string> = {
   map: 'Esc 再開 ・ 1–3 タブ ・ ↑↓ 高さの層 ・ 見た所だけが地図に残る',
@@ -135,6 +145,8 @@ export function mountUi(root: HTMLElement): UiRefs {
   const hint = el('div', { id: 'hud-hint' });
   hint.setAttribute('role', 'status');
   hint.setAttribute('aria-live', 'polite');
+  const deviceHint = el('div', { id: 'hud-device', className: 'mono' });
+  deviceHint.setAttribute('aria-live', 'polite');
   const toastEl = el('div', { id: 'hud-toast' });
   toastEl.setAttribute('role', 'status');
   toastEl.setAttribute('aria-live', 'polite');
@@ -171,7 +183,8 @@ export function mountUi(root: HTMLElement): UiRefs {
   const mapBtn = button('btn-map', '地図', '地図', MAP_SVG);
   const flashlight = button('btn-flash', 'ライト', '懐中電灯（切替）', FLASH_SVG);
   const drop = button('btn-drop', '置く', '置く・投げる', DROP_SVG);
-  touchRoot.append(stick, crouch, jump, dash, drop, menu, mapBtn, flashlight);
+  const tabletBtn = button('btn-tablet', '端末', 'タブレット（出す・しまう）', TABLET_SVG);
+  touchRoot.append(stick, crouch, jump, dash, drop, menu, mapBtn, flashlight, tabletBtn);
 
   // ---- 一時停止の画面（v1 第21回のメニューの枠: 四隅の枠・❚❚ PAUSE・走査線・タブ）
   const pauseRoot = el('div', { id: 'pause' });
@@ -232,7 +245,7 @@ export function mountUi(root: HTMLElement): UiRefs {
   // 一時停止の画面の操作が視点入力へ漏れないように（v1 MenuUI と同じ）
   for (const ev of ['pointerdown', 'touchstart', 'touchmove'] as const) pauseRoot.addEventListener(ev, (e) => e.stopPropagation(), { passive: true, signal: listeners.signal });
 
-  layer.append(reticle, hint, toastEl, mapBox, recParent, touchRoot, pauseRoot);
+  layer.append(reticle, hint, deviceHint, toastEl, mapBox, recParent, touchRoot, pauseRoot);
   root.append(layer);
 
   let lastHint = '';
@@ -240,7 +253,7 @@ export function mountUi(root: HTMLElement): UiRefs {
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
   const refs: UiRefs = {
     layer,
-    input: { touchRoot, stick, knob, jump, dash, menu, crouch, map: mapBtn, flashlight, drop },
+    input: { touchRoot, stick, knob, jump, dash, menu, crouch, map: mapBtn, flashlight, drop, tablet: tabletBtn },
     recParent,
     reticle,
     hint,
@@ -252,6 +265,9 @@ export function mountUi(root: HTMLElement): UiRefs {
       if (text === lastHint) return;
       lastHint = text;
       hint.textContent = text;
+    },
+    setDeviceHint(text: string): void {
+      if (deviceHint.textContent !== text) deviceHint.textContent = text;
     },
     toast(text: string, ms = 3200): void {
       toastEl.textContent = text;

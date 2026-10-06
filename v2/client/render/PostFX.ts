@@ -6,6 +6,7 @@
  *   → GTAOPass（画面空間の遮蔽。Tier.postfx.gtaoScale の解像度で計算し、乗算合成）
  *   → UnrealBloomPass（閾値高め・弱い強度。発光箔だけが滲む）
  *   → LensPass（撮像プリセット off 以外。線形 HDR: レンズ歪み・色収差・軟焦点・かすみ・露出 / WB 追従など。client/render/LensPass.ts）
+ *   → ViewmodelPass（setOverlay で渡した手に持つ物の場面。持っている間だけ。client/render/ViewmodelPass.ts）
  *   → OutputPass（renderer.toneMapping + sRGB 変換を **ここで 1 回だけ**）
  *   → VideoPass（撮像プリセット off 以外。表示域: 色調整・色のにじみ・暗部ノイズ・走査線など。画面へ描く。client/render/VideoPass.ts）
  *
@@ -29,7 +30,8 @@ import { hideOverrideExcluded } from './OverridePassExclusion.ts';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { CopyShader } from 'three/addons/shaders/CopyShader.js';
-import { LensPass } from './LensPass.ts';
+import { LENS_PRESETS, LensPass } from './LensPass.ts';
+import { ViewmodelPass } from './ViewmodelPass.ts';
 import { VideoPass } from './VideoPass.ts';
 import type { FilmPreset } from './FilmPreset.ts';
 import { GradePass, RoomGradeState, type RoomGrade } from './RoomGrade.ts';
@@ -223,6 +225,11 @@ export class PostFX {
   videoPass: VideoPass | null = null;
   outputPass: OutputPass | null = null;
   private renderPass: RenderPass | null = null;
+  /** 手に持つ物（タブレット）の場面と、それを重ねる pass（composer を作り直しても入れ直す） */
+  private overlay: { scene: THREE.Scene; camera: THREE.Camera } | null = null;
+  private overlayPass: ViewmodelPass | null = null;
+  /** 手に持つ物を描くか（持っていない間は false: 費用 0） */
+  overlayVisible = false;
   config: PostFXConfig = { gtao: false, bloom: false, msaa: 0, gtaoScale: 0.5, film: 'off' };
   /** スクリーンショット用: 数値を入れるとノイズの種を固定する。null なら毎フレーム更新 */
   frozenSeed: number | null = null;
@@ -308,6 +315,7 @@ export class PostFX {
       composer.addPass(lens);
       this.lensPass = lens;
     }
+    this.addOverlayPass(composer);
     this.outputPass = new OutputPass();
     composer.addPass(this.outputPass);
     if (cfg.film !== 'off') {
@@ -356,8 +364,63 @@ export class PostFX {
       this.videoPass.update(dt, this.frame);
     }
     this.updateGrade(dt);
+    if (this.overlayPass) this.overlayPass.enabled = this.overlayVisible;
     if (this.composer) this.composer.render();
-    else this.renderer.render(this.scene, this.camera);
+    else {
+      this.renderer.render(this.scene, this.camera);
+      // 直接描画: 手に持つ物を深度を消してから上に描く
+      if (this.overlay && this.overlayVisible) {
+        const auto = this.renderer.autoClear;
+        this.renderer.autoClear = false;
+        this.renderer.clearDepth();
+        this.renderer.render(this.overlay.scene, this.overlay.camera);
+        this.renderer.autoClear = auto;
+      }
+    }
+  }
+
+  /** 手に持つ物の場面とカメラ（null で外す）。描くかは overlayVisible */
+  setOverlay(scene: THREE.Scene | null, camera: THREE.Camera | null): void {
+    if (this.overlayPass) { this.composer?.removePass(this.overlayPass); this.overlayPass.dispose(); this.overlayPass = null; }
+    this.overlay = scene && camera ? { scene, camera } : null;
+    if (this.composer && this.overlay) {
+      this.addOverlayPass(this.composer);
+      this.applySize();
+    }
+  }
+
+  /** composer の OutputPass の前（無ければ最後）に、手に持つ物の pass を入れる */
+  private addOverlayPass(composer: EffectComposer): void {
+    if (!this.overlay) return;
+    if (!this.overlayPass) this.overlayPass = new ViewmodelPass(this.overlay.scene, this.overlay.camera, this.config.msaa > 0 ? 4 : 0);
+    if (composer.passes.includes(this.overlayPass)) return;
+    const at = this.outputPass ? composer.passes.indexOf(this.outputPass) : -1;
+    composer.insertPass(this.overlayPass, at >= 0 ? at : composer.passes.length);
+  }
+
+  /** 露出の追従の今の倍率（LensPass。無ければ 1）。手に持つ物の照明に掛けて世界と明るさをそろえる */
+  get exposureGain(): number {
+    return this.lensPass?.exposureGain ?? 1;
+  }
+
+  /**
+   * 写真の 1 枚を描く（描いた直後に renderer の canvas から写すこと）。overlay: 手に持つ物を描くか・video: ビデオの効果（にじみ・走査線・
+   * ノイズ）を掛けるか・lens 'clean': レンズの癖（歪み・色収差・軟焦点・にじみ・フレア・ブラー）を外す（露出と WB の追従は残す）
+   */
+  renderCapture(o: { overlay?: boolean; video?: boolean; lens?: 'asIs' | 'clean' } = {}): void {
+    const vis = this.overlayVisible;
+    const video = this.videoPass?.enabled ?? false;
+    const lens = this.lensPass ? { ...this.lensPass.params } : null;
+    this.overlayVisible = o.overlay ?? false;
+    if (this.videoPass && o.video === false) this.videoPass.enabled = false;
+    if (this.lensPass && o.lens === 'clean') Object.assign(this.lensPass.params, LENS_PRESETS.clean, { autoExposure: lens!.autoExposure, autoWhiteBalance: lens!.autoWhiteBalance });
+    try {
+      this.render();
+    } finally {
+      this.overlayVisible = vis;
+      if (this.videoPass) this.videoPass.enabled = video;
+      if (this.lensPass && lens) Object.assign(this.lensPass.params, lens);
+    }
   }
 
   /**
@@ -420,6 +483,7 @@ export class PostFX {
       this.renderPass = new RenderPass(this.scene, this.camera);
       composer.addPass(this.renderPass);
       composer.addPass(gp);
+      this.addOverlayPass(composer);
       this.outputPass = new OutputPass();
       composer.addPass(this.outputPass);
       this.composer = composer;
@@ -442,6 +506,7 @@ export class PostFX {
   }
 
   private disposeComposer(): void {
+    if (this.overlayPass) { this.composer?.removePass(this.overlayPass); this.overlayPass.dispose(); this.overlayPass = null; }
     this.gtaoPass?.dispose();
     this.bloomPass?.dispose();
     this.lensPass?.dispose();

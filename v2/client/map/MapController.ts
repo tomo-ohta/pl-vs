@@ -19,7 +19,7 @@ import { CodexPanel, type CodexEntryDef } from '../ui/CodexPanel.ts';
 import { MapPanel } from '../ui/MapPanel.ts';
 import { Minimap } from '../ui/Minimap.ts';
 import { Codex } from './Codex.ts';
-import type { DrawInput } from './draw.ts';
+import { drawMap, type DrawInput } from './draw.ts';
 import { buildMapInfo, type MapInfo } from './MapInfo.ts';
 import { FloorMap, type MapEvent, type MapSave } from './MapModel.ts';
 import { MapStore } from './MapStore.ts';
@@ -292,6 +292,35 @@ export class MapController {
     const doorAngle = (id: string): number => sim.outputOf(id, 'angle');
     this.minimap.update(map, dt, { player, doorAngle, ...(this.story ? { scene: () => this.sceneFor({ player, doorAngle })! } : {}) });
     this.panel.update(dt);
+  }
+
+  /**
+   * 地図を好きな 2D の画面の (x, y, w, h) に描く（タブレットのマップ。メニューの地図と同じ絵）。view.zoom: 1 m の画素（null は全体に合わせる。
+   * 広すぎるときはプレイヤーのまわり）・view.pan: 中心（m。null はプレイヤー）。描いた倍率と中心（地図が無ければ null）
+   */
+  drawTo(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, view: { zoom: number | null; pan: [number, number] | null }, dpr = 2): { scale: number; center: [number, number] } | null {
+    const map = this.map;
+    if (!map) return null;
+    const sim = this.game.sim;
+    const p = sim?.players[0];
+    const player = p ? { x: p.pos[0], z: p.pos[2], yaw: p.yaw } : null;
+    const doorAngle = sim ? (id: string): number => sim.outputOf(id, 'angle') : undefined;
+    const scene = this.sceneFor({ player, ...(doorAngle ? { doorAngle } : {}) });
+    if (!scene) return null;
+    let center: [number, number] | null = scene.bounds ? null : player ? [player.x, player.z] : [0, 0];
+    let pxPerM = 14 * dpr;
+    if (view.zoom !== null) { center = view.pan ?? (player ? [player.x, player.z] : [0, 0]); pxPerM = view.zoom; }
+    else if (scene.bounds) {
+      const b = scene.bounds, pad = 24 * dpr;
+      const fit = Math.min((w - 2 * pad) / Math.max(4, b.x1 - b.x0), (h - 2 * pad) / Math.max(4, b.z1 - b.z0));
+      if (fit < 1.5 * dpr && player) { center = [player.x, player.z]; pxPerM = 1.5 * dpr; }
+    }
+    g.save();
+    g.translate(x, y);
+    const res = drawMap(g, scene, { width: w, height: h, center, pxPerM, rotation: map.rotation, style: 'panel', north: true, dpr, pad: 24 * dpr, time: map.time });
+    g.restore();
+    const b = scene.bounds;
+    return { scale: res.scale, center: center ?? (b ? [(b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2] : [0, 0]) };
   }
 
   /** メニューを地図のタブで開く */

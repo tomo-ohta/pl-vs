@@ -386,6 +386,11 @@ export class Sim implements PlayerWorld {
     return this.revealedGroups.has(group);
   }
 
+  /** 見え隠れの組を今すぐ現す（ルーム ID で出現型の隠し場所の中へ飛んだとき。core/stream/spawn.ts） */
+  revealNow(group: string): void {
+    this.revealGroup(group, 'start');
+  }
+
   /** 今いちばん近くで調べられる部品（画面の照準の表示用。操作はしない） */
   focusedInteractable(player = this.players[0]): string | null {
     return player ? this.pickInteractable(player, player.yaw, player.pitch) : null;

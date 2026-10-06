@@ -77,6 +77,9 @@ export class CameraRig {
   readonly feel: CameraFeelSettings = { handheld: 0.6, lag: true, preset: 'homeVideo' };
   /** true の間は揺れ・遅れを掛けない（乗車中など） */
   suppressed = false;
+  /** 拡大（1 = そのまま。タブレットのカメラのズーム。画角を tan(画角/2)/zoom にする） */
+  zoom = 1;
+  private zoomNow = 1;
   baseFov: number;
   /** 表示値（デバッグ用） */
   readonly out = { y: 0, roll: 0, yaw: 0, pitch: 0, fov: 0 };
@@ -185,9 +188,11 @@ export class CameraRig {
     else this.camera.rotation.set(o.pitch, o.yaw, o.roll, 'YXZ');
     this.applyGravity(dt, s, sup ? 0 : o.y);
     const f = sup ? 0 : o.fov;
-    if (f !== this.fovNow) {
+    if (f !== this.fovNow || this.zoom !== this.zoomNow) {
       this.fovNow = f;
-      this.camera.fov = this.baseFov + f;
+      this.zoomNow = this.zoom;
+      const base = this.baseFov + f;
+      this.camera.fov = this.zoom === 1 ? base : (2 * Math.atan(Math.tan((base * Math.PI) / 360) / Math.max(1, this.zoom)) * 180) / Math.PI;
       this.camera.updateProjectionMatrix();
     }
   }

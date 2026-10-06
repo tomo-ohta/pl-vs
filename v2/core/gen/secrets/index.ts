@@ -68,6 +68,8 @@ export interface SecretWorld {
   depth: number;
   /** 通り抜けの出口にしない区画（仕掛けのある区画など） */
   avoid?: ReadonlySet<string>;
+  /** 必ず通る区画を除いてつながる所ごとの番号（floor/gimmicks.ts の zonesAround）。通り抜けは番号の違う所どうしをつながない */
+  zone?: ReadonlyMap<string, number>;
   /** 隠し場所を置いてよい範囲（果てしない階の区域の矩形。無ければどこでも） */
   bound?: Rect;
 }
@@ -226,6 +228,9 @@ function exitFace(world: SecretWorld, g: GeoCell, n: 'x' | 'z', sg: number, near
   // 入口・出口の部屋は出口にしてよい（階段は除く）
   if (g.kind !== 'room' && g.kind !== 'hall' && g.kind !== 'corridor' && g.kind !== 'junction') return null;
   if (Math.abs(g.cell.floorY - y) > 0.01 || g.cell.height < DOOR_H + 0.2 || world.avoid?.has(g.cell.id)) return null;
+  // 必ず通る区画（同心円の中心）を避ける近道にしない
+  const zh = world.zone?.get(host), zg = world.zone?.get(g.cell.id);
+  if (zh !== undefined && zg !== undefined && zh !== zg) return null;
   // 当たった面: 区画の足跡の矩形のうち、横 at を含み、こちらを向いた面
   let coord: number | null = null;
   for (const r of g.cell.footprint) {
@@ -410,11 +415,11 @@ function planArea(world: SecretWorld, host: GeoCell, dest: SecretDest, rare: Rar
   return null;
 }
 
-/** 行き先が作れないときに試す順（小さい方へ） */
+/** 行き先が作れないときに試す順（小さい方へ。入口のすぐ先にレア部屋が収まらなければ、短い通路の先に置く: どちらもレア部屋） */
 const FALLBACK: Record<SecretDest, SecretDest[]> = {
   loop: ['loop', 'passageRare', 'rareRoom'],
   passageRare: ['passageRare', 'rareRoom'],
-  rareRoom: ['rareRoom'],
+  rareRoom: ['rareRoom', 'passageRare'],
   floorLink: ['floorLink'],
   bFloor: ['bFloor'],
 };

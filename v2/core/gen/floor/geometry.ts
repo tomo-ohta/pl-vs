@@ -83,6 +83,8 @@ export interface FloorGeometry {
    * 部屋の形（core/gen/rooms）と、天井を上げる異変（vast）が掛けない（段階 4 の統合で足した）
    */
   fixedSize?: Set<string>;
+  /** 入口から出口へ行くのに必ず通る区画（骨組みの mustPass）。隠しの通り抜けがこれを避ける近道を作らない（floor/gimmicks.ts） */
+  mustPass?: Set<string>;
   /** 中身を置いた後の仕上げ（index.ts が中身・異変の後に呼ぶ） */
   afterDress?: (env: AfterDressEnv) => void;
   /**
@@ -174,6 +176,7 @@ export class GeoBuild {
   readonly keepOut = new Map<string, AABB[]>();
   readonly reserved = new Set<string>();
   readonly fixedSize = new Set<string>();
+  readonly mustPass = new Set<string>();
   /** 区画を作った後に、区画 id で呼ぶ仕上げ（GeoCell を見る物） */
   readonly finishers: ((g: GeoBuild) => void)[] = [];
   readonly afterDress: ((env: AfterDressEnv) => void)[] = [];
@@ -329,6 +332,7 @@ export class GeoBuild {
     if (this.keepOut.size) this.out.keepOut = this.keepOut;
     if (this.reserved.size) this.out.reserved = this.reserved;
     if (this.fixedSize.size) this.out.fixedSize = this.fixedSize;
+    if (this.mustPass.size) this.out.mustPass = this.mustPass;
     if (this.afterDress.length) { const list = this.afterDress.slice(); this.out.afterDress = (env) => { for (const f of list) f(env); }; }
     return this.out;
   }
@@ -463,6 +467,7 @@ export function buildGeometry(p: FloorProfile, sk: Skeleton, rng: Rng, t: Tuning
       .sort((x, y) => x[0].row - y[0].row || x[0].col - y[0].col);
     for (const [n, m] of pairs.slice(0, t['structure.mirror.cleanPairs'])) { g.reserved.add(placed.get(n.id)!.cellId); g.reserved.add(placed.get(m!.id)!.cellId); }
   }
+  for (const id of sk.mustPass ?? []) { const pl = placed.get(id); if (pl) g.mustPass.add(pl.cellId); }
   // 上下に重なる型: 1 つの階の区画の天井は、上の階の床より下（区画が重ならない。階をまたぐ区画は除く）
   if (sk.stories > 1) {
     for (const pl of new Set(placed.values())) {

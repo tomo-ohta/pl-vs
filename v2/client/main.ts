@@ -12,6 +12,11 @@
  * - 開発用: window.game（ClientGame）。ペインが隠れて rAF が止まるときは game.stepOnce() で 1 tick ずつ進める
  * - 作り込む小物（client/props）: `?props=0` で箱のまま。`?dev=1` などの見本では P で 形の関数の物 ↔ 箱 を切り替える（見比べ）
  * - 果てしない階（docs/endless-world.md）: ふつうに遊ぶときは、階が無限の平面（区域を流し込む）。見本・実験場・?shape=・?floor=1 は今までのフロア
+ * - ルーム ID（docs/endless-world.md 15 章）: `?id=1234` でその部屋から始める（無い番号なら「通信エラー」→ トップページ）。
+ *   部屋を移るたびにアドレスとタブの名前を `?id=…`・`Room …` に書き換える。始める場所の指定（id・depth・variant・見本・実験場・型・?floor=1）が
+ *   無ければトップページ（仮。ルーム ID を入れる・ランダムな部屋・はじめから）
+ * - タブレット（client/tablet）: Tab（スマホは端末ボタン）で出す・しまう。カメラ・探索（番号の部屋へ移る。電源が落ちる演出）・
+ *   マップ・SNS（準備中）・ギャラリー・設定（メニュー）
  */
 import './ui/style.css';
 import { makeTuning, parseTuneParam, tuningVersion } from '../core/config/tuning.ts';
@@ -29,14 +34,20 @@ import { ClientGame } from './game/ClientGame.ts';
 import { IS_MOBILE } from './device.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
-import { START_SLOT, WorldPlanner } from '../core/gen/world/plan.ts';
-import { WorldSession } from '../core/stream/session.ts';
+import { START_SLOT, WorldPlanner, type StoryKey } from '../core/gen/world/plan.ts';
+import { cellIndexAt, decodeRoomId, isRoomCell, roomCellOk, roomIdOf } from '../core/gen/world/roomId.ts';
+import { WorldSession, type SessionOptions } from '../core/stream/session.ts';
 import { WorkerSource } from './world/WorkerSource.ts';
 import { restoreRegionCarry, saveRegionCarry, watchRegionCarry } from './game/carryStore.ts';
 import { codexDefs } from './map/codexDefs.ts';
 import { MapController } from './map/MapController.ts';
 import { mountUi } from './ui/dom.ts';
 import { RecOverlay } from './ui/RecOverlay.ts';
+import { showConnectionError } from './ui/ConnectionError.ts';
+import { showTopPage } from './ui/TopPage.ts';
+import { RoomAddress, roomTitle, roomUrl, topUrl } from './game/roomAddress.ts';
+import { TabletController, type TabletHooks } from './tablet/TabletController.ts';
+import { PowerFx } from './ui/PowerFx.ts';
 import { SettingsPanel } from './ui/SettingsPanel.ts';
 
 const params = new URLSearchParams(location.search);
@@ -77,13 +88,22 @@ if (devTour) {
   p.innerHTML = '<b class="mono">G</b>次の仕掛けの入口へ移る（Shift+G で前へ）';
   ui.pause.help.append(p);
 }
-ui.pause.resumeLabel.textContent = '始める';
-ui.setPauseVisible(true);
+// メニューの「再開」。始めるときはメニューを出さない（読み込みの間は LOADING、終わったら電源が入って一人称の画面から。下の「遊び始める」）
 ui.pause.resume.addEventListener('click', () => {
   ui.setPauseVisible(false);
-  ui.pause.resumeLabel.textContent = '再開';
   void game.resume();
 });
+// 始めるまで入力を止める（トップページ・読み込みの間の操作がゲームに渡らないように。Pointer Lock が外れてもメニューを開かない）
+game.input.enabled = false;
+// 音はユーザー操作の中でしか鳴らし始められない: 最初の操作（トップページのボタン・クリック・タップ・キー）で解錠する
+const GESTURES = ['pointerdown', 'touchend', 'click', 'keydown'] as const;
+const firstGesture = (): void => {
+  game.audio.unlock();
+  for (const ev of GESTURES) removeEventListener(ev, firstGesture, true);
+};
+for (const ev of GESTURES) addEventListener(ev, firstGesture, true);
+// 電源が落ちる・入る演出（始める前の読み込み・タブレットの「探索」で部屋を移るとき）
+const power = new PowerFx(canvas, () => game.audio.sfxInput);
 
 /** 深さ depth（・版 variant）のフロアを作る（seed は世界の seed。見本は最初のフロアだけ） */
 let variant = Math.max(0, Number(params.get('variant') ?? 0) | 0);
@@ -190,20 +210,84 @@ game.onFloorExit = (_exit, _kind, to): void => {
   })();
 };
 
-const t0 = performance.now();
 // 果てしない階（ふつうに遊ぶとき）。見本・実験場・型を決めて作る・?floor=1 は今までのフロア
 const worldMode = !useLab && !showcase && !tryIds.length && !shapeParam && !params.has('floor');
+/** 今いる部屋のルーム ID（果てしない階。番号の無い所に入っても前の部屋のまま） */
+let currentRoomId: number | null = null;
+/** タブレットの「探索」: 番号の部屋があるか・その部屋へ移る（果てしない階で入れる） */
+let roomCheck: TabletHooks['checkRoom'] = async () => false;
+let roomWarp: TabletHooks['warp'] = async () => false;
+const worldSource = worldMode ? new WorkerSource(tuning, { dress: !params.has('nodress') }) : null;
+const planner = new WorldPlanner(tuning);
+
+/** ランダムな部屋の番号（深さ 0〜9 の表の階・出発点から 6 升目までの区域の、隠し場所でない部屋。区域を作って選ぶ） */
+async function randomRoom(): Promise<number | null> {
+  for (let i = 0; i < 6; i++) {
+    const story: StoryKey = { world: seed, depth: Math.floor(Math.random() * 10), variant: 0 };
+    const plan = planner.at(story, Math.floor(Math.random() * 13) - 6, Math.floor(Math.random() * 13) - 6);
+    const L = await worldSource!.prefetch(plan);
+    if (!L) continue;
+    const secret = new Set((L.region?.contents?.secrets ?? []).flatMap((x) => x.cells));
+    const ok = L.cells.map((c, k) => ({ c, k })).filter(({ c }) => isRoomCell(L, c) && c.role !== 'secret' && !secret.has(c.id));
+    if (!ok.length) continue;
+    const id = roomIdOf(seed, L, story, ok[Math.floor(Math.random() * ok.length)]!.k);
+    if (id !== null) return id;
+  }
+  return null;
+}
+
+/** 無い部屋: 「通信エラー」を出してトップページへ（このページはここで止める） */
+async function roomNotFound(id: string): Promise<never> {
+  ui.setPauseVisible(false);
+  await showConnectionError(id);
+  location.replace(topUrl());
+  return new Promise<never>(() => {});
+}
+
+// 始める場所の指定が無ければトップページ
+let startId = worldMode ? params.get('id') : null;
+const startGiven = ['id', 'depth', 'variant', 'lab', 'showcase', 'try', 'group', 'shape', 'floor'].some((k) => params.has(k));
+if (worldMode && !startGiven) {
+  const choice = await showTopPage({
+    seed, randomRoom,
+    // 押した操作の中で音の解錠と Pointer Lock を取っておく（読み込みが終わったら、すぐ視点を動かして遊べる）
+    onChoose: () => { game.audio.unlock(); void game.input.requestLock(); },
+    onCancel: () => game.input.exitLock(),
+  });
+  if (choice.kind === 'id') {
+    startId = choice.id;
+    history.replaceState(history.state, '', roomUrl(startId));
+    document.title = roomTitle(startId);
+  }
+}
+
+// 読み込みの間は真っ暗で LOADING（終わったら電源が入り、一人称の画面から始まる）
+power.dark(startId !== null ? `ROOM ${startId}` : useLab ? '' : `B${depth + 1}F`);
+const t0 = performance.now();
 if (worldMode) {
   const R = await loadRapier();
-  const source = new WorkerSource(tuning, { dress: !params.has('nodress') });
-  const planner = new WorldPlanner(tuning);
-  const story = { world: seed, depth, variant: 0 };
-  const [sx, sz] = START_SLOT;
-  await source.prefetch(planner.at(story, sx, sz));
+  const source = worldSource!;
+  // ルーム ID の部屋から: 番号 → 部屋の場所 → 区域を作って、その区画があるか確かめる
+  let start: SessionOptions['start'];
+  if (startId !== null) {
+    const ref = decodeRoomId(seed, startId);
+    if (!ref) await roomNotFound(startId);
+    const st: StoryKey = { world: seed, depth: ref!.depth, variant: ref!.variant };
+    const plan = planner.at(st, ref!.cx, ref!.cz);
+    const L = await source.prefetch(plan);
+    if (!L || !roomCellOk(L, ref!)) await roomNotFound(startId);
+    start = { story: st, plan, cell: L!.cells[ref!.cell]!.id };
+    depth = st.depth;
+    variant = st.variant;
+    document.title = roomTitle(startId);
+  } else {
+    const [sx, sz] = START_SLOT;
+    await source.prefetch(planner.at({ world: seed, depth, variant: 0 }, sx, sz));
+  }
   // 置いた物が残る（I09）: 区域ごとに保存する（区域を入れた直後に戻し、外す直前と置くたびに書く）
   const carryKey = (story: { depth: number; variant: number }, rid: string): string => `${seed}:${story.depth}.${story.variant}:${rid}:${tuningVersion(tuning)}`;
   const session = new WorldSession(seed, depth, {
-    tuning, source, physics: () => new PhysicsWorld(R, 1 / tuning['physics.tickHz']), ready: (w, id) => game.regionReady(w, id),
+    tuning, source, physics: () => new PhysicsWorld(R, 1 / tuning['physics.tickHz']), ready: (w, id) => game.regionReady(w, id), ...(start ? { start } : {}),
     regionAdded: (w, id, L) => restoreRegionCarry(w.sim, L, carryKey(w.story, id)),
     regionRemoving: (w, id, L) => saveRegionCarry(w.sim, L, carryKey(w.story, id)),
   });
@@ -226,8 +310,58 @@ if (worldMode) {
     maps.setRegion(L, null, { world: seed, depth, variant, region: plan.id, name: L.region?.name ?? '' });
   };
   syncRegion();
+  // ルーム ID: 番号の違う部屋に入ったら、アドレスとタブの名前を書き換える（階段室・エレベーターのかご・別の空間は番号なし: そのまま）
+  const address = new RoomAddress({ current: startId !== null ? Number(startId) : null });
+  const syncRoom = (): void => {
+    const sim = game.sim, s = game.session;
+    if (!sim || !s) return;
+    const p = sim.players[0]!;
+    const plan = s.active.planAt(p.pos[0], p.pos[2]);
+    const L = s.active.regionLayout(plan.id);
+    if (!L) return;
+    const id = roomIdOf(seed, L, s.active.story, cellIndexAt(L, p.pos));
+    if (id !== null) { address.set(id); currentRoomId = id; }
+  };
+  if (startId !== null) currentRoomId = Number(startId);
+  // タブレットの「探索」: 番号 → 部屋の場所 → 区域を作って区画があるか
+  const roomTarget = async (id: number): Promise<{ story: StoryKey; plan: ReturnType<WorldPlanner['at']>; cell: string } | null> => {
+    const ref = decodeRoomId(seed, id);
+    if (!ref) return null;
+    const st: StoryKey = { world: seed, depth: ref.depth, variant: ref.variant };
+    const plan = planner.at(st, ref.cx, ref.cz);
+    const L = await source.prefetch(plan);
+    return L && roomCellOk(L, ref) ? { story: st, plan, cell: L.cells[ref.cell]!.id } : null;
+  };
+  roomCheck = async (id) => (await roomTarget(id)) !== null;
+  // 番号の部屋へ移る: 電源が落ちる → 移る先を作る（LOADING）→ 電源が入って、その部屋の開口の内側に立つ
+  roomWarp = async (id, onDark) => {
+    if (moving) return false;
+    const target = await roomTarget(id);
+    if (!target || moving) return false;
+    moving = true;
+    game.input.enabled = false;
+    let ok = false;
+    try {
+      const t1 = performance.now();
+      await power.off(`ROOM ${id}`);
+      onDark();
+      const s = game.session!;
+      for (let i = 0; i < 200 && !(ok = s.prepareGotoRoom(target.story, target.plan, target.cell)); i++) await sleep(50);
+      if (ok) { ok = false; for (let i = 0; i < 600 && !(ok = s.commitGoto()); i++) await sleep(30); }
+      // LOADING を少しは見せる
+      const rest = 1500 - (performance.now() - t1);
+      if (rest > 0) await sleep(rest);
+      if (ok) currentRoomId = id;
+      console.info(`[探索] ROOM ${id} へ${ok ? '' : '移れず'} ${(performance.now() - t1).toFixed(0)} ms`);
+      await power.on();
+    } finally {
+      game.input.enabled = !game.paused;
+      moving = false;
+    }
+    return ok;
+  };
   const frame0 = game.onFrame;
-  game.onFrame = (input, dt) => { syncRegion(); frame0?.(input, dt); };
+  game.onFrame = (input, dt) => { syncRegion(); syncRoom(); frame0?.(input, dt); };
   game.onStoryChange = (c) => console.info(`[階] B${c.from.depth + 1}F → B${c.to.depth + 1}F（${c.seamless ? `階段室 ${c.airlock}` : '暗転'}）`);
   // 階段室でない出口（隠しの穴・縦穴・エレベーターの仕掛け・迷路フロアの別の出口）: 暗転して、行き先の階の同じ位置に近い部屋へ
   game.onFloorExit = (_exit, kind, to): void => {
@@ -256,7 +390,31 @@ if (worldMode) {
   if (game.sim) maps.setFloor(game.sim.floor, lastReport, { world: seed, depth, variant });
 }
 console.info(`[floor] 読み込み ${(performance.now() - t0).toFixed(0)} ms`);
+// タブレット（Tab / 端末ボタン）
+const tablet = new TabletController(game, {
+  seed,
+  roomId: () => currentRoomId,
+  placeLabel: () => `B${depth + 1}F${variant ? ' 裏' : ''}`,
+  roomsAvailable: () => !!game.session,
+  checkRoom: (id) => roomCheck(id),
+  warp: (id, onDark) => roomWarp(id, onDark),
+  maps,
+});
+// 遊び始める: メニューを出さずに、電源が入って一人称の画面から
+game.begin();
 game.start();
+void power.on().then(() => {
+  // Pointer Lock をまだ取れていない（アドレスから直接開いた・読み込みの間に Esc）: 最初のクリックで取る（InputController）。それまで案内を出す
+  const inp = game.input;
+  if (inp.mode !== 'pc' || !inp.useLock || inp.locked) return;
+  ui.setHint('クリックで視点を動かせます');
+  const locked = (): void => {
+    if (!document.pointerLockElement) return;
+    ui.setHint('');
+    document.removeEventListener('pointerlockchange', locked);
+  };
+  document.addEventListener('pointerlockchange', locked);
+});
 // REC の時刻（一時停止中は止める）
 let last = performance.now();
 const tickRec = (now: number): void => {
@@ -268,5 +426,6 @@ const tickRec = (now: number): void => {
 requestAnimationFrame(tickRec);
 
 (window as unknown as { game: ClientGame }).game = game;
+(window as unknown as { tablet: TabletController }).tablet = tablet;
 // 開発用: 地図と図鑑（window.maps.map が自分の地図）
 (window as unknown as { maps: MapController }).maps = maps;

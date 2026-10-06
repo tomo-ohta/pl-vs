@@ -6,6 +6,8 @@
  * - 部屋の種類: 広い部屋は広間（天井が高い）、細長い所は通路、ほかは部屋。小部屋から 40 m の広間まで
  * - 通路: まっすぐ・L 字・T 字・十字（world.patch.corridorMaxM より長い矩形は先に切り分ける。端から端までの長い通路ばかりにしない）
  * - 部屋ごとの系統は、壁を接する部屋と違う物を引く。暗い・まぶしい・天井の高い・低い部屋もある
+ * - 空き: 中くらいの部屋のいくつか（world.patch.voidShare）を部屋にせず空けておく（壁の向こうの見えない所。隠し場所を置く。
+ *   埋め尽くすと隠しがほとんど付かなかった）
  * - つなぎ: 壁を接する部屋どうしの木（入口から全部へ行ける）+ 確率で足す扉 + 行き止まりの部屋に足す扉。開口は同じ系統の部屋どうしだけ
  * - 境目の扉: 区域の辺の上の部屋の壁に直接（廊下を挟まない）
  * - 階段室: 部屋の角を切り取って置く（残りは L 字の部屋）。扉は残りの部屋へ
@@ -178,6 +180,49 @@ export function buildPatchwork(p: FloorProfile, rng: Rng, t: Tuning): FloorGeome
     }
     throw new GenError(`寄せ集めに階段室を置けません: ${a.id}`);
   });
+
+  // ---------------------------------------------------------------- 空き（隠し場所を置く所）
+  // 区域を部屋で埋め尽くすと、隠し場所（レア部屋・隠し通路）を置く空きが壁の向こうに無く、隠しがほとんど付かない。
+  // 中くらいの部屋のいくつかを部屋にせず空けておく（壁の向こうの見えない所。街区の部屋の間の空きと同じ）。
+  // 通路・広間・階段室を切り取った部屋・境目の扉の部屋は空けない。空けても残りの部屋が扉でつながること
+  const voidOk = (lf: Leaf): boolean => {
+    if (lf.module || lf.kind !== 'room' || lf.rects.length !== 1 || carved.some((c) => c.leaf === lf)) return false;
+    const r = lf.rects[0]!;
+    const s = Math.min(r.x1 - r.x0, r.z1 - r.z0), l = Math.max(r.x1 - r.x0, r.z1 - r.z0);
+    if (s < t['world.patch.voidMinM'] || l > t['world.patch.voidMaxM']) return false;
+    // 境目の扉の部屋（区域の辺の上で、扉の位置を含む）
+    return !reg.gates.some((gt) => {
+      const on = gt.side === 0 ? Math.abs(r.z1 - gt.line) < 0.01 : gt.side === 2 ? Math.abs(r.z0 - gt.line) < 0.01 : gt.side === 1 ? Math.abs(r.x1 - gt.line) < 0.01 : Math.abs(r.x0 - gt.line) < 0.01;
+      const [lo, hi] = gt.side % 2 === 0 ? [r.x0, r.x1] : [r.z0, r.z1];
+      return on && gt.at > lo - gateClear && gt.at < hi + gateClear;
+    });
+  };
+  // 扉を付けられる長さで壁を接するか（下の「つなぎ」と同じ決まり）
+  const doorable = (A: Leaf, B: Leaf): boolean => A.rects.some((ra) => B.rects.some((rb) => {
+    const len = Math.abs(ra.x1 - rb.x0) < 0.01 || Math.abs(ra.x0 - rb.x1) < 0.01 ? Math.min(ra.z1, rb.z1) - Math.max(ra.z0, rb.z0)
+      : Math.abs(ra.z1 - rb.z0) < 0.01 || Math.abs(ra.z0 - rb.z1) < 0.01 ? Math.min(ra.x1, rb.x1) - Math.max(ra.x0, rb.x0) : 0;
+    return len >= DOOR_W + 1.8 || (len >= DOOR_W + 0.6 && (A.kind === 'corridor' || B.kind === 'corridor'));
+  }));
+  const connected = (ls: Leaf[]): boolean => {
+    if (!ls.length) return true;
+    const seen = new Set<Leaf>([ls[0]!]);
+    const stack = [ls[0]!];
+    while (stack.length) {
+      const a = stack.pop()!;
+      for (const b of ls) if (!seen.has(b) && doorable(a, b)) { seen.add(b); stack.push(b); }
+    }
+    return seen.size === ls.length;
+  };
+  const vr = rng.fork('voids');
+  const roomLeaves = leaves.filter((lf) => !lf.module && lf.kind === 'room').length;
+  let voids = Math.round(roomLeaves * t['world.patch.voidShare']);
+  for (const lf of vr.shuffle(leaves.filter(voidOk))) {
+    if (voids <= 0) break;
+    const rest = leaves.filter((x) => x !== lf && !x.module);
+    if (!connected(rest)) continue;
+    leaves.splice(leaves.indexOf(lf), 1);
+    voids--;
+  }
 
   // ---------------------------------------------------------------- 部屋（区画）を決める
   const fr = rng.fork('themes');

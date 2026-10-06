@@ -51,13 +51,14 @@ test('型が違う・範囲外・知らない選択肢は丸める（sanitize）
   const mem = new MemoryStorage();
   mem.setItem(SETTINGS_KEY, JSON.stringify({
     masterVolume: 3, ambientVolume: -1, sfxVolume: 'loud', lookSensitivity: 10, tier: 'ultra', postfx: 'archival',
-    handheld: NaN, cameraLag: 'yes', recOverlay: 0, frameHold: '60', vhsStrength: 5, toneMapping: 'reinhard', playerName: 42,
+    handheld: NaN, cameraLag: 'yes', recOverlay: 0, frameHold: '60', vhsStrength: 5, toneMapping: 'reinhard', playerName: 42, photoLook: 'sepia',
   }));
   const s = Settings.load(mem);
   assert.deepEqual(s.data, {
     masterVolume: 1, ambientVolume: 0, sfxVolume: 1, lookSensitivity: 3, tier: 'auto', postfx: 'tape',
-    handheld: 0.6, cameraLag: true, recOverlay: true, frameHold: 'off', vhsStrength: 2, toneMapping: 'agx', playerName: '',
+    handheld: 0.6, cameraLag: true, recOverlay: true, frameHold: 'off', vhsStrength: 2, toneMapping: 'agx', playerName: '', photoLook: 'clean',
   });
+  assert.equal(sanitize({ ...DEFAULT_SETTINGS, photoLook: 'video' }).photoLook, 'video');
   // 名前: 制御文字を除き、前後の空白を落として 12 文字まで
   assert.equal(sanitize({ ...DEFAULT_SETTINGS, playerName: '  たな\nか　一二三四五六七八九十  ' }).playerName, 'たなか　一二三四五六七八');
   // 下限側

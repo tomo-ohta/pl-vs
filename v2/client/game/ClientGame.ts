@@ -33,7 +33,7 @@ import type { UiRefs } from '../ui/dom.ts';
 import { PlayerFlashlight } from '../render/PlayerFlashlight.ts';
 import type { ViewContext } from '../views/index.ts';
 import { PortalRenderer } from '../world/Portals.ts';
-import { applyLampLevels, cellAt, FloorBuilder, type BuiltFloor } from '../world/FloorBuilder.ts';
+import { applyLampLevels, cellAt, FloorBuilder, sampleCellLight, type BuiltFloor } from '../world/FloorBuilder.ts';
 import { PropManager } from '../props/PropManager.ts';
 import { LightManager } from '../world/LightManager.ts';
 import { restoreCarry, watchCarry } from './carryStore.ts';
@@ -46,6 +46,16 @@ const TONE_MAPPINGS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMap
 /** 縦穴の中の霧の色 */
 const BLACK = new THREE.Color(0, 0, 0);
 const ENV_LERP_SEC = 0.8;
+
+/**
+ * 手に持つ物（タブレット。client/tablet/TabletController.ts）: ゲームの毎フレームに入る所。
+ * input は遊んでいる間だけ呼ぶ（持っている間の入力に直して返す: 指のカーソル・クリック・ダッシュやジャンプを止める など）。
+ * update は描く前に毎フレーム（止まっている間は dt = 0）
+ */
+export interface HeldDevice {
+  input(input: InputState, dt: number): InputState;
+  update(dt: number): void;
+}
 
 export interface GameOptions {
   canvas: HTMLCanvasElement;
@@ -91,6 +101,8 @@ export class ClientGame {
   onFloorExit: ((exitId: string, kind: string, to: string | null) => void) | null = null;
   /** 毎フレーム（入力を読んでシミュレーションを進めた後・描く前）。地図（client/map/MapController）が使う */
   onFrame: ((input: InputState, dt: number) => void) | null = null;
+  /** 手に持つ物（タブレット）。無ければ null */
+  device: HeldDevice | null = null;
 
   private readonly hemi = new THREE.HemisphereLight(0xe5e4d5, 0x6c665a, 0.1);
   private lightsPool: LightManager;
@@ -299,6 +311,9 @@ export class ClientGame {
   private syncWorld(): void {
     const s = this.session;
     if (!s || !this.story) return;
+    // tick の外で移った（暗転して移る: タブレットの探索・穴・エレベーターの仕掛け。commitGoto）: 移った先の描画は、もう向こうの階に
+    // 数えられないので、下で捨てる前に入れ替える（入れ替えないと前の階の描画が残り、移った先は何も描かれず真っ暗になる）
+    for (const c of s.drainChanges()) this.swapStory(c);
     const budget = this.tuning['world.buildMs'] * (IS_MOBILE ? 0.6 : 1);
     const used = this.syncStory(this.story, budget);
     // 向こうの階: 作り始めた階に描画を付け、捨てた階の描画を捨てる。残りの時間で作る
@@ -342,6 +357,7 @@ export class ClientGame {
     prev.root.removeFromParent();
     this.scene.add(next.root);
     this.story = next;
+    const p = s.active.sim.players[0]!;
     if (c.seamless) {
       this.prevPos = [this.prevPos[0] + c.dx, this.prevPos[1] + c.dy, this.prevPos[2] + c.dz];
       this.yaw += c.dYaw;
@@ -349,7 +365,6 @@ export class ClientGame {
       this.prevCamYaw += c.dYaw;
     } else {
       // 暗転して移った: 視点をそのまま新しい所へ
-      const p = s.active.sim.players[0]!;
       this.prevPos = [...p.pos];
       this.yaw = p.yaw;
       this.pitch = 0;
@@ -358,8 +373,8 @@ export class ClientGame {
     this.flashlight?.reset();
     this.currentCell = null;
     this.enterCell(true);
-    // 照明の割り当ても、新しい階の同じ形の階段室の照明へすぐに（なめらかに替えると一瞬暗くなる）
-    const cam = new THREE.Vector3(this.camera.position.x + c.dx, this.camera.position.y + c.dy, this.camera.position.z + c.dz);
+    // 照明の割り当ても、新しい階の同じ形の階段室の照明へすぐに（なめらかに替えると一瞬暗くなる）。暗転して移ったときは着いた所の目の高さ
+    const cam = c.seamless ? new THREE.Vector3(this.camera.position.x + c.dx, this.camera.position.y + c.dy, this.camera.position.z + c.dz) : new THREE.Vector3(p.pos[0], p.pos[1] + p.eye, p.pos[2]);
     const cell = cellAt(next.built, [cam.x, cam.y - 1.5, cam.z]);
     this.lightsPool.snap(next.built, cam, this.lampLevel, cell ? new Set([cell.id]) : null);
     this.onStoryChange?.(c);
@@ -414,7 +429,18 @@ export class ClientGame {
     this.renderer.setAnimationLoop((now) => this.frame(now));
   }
 
-  /** 開始・再開（ユーザー操作の中で呼ぶ: 音の解錠と Pointer Lock） */
+  /**
+   * 遊び始める（読み込みの後。メニューを出さずに一人称の画面から）。音の解錠と Pointer Lock はユーザー操作の中でしか取れないので、
+   * 呼ぶ側がトップページのボタン・最初のクリックで別に取る
+   */
+  begin(): void {
+    // 読み込みの間に溜まった入力（視点の動き・押したキー）を捨てる
+    this.input.poll();
+    this.paused = false;
+    this.input.enabled = true;
+  }
+
+  /** 再開（ユーザー操作の中で呼ぶ: 音の解錠と Pointer Lock） */
   async resume(): Promise<void> {
     this.audio.unlock();
     this.paused = false;
@@ -457,11 +483,14 @@ export class ClientGame {
   }
 
   private frame(now: number): void {
-    const dt = Math.min(0.1, (now - this.last) / 1000);
+    // 0 未満にしない（start の直後の 1 コマ目は、rAF の時刻が start で覚えた時刻より前のことがある。負の dt だとしまったタブレットが一瞬出る）
+    const dt = Math.min(0.1, Math.max(0, (now - this.last) / 1000));
     this.last = now;
     this.syncWorld();
     const sim = this.sim;
-    const input = this.input.poll();
+    const raw = this.input.poll();
+    // 手に持つ物（タブレット）を持っている間の入力（遊んでいる間だけ）
+    const input = sim && !this.paused && this.device ? this.device.input(raw, dt) : raw;
     // メニュー（Esc / 右上）: 開くだけ。閉じるのは一時停止の画面の「再開」（Pointer Lock はユーザー操作の中でしか取れない）
     if (input.menu && !this.paused) { this.pause(); this.ui.setPauseVisible(true); this.audio.ui('open'); }
     if (sim && !this.paused) {
@@ -755,11 +784,37 @@ export class ClientGame {
       this.postfx.setAudioNoise(this.audio.ambientLevel);
       this.ui.reticle.classList.toggle('focus', !!sim.focusedInteractable());
     }
+    this.device?.update(this.paused ? 0 : dt);
     const t0 = performance.now();
     this.materials.update(dt);
     this.renderPortals();
     this.postfx.render();
     this.materials.uploads.flush(this.renderer, performance.now() - t0);
+  }
+
+  /** 点の明るさ（焼き込んだ光。RGB。区画の外なら弱い灰色）。手に持つ物の照明に使う */
+  lightAt(at: readonly [number, number, number]): [number, number, number] {
+    const built = this.built;
+    const cell = built ? cellAt(built, at) : null;
+    return cell ? sampleCellLight(cell, [at[0], at[1], at[2]], this.lampLevel) : [0.2, 0.2, 0.2];
+  }
+
+  /**
+   * 写真を撮る（タブレットのカメラ）: 手に持つ物を除いた今の画面を描き、canvas に写して返す（横 maxWidth まで縮める）。
+   * video: ビデオの効果（にじみ・走査線・ノイズ）とレンズの癖を掛けるか（false ならタブレットのカメラらしく外す。露出の追従は残す）
+   */
+  capture(o: { video: boolean; maxWidth: number }): HTMLCanvasElement | null {
+    if (!this.sim) return null;
+    this.postfx.renderCapture({ overlay: false, video: o.video, lens: o.video ? 'asIs' : 'clean' });
+    const src = this.renderer.domElement;
+    const k = Math.min(1, o.maxWidth / Math.max(1, src.width));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(src.width * k));
+    c.height = Math.max(1, Math.round(src.height * k));
+    const g = c.getContext('2d');
+    if (!g) return null;
+    g.drawImage(src, 0, 0, c.width, c.height);
+    return c;
   }
 
   /** 窓・枠の向こうを描く（場面を描く前。区画の見え方を面ごとに替えて、終わったら戻す。段階 4 warp で足した） */
