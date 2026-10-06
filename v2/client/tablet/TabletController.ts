@@ -11,8 +11,8 @@
  *   スマホ（と Pointer Lock を使わないマウス）: 画面を直接タップ・ドラッグ（光線を画面に当てる）。カメラのときはボタンの上だけ受け取る
  * - 持っている間: 歩ける（ダッシュ・ジャンプ・調べる・置くはできない）。物を持っている・乗り物・はしご・よじ登りの間は出せない
  * - 出す・しまうキーは input/keymap.ts の 'tablet'（既定 Tab）。スマホは右の「端末」ボタン
- * - 写真から移る（ギャラリー・SNS の「探索」。docs/tablet.md）: 覗き込む音 → タブレットを顔の前へ上げ、写真を視界いっぱいに見せる
- *   （押した瞬間から移る先を読み込み、その間ずっと写真。環境音を絞る）→ 着いたら世界を写真の視点に重ね、タブレットをゆっくり手元へ
+ * - 写真から移る（ギャラリー・SNS の「探索」。docs/tablet.md）: 覗き込む音 → タブレットをカメラと同じ顔の前へ上げる（画面は
+ *   ギャラリー・SNS の表示のまま。写真が大きく見える。押した瞬間から移る先を読み込み、環境音を絞る）→ 着いたら世界を写真の視点に重ね、タブレットをゆっくり手元へ
  *   戻しながら普通の視点へ（環境音を戻す）。下ろし終えるまで視点と移動は止める。移れたら、手元へ戻したあと Tab と同じようにしまう
  */
 import * as THREE from 'three';
@@ -85,9 +85,9 @@ export class TabletController implements HeldDevice {
   private pxPerCss = 1.6;
   private touch: number | null = null;
   private warping = false;
-  /** 写真から移る: 0 手元 … 1 顔の前（写真が視界いっぱい） */
+  /** 写真から移る: 0 手元 … 1 顔の前（カメラと同じ所。画面はギャラリー・SNS のまま） */
   private v = 0;
-  /** 写真から移る間（上げる・見せたまま読み込む・下ろす）。result: 移れたか（読み込み中は null） */
+  /** 写真から移る間（上げる・顔の前のまま読み込む・下ろす）。result: 移れたか（読み込み中は null） */
   private trip: { phase: 'raise' | 'hold' | 'lower'; t: number; kind: 'gallery' | 'sns'; result: boolean | null } | null = null;
   /** 写真から移り終えて、しまう時刻（this.t。null はしまわない） */
   private stowAt: number | null = null;
@@ -322,26 +322,26 @@ export class TabletController implements HeldDevice {
   }
 
   // ---------------------------------------------------------------- 写真から移る
-  /** 写真から移り始める（ギャラリー・SNS の「探索」） */
-  private startTrip(req: TravelRequest): void {
+  /** 写真から移り始める（ギャラリー・SNS の「探索」。始められなければ false） */
+  private startTrip(req: TravelRequest): boolean {
     const g = this.game;
-    if (this.trip || this.warping || !this.want || g.paused) return;
+    if (this.trip || this.warping || !this.want || g.paused) return false;
     const T = g.tuning;
     this.warping = true;
     this.trip = { phase: 'raise', t: 0, kind: req.kind, result: null };
     g.input.enabled = false;
     this.ui.cancel();
     this.touch = null;
-    this.ui.setTravelView({ image: req.image });
     this.peerSound();
     g.audio.fadeAmbient(0, T['tablet.travel.fadeOutSec']);
-    // 押した瞬間から移る先を読み込む（着いた視点: 写真の視点。画角は、写真を視界いっぱいに見せたときに重なる画角）
+    // 押した瞬間から移る先を読み込む（着いた視点: 写真の視点。画角は、写真を今の画面の縦横比で覆うように見せたときと同じ見え方）
     const s = req.spot;
     const view: ArrivalView = { eye: s.eye, yaw: s.camYaw, pitch: s.camPitch, roll: s.camRoll, fov: revealFov(s.fov, req.aspect, g.camera.aspect || 1), crouch: s.crouch };
     void this.hooks.travel(s, view).then((ok) => { if (this.trip) this.trip.result = ok; }, () => { if (this.trip) this.trip.result = false; });
+    return true;
   }
 
-  /** 写真から移る間の毎フレーム（上げる → 見せたまま待つ → 下ろす） */
+  /** 写真から移る間の毎フレーム（上げる → 顔の前のまま待つ → 下ろす） */
   private stepTrip(dt: number): void {
     const tr = this.trip;
     if (!tr) return;
@@ -351,19 +351,17 @@ export class TabletController implements HeldDevice {
       this.v = approach(this.v, 1, dt / T['tablet.travel.raiseSec']);
       if (this.v >= 1) { tr.phase = 'hold'; tr.t = 0; }
     } else if (tr.phase === 'hold') {
-      // 移り終えて（階を入れ替えて視点を合わせた）、写真を少しは見せた
+      // 移り終えて（階を入れ替えて視点を合わせた）、近づけた画面を少しは見せた
       if (tr.result === null || g.arrivalPending || tr.t < T['tablet.travel.holdMinSec']) return;
       tr.phase = 'lower';
       tr.t = 0;
       g.audio.fadeAmbient(1, tr.result ? T['tablet.travel.fadeInSec'] : 0.4);
-      if (!tr.result) this.ui.travelFailed(tr.kind, '通信エラー：この写真の場所へ移動できませんでした');
+      this.ui.travelDone(tr.kind, !!tr.result);
     } else {
       this.v = approach(this.v, 0, dt / T['tablet.travel.lowerSec']);
       // 下ろし始めは写真の視点のまま、残りで普通の視点へ
       const keep = 1 - T['tablet.travel.viewKeep'];
       if (g.rig.hold) g.rig.hold.k = ease(Math.min(1, this.v / Math.max(0.01, keep)));
-      // 手元へ戻しきる前（残りの 3 割）に、写真から元の画面（ギャラリー・SNS の投稿）へ溶かす
-      this.ui.setTravelAlpha(ease(Math.min(1, this.v / 0.3)));
       if (this.v <= 0) this.endTrip(!!tr.result);
     }
   }
@@ -377,7 +375,6 @@ export class TabletController implements HeldDevice {
     this.warping = false;
     g.rig.hold = null;
     g.holdCrouch = false;
-    this.ui.setTravelView(null);
     g.input.enabled = !g.paused;
     this.prevYaw = null;
   }
@@ -503,11 +500,6 @@ export class TabletController implements HeldDevice {
     const grp = this.model.group;
     grp.position.set(pose[0], pose[1], pose[2]);
     grp.rotation.set(pose[3], pose[4], pose[5], 'XYZ');
-    // 写真から移る: 顔の前で視界に重なる所に写真を置く（絵の px）
-    if (this.trip) {
-      const hw = (dScreen * tan * aspect) / TABLET.SW, hh = (dScreen * tan) / TABLET.SH;
-      this.ui.setTravelRect({ x0: (0.5 - hw) * SCREEN_PX.w, x1: (0.5 + hw) * SCREEN_PX.w, y0: (0.5 - hh) * SCREEN_PX.h, y1: (0.5 + hh) * SCREEN_PX.h });
-    }
     // カメラのとき、画面のうち見えている所（絵の px。画面の面までの距離で）
     const d = -pose[2] - SURFACE;
     const hw = (d * tan * aspect) / TABLET.SW, hh = (d * tan) / TABLET.SH;

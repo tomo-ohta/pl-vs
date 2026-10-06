@@ -3,7 +3,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { APPS, DIAL_DIGITS, DialModel, formatTaken, revealFov, coverRect } from '../client/tablet/logic.ts';
+import { APPS, DIAL_DIGITS, DialModel, formatTaken, revealFov } from '../client/tablet/logic.ts';
 import { actionsOf, copyKeymap, DEFAULT_KEYMAP, keyLabel, keysLabel } from '../client/input/keymap.ts';
 import { PhotoStore } from '../client/tablet/PhotoStore.ts';
 import { localPlayerId, PostStore } from '../client/tablet/PostStore.ts';
@@ -123,13 +123,4 @@ test('写真から移る: 写真を視界いっぱいに覆って見せたとき
   assert.ok(Math.abs(Math.tan((f * Math.PI) / 360) - Math.tan(Math.PI / 6) * (9 / 16) / (16 / 9)) < 1e-9);
   // ズームした写真（画角 20°）は 20°
   assert.ok(Math.abs(revealFov(20, 4 / 3, 4 / 3) - 20) < 1e-9);
-});
-
-test('写真から移る: 写真を矩形に覆うように置く（縦横比そのまま・真ん中・はみ出しは切る）', () => {
-  const r = { x0: 100, y0: 50, x1: 900, y1: 500 };
-  const a = coverRect(1600, 900, r);
-  assert.ok(a.w >= 800 - 1e-9 && a.h >= 450 - 1e-9 && Math.abs(a.w / a.h - 16 / 9) < 1e-9);
-  assert.ok(Math.abs(a.x + a.w / 2 - 500) < 1e-9 && Math.abs(a.y + a.h / 2 - 275) < 1e-9);
-  const b = coverRect(900, 1600, r);
-  assert.ok(Math.abs(b.w - 800) < 1e-9 && b.h > 450);
 });
