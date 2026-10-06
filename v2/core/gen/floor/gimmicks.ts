@@ -9,13 +9,14 @@
 import type { Tuning } from '../../config/tuning.ts';
 import type { AABB } from '../../math/aabb.ts';
 import { hashAll, Rng } from '../../math/rng.ts';
+import type { Rect } from '../../world/footprint.ts';
 import type { Box, EntitySpec, WallOpening, Zone } from '../../world/layout.ts';
 import { reachOpenings } from '../reach.ts';
 import { attachSecret, THROUGH_DESTS, type AttachOptions, type PlacedSecret, type RareKind, type SecretDest } from '../secrets/index.ts';
 import '../gimmicks/index.ts';
 import { gimmickDefs, type ClueCell, type GimmickContext, type GimmickAxis, type GimmickDef, type GimmickSlot, type SecretMode, type SecretOffer } from '../gimmicks/types.ts';
 import { frontOf, inward } from '../gimmicks/util.ts';
-import type { Vec3 } from '../../math/vec.ts';
+import type { Dir, Vec3 } from '../../math/vec.ts';
 import type { FloorGeometry, GeoCell } from './geometry.ts';
 import { rarityRank, type FloorProfile } from './profile.ts';
 
@@ -114,7 +115,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
   let alternate = showcase?.flip ? 1 : 0;
   // 通り抜けの出口にしない区画: 仕掛けのある区画（置くたびに足す）
   const avoid = new Set<string>(geo.reserved ?? []);
-  const world = { cells: geo.cells, portals: geo.portals, entities: geo.entities, exits: geo.exits, depth, avoid, ...(p.region ? { bound: p.region.rect } : {}) };
+  const world = { cells: geo.cells, portals: geo.portals, entities: geo.entities, exits: geo.exits, depth, avoid, ...(p.region ? { bound: p.region.rect } : {}), ...(geo.mustPass?.size ? { zone: zonesAround(geo, geo.mustPass) } : {}) };
   // 行き止まりでない隠し（通り抜け・穴）の数。隠しが 2 つ以上になるフロアでは secrets.throughMin 以上にする
   let through = 0;
   /**
@@ -249,7 +250,7 @@ export function placeGimmicks(p: FloorProfile, geo: FloorGeometry, t: Tuning, de
     const hosts = sr.shuffle(geo.cells.filter((g) => g.kind === 'room' && (g.cell.role === 'side' || g.cell.role === 'rest') && !result.gimmicks.some((x) => x.cell === g.cell.id) && !geo.reserved?.has(g.cell.id)));
     for (const g of hosts) {
       if (budget <= 0) break;
-      const offer = darkCornerOffer(g, sr);
+      const offer = darkCornerOffer(g, sr, (r) => spaceFree(geo.cells, g, r, g.cell.floorY, world.bound));
       if (!offer) continue;
       const s = attach(g, offer, 'present', sr.fork(`d${index}`), budget);
       if (!s) { result.attachFailures++; continue; }
@@ -294,19 +295,78 @@ function clueCellsFor(geo: FloorGeometry, host: GeoCell, before: readonly GeoCel
 }
 
 /** 暗がりの入口の元: 開口の無い壁の、入口から遠い端 */
-function darkCornerOffer(g: GeoCell, rng: Rng): SecretOffer | null {
+/**
+ * 仕掛けとは別の隠しの元（暗がりの入口）: 開口の無い壁の、入口から遠い端。free を渡すと、壁の向こうに隠し場所の最小の区画
+ * （DARK_SPACE）が収まる所を先に選ぶ（寄せ集めのように隣の部屋と壁 1 枚で接する所が多いと、選んだ壁の向こうに空きが無いことが多い）
+ */
+function darkCornerOffer(g: GeoCell, rng: Rng, free?: (r: Rect) => boolean): SecretOffer | null {
   const rect = g.cell.footprint.reduce((a, x) => ((x.x1 - x.x0) * (x.z1 - x.z0) > (a.x1 - a.x0) * (a.z1 - a.z0) ? x : a));
   const ent = g.openings[0];
   if (!ent) return null;
   const dirs = ([0, 1, 2, 3] as const).filter((d) => !g.openings.some((o) => o.dir === d));
+  const cands: { d: Dir; at: number }[] = [];
   for (const d of rng.shuffle([...dirs])) {
     const [a0, a1] = d === 0 || d === 2 ? [rect.x0 + 0.9, rect.x1 - 0.9] : [rect.z0 + 0.9, rect.z1 - 0.9];
     if (a1 - a0 < 1.2) continue;
     const e = d === 0 || d === 2 ? ent.pos[0] : ent.pos[2];
-    const at = Math.abs(a0 - e) > Math.abs(a1 - e) ? a0 + 0.1 : a1 - 0.1;
-    return { hook: 'generic.darkCorner', modes: ['present'], weight: 0.5, doorway: { dir: d, at, y: g.cell.floorY, width: 0.9, height: 2.0 }, tell: '暗がり' };
+    const far = Math.abs(a0 - e) > Math.abs(a1 - e);
+    // 入口から遠い端・壁の真ん中・近い端の順
+    for (const at of [far ? a0 + 0.1 : a1 - 0.1, (a0 + a1) / 2, far ? a1 - 0.1 : a0 + 0.1]) cands.push({ d, at });
   }
-  return null;
+  if (!cands.length) return null;
+  const pick = (free && cands.find((c) => free(behindWall(rect, c.d, c.at)))) || cands[0]!;
+  return { hook: 'generic.darkCorner', modes: ['present'], weight: 0.5, doorway: { dir: pick.d, at: pick.at, y: g.cell.floorY, width: 0.9, height: 2.0 }, tell: '暗がり' };
+}
+
+/**
+ * 必ず通る区画（geo.mustPass）を除いて開口でつながる所ごとの番号（区画 id → 番号。必ず通る区画は入らない）。
+ * 隠しの通り抜けは、番号の違う所どうしをつながない（つなぐと、必ず通る区画を避ける近道になる）
+ */
+function zonesAround(geo: FloorGeometry, must: ReadonlySet<string>): Map<string, number> {
+  const zone = new Map<string, number>();
+  const walk = geo.portals.filter((q) => q.kind !== 'window');
+  let n = 0;
+  for (const g of geo.cells) {
+    const id = g.cell.id;
+    if (zone.has(id) || must.has(id)) continue;
+    zone.set(id, n);
+    const stack = [id];
+    while (stack.length) {
+      const a = stack.pop()!;
+      for (const q of walk) {
+        if (!q.cells.includes(a)) continue;
+        const b = q.cells[0] === a ? q.cells[1] : q.cells[0];
+        if (zone.has(b) || must.has(b)) continue;
+        zone.set(b, n);
+        stack.push(b);
+      }
+    }
+    n++;
+  }
+  return zone;
+}
+
+/** 隠し場所の最小の区画（奥行き・幅。穴の部屋・灯りの小部屋が入る大きさ） */
+const DARK_SPACE: [number, number] = [3.4, 3.6];
+
+/** 区画の矩形 rect の、向き d の壁の外側の、位置 at を真ん中にした DARK_SPACE の矩形 */
+function behindWall(rect: Rect, d: Dir, at: number): Rect {
+  const [D, W] = DARK_SPACE;
+  if (d === 0) return { x0: at - W / 2, x1: at + W / 2, z0: rect.z1, z1: rect.z1 + D };
+  if (d === 2) return { x0: at - W / 2, x1: at + W / 2, z0: rect.z0 - D, z1: rect.z0 };
+  if (d === 1) return { x0: rect.x1, x1: rect.x1 + D, z0: at - W / 2, z1: at + W / 2 };
+  return { x0: rect.x0 - D, x1: rect.x0, z0: at - W / 2, z1: at + W / 2 };
+}
+
+/** 矩形 r（床の高さ y）が、ほかの区画と重ならず、範囲 bound の中にあるか */
+function spaceFree(cells: readonly GeoCell[], self: GeoCell, r: Rect, y: number, bound?: Rect): boolean {
+  if (bound && (r.x0 < bound.x0 - 1e-6 || r.x1 > bound.x1 + 1e-6 || r.z0 < bound.z0 - 1e-6 || r.z1 > bound.z1 + 1e-6)) return false;
+  return !cells.some((c) => {
+    if (c === self) return false;
+    const b = c.cell.bounds;
+    if (b.max[1] <= y - 0.3 || b.min[1] >= y + 2.9) return false;
+    return r.x0 < b.max[0] - 0.02 && r.x1 > b.min[0] + 0.02 && r.z0 < b.max[2] - 0.02 && r.z1 > b.min[2] + 0.02;
+  });
 }
 
 /**

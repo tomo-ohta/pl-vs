@@ -82,16 +82,25 @@ defineAnomaly({
     const solids = interiorSolids(cell);
     const marks: { dir: number; face: number; inward: number; at: number; y: number; kind: string; color: number; lamp: string }[] = [];
     const kinds = ['hand', 'arrow', 'tally'];
-    for (const s of wallSpans(ctx, 0.4).slice(0, 4)) {
+    const spans = wallSpans(ctx, 0.4);
+    const tryMark = (s: (typeof spans)[number], at: number): void => {
+      const y = fy + ctx.rng.float(1.15, 1.7);
+      const [px, pz] = facePoint(s, at, 0.15);
+      // 壁際の背の高い物に隠れる所は避ける
+      if (solids.some((b) => b.max[1] > y - 0.3 && px > b.min[0] - 0.3 && px < b.max[0] + 0.3 && pz > b.min[2] - 0.3 && pz < b.max[2] + 0.3)) return;
+      if (marks.some((m) => m.dir === s.dir && Math.abs(m.face - s.face) < 0.05 && Math.abs(m.at - at) < 0.6)) return;
+      const c = marks.length % 3;
+      marks.push({ dir: s.dir, face: s.face, inward: s.inward, at, y, kind: kinds[(marks.length + ctx.rng.int(0, 2)) % 3]!, color: c, lamp: lamps[c]! });
+    };
+    for (const s of spans.slice(0, 4)) {
       const n = s.a1 - s.a0 > 3 ? 2 : 1;
-      for (let k = 0; k < n; k++) {
-        const at = s.a0 + ((s.a1 - s.a0) * (k + 1)) / (n + 1);
-        const y = fy + ctx.rng.float(1.15, 1.7);
-        const [px, pz] = facePoint(s, at, 0.15);
-        // 壁際の背の高い物に隠れる所は避ける
-        if (solids.some((b) => b.max[1] > y - 0.3 && px > b.min[0] - 0.3 && px < b.max[0] + 0.3 && pz > b.min[2] - 0.3 && pz < b.max[2] + 0.3)) continue;
-        const c = marks.length % 3;
-        marks.push({ dir: s.dir, face: s.face, inward: s.inward, at, y, kind: kinds[(marks.length + ctx.rng.int(0, 2)) % 3]!, color: c, lamp: lamps[c]! });
+      for (let k = 0; k < n; k++) tryMark(s, s.a0 + ((s.a1 - s.a0) * (k + 1)) / (n + 1));
+    }
+    // 家具に隠れて 3 つに足りなければ、残りの壁と、壁の別の所（4 分の 1 ずつ）も見る（印が 1 色だけだと色の照明の意味が分からない）
+    for (const s of spans) {
+      for (const f of [0.25, 0.75, 0.5]) {
+        if (marks.length >= 3) break;
+        tryMark(s, s.a0 + (s.a1 - s.a0) * f);
       }
     }
     ctx.addEntity('marks', { type: 'senseFx', params: { fx: 'rgbMarks', marks } });

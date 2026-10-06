@@ -71,4 +71,7 @@ export const WORLD_TUNING = {
   'world.patch.tallChance': num(0.14, 0, 1, '寄せ集め: 部屋・広間の天井が 1.5〜3.5 m 高い確率'),
   'world.patch.lowChance': num(0.08, 0, 1, '寄せ集め: 部屋の天井が低い（2.3〜2.5 m）確率'),
   'world.patch.openChance': num(0.15, 0, 1, '寄せ集め: 部屋どうしの出入り口を扉でなく開口にする確率'),
+  'world.patch.voidShare': num(0.2, 0, 0.5, '寄せ集め: 部屋にせず空けておく部屋の割合（壁の向こうの見えない空き。隠し場所（レア部屋・隠し通路）を置く所）'),
+  'world.patch.voidMinM': num(6, 3, 10, '寄せ集め: 空ける部屋の短い辺の下限（m。どのレア部屋も入る大きさ。小さい部屋は部屋のまま残す: 小さい部屋向きの異変（物の海など）が出なくなる）'),
+  'world.patch.voidMaxM': num(16, 6, 40, '寄せ集め: 空ける部屋の長い辺の上限（m）'),
 } as const;

@@ -183,12 +183,14 @@ test('ゴンドラ: 乗り場で箱に乗っていると、向こうの乗り場
 
 test('吹き抜け: 生成したフロアに出て、入口から出口の先まで歩ける・同じ鍵なら同じ', async () => {
   await loadRapier();
-  const list = findRooms('atrium', 3, { maxWorld: 900 });
+  // 吹き抜けはまれ（段階 5 で出方をそろえる）なので、出やすくして集める（gimmick.w.<id>。ほかの試験と同じ）
+  const tA = { ...defaultTuning(), 'gimmick.w.atrium': 6 } as Tuning;
+  const list = findRooms('atrium', 3, { maxWorld: 900, t: tA });
   assert.ok(list.length >= 1, `見つかった部屋 ${list.length}`);
   for (const room of list) {
     const res = await walkThrough(room, 220);
     assert.ok(res.ok, `${room.floor.id} ${room.id}: ${res.reason}`);
-    assert.equal(JSON.stringify(regenerate(room)), JSON.stringify(room.floor));
+    assert.equal(JSON.stringify(regenerate(room, { t: tA })), JSON.stringify(room.floor));
   }
   void defaultTuning;
 });

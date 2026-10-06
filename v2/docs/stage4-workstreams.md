@@ -152,7 +152,7 @@ cd "$WT/v2" && npm run verify
 - まれすぎる仕掛け（300 フロアに数回以下: searchlight・atrium・escalator・poolRoom・pushWall・spotRide・tiltMarble・mazeModel・chimeOrder・clockRoom・lightBands・fogBeacons …）と、多い物（carry の homeObject・carryWater、廊下の sensorLights・lowCeiling）を、`gimmick.w.<id>` で全体を見てそろえる
 - 異変 57 種の偏り。部屋の形の割合（1 フロアに約 1.2）
 - 裏のフロアに表の部屋の形が残る割合（3 割前後。裏の異変の計画が表の形の部屋を避けると揃う）
-- 部屋の形と重ねてよい異変の一覧に、見た目だけの異変（missingColor・mono・dayCycle …）を足すか
+- ~~部屋の形と重ねてよい異変の一覧に、見た目だけの異変（missingColor・mono・dayCycle …）を足すか~~ → 2026-10-06: 形の一覧はそのまま、段階 4 で足した異変を似た異変（色の異変・霧・散乱・時計だらけ・小さな家具）として重ねる（`core/gen/rooms/index.ts` の ANOMALY_LIKE）
 
 **見て確かめる（ユーザーの確認）**
 - 画面効果（色が抜ける・単色・霜）・煙と雨の重さ（スマホ）・窓と枠の向こうの描画（W03・W08）・回転する部屋（酔わないか）・重力の切り替えのカメラ

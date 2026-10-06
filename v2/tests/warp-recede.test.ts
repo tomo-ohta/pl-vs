@@ -17,7 +17,9 @@ import { faceTo, stepWith } from './helpers/warp.ts';
 
 const t = defaultTuning();
 const RAPIER = await loadRapier();
-const ROOMS = findRooms('recedingHall', 5, { maxWorld: 260 });
+// 出やすくして集める（gimmick.w.<id>。ほかの試験と同じ。2026-10-06 に希少度を階によらなくしたら 260 フロアに 2 つになった）
+const TR = { ...t, 'gimmick.w.recedingHall': 4 } as typeof t;
+const ROOMS = findRooms('recedingHall', 5, { maxWorld: 260, t: TR });
 const ent = (f: FloorLayout, id: string) => f.entities.find((e) => e.id === id)!;
 
 test('遠ざかる廊下: 歩くほど突き当たりが遠ざかり、偽の突き当たりは通れない・ある所で消えて本物の扉へ着く・戻ると近づく', () => {
@@ -63,7 +65,7 @@ test('遠ざかる廊下: 歩くほど突き当たりが遠ざかり、偽の突
 
 test('遠ざかる廊下: 決定的', () => {
   for (const room of ROOMS.slice(0, 2)) {
-    const again = regenerate(room);
+    const again = regenerate(room, { t: TR });
     assert.equal(JSON.stringify(again.entities.filter((e) => e.id.startsWith(room.id))), JSON.stringify(room.floor.entities.filter((e) => e.id.startsWith(room.id))));
   }
 });

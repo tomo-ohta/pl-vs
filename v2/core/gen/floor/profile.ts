@@ -79,14 +79,15 @@ export interface ProfileOptions {
   noStation?: boolean;
 }
 
-export function rollRarity(rng: Rng, depth: number, t: Tuning): Rarity {
+/** 希少度を引く（階によらず同じ重み。調整表 rarity.w.*） */
+export function rollRarity(rng: Rng, t: Tuning): Rarity {
   const w: Record<Rarity, number> = {
     Common: t['rarity.w.common'],
     Uncommon: t['rarity.w.uncommon'],
-    Rare: depth >= t['rarity.depth.rare'] ? t['rarity.w.rare'] : 0,
-    Epic: depth >= t['rarity.depth.epic'] ? t['rarity.w.epic'] : 0,
-    Legendary: depth >= t['rarity.depth.legendary'] ? t['rarity.w.legendary'] : 0,
-    Mythic: depth >= t['rarity.depth.mythic'] ? t['rarity.w.mythic'] : 0,
+    Rare: t['rarity.w.rare'],
+    Epic: t['rarity.w.epic'],
+    Legendary: t['rarity.w.legendary'],
+    Mythic: t['rarity.w.mythic'],
   };
   return rng.weighted(RARITIES, (r) => w[r]);
 }
@@ -116,8 +117,9 @@ export function stationContinues(world: number, depth: number, t: Tuning): boole
 export function rollProfile(key: FloorKey, t: Tuning, salt = 0, force?: PatternId, o: ProfileOptions = {}, seedBase = floorSeed(key)): FloorProfile {
   const seed = hashAll(seedBase, 'profile', salt);
   const rng = new Rng(seed);
-  // 最初の 2 階は落ち着いたフロア（はじめての人が仕組みに慣れる）
-  const rarity = key.depth <= 0 ? 'Common' : rollRarity(rng.fork('rarity'), key.depth, t);
+  // 希少度: 階によらず同じ重み（B1F から珍しいフロアが出る）。フロア・区域ごとに 1 回だけ引き、形の引き直し・作り直し（salt）では
+  // 変えない（変えると、少し広くなる珍しいフロアが区域に収まらずに引き直され、出る割合が重みからずれる）
+  const rarity = rollRarity(new Rng(hashAll(seedBase, 'rarity')), t);
   const famPick = rng.fork('family').weighted(FAMILIES.filter((f) => !f.minRarity || rarityRank(rarity) >= rarityRank(f.minRarity)), (f) => f.weight);
   let fam = o.family && (!o.family.minRarity || rarityRank(rarity) >= rarityRank(o.family.minRarity)) ? o.family : famPick;
   // 駅の線（F35）: 系統は駅の連絡通路

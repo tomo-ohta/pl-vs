@@ -72,17 +72,13 @@ export const TUNING_SPEC = {
   'floor.roomDoorChance': num(0.92, 0, 1, '部屋（入口・出口の部屋を除く）の出入り口を扉にする確率（扉を開けるまで中が見えない）'),
   'floor.hallDoorChance': num(0.35, 0, 1, '広間の出入り口を扉にする確率'),
 
-  // ---- 希少度（v1 第12回の値。v2-plan.md 2 章）----
+  // ---- 希少度（v1 第12回の値。v2-plan.md 2 章）。階によらず同じ重み（2026-10-06。前は Rare 以上に出る最小の深さがあった）----
   'rarity.w.common': num(33, 0, 100, 'Common の重み'),
   'rarity.w.uncommon': num(24, 0, 100, 'Uncommon の重み'),
   'rarity.w.rare': num(19, 0, 100, 'Rare の重み'),
   'rarity.w.epic': num(18, 0, 100, 'Epic の重み'),
   'rarity.w.legendary': num(4, 0, 100, 'Legendary の重み'),
   'rarity.w.mythic': num(6.5, 0, 100, 'Mythic の重み'),
-  'rarity.depth.rare': num(2, 0, 100, 'Rare が出る最小の深さ', true),
-  'rarity.depth.epic': num(5, 0, 100, 'Epic が出る最小の深さ', true),
-  'rarity.depth.legendary': num(10, 0, 100, 'Legendary が出る最小の深さ', true),
-  'rarity.depth.mythic': num(18, 0, 100, 'Mythic が出る最小の深さ', true),
 
   // ---- 仕掛けの置き方（gimmicks-and-structures.md 4.2・4.5）----
   'gimmick.chance.main': num(0.36, 0, 1, '本道の上の部屋に仕掛けを置く確率'),

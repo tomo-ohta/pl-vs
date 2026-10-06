@@ -1,7 +1,7 @@
 // v1 風の寄せ集めの区域（部屋ごとに雰囲気と大きさが違う）でも、v2 の異変が出る（docs/endless-world.md 7 章）
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultTuning, makeTuning, type TuningOverrides } from '../core/config/tuning.ts';
+import { defaultTuning, type Tuning } from '../core/config/tuning.ts';
 import { dressCell } from '../core/gen/dress/index.ts';
 import { anomalyDefs } from '../core/gen/anomaly/index.ts';
 import { planRegion, type RegionPlan } from '../core/gen/world/plan.ts';
@@ -15,7 +15,8 @@ test('異変 57 種がどれも、寄せ集めの区域の部屋に掛かる（�
   const missing: string[] = [];
   let placed = 0;
   for (const d of anomalyDefs()) {
-    const { tuning } = makeTuning({ [`anomaly.w.${d.id}`]: 5000, 'anomaly.share.main': 0.9, 'anomaly.share.side': 0.9 } as TuningOverrides);
+    // 重みは調整表の範囲（0〜10）の外なので makeTuning では入らない（範囲外はエラーで既定値のまま）。直接上書きする（ほかの試験の gimmick.w.<id> と同じ）
+    const tuning = { ...base, [`anomaly.w.${d.id}`]: 5000, 'anomaly.share.main': 0.9, 'anomaly.share.side': 0.9 } as Tuning;
     let hit = 0;
     for (const p of plans) {
       const r = generateRegionReport(p, tuning, { dress: dressCell });

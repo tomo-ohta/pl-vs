@@ -23,10 +23,12 @@ const ROLES = new Set(['side', 'rest', 'hub', 'gimmick', 'landmark']);
 
 export function loopSpawn(floor: FloorLayout, world: number): FloorLayout['spawn'] {
   const s = floor.spawn.pos;
+  // 仕掛け・部屋の形のある部屋には着かない（落とし戸・崩れる床・穴の部屋に着くと、歩き出してすぐ落ちる）
+  const busy = new Set(floor.entities.filter((e) => e.cell && /^[gs]:/.test(e.id)).map((e) => e.cell!));
   // 入口から遠い部屋（別の空間・隠し・階段の区画は除く）の、扉の付いた開口
   const cand: { cell: string; pos: Vec3; yaw: number; d: number }[] = [];
   for (const c of floor.cells) {
-    if (c.pocket || !ROLES.has(c.role) || c.id === floor.spawn.cell || c.footprint.length !== 1) continue;
+    if (c.pocket || !ROLES.has(c.role) || c.id === floor.spawn.cell || c.footprint.length !== 1 || busy.has(c.id) || c.shape) continue;
     for (const p of floor.portals) {
       if (!p.cells.includes(c.id) || p.kind !== 'door' || p.cells.some((x) => x.startsWith('secret'))) continue;
       const a = p.aabb;

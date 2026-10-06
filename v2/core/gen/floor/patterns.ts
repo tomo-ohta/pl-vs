@@ -238,6 +238,7 @@ const BUILDERS: Partial<Record<string, Builder>> = {
       link(core, nodeId(sk, cc, cr + 1), 'narrow', { width: widthOf(maxRing) });
     }
     sk.nodes[core]!.kind = 'room';
+    sk.mustPass = [core];
     sk.nodes[sk.entry]!.kind = 'room';
     sk.exit = nodeId(sk, cc, rows - 1);
     sk.nodes[sk.exit]!.kind = 'room';
