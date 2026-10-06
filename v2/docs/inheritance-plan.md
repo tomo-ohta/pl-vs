@@ -122,6 +122,29 @@ v2/
 
 **素材の場所を決めている所（v2 で `ASSET_BASE` に寄せる）**: `MaterialLibrary.ts:2079`（内部関数）・同 `:500`（BASE_URL を直接使用）・`PropCatalog.ts:138`（既定値）・`AssetManifest.ts:103`。調べた範囲ではこれで全部。
 
+### 3.1 移植の状況（2026-10-02・段階 3 まで）
+
+| v1 | 状態 | v2 の場所 | 備考 |
+|---|---|---|---|
+| `core/rng.ts`・`core/aabb.ts` | 移植済み | `core/math/rng.ts`・`aabb.ts` | `Rng` に poisson・fork・状態の保存を足した |
+| `PlayerController.ts`（移動） | 移植済み | `core/sim/player.ts` | 固定 tick の純関数。押し戻す面を「動く前にいた側」で決めるよう直した（v1 は動いた向きで決めていたため、角をかすめると家具を突き抜け、下向きの移動では背の高い棚の上へ乗った）。頭の上の大きな箱から横へ何 m も押し出さない |
+| `PlayerController.ts`（カメラ） | 移植済み | `client/camera/CameraRig.ts` | |
+| `generators/footprint.ts`・`reach.ts` | 移植済み | `core/world/footprint.ts`・`core/gen/reach.ts` | ソケットの代わりに開口（WallOpening） |
+| `generators/common.ts`・`furniture.ts` | 移植済み | `core/gen/dress/`（`furniture.ts`・`patterns.ts`・`geom.ts`・`decor.ts`・`props.ts`） | 置いたあと開口どうしの到達を確かめ、塞いだ物だけを外す |
+| `generators/dressing/*` | 作り直し | `core/gen/dress/kits/*` | 部屋 ID ではなく、テーマ（35 種）× 区画の種類（7 種）で中身を選ぶ |
+| 生成器・`RarityGenerator.ts`・`WorldManager.ts` | 作り直し | `core/gen/floor/*` | フロア単位の生成（V2-1）。希少度は `profile.ts` |
+| `PostFX`・`LensPass`・`VideoPass`・`shaders/*`・`FilmPreset` ほか A 区分の描画 | 移植済み | `client/render/` | |
+| `Lightmap` + worker | 移植済み・組み込み済み | `client/render/Lightmap.ts`・`client/world/FloorBuilder.ts` | 区画ごとに焼く（mid / high）。部品で入切する照明のある区画は頂点焼き込みのまま |
+| `MaterialLibrary` + `cc0Materials` + `SurfaceAppearance`・`SurfaceGeometry` | 移植済み | `client/render/` | |
+| `WindowRoom`・`LightBudget`・`PlayerFlashlight` | 移植済み | `client/render/` | |
+| `RoomBuilder` | 作り直し | `client/world/FloorBuilder.ts` | 区画ごとの Group・出現型の隠し・部品で入切する照明・ライトマップ |
+| `streaming/RoomStreamingManager.ts` | 作り直し | `client/world/Visibility.ts`・`LightManager.ts` | フロアを丸ごと読み、区画と開口で見える所だけ描く |
+| `audio/*`・`AudioEngine` | 移植済み | `client/audio/` | |
+| `RecOverlay`・`SettingsPanel`・`Settings`・`InputController` | 移植済み | `client/ui/`・`client/settings/`・`client/input/` | 保存名は `liminal2.*` |
+| `game/Game.ts` | 作り直し | `core/sim/sim.ts`（手元のサーバー）・`client/game/ClientGame.ts` | |
+| `MenuUI`・`MapPanel`・`Minimap`・`FloorCodex` | 作り直し（段階 4・map） | `client/ui/`（MapPanel・Minimap・CodexPanel）・`client/map/` | 一時停止の画面のタブ（地図 / 図鑑 / 設定）。地図は見た区画だけ・調査率・足跡・上下の層。保存は `liminal2.codex.v1`・`liminal2.maps.v1:<鍵>`。`Map3D` は移さない（フロアごとに別の世界） |
+| まだ移していない | — | — | `Hud`・`SnapshotService`（図鑑の画像）・`DoorLeak`・`PropCatalog`・`props/*`・`ObjectGeometry`・`DecalLayer`・`SignAtlas`・`wearEffects`・oddity・Modifier・monument・`data/index.ts`・`SaveManager`・`PlayerRide`・`PlayerProxy` |
+
 ---
 
 ## 4. 進め方（段階）

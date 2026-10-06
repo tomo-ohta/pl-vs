@@ -2,7 +2,24 @@
   "name": "liminal-v2",
   "private": true,
   "version": "0.0.0",
-  "description": "Liminal v2（拡張版: マルチプレイ・体力・新しい部屋生成）。v1 からは継承計画に沿って移植する",
+  "description": "Liminal v2（拡張版）: フロア単位の生成・部品で作る仕掛け・隠し発見。v1 からは継承計画に沿って移植する",
   "type": "module",
-  "scripts": {}
+  "scripts": {
+    "dev": "vite --host --port 5174",
+    "build": "vite build",
+    "preview": "vite preview --port 4174",
+    "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.client.json",
+    "check:boundaries": "node tools/check-boundaries.mjs",
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "verify": "npm run typecheck && npm run check:boundaries && npm test"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-deterministic-compat": "^0.21.0",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
 }
