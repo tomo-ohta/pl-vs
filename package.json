@@ -15,6 +15,7 @@
     "deploy:v1": "npm run deploy:pages -w v1",
     "dev:v2": "npm run dev -w v2",
     "typecheck:v2": "npm run typecheck -w v2",
-    "verify:v2": "npm run verify -w v2"
+    "verify:v2": "npm run verify -w v2",
+    "deploy:v2": "npm run deploy:pages -w v2"
   }
 }
