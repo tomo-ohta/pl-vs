@@ -1,0 +1,61 @@
+{
+  "note": "元の版（index.html）の各視点の値（2026-10-07）。建築版の合格: ΔE は +0.5 以内、構図 F は −3 以内",
+  "views": {
+    "alley-0": {
+      "dE": 3.6,
+      "edgeF": 71
+    },
+    "corridor-0": {
+      "dE": 2.6,
+      "edgeF": 76
+    },
+    "corridor-1": {
+      "dE": 2.6,
+      "edgeF": 74.7
+    },
+    "corridor-2": {
+      "dE": 2.4,
+      "edgeF": 74.3
+    },
+    "corridor-3": {
+      "dE": 2.8,
+      "edgeF": 77.9
+    },
+    "pastel-0": {
+      "dE": 2.4,
+      "edgeF": 72.5
+    },
+    "pool-0": {
+      "dE": 6.6,
+      "edgeF": 51.8
+    },
+    "pool-1": {
+      "dE": 6.7,
+      "edgeF": 52
+    },
+    "pool-2": {
+      "dE": 7.8,
+      "edgeF": 35.3
+    },
+    "pool-3": {
+      "dE": 7.5,
+      "edgeF": 48
+    },
+    "station-0": {
+      "dE": 4.6,
+      "edgeF": 67.4
+    },
+    "station-1": {
+      "dE": 5.2,
+      "edgeF": 77.3
+    },
+    "station-2": {
+      "dE": 4.4,
+      "edgeF": 69.4
+    },
+    "station-3": {
+      "dE": 4.8,
+      "edgeF": 69.8
+    }
+  }
+}

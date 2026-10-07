@@ -63,6 +63,17 @@
         "experiments/v2-splat-props"
       ],
       "port": 5175
+    },
+    {
+      "name": "visual-style-lab",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "experiments/visual-style-lab"
+      ],
+      "port": 5176
     }
   ]
 }

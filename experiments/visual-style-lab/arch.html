@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 公開ページ（GitHub Pages の lab/）を検索に出さない（v1 と同じ） -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+    <title>見た目の検証ステージ（建築版）</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0f10; overflow: hidden; font-family: -apple-system, 'Hiragino Sans', sans-serif; }
+      #app { position: fixed; inset: 0; }
+      #app canvas { position: absolute; display: block; }
+      #app .ref { position: absolute; left: var(--vx); top: var(--vy); width: var(--vw); height: var(--vh); pointer-events: none; display: none; }
+      .panel { position: absolute; left: 10px; top: 10px; width: 250px; padding: 10px; border-radius: 8px; background: rgba(10, 16, 18, 0.78); color: #dfe9e6; font-size: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
+      .panel .title { font-weight: 600; font-size: 13px; }
+      .panel label { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+      .panel select, .panel input[type=range] { flex: 1; max-width: 170px; }
+      .panel .row { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+      .panel .row label { justify-content: flex-start; gap: 3px; }
+      .panel .info { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 10.5px; color: #a9bcb7; }
+      .panel button { font-size: 11px; }
+      .panel details.film { border-top: 1px solid rgba(255,255,255,0.12); padding-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+      .panel details.film summary { cursor: pointer; font-weight: 600; margin-bottom: 4px; }
+      .panel details.film label { margin-bottom: 4px; }
+      .panel details.film span[data-o] { width: 34px; text-align: right; font-family: ui-monospace, monospace; font-size: 10.5px; }
+      .panel details.film input[type=range] { max-width: 120px; }
+      .panel details.film .note { color: #8fa29d; font-size: 10.5px; line-height: 1.5; margin-top: 4px; }
+      .panel :disabled { opacity: 0.45; }
+      /* REC 表示の枠（描画の枠に合わせる。transform で position:fixed の子をこの枠に閉じ込める） */
+      #app .film-frame { position: absolute; left: var(--vx); top: var(--vy); width: var(--vw); height: var(--vh); pointer-events: none; transform: translateZ(0); z-index: 1; }
+      .help { position: absolute; left: 10px; bottom: 10px; padding: 6px 10px; border-radius: 6px; background: rgba(10, 16, 18, 0.6); color: #c9d6d3; font-size: 11px; line-height: 1.6; z-index: 2; }
+      body.capture .panel, body.capture .help, body.capture .minimap { display: none; }
+      .minimap { position: absolute; right: 10px; top: 10px; max-width: 340px; max-height: 340px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); z-index: 2; display: none; }
+      .panel .variant a { color: #9fd6c8; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
