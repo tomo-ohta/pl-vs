@@ -3,7 +3,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { APPS, DIAL_DIGITS, DialModel, formatTaken } from '../client/tablet/logic.ts';
+import { APPS, DIAL_DIGITS, DialModel, formatTaken, revealFov } from '../client/tablet/logic.ts';
 import { actionsOf, copyKeymap, DEFAULT_KEYMAP, keyLabel, keysLabel } from '../client/input/keymap.ts';
 import { PhotoStore } from '../client/tablet/PhotoStore.ts';
 import { localPlayerId, PostStore } from '../client/tablet/PostStore.ts';
@@ -113,3 +113,14 @@ test('SNS の投稿（IndexedDB の無い所）: 新しく投稿した順・投�
   assert.deepEqual([...await posts.postedPhotoIds()], [b.id]);
 });
 
+
+test('写真から移る: 写真を視界いっぱいに覆って見せたときに重なる世界の画角（縦横比・ズーム）', () => {
+  // 同じ縦横比なら写真の画角のまま・写真が横に広い（左右が切れる）ときも縦の画角はそのまま
+  assert.ok(Math.abs(revealFov(60, 16 / 9, 16 / 9) - 60) < 1e-9);
+  assert.ok(Math.abs(revealFov(60, 16 / 9, 4 / 3) - 60) < 1e-9);
+  // 写真が細い（縦長の写真を横長の画面で見る）と上下が切れるので、縦の画角が狭まる
+  const f = revealFov(60, 9 / 16, 16 / 9);
+  assert.ok(Math.abs(Math.tan((f * Math.PI) / 360) - Math.tan(Math.PI / 6) * (9 / 16) / (16 / 9)) < 1e-9);
+  // ズームした写真（画角 20°）は 20°
+  assert.ok(Math.abs(revealFov(20, 4 / 3, 4 / 3) - 20) < 1e-9);
+});

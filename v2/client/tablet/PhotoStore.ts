@@ -3,6 +3,7 @@
  */
 import { STORAGE_PREFIX } from '../env.ts';
 import { ImageStore } from './ImageStore.ts';
+import type { PhotoSpot } from './logic.ts';
 
 export interface PhotoMeta {
   id: number;
@@ -18,6 +19,8 @@ export interface PhotoMeta {
   h: number;
   /** 写真の見た目（settings.photoLook） */
   look: 'clean' | 'video';
+  /** 撮った所と視点（写真から移る。2026-10-06 より前の写真・果てしない階の外では無し = 移れない） */
+  spot?: PhotoSpot;
 }
 
 export class PhotoStore extends ImageStore<PhotoMeta> {

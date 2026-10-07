@@ -313,7 +313,7 @@ export class WorldSession {
   }
 
   // ---------------------------------------------------------------- 暗転して移る（穴・エレベーターの仕掛け・縦穴・迷路フロアの別の出口）
-  private gotoWorld: { key: string; to: StoryKey; w: StoryWorld; land: { pos: Vec3; yaw: number } } | null = null;
+  private gotoWorld: { key: string; to: StoryKey; w: StoryWorld; land: { pos: Vec3; yaw: number; crouching?: boolean } } | null = null;
 
   /**
    * 行き先の階 to の、点 (x, z) を持つ区域を作り始める（同期で作れなければ次に呼んだときにまた試す）。
@@ -364,6 +364,25 @@ export class WorldSession {
     }
   }
 
+  /**
+   * 写真の場所へ移る用意（タブレットの写真・SNS の投稿から「探索」。docs/tablet.md）: 階 to の区域 plan（同期で受け取れること）を作り、
+   * 足元 pos に向き yaw・しゃがみ crouch で置く（撮った所そのまま。立てない所でも置く: 2026-10-06 ユーザーの決定）。作れたら true（commitGoto で移る）
+   */
+  prepareGotoPose(to: StoryKey, plan: RegionPlan, pos: Vec3, yaw: number, crouch = false): boolean {
+    const key = `${storyId(to)}#${plan.id}@${pos.map((v) => v.toFixed(3)).join(',')}`;
+    if (this.gotoWorld?.key === key) return true;
+    try {
+      const w = new StoryWorld(to, plan, this.storyOpts());
+      w.sim.teleport(0, [pos[0], pos[1], pos[2]], yaw);
+      w.sim.players[0]!.crouching = crouch;
+      this.gotoWorld = { key, to, w, land: { pos: [pos[0], pos[1], pos[2]], yaw, crouching: crouch } };
+      this.opts.created?.(w);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** 暗転して移る先（作ってあれば） */
   get gotoTarget(): StoryWorld | null {
     return this.gotoWorld?.w ?? null;
@@ -379,6 +398,7 @@ export class WorldSession {
     Object.assign(to, JSON.parse(JSON.stringify(from)) as PlayerState);
     to.pos = keepPos; to.vel = [0, 0, 0]; to.yaw = g.land.yaw; to.pitch = 0; to.holding = null; to.ride = null; to.surfaceId = null; to.interactedId = null; to.grav = null;
     to.respawn = { pos: [...keepPos], yaw: g.land.yaw }; to.lastGround = [...keepPos];
+    if (g.land.crouching !== undefined) to.crouching = g.land.crouching;
     // 捨てる階の置いた物を書き残す
     prev.flush();
     for (const w of this.others.values()) if (w !== g.w) w.flush();

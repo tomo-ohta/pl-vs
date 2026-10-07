@@ -7,11 +7,13 @@
   "scripts": {
     "dev": "vite --host --port 5174",
     "build": "vite build",
+    "build:pages": "BASE_PATH=/pl-vs/v2/ VITE_ASSET_BASE=/pl-vs/ vite build",
     "preview": "vite preview --port 4174",
     "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.client.json",
     "check:boundaries": "node tools/check-boundaries.mjs",
     "test": "node --test \"tests/**/*.test.ts\"",
-    "verify": "npm run typecheck && npm run check:boundaries && npm test"
+    "verify": "npm run typecheck && npm run check:boundaries && npm test",
+    "deploy:pages": "npm run build:pages && gh-pages -d dist --add --dest v2 -m \"deploy: GitHub Pages（v2/）\""
   },
   "dependencies": {
     "@dimforge/rapier3d-deterministic-compat": "^0.21.0",

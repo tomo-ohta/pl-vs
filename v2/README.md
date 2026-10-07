@@ -60,6 +60,8 @@ URL の指定（開発用）:
 - 作り込む小物の開発用: `game.props.stats()`（区切り・小物・三角形・GPU の量）・`game.props.setEnabled(false)`（箱に戻す）
 - import は拡張子 `.ts` まで書く（Vite と Node の両方でそのまま動かすため）。
 - 本番ビルドで `VITE_ASSET_BASE=/pl-vs/` を渡すと、素材を複写せず v1 と同じ素材を読む（`BASE_PATH=/pl-vs/v2/` と一緒に使う）。
+- 公開（2026-10-07〜）: `npm run deploy:v2`（= `build:pages` → gh-pages ブランチの `v2/` に **追加**。素材は v1 の公開物 `/pl-vs/` を読む）→ https://tomo-ohta.github.io/pl-vs/v2/ 。
+  v1 を `npm run deploy:v1` で出し直すと gh-pages が入れ替わって `v2/`・`lab/` が消えるので、その後に v2・lab も出し直す。
 
 ## 決まり（抜粋。詳細は継承計画の 2 章）
 

@@ -35,7 +35,7 @@ import { IS_MOBILE } from './device.ts';
 import { loadRapier } from '../core/physics/rapier.ts';
 import { PhysicsWorld } from '../core/physics/world.ts';
 import { START_SLOT, WorldPlanner, type StoryKey } from '../core/gen/world/plan.ts';
-import { cellIndexAt, decodeRoomId, isRoomCell, roomCellOk, roomIdOf } from '../core/gen/world/roomId.ts';
+import { cellIndexAt, decodeRoomId, isRoomCell, roomCellOk, roomIdOf, spotSignature } from '../core/gen/world/roomId.ts';
 import { WorldSession, type SessionOptions } from '../core/stream/session.ts';
 import { WorkerSource } from './world/WorkerSource.ts';
 import { restoreRegionCarry, saveRegionCarry, watchRegionCarry } from './game/carryStore.ts';
@@ -217,6 +217,10 @@ let currentRoomId: number | null = null;
 /** タブレットの「探索」: 番号の部屋があるか・その部屋へ移る（果てしない階で入れる） */
 let roomCheck: TabletHooks['checkRoom'] = async () => false;
 let roomWarp: TabletHooks['warp'] = async () => false;
+/** タブレットの写真: 足元の場所の印・写真の場所があるか・写真の場所へ移る（果てしない階で入れる。docs/tablet.md） */
+let spotAt: TabletHooks['spotAt'] = () => null;
+let spotCheck: TabletHooks['checkSpot'] = async () => false;
+let photoWarp: TabletHooks['travel'] = async () => false;
 const worldSource = worldMode ? new WorkerSource(tuning, { dress: !params.has('nodress') }) : null;
 const planner = new WorldPlanner(tuning);
 
@@ -333,6 +337,42 @@ if (worldMode) {
     return L && roomCellOk(L, ref) ? { story: st, plan, cell: L.cells[ref.cell]!.id } : null;
   };
   roomCheck = async (id) => (await roomTarget(id)) !== null;
+  // 写真の場所: 撮った所の階と区域の区画から作る印（世界の作りが変わったら合わない = 行けない）
+  spotAt = (pos) => {
+    const s = game.session;
+    if (!s) return null;
+    const plan = s.active.planAt(pos[0]!, pos[2]!);
+    const L = s.active.regionLayout(plan.id);
+    const sig = L ? spotSignature(L, pos) : null;
+    return sig ? { depth: s.active.story.depth, variant: s.active.story.variant, sig } : null;
+  };
+  /** 写真の場所の区域（作って確かめる。場所の印が合わなければ null） */
+  const spotTarget = async (spot: Parameters<TabletHooks['checkSpot']>[0]): Promise<{ story: StoryKey; plan: ReturnType<WorldPlanner['at']> } | null> => {
+    const st: StoryKey = { world: seed, depth: spot.depth, variant: spot.variant };
+    const plan = planner.atPos(st, spot.feet[0], spot.feet[2]);
+    const L = await source.prefetch(plan);
+    return L && spotSignature(L, spot.feet) === spot.sig ? { story: st, plan } : null;
+  };
+  spotCheck = async (spot) => (await spotTarget(spot)) !== null;
+  // 写真の場所へ移る: 演出はタブレット（写真を見せたまま）。撮った所にそのまま置き（立てない所でも）、着いた視点を合わせる
+  photoWarp = async (spot, view) => {
+    if (moving) return false;
+    moving = true;
+    try {
+      const t1 = performance.now();
+      const target = await spotTarget(spot);
+      if (!target) return false;
+      const s = game.session!;
+      let ok = false;
+      for (let i = 0; i < 200 && !(ok = s.prepareGotoPose(target.story, target.plan, spot.feet, spot.yaw, spot.crouch)); i++) await sleep(50);
+      if (ok) { ok = false; for (let i = 0; i < 600 && !(ok = s.commitGoto()); i++) await sleep(30); }
+      if (ok) game.arrive(view);
+      console.info(`[写真] B${spot.depth + 1}F${spot.variant ? ' 裏' : ''} の撮った所へ${ok ? '' : '移れず'} ${(performance.now() - t1).toFixed(0)} ms`);
+      return ok;
+    } finally {
+      moving = false;
+    }
+  };
   // 番号の部屋へ移る: 電源が落ちる → 移る先を作る（LOADING）→ 電源が入って、その部屋の開口の内側に立つ
   roomWarp = async (id, onDark) => {
     if (moving) return false;
@@ -398,6 +438,9 @@ const tablet = new TabletController(game, {
   roomsAvailable: () => !!game.session,
   checkRoom: (id) => roomCheck(id),
   warp: (id, onDark) => roomWarp(id, onDark),
+  spotAt: (pos) => spotAt(pos),
+  checkSpot: (spot) => spotCheck(spot),
+  travel: (spot, view) => photoWarp(spot, view),
   maps,
 });
 // 遊び始める: メニューを出さずに、電源が入って一人称の画面から

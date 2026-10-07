@@ -52,6 +52,16 @@ const ENV_LERP_SEC = 0.8;
  * input は遊んでいる間だけ呼ぶ（持っている間の入力に直して返す: 指のカーソル・クリック・ダッシュやジャンプを止める など）。
  * update は描く前に毎フレーム（止まっている間は dt = 0）
  */
+/** 写真の場所へ移ったときの視点（タブレットの写真。カメラの位置・向き YXZ・縦の画角（度）・しゃがみ） */
+export interface ArrivalView {
+  eye: [number, number, number];
+  yaw: number;
+  pitch: number;
+  roll: number;
+  fov: number;
+  crouch: boolean;
+}
+
 export interface HeldDevice {
   input(input: InputState, dt: number): InputState;
   update(dt: number): void;
@@ -103,6 +113,10 @@ export class ClientGame {
   onFrame: ((input: InputState, dt: number) => void) | null = null;
   /** 手に持つ物（タブレット）。無ければ null */
   device: HeldDevice | null = null;
+  /** しゃがんだままにする（しゃがんで撮った写真の場所へ移った直後。タブレットを下ろし終えるまで） */
+  holdCrouch = false;
+  /** 写真の場所へ移ったときの視点（次の階の入れ替えで合わせる。arrive） */
+  private arrival: ArrivalView | null = null;
 
   private readonly hemi = new THREE.HemisphereLight(0xe5e4d5, 0x6c665a, 0.1);
   private lightsPool: LightManager;
@@ -369,6 +383,7 @@ export class ClientGame {
       this.yaw = p.yaw;
       this.pitch = 0;
       this.rig.snap(this.subject(1));
+      this.applyArrival();
     }
     this.flashlight?.reset();
     this.currentCell = null;
@@ -454,6 +469,31 @@ export class ClientGame {
     this.input.exitLock();
   }
 
+  /**
+   * 写真の場所へ移った（タブレットの写真から。docs/tablet.md）: 次に階を入れ替えたとき、視線を写真の向きにし、カメラを写真の視点
+   * （位置・向き・画角）に重ねる（rig.hold。タブレットを下ろしながら k を 0 へ）。crouch: しゃがんで撮った写真（holdCrouch で保つ）
+   */
+  arrive(v: ArrivalView): void {
+    this.arrival = v;
+  }
+
+  /** arrive で頼んだ視点を、まだ合わせていない（階の入れ替えを待っている） */
+  get arrivalPending(): boolean {
+    return this.arrival !== null;
+  }
+
+  private applyArrival(): void {
+    const v = this.arrival;
+    if (!v) return;
+    this.arrival = null;
+    this.yaw = v.yaw;
+    this.pitch = v.pitch;
+    this.rig.snap(this.subject(1));
+    const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(v.pitch, v.yaw, v.roll, 'YXZ'));
+    this.rig.hold = { pos: new THREE.Vector3(v.eye[0], v.eye[1], v.eye[2]), quat, fov: v.fov, k: 1 };
+    this.holdCrouch = v.crouch;
+  }
+
   /** 開発用: プレイヤーを pos へ移す（見本のフロアのワープ）。視点もすぐ合わせる */
   teleport(pos: readonly [number, number, number], yaw: number): void {
     if (!this.sim) return;
@@ -526,7 +566,7 @@ export class ClientGame {
   }
 
   private command(input: InputState): InputCommand {
-    return { moveX: input.moveX, moveY: input.moveY, yaw: this.yaw, pitch: this.pitch, jump: this.pendingJump, dash: input.dash, crouch: input.crouch, interact: this.pendingInteract, drop: this.pendingDrop, flashlight: this.flashlightOn, ...(this.audio.loudness.micAvailable ? { voice: this.audio.loudness.level() } : {}) };
+    return { moveX: input.moveX, moveY: input.moveY, yaw: this.yaw, pitch: this.pitch, jump: this.pendingJump, dash: input.dash, crouch: input.crouch || this.holdCrouch, interact: this.pendingInteract, drop: this.pendingDrop, flashlight: this.flashlightOn, ...(this.audio.loudness.micAvailable ? { voice: this.audio.loudness.level() } : {}) };
   }
 
   /** タップした画面の位置（NDC）を、視線の向きにする */
