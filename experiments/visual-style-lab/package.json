@@ -1,0 +1,15 @@
+{
+  "name": "visual-style-lab",
+  "private": true,
+  "version": "0.0.0",
+  "description": "検証用: 参考画像（imageboard）の見た目を再現して歩き回れるテストステージ（v1 / v2 のファイルは変更しない）",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host --port 5176 --strictPort",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "capture": "node tools/capture.mjs",
+    "build:pages": "vite build --base /pl-vs/lab/",
+    "deploy:pages": "npm run build:pages && gh-pages -d dist --add --dest lab -m \"deploy: GitHub Pages（見た目の検証ステージ lab/）\""
+  }
+}
