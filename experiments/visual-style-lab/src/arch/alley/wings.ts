@@ -10,6 +10,8 @@ import { streakMat } from './dress.ts';
 import type { FacadePaint } from './reflect.ts';
 import type { Doors } from './doors.ts';
 import { createPaint } from '../../render/PaintMaterial.ts';
+import { alleySink, propMats, propOnFrame } from './props/mats.ts';
+import { umbrellaStand } from './props/school.ts';
 
 /**
  * 西棟・東棟の外壁（通路側・南と北の端・裏）。窓の並びは参考画像から測った値（docs と plan.ts の notes）。
@@ -180,7 +182,7 @@ export function buildWest(b: Builder, paint: FacadePaint, doors: Doors): WingRes
   const canopy = facadeMat(sFr, { colors: { front: '#21434a', top: '#2a5056', bottom: '#183439', side: '#1c3b41' } });
   sFr.box(b, canopy, [0.7, 2.75, 0], [5.1, 2.95, 1.7]);
   sFr.box(b, createPaint({ color: { py: '#173a3c', side: '#132f31' } }), [1.3, 0, 0.05], [4.5, 0.02, 1.2]);
-  sFr.box(b, createPaint({ color: { side: '#2f5a5e', py: '#3a666a' } }), [4.8, 0, 0.1], [5.5, 0.55, 0.45], { collide: true });
+  umbrellaStand(propOnFrame(alleySink(b), propMats('shade', 0.7), sFr, 5.15, 0, 0.27, 'out', 75).p, { w: 0.7, d: 0.32, h: 0.55, nx: 5, fill: 0.4 });
   // 北の端（道路斜線で低い）: 1 階は外階段への非常口、窓は階段室
   const hN = roofAt(WEST, WEST.u1);
   const nOps: Opening[] = [];

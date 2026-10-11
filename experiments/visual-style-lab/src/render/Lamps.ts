@@ -124,6 +124,7 @@ export class LampSet {
 
   clear(): void {
     this.list.length = 0;
+    this.maxDist = 24;
   }
 
   /** 目に近い灯り（照らす箱までの距離の近い順）を uniform へ */

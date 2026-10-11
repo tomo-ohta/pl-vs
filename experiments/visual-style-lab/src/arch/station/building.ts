@@ -9,6 +9,11 @@ import type { Mats } from './mats.ts';
 import { region, tubeAdder, type AddTube } from './region.ts';
 import { signGeo, type SignKind } from './signs.ts';
 import { addPool } from './mat.ts';
+import { bicycle, chair, extinguisher, pottedPlant, steelShelf, trashBin, vendingMachine } from '../../props/lib/index.ts';
+import { placer } from './props/mats.ts';
+import { STATION_COLORS as C } from './props/colors.ts';
+import { acUnit, coinLocker, hydrantBox, ticketGate, ticketVendor } from './props/machines.ts';
+import { officeDesk, pamphletRack, planter } from './props/furnish.ts';
 
 /**
  * 駅舎（平屋・切妻屋根）と地下道。
@@ -93,24 +98,12 @@ function buildFacade(b: Builder, ctx: SceneContext, mat: Mats, addTube: AddTube)
   // ベンチ（入口の北、壁沿い）・くず入れ 3 つ（燃える・缶・びん）・植木鉢の列（入口の南）
   seatRow(b, mat.benchT, mat.steel, [x1 + 0.55, Y.road + 0.12, z0 + 10.6], -Math.PI / 2, 3, 0.55);
   ctx.colliders.add({ x: x1 + 0.2, y: Y.road, z: z0 + 9.7 }, { x: x1 + 0.9, y: Y.road + 1.0, z: z0 + 11.5 });
-  for (let k = 0; k < 3; k++) {
-    const z = z0 + 13.0 + k * 0.52;
-    b.boxMM(mat.steel, [x1 + 0.25, Y.road + 0.12, z - 0.22], [x1 + 0.7, Y.road + 0.97, z + 0.22], { collide: true });
-    b.boxMM([mat.board, mat.signWhite, mat.green][k], [x1 + 0.23, Y.road + 0.97, z - 0.23], [x1 + 0.72, Y.road + 1.02, z + 0.23]);
-    b.box(mat.black, [x1 + 0.71, Y.road + 0.82, z], [0.01, 0.06, 0.22], { shadow: false });
-  }
-  for (let k = 0; k < 4; k++) {
-    const z = z0 + 22.2 + k * 0.75;
-    b.boxMM(mat.wood, [x1 + 0.2, Y.road + 0.12, z - 0.3], [x1 + 0.7, Y.road + 0.55, z + 0.3], { collide: true });
-    for (let j = 0; j < 3; j++) b.mesh(new THREE.IcosahedronGeometry(0.2 + ((k + j) % 3) * 0.04, 0), mat.hedge, [x1 + 0.45 + (j - 1) * 0.1, Y.road + 0.68 + (j % 2) * 0.08, z + (j - 1) * 0.15], { shadow: false });
-  }
-  // 自転車（北の壁に立てかけて）
-  for (const z of [z0 + 2.2, z0 + 3.0]) {
-    b.mesh(new THREE.TorusGeometry(0.33, 0.02, 4, 16), mat.black, [x1 + 0.3, Y.road + 0.46, z - 0.45], { shadow: false });
-    b.mesh(new THREE.TorusGeometry(0.33, 0.02, 4, 16), mat.black, [x1 + 0.3, Y.road + 0.46, z + 0.55], { shadow: false });
-    b.box(mat.steel, [x1 + 0.3, Y.road + 0.75, z + 0.05], [0.03, 0.03, 0.9], { shadow: false });
-    b.box(mat.steel, [x1 + 0.3, Y.road + 0.98, z + 0.45], [0.5, 0.03, 0.03], { shadow: false });
-  }
+  // 分別のくず入れ（燃える・缶・びん）・角のプランター 4 つ（入口の南）・自転車 2 台（北の端、前輪を壁へ向けて）
+  const put = placer(b, ctx);
+  put((p) => trashBin(p, C.bins), [x1 + 0.47, Y.road + 0.12, z0 + 13.52], Math.PI / 2);
+  for (let k = 0; k < 4; k++) put((p) => planter(p, { w: 0.6, d: 0.48 }), [x1 + 0.45, Y.road + 0.12, z0 + 22.2 + k * 0.75], Math.PI / 2, 50 + k);
+  put((p) => bicycle(p, C.bikeSilver), [x1 + 1.0, Y.road + 0.12, z0 + 2.0], -Math.PI / 2 + 0.06, 61);
+  put((p) => bicycle(p, C.bikeBlack), [x1 + 1.0, Y.road + 0.12, z0 + 2.75], -Math.PI / 2 - 0.08, 62);
   // 歩道の点字ブロック（南北の線と、入口への枝）
   const o = { x: mat.tactileXo, z: mat.tactileZo, dot: mat.tactileDoto };
   const yt = Y.road + 0.12;
@@ -277,8 +270,7 @@ function buildShell(b: Builder, ctx: SceneContext, mat: Mats): void {
     for (const [x, z] of [[x0 + 0.2, z0 - 0.15], [x1 - 0.2, z0 - 0.15], [x0 + 0.2, z1 + 0.15], [x1 - 0.2, z1 + 0.15]] as const) {
       b.cyl(mat.steel, [x, eave / 2, z], 0.05, eave, { segments: 8 });
     }
-    b.boxMM(mat.vending, [x1 - 3.6, 0, z1 + 0.15], [x1 - 2.8, 0.62, z1 + 0.45], { collide: true });
-    b.box(mat.black, [x1 - 3.2, 0.31, z1 + 0.46], [0.5, 0.5, 0.01]);
+    placer(b, ctx)((p) => acUnit(p), [x1 - 3.2, 0, z1 + 0.32], 0);
     b.boxMM(mat.steel, [x1 - 2.75, 0.4, z1 + 0.12], [x1 - 2.68, 2.4, z1 + 0.18]);
     b.boxMM(mat.wallBase, [x1 - 6.2, 1.2, z0 - 0.3], [x1 - 5.4, 2.0, z0 - 0.12]);
     b.box(mat.board, [x1 - 5.8, 1.6, z0 - 0.31], [0.3, 0.2, 0.01]);
@@ -411,13 +403,8 @@ function buildInterior(b: Builder, ctx: SceneContext, mat: Mats, addTube: AddTub
     seatRow(b, mat.benchIn, mat.steelIn, [x1 - 0.55, 0, zh1 - 2.0], Math.PI / 2, 4, 0.55);
     ctx.colliders.add({ x: x1 - 0.9, y: 0, z: zh1 - 3.2 }, { x: x1 - 0.2, y: 0.9, z: zh1 - 0.8 });
     // 券売機 2 台（北の壁、窓口の東）と運賃表・「きっぷうりば」
-    for (const x of [x0 + 6.4, x0 + 7.4]) {
-      b.boxMM(mat.ticketIn, [x - 0.42, 0, zh0 + 0.06], [x + 0.42, 1.65, zh0 + 0.62], { collide: true });
-      b.box(mat.ticketScreen, [x, 1.15, zh0 + 0.63], [0.5, 0.36, 0.02], { shadow: false });
-      b.box(mat.blackIn, [x, 0.75, zh0 + 0.63], [0.3, 0.12, 0.02]);
-      b.box(mat.boardIn, [x, 1.5, zh0 + 0.63], [0.6, 0.08, 0.02], { shadow: false });
-      b.boxMM(mat.housingIn, [x - 0.44, 1.65, zh0 + 0.06], [x + 0.44, 1.75, zh0 + 0.66]);
-    }
+    const put = placer(b, ctx, { inside: true });
+    for (const x of [x0 + 6.4, x0 + 7.4]) put((p) => ticketVendor(p, C.ticket), [x, 0, zh0 + 0.34], 0);
     framed(b, mat, 'fare', [x0 + 6.9, 2.25, zh0 + 0.08], 2.2, 0.85, 'z');
     b.mesh(signGeo('kippu', [1.5, 0.22, 0.03]), mat.signGlowIn, [x0 + 6.9, 2.86, zh0 + 0.1], { shadow: false, layer: 1 });
     // 窓口のカウンターと札・小さな掲示
@@ -427,25 +414,10 @@ function buildInterior(b: Builder, ctx: SceneContext, mat: Mats, addTube: AddTub
     b.boxMM(mat.sashIn, [x0 + 2.25, 1.95, zh0 + 0.06], [x0 + 4.15, 2.05, zh0 + 0.1]);
     b.box(mat.boardIn, [x0 + 3.2, 2.25, zh0 + 0.08], [1.2, 0.22, 0.02], { shadow: false });
     // コインロッカー（北の壁の東）: 4 列 × 5 段の扉・すき間・鍵
-    {
-      const xa = x0 + 9.2;
-      const xb = x0 + 11.6;
-      const zf = zh0 + 0.56;
-      b.boxMM(mat.lockerIn, [xa, 0, zh0 + 0.06], [xb, 1.85, zf], { collide: true });
-      b.boxMM(mat.housingIn, [xa - 0.02, 1.85, zh0 + 0.06], [xb + 0.02, 1.95, zf + 0.02]);
-      for (let k = 1; k < 4; k++) b.box(mat.blackIn, [xa + (k * (xb - xa)) / 4, 0.95, zf + 0.003], [0.015, 1.8, 0.01], { shadow: false });
-      for (let r = 1; r < 5; r++) b.box(mat.blackIn, [(xa + xb) / 2, 0.08 + r * 0.354, zf + 0.003], [xb - xa, 0.015, 0.01], { shadow: false });
-      for (let c = 0; c < 4; c++) for (let r = 0; r < 5; r++) b.box(mat.steelIn, [xa + (c + 0.8) * 0.6, 0.08 + (r + 0.5) * 0.354, zf + 0.008], [0.04, 0.06, 0.012], { shadow: false });
-    }
+    put((p) => coinLocker(p, C.locker), [x0 + 10.4, 0, zh0 + 0.31], 0);
     // 消火栓の箱（赤）と赤い灯・パンフレットの棚
-    b.boxMM(mat.redIn, [ix1 - 1.75, 0.5, zh0 + 0.06], [ix1 - 1.05, 1.4, zh0 + 0.24]);
-    b.box(mat.redLit, [ix1 - 1.4, 1.55, zh0 + 0.12], [0.12, 0.12, 0.08], { shadow: false });
-    {
-      const xr = x0 + 12.6;
-      b.boxMM(mat.woodIn, [xr - 0.4, 0, zh0 + 0.06], [xr + 0.4, 1.45, zh0 + 0.36]);
-      const cols = [mat.boardIn, mat.redIn, mat.greenIn, mat.boardIn, mat.ticketIn];
-      for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) b.box(cols[(r * 3 + c) % cols.length], [xr - 0.25 + c * 0.25, 0.55 + r * 0.24, zh0 + 0.38], [0.2, 0.2, 0.02], { rotX: -0.25, shadow: false });
-    }
+    put((p) => hydrantBox(p), [ix1 - 1.4, 0, zh0 + 0.15], 0);
+    put((p) => pamphletRack(p), [x0 + 12.6, 0, zh0 + 0.22], 0);
     // 時刻表・発車の案内・時計（改札の上）
     framed(b, mat, 'timetable', [ix0 + 0.03, 1.6, zh0 + 0.9], 1.3, 1.1, 'x');
     b.mesh(signGeo('depart', [1.5, 0.19, 0.03]), mat.signGlowIn, [ix0 + 0.04, 2.62, z0 + 16.3], { rotY: Math.PI / 2, shadow: false, layer: 1 });
@@ -462,15 +434,8 @@ function buildInterior(b: Builder, ctx: SceneContext, mat: Mats, addTube: AddTub
     framed(b, mat, 'dengon', [x0 + 1.7, 1.5, zh1 - 0.09], 1.3, 1.0, '-z');
     framed(b, mat, 'ad', [ix1 - 0.03, 1.55, z0 + 21.0 - 0.6], 0.5, 0.7, '-x', true);
     // 自動販売機（入口の脇）・くず入れ 3 つ（燃える・缶・びん）
-    b.boxMM(mat.vendingIn, [x1 - 0.95, 0, zh1 - 0.95], [x1 - 0.12, 1.83, zh1 - 0.12], { collide: true });
-    b.box(mat.vendingLit, [x1 - 0.96, 1.25, zh1 - 0.53], [0.02, 0.6, 0.6], { shadow: false });
-    b.box(mat.blackIn, [x1 - 0.96, 0.4, zh1 - 0.53], [0.02, 0.18, 0.4]);
-    for (let k = 0; k < 3; k++) {
-      const z = zh0 + 2.2 + k * 0.5;
-      b.boxMM(mat.steelIn, [ix1 - 0.45, 0, z - 0.21], [ix1 - 0.05, 0.85, z + 0.21], { collide: true });
-      b.boxMM([mat.boardIn, mat.ticketIn, mat.greenIn][k], [ix1 - 0.47, 0.85, z - 0.22], [ix1 - 0.04, 0.9, z + 0.22]);
-      b.box(mat.blackIn, [ix1 - 0.46, 0.7, z], [0.01, 0.06, 0.2], { shadow: false });
-    }
+    put((p) => vendingMachine(p, C.vendingWhite), [x1 - 0.5, 0, zh1 - 0.62], -Math.PI / 2, 31);
+    put((p) => trashBin(p, C.bins), [ix1 - 0.25, 0, zh0 + 2.7], -Math.PI / 2);
     // 腰壁の帯（内側。開口をよけて置く）と、上の縁の細い見切り
     for (const [xa, xb] of [[ix0, ix0 + 0.02], [ix1 - 0.02, ix1]] as const) {
       const cuts = xa < xm ? [[15.2, 21.8]] : [[17.3, 20.3], [14.8, 16.6], [21.1, 23.7]];
@@ -490,9 +455,8 @@ function buildInterior(b: Builder, ctx: SceneContext, mat: Mats, addTube: AddTub
     for (const z of [zh0 + 0.16, z0 + 16.95, z0 + 20.65, zh1 - 0.16]) b.boxMM(mat.woodIn, [ix1 - 0.12, 0, z - 0.12], [ix1, CEIL, z + 0.12], { shadow: false });
     for (const z of [zh0 + 0.16, z0 + 15.1, z0 + 21.9, zh1 - 0.16]) b.boxMM(mat.woodIn, [ix0, 0, z - 0.12], [ix0 + 0.12, CEIL, z + 0.12], { shadow: false });
     // 消火器・植木鉢
-    b.cyl(mat.redLit, [x1 - 1.4, 0.3, zh1 - 0.3], 0.09, 0.55, { segments: 10 });
-    b.cyl(mat.woodIn, [x0 + 1.0, 0.25, zh1 - 0.6], 0.25, 0.5, { segments: 12, collide: true });
-    for (let k = 0; k < 6; k++) b.mesh(new THREE.IcosahedronGeometry(0.22, 0), mat.hedge, [x0 + 1.0 + Math.cos(k) * 0.15, 0.7 + k * 0.08, zh1 - 0.6 + Math.sin(k * 2) * 0.15]);
+    put((p) => extinguisher(p), [x1 - 1.45, 0, zh1 - 0.3], Math.PI);
+    put((p) => pottedPlant(p, C.plant), [x0 + 1.0, 0, zh1 - 0.6], 0, 41);
     // 床: 入口から改札への点字ブロック・入口のマット
     tactile(b, mat, x0 + 2.4, z0 + 17.95, ix1 - 0.3, z0 + 18.25, 0, 'both');
     tactile(b, mat, x0 + 2.4, zh0 + 0.8, x0 + 2.7, z0 + 17.95, 0, 'start');
@@ -504,13 +468,9 @@ function buildInterior(b: Builder, ctx: SceneContext, mat: Mats, addTube: AddTub
     const zc = z0 + 18.5;
     const xg = x0 + 0.9;
     const lanes = [-2.15, -1.0, 0.15, 1.3];
-    for (const dz of lanes) {
-      b.boxMM(mat.vendingIn, [xg - 0.7, 0, zc + dz - 0.125], [xg + 0.7, 0.95, zc + dz + 0.125], { collide: true });
-      b.boxMM(mat.blackIn, [xg - 0.72, 0.95, zc + dz - 0.13], [xg + 0.72, 1.02, zc + dz + 0.13]);
-      b.box(mat.ticketScreen, [xg - 0.2, 1.03, zc + dz], [0.18, 0.01, 0.16], { shadow: false });
-      b.box(mat.signalG, [xg - 0.71, 0.8, zc + dz], [0.01, 0.08, 0.08], { shadow: false });
-      b.box(mat.signalG, [xg + 0.71, 0.8, zc + dz], [0.01, 0.08, 0.08], { shadow: false });
-    }
+    // 自動改札機 4 台（入る側を待合室へ向ける。端の台は外の面に扉の口が無い）
+    const put = placer(b, ctx, { inside: true });
+    lanes.forEach((dz, i) => put((p) => ticketGate(p, { flaps: [i < lanes.length - 1, i > 0] }), [xg, 0, zc + dz], Math.PI / 2));
     // 係員の箱（改札の南）
     b.boxMM(mat.wallBaseIn, [xg - 0.8, 0, zc + 2.0], [xg + 0.8, 1.05, zc + 3.1], { collide: true });
     b.boxMM(mat.boardIn, [xg - 0.85, 1.05, zc + 1.95], [xg + 0.85, 1.1, zc + 3.15]);
@@ -524,18 +484,13 @@ function buildInterior(b: Builder, ctx: SceneContext, mat: Mats, addTube: AddTub
     const zr0 = ROOMS.zA;
     const zr1 = ROOMS.zB;
     const box: Box6 = [ix0, -0.1, zr0 + 0.06, ROOMS.xOff - 0.06, 3.1, zr1 - 0.06];
-    b.boxMM(mat.woodIn, [x0 + 1.5, 0, zr0 + 1.0], [x0 + 3.5, 0.72, zr0 + 1.9], { collide: true });
-    b.boxMM(mat.woodIn, [x0 + 4.2, 0, zr0 + 1.0], [x0 + 6.2, 0.72, zr0 + 1.9], { collide: true });
-    for (const x of [x0 + 2.5, x0 + 5.2]) {
-      b.box(mat.blackIn, [x, 0.45, zr0 + 2.4], [0.45, 0.08, 0.45]);
-      b.box(mat.blackIn, [x, 0.75, zr0 + 2.62], [0.45, 0.55, 0.06]);
-      b.box(mat.ticketScreen, [x, 0.95, zr0 + 1.2], [0.5, 0.32, 0.03], { shadow: false });
-      // 書類の山
-      b.boxMM(mat.boardIn, [x + 0.35, 0.72, zr0 + 1.2], [x + 0.75, 0.8 + (x > x0 + 4 ? 0.12 : 0.05), zr0 + 1.6]);
+    // 事務机 2 つ（窓口の側に座る人の席）と事務椅子・壁際のスチール棚 3 つ（ファイル・紙・段ボール）
+    const put = placer(b, ctx, { inside: true });
+    for (const [k, x] of [x0 + 2.5, x0 + 5.2].entries()) {
+      put((p) => officeDesk(p, { w: 1.6, d: 0.8 }), [x, 0, zr0 + 1.45], 0, 71 + k);
+      put((p) => chair(p, C.officeChair), [x - 0.2, 0, zr0 + 2.35], Math.PI + (k - 0.5) * 0.5, 73 + k);
     }
-    // 棚と書類
-    b.boxMM(mat.steelIn, [ROOMS.xOff - 0.5, 0, zr0 + 0.2], [ROOMS.xOff - 0.1, 2.0, zr1 - 0.3], { collide: true });
-    for (let k = 0; k < 4; k++) b.boxMM(mat.boardIn, [ROOMS.xOff - 0.48, 0.3 + k * 0.45, zr0 + 0.4], [ROOMS.xOff - 0.14, 0.55 + k * 0.45, zr1 - 0.5]);
+    for (let k = 0; k < 3; k++) put((p) => steelShelf(p, { ...C.officeShelf, h: 1.95, d: 0.4 }), [ROOMS.xOff - 0.32, 0, zr0 + 0.85 + k * 1.24], -Math.PI / 2, 80 + k);
     // 黒板（運行の掲示）
     b.box(mat.greenIn, [x0 + 3.8, 1.6, zr0 + 0.08], [2.4, 1.0, 0.03]);
     b.box(mat.woodIn, [x0 + 3.8, 1.08, zr0 + 0.1], [2.4, 0.04, 0.06]);
@@ -581,7 +536,7 @@ function buildInterior(b: Builder, ctx: SceneContext, mat: Mats, addTube: AddTub
     framed(b, mat, 'posters', [ix1 - 0.03, 1.05, z0 + 6.5], 2.2, 0.8, '-x');
     framed(b, mat, 'timetable', [x0 + 1.5, 1.35, z0 + 0.13], 1.1, 0.9, 'z');
     framed(b, mat, 'notice', [x0 + 9.0, 1.4, ROOMS.zA - 0.08], 2.4, 0.9, '-z');
-    b.cyl(mat.redLit, [ix1 - 0.3, 0.3, ROOMS.zA - 0.3], 0.09, 0.55, { segments: 10 });
+    placer(b, ctx, { inside: true })((p) => extinguisher(p), [ix1 - 0.3, 0, ROOMS.zA - 0.3], Math.PI);
     // 天井: 梁・器具（階段の上にも 1 つ）
     beams(b, mat, 'x', [ix0, ix1], [z0 + 3.4, z0 + 6.6], CEIL);
     for (const x of [x0 + 3, x0 + 9]) fixture(b, mat, addTube, x, CEIL, z0 + 5.0, 'x', box, 1.15);

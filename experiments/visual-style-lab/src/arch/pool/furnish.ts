@@ -25,6 +25,7 @@ import {
   panel,
   pipeRun,
   plant,
+  propAt,
   pump,
   rescueBoard,
   scale,
@@ -40,11 +41,17 @@ import {
   washbasin,
   type Dress,
 } from './props.ts';
+import { boxPile } from '../../props/lib/index.ts';
+import { fridge as fridgeK, handDryer as handDryerK, kitchenette as kitchenetteK, saunaHeater, saunaThermometer, snackItems, spinner as spinnerK } from './props/furniture.ts';
+import { heatExchanger as heatExchangerK, panelTank, poolCleaner, ropeReel as ropeReelK, stackedChairs as stackedChairsK, woodFence } from './props/equipment.ts';
+import { boardCart, drum, jerrycan, pail, type PoolLoad } from './props/gear.ts';
+import { footprints, PC } from './props/mats.ts';
+import { poolBin } from './props/common.ts';
 
 /**
- * 部屋の種類ごとの「置く物の決まり」。どの部屋も同じ描き方（白いタイル・淡い青緑・記号的な小物）で、
+ * 部屋の種類ごとの「置く物の決まり」。どの部屋も同じ描き方（白いタイル・淡い青緑）で、小物は小物の道具で作り込んだ物（./props/*.ts）。
  * 壁ぞいの空いた所へ順に置き（扉の前は空ける）、真ん中に島（背中合わせのロッカー・テーブル）を置く。
- * Frame の向き: 壁の内側の面に沿って、正面 +z が部屋の内側。
+ * Frame の向き: 壁の内側の面に沿って、正面 +z が部屋の内側。壁ぎわの物は壁の面から前へ出す（壁に埋めない）。
  */
 type Side = 'n' | 's' | 'w' | 'e';
 
@@ -173,12 +180,12 @@ export function furnishRoom(b: Builder, d: Dress, fm: FurnishMats, r: RoomDef): 
       // 壁ぞいにロッカー、真ん中に背中合わせのロッカーとベンチの島。奥の壁に化粧台・脱水機・体重計
       along(b, r, 'w', [lock(6, 3), lock(6, 3), lock(6, 3), lock(6, 3), lock(6, 3)], { corner: 0.4, gap: 0.0 });
       along(b, r, 'e', [lock(6, 3), lock(6, 3), lock(6, 3), lock(6, 3), lock(6, 3)], { corner: 0.4, gap: 0.0 });
-      along(b, r, 'n', [{ w: 4.0, put: (f) => vanity(d, f, 4.0) }, { w: 0.7, put: (f) => scale(d, f.sub(0, 0.6)) }, { w: 0.9, put: (f) => spinner(d, f) }, { w: 0.6, put: (f) => fountain(d, f.sub(0, 0.25)) }], { corner: 0.6, gap: 0.4 });
+      along(b, r, 'n', [{ w: 2.6, put: (f) => vanity(d, f, 2.6) }, { w: 0.7, put: (f) => scale(d, f.sub(0, 0.3)) }, { w: 0.9, put: (f) => spinner(d, f) }, { w: 0.6, put: (f) => fountain(d, f.sub(0, 0.25)) }], { corner: 0.6, gap: 0.3 });
       for (const zc of [cz - D * 0.22, cz + D * 0.18]) {
         const f = at(b, r, cx, zc, 0);
         // 背中合わせ（扉は外向き）
-        lockers(d, f.sub(0, 0.5, 0), 8, 3, Math.floor(d.r() * 400) + 1, 0.4, 1.5);
-        lockers(d, f.sub(0, -0.5, 2), 8, 3, Math.floor(d.r() * 400) + 1, 0.4, 1.5);
+        lockers(d, f, 8, 3, Math.floor(d.r() * 400) + 1, 0.4, 1.5, 0);
+        lockers(d, f.sub(0, 0, 2), 8, 3, Math.floor(d.r() * 400) + 1, 0.4, 1.5, 0);
         bench(d, f.sub(0, 1.25, 0), 2.6, 0.38);
         bench(d, f.sub(0, -1.25, 0), 2.6, 0.38);
         // 島の両端と上はタイル張りの塊（端は青緑の帯）
@@ -208,9 +215,10 @@ export function furnishRoom(b: Builder, d: Dress, fm: FurnishMats, r: RoomDef): 
     }
     case 'guard': {
       // プールを見る窓の前に机と端末・無線、壁に救助の道具・AED・掲示
-      along(b, r, 'n', [{ w: 3.0, put: (f) => { desk(d, f.sub(-0.75, 0.4), 1.4); desk(d, f.sub(0.75, 0.4), 1.4); } }, { w: 3.0, put: (f) => { desk(d, f.sub(-0.75, 0.4), 1.4); desk(d, f.sub(0.75, 0.4), 1.4); } }], { from: 1.4, gap: 1.0 });
-      along(b, r, 'w', [{ w: 0.8, put: (f) => backboard(d, f) }, { w: 1.0, put: (f) => rescueBoard(d, f) }, { w: 0.6, put: (f) => aed(d, f) }, { w: 1.2, put: (f) => shelf(d, f.sub(0, 0.5), 1.1, 1.9, 0.5, 'float') }], { corner: 0.5, gap: 0.3 });
-      along(b, r, 's', [lock(5, 2), { w: 1.6, put: (f) => wallNotice(d, f, d.signs.board(61), 1.5, 0.95, 1.6) }, { w: 1.3, put: (f) => shelf(d, f.sub(0, 0.45), 1.2, 1.8, 0.45, 'mixed') }], { corner: 0.5, gap: 0.4 });
+      // 窓の前に机を 2 つずつ（窓の下の壁に寄せる）
+      for (const x of [x0 + 3.6, x0 + 5.1, x0 + 8.6, x0 + 10.1]) desk(d, at(b, r, x, z0 + 0.45, 0), 1.4);
+      along(b, r, 'w', [{ w: 0.8, put: (f) => backboard(d, f) }, { w: 1.0, put: (f) => rescueBoard(d, f) }, { w: 0.6, put: (f) => aed(d, f) }, { w: 1.2, put: (f) => shelf(d, f.sub(0, 0.5), 1.1, 1.9, 0.5, ['boards', 'tubes', 'buoys', 'boards']) }], { corner: 0.5, gap: 0.3 });
+      along(b, r, 's', [lock(5, 2), { w: 1.6, put: (f) => wallNotice(d, f, d.signs.board(61), 1.5, 0.95, 1.6) }, { w: 1.3, put: (f) => shelf(d, f.sub(0, 0.45), 1.2, 1.8, 0.45, ['binders', 'towels', 'aid', 'bins']) }], { corner: 0.5, gap: 0.4 });
       table(d, at(b, r, x0 + W * 0.65, cz + 1.0, 0), 1.6, 0.8);
       for (const dx of [-0.5, 0.5]) chair(d, at(b, r, x0 + W * 0.65 + dx, cz + 1.75, 2));
       clock(d, sideFrame(b, r, 'e').f.sub(D / 2, 0), 2.3, 0.22);
@@ -218,7 +226,7 @@ export function furnishRoom(b: Builder, d: Dress, fm: FurnishMats, r: RoomDef): 
     }
     case 'staff': {
       along(b, r, 'w', [lock(5, 2), lock(5, 2), lock(5, 2)], { corner: 0.5 });
-      along(b, r, 'n', [{ w: 2.4, put: (f) => kitchenette(d, f, 2.4) }, { w: 0.7, put: (f) => fridge(d, f) }, { w: 1.0, put: (f) => vending(d, f.sub(0, 0.35), 'water') }], { corner: 0.6, gap: 0.3 });
+      along(b, r, 'n', [{ w: 2.4, put: (f) => kitchenette(d, f, 2.4) }, { w: 0.7, put: (f) => fridge(d, f) }, { w: 1.0, put: (f) => vending(d, f.sub(0, 0.4), 'water') }], { corner: 0.6, gap: 0.3 });
       along(b, r, 'e', [{ w: 2.2, put: (f) => sofa(d, f.sub(0, 0.45), 2.0) }, { w: 1.6, put: (f) => wallNotice(d, f, d.signs.board(62), 1.5, 0.95, 1.6) }], { corner: 1.0, gap: 0.8 });
       const t = at(b, r, cx, cz, 0);
       table(d, t, 2.0, 0.9);
@@ -232,13 +240,15 @@ export function furnishRoom(b: Builder, d: Dress, fm: FurnishMats, r: RoomDef): 
     case 'lobby': {
       if (r.id === 'entrance') {
         // 入口: 下足箱・券売機・受付の窓口（北の事務室）・入場ゲート（西の通路の口）・ベンチ・自販機・案内図
-        along(b, r, 'e', [{ w: 3.0, put: (f) => shoeLockers(d, f, 10, 6, 1) }, { w: 3.0, put: (f) => shoeLockers(d, f, 10, 6, 61) }, { w: 3.0, put: (f) => shoeLockers(d, f, 10, 6, 121) }], { from: 2.4, gap: 0.2 });
-        along(b, r, 's', [{ w: 3.0, put: (f) => shoeLockers(d, f, 10, 6, 181) }, { w: 3.0, put: (f) => shoeLockers(d, f, 10, 6, 241) }], { from: 0.6, gap: 0.3 });
+        // 下足箱（壁の柱型の間に収まる幅 1.5〜1.8 m の組）
+        along(b, r, 'e', [{ w: 1.8, put: (f) => shoeLockers(d, f, 6, 6, 1) }, { w: 1.8, put: (f) => shoeLockers(d, f, 6, 6, 37) }, { w: 1.8, put: (f) => shoeLockers(d, f, 6, 6, 73) }, { w: 1.5, put: (f) => shoeLockers(d, f, 5, 6, 109) }], { from: 0.6, gap: 0.2 });
+        along(b, r, 's', [{ w: 1.8, put: (f) => shoeLockers(d, f, 6, 6, 139) }, { w: 1.8, put: (f) => shoeLockers(d, f, 6, 6, 175) }, { w: 1.8, put: (f) => shoeLockers(d, f, 6, 6, 211) }], { from: 0.6, gap: 0.2 });
         along(b, r, 'n', [{ w: 1.0, put: (f) => ticketMachine(d, f.sub(0, 0.35)) }, { w: 1.0, put: (f) => ticketMachine(d, f.sub(0, 0.35)) }], { from: 0.6, gap: 0.3, clear: 0.2 });
         frontDesk(d, at(b, r, (25 + 31) / 2, z0 + 0.6, 0), 6.0);
-        along(b, r, 'n', [{ w: 1.0, put: (f) => vending(d, f.sub(0, 0.35), 'drink') }, { w: 1.0, put: (f) => vending(d, f.sub(0, 0.35), 'water') }, { w: 1.6, put: (f) => wallNotice(d, f, d.signs.map(71), 1.5, 1.12, 1.7) }], { from: 11.0, gap: 0.3 });
+        along(b, r, 'n', [{ w: 1.0, put: (f) => vending(d, f.sub(0, 0.4), 'drink') }, { w: 1.0, put: (f) => vending(d, f.sub(0, 0.4), 'water') }, { w: 1.6, put: (f) => wallNotice(d, f, d.signs.map(71), 1.5, 1.12, 1.7) }], { from: 11.0, gap: 0.3 });
         gates(d, at(b, r, x0 + 1.6, 35.5, 1), 2, 0.9);
-        for (const z of [29.5, 32.5]) bench(d, at(b, r, cx + 2.0, z, 0), 2.4, 0.42);
+        for (const z of [29.5, 32.5]) bench(d, at(b, r, cx + 2.0, z, 0), 2.4, 0.42, 'seats');
+        along(b, r, 'n', [{ w: 0.6, put: (f) => bin(d, f.sub(0, 0.3)) }, { w: 1.2, put: (f) => recycleBin(d, f.sub(0, 0.28)) }], { from: 14.4, gap: 0.2 });
         plant(d, at(b, r, x1 - 0.6, z1 - 3.0, 0), 1.2);
         plant(d, at(b, r, x0 + 0.7, z1 - 0.7, 0), 1.2);
         decal(sideFrame(b, r, 'w').f.sub(D - 4.6, 0), d.signs.label('更衣室', '←'), [0, 2.6, 0.01], 1.4, 0.35);
@@ -247,44 +257,35 @@ export function furnishRoom(b: Builder, d: Dress, fm: FurnishMats, r: RoomDef): 
         clock(d, sideFrame(b, r, 'n').f.sub(9.5, 0), 2.9, 0.28);
       } else {
         // 休憩コーナー: ベンチ・自販機・給水器・コインロッカー・植木・案内・時計
-        along(b, r, 'w', [lock(6, 4, 1.6), { w: 1.0, put: (f) => vending(d, f.sub(0, 0.35), 'drink') }, { w: 1.0, put: (f) => vending(d, f.sub(0, 0.35), 'water') }, { w: 0.6, put: (f) => fountain(d, f.sub(0, 0.2)) }], { corner: 0.4, gap: 0.3 });
+        along(b, r, 'w', [lock(3, 4, 1.6), { w: 1.0, put: (f) => vending(d, f.sub(0, 0.4), 'drink') }, { w: 1.0, put: (f) => vending(d, f.sub(0, 0.4), 'water') }], { corner: 0.4, gap: 0.3 });
+        // 背中合わせの待合いの椅子
         for (const z of [cz - 2.5, cz + 1.0]) {
-          bench(d, at(b, r, cx + 1.5, z, 0), 2.6, 0.42);
-          bench(d, at(b, r, cx + 1.5, z + 1.1, 0), 2.6, 0.42);
+          bench(d, at(b, r, cx + 1.5, z, 2), 2.6, 0.42, 'seats');
+          bench(d, at(b, r, cx + 1.5, z + 0.75, 0), 2.6, 0.42, 'seats');
         }
         plant(d, at(b, r, x1 - 0.7, z1 - 0.7, 0), 1.1);
         plant(d, at(b, r, x1 - 0.7, z0 + 0.7, 0), 1.1);
         notices('n', [{ w: 1.6, put: (f) => wallNotice(d, f, d.signs.map(72), 1.5, 1.12, 1.7) }, nt(73), ct(74)], 4.0);
         clock(d, sideFrame(b, r, 's').f.sub(W * 0.3, 0), 2.6, 0.25);
-        along(b, r, 's', [{ w: 0.5, put: (f) => extinguisher(d, f.sub(0, 0.2)) }, { w: 0.6, put: (f) => bin(d, f.sub(0, 0.3)) }], { from: 0.5, gap: 0.4 });
+        along(b, r, 's', [{ w: 0.5, put: (f) => extinguisher(d, f.sub(0, 0.2)) }, { w: 0.6, put: (f) => bin(d, f.sub(0, 0.3)) }, { w: 0.6, put: (f) => fountain(d, f.sub(0, 0.24)) }], { from: 0.5, gap: 0.4 });
       }
       break;
     }
     case 'office': {
-      along(b, r, 'n', [{ w: 1.3, put: (f) => shelf(d, f.sub(0, 0.45), 1.2, 1.9, 0.45, 'box') }, { w: 1.3, put: (f) => shelf(d, f.sub(0, 0.45), 1.2, 1.9, 0.45, 'box') }, { w: 1.6, put: (f) => wallNotice(d, f, d.signs.board(81), 1.5, 0.95, 1.6) }, { w: 1.3, put: (f) => shelf(d, f.sub(0, 0.45), 1.2, 1.9, 0.45, 'box') }], { corner: 0.4, gap: 0.3 });
+      along(b, r, 'n', [{ w: 1.3, put: (f) => shelf(d, f.sub(0, 0.45), 1.2, 1.9, 0.45, ['binders', 'binders', 'paper', 'cardboard']) }, { w: 1.3, put: (f) => shelf(d, f.sub(0, 0.45), 1.2, 1.9, 0.45, ['bins', 'binders', 'binders', 'cardboard']) }, { w: 1.6, put: (f) => wallNotice(d, f, d.signs.board(81), 1.5, 0.95, 1.6) }, { w: 1.3, put: (f) => shelf(d, f.sub(0, 0.45), 1.2, 1.9, 0.45, ['cardboard', 'paper', 'binders', 'bins']) }], { corner: 0.4, gap: 0.3 });
       for (const dx of [-2.6, 0, 2.6]) for (const dz of [-1.6, 1.0]) desk(d, at(b, r, cx + dx, cz + dz, dz < 0 ? 0 : 2), 1.4);
       along(b, r, 'w', [{ w: 1.0, put: (f) => panel(d, f, 0.9) }, { w: 0.6, put: (f) => extinguisher(d, f.sub(0, 0.2)) }], { corner: 1.0, gap: 0.6 });
       clock(d, sideFrame(b, r, 'e').f.sub(D / 2, 0), 2.3, 0.22);
       break;
     }
     case 'store': {
-      along(b, r, 'n', [{ w: 2.0, put: (f) => shelf(d, f.sub(0, 0.55), 1.9, 2.1, 0.55, 'float') }, { w: 2.0, put: (f) => shelf(d, f.sub(0, 0.55), 1.9, 2.1, 0.55, 'float') }, { w: 2.0, put: (f) => shelf(d, f.sub(0, 0.55), 1.9, 2.1, 0.55, 'mixed') }, { w: 2.0, put: (f) => shelf(d, f.sub(0, 0.55), 1.9, 2.1, 0.55, 'box') }, { w: 2.0, put: (f) => shelf(d, f.sub(0, 0.55), 1.9, 2.1, 0.55, 'mixed') }], { corner: 0.4, gap: 0.2 });
-      along(b, r, 'w', [{ w: 2.0, put: (f) => ropeReel(d, f.sub(0, 0.9)) }, { w: 2.0, put: (f) => ropeReel(d, f.sub(0, 0.9)) }], { corner: 0.5, gap: 0.3 });
-      along(b, r, 'e', [{ w: 1.2, put: (f) => cleaner(d, f.sub(0, 0.6)) }, { w: 1.2, put: (f) => stackedChairs(d, f.sub(0, 0.4)) }, { w: 1.2, put: (f) => stackedChairs(d, f.sub(0, 0.4)) }], { corner: 0.5, gap: 0.3 });
-      // 真ん中: 台車に積んだビート板・浮きの山（2 列）と、コースロープの巻き取り台
-      for (const [dx, dz] of [[-1.6, -1.0], [1.6, -1.0], [-1.6, 1.4]] as [number, number][]) {
-        const t = at(b, r, cx + dx, cz + dz, 0);
-        t.box(d.p.steel, [-0.6, 0.08, -0.45], [0.6, 0.14, 0.45], { shadow: true, collide: true });
-        for (const wx of [-0.5, 0.5]) for (const wz of [-0.35, 0.35]) t.cyl(d.p.dark, [wx, 0.05, wz], 0.05, 0.04, { axis: 'x', segments: 8 });
-        let y = 0.14;
-        for (let i = 0; i < 9; i++) {
-          const mat = i % 3 === 0 ? d.p.float : i % 3 === 1 ? d.p.teal : d.p.white;
-          const h = 0.035 + d.r() * 0.01;
-          const o = (d.r() - 0.5) * 0.06;
-          t.box(mat, [-0.5 + o, y, -0.33 - o], [0.5 + o, y + h, 0.33 - o], { shadow: true });
-          y += h + 0.004;
-        }
-      }
+      // 棚（柱型の間に 1.2 m と 0.9 m の棚）: ビート板・プルブイ・レスキューチューブ・収納箱・タオル・段ボール・薬品
+      const sh = (w: number, load: PoolLoad[]) => ({ w: w + 0.1, put: (f: Frame) => shelf(d, f.sub(0, 0.55), w, 2.1, 0.55, load) });
+      along(b, r, 'n', [sh(1.2, ['boards', 'boards', 'buoys', 'tubes', 'boards']), sh(1.2, ['buoys', 'boards', 'buoys', 'boards', 'tubes']), sh(0.9, ['bins', 'towels', 'buoys', 'cardboard']), sh(0.9, ['jugs', 'cardboard', 'bins', 'cardboard']), sh(1.2, ['tubes', 'boards', 'buoys', 'boards']), sh(1.2, ['pails', 'towels', 'bins', 'cardboard', 'bins'])], { corner: 0.4, gap: 0.2 });
+      along(b, r, 'w', [{ w: 2.0, put: (f) => ropeReel(d, f.sub(0, 0.6)) }, { w: 2.0, put: (f) => ropeReel(d, f.sub(0, 0.6)) }, { w: 1.0, put: (f) => chemCorner(d, f) }], { corner: 0.5, gap: 0.3 });
+      along(b, r, 'e', [{ w: 1.2, put: (f) => cleaner(d, f.sub(0, 0.45)) }, { w: 1.0, put: (f) => stackedChairs(d, f.sub(0, 0.35)) }, { w: 1.0, put: (f) => stackedChairs(d, f.sub(0, 0.35)) }, { w: 0.9, put: (f) => boxPile(propAt(d, f.sub(0, 0.4), [0, 0, 0], (d.r() - 0.5) * 0.3), { n: 3, colors: [PC.kraft, PC.kraft, PC.wood] }) }], { corner: 0.5, gap: 0.3 });
+      // 真ん中: 台車に積んだビート板の山と、コースロープの巻き取り台
+      for (const [dx, dz] of [[-1.6, -1.0], [1.6, -1.0], [-1.6, 1.4]] as [number, number][]) boardCart(propAt(d, at(b, r, cx + dx, cz + dz, 0), [0, 0, 0], (d.r() - 0.5) * 0.3));
       ropeReel(d, at(b, r, cx + 1.6, cz + 1.6, 0));
       break;
     }
@@ -294,23 +295,22 @@ export function furnishRoom(b: Builder, d: Dress, fm: FurnishMats, r: RoomDef): 
       at(b, r, cx, cz, 0).box(fm.plantFloor, [-W / 2, 0, -D / 2], [W / 2, 0.01, D / 2], { shadow: 'receive' });
       // ろ過装置 3 基（北）・ポンプ 4 台（真ん中）・薬品の槽・制御盤（西の壁）・配管（天井の近く）
       const tanks: [number, number][] = [[x0 + 4, z0 + 4], [x0 + 9, z0 + 4], [x0 + 14, z0 + 4], [x0 + 19, z0 + 4], [x0 + 24, z0 + 4]];
-      // 受水槽（パネルの升目の箱・はしご）
-      const wt = at(b, r, x0 + 20.5, z0 + 11.5, 0);
-      wt.box(d.p.white, [-2.2, 0.3, -1.6], [2.2, 2.7, 1.6], { shadow: true, collide: true });
-      for (let x = -2.0; x < 2.2; x += 0.5) wt.box(d.p.pale, [x - 0.015, 0.3, 1.6], [x + 0.015, 2.7, 1.62], { shadow: false });
-      for (let y = 0.8; y < 2.7; y += 0.5) wt.box(d.p.pale, [-2.2, y - 0.015, 1.6], [2.2, y + 0.015, 1.62], { shadow: false });
-      wt.box(d.p.floorDark, [-2.4, 0, -1.8], [2.4, 0.3, 1.8], { shadow: true, collide: true });
-      for (let y = 0.4; y < 2.8; y += 0.3) wt.box(d.p.steel, [2.2, y - 0.015, -0.3], [2.45, y + 0.015, 0.3], { shadow: true });
-      for (const z of [-0.3, 0.3]) wt.box(d.p.steel, [2.42, 0.3, z - 0.02], [2.46, 2.9, z + 0.02], { shadow: true });
+      // 受水槽（FRP のパネル水槽・はしご・上の点検口）
+      panelTank(propAt(d, at(b, r, x0 + 20.5, z0 + 11.5, 0)), 4.4, 3.2, 2.0);
       for (const [x, z] of tanks) filterTank(d, at(b, r, x, z, 0), 1.3, 2.2);
       for (let i = 0; i < 4; i++) pump(d, at(b, r, x0 + 4 + i * 3.2, z0 + 11, 0));
-      for (let i = 0; i < 2; i++) chemTank(d, at(b, r, x1 - 2.0 - i * 1.4, z1 - 3.0, 2));
+      // 薬品の槽 2 基（東の壁ぎわ。南の角の道順の視点の前をふさがない）
+      for (let i = 0; i < 2; i++) chemTank(d, at(b, r, x1 - 0.75, z1 - 2.4 - i * 1.4, 3));
       along(b, r, 'w', [{ w: 1.0, put: (f) => panel(d, f, 0.9) }, { w: 1.0, put: (f) => panel(d, f, 0.9) }, { w: 1.0, put: (f) => panel(d, f, 0.9) }, { w: 1.0, put: (f) => panel(d, f, 0.9) }], { from: 9.0, gap: 0.1 });
-      along(b, r, 'e', [{ w: 3.0, put: (f) => heatExchanger(d, f.sub(0, 0.8)) }, { w: 2.2, put: (f) => shelf(d, f.sub(0, 0.5), 2.0, 2.0, 0.5, 'box') }], { corner: 3.0, gap: 1.0 });
+      along(b, r, 'e', [{ w: 3.0, put: (f) => heatExchanger(d, f.sub(0, 0.6)) }, { w: 1.3, put: (f) => shelf(d, f.sub(0, 0.5), 1.2, 2.0, 0.5, ['pails', 'jugs', 'bottles', 'cardboard']) }, { w: 1.4, put: (f) => chemCorner(d, f) }], { corner: 3.0, gap: 1.0 });
       const pf = at(b, r, 0, 0, 0);
       // 配管は梁の下を通す
       const yP = (roomFrame(r)?.bottom ?? r.ceil) - 0.32;
-      for (const [x, z] of tanks) pipeRun(d, pf, [[x, 2.9, z], [x, yP, z], [x, yP, z0 + 8], [x0 + 4 + 3.2 * Math.round((x - x0 - 4) / 3.2), yP, z0 + 8], [x0 + 4 + 3.2 * Math.round((x - x0 - 4) / 3.2), 1.25, z0 + 11]], 0.1, d.p.pipeBlue);
+      // ろ過装置の上の管 → 天井の下 → ポンプの端の吸込み（局所 x +0.64）へ下りる
+      for (const [x, z] of tanks) {
+        const px = x0 + 4 + 3.2 * Math.round((x - x0 - 4) / 3.2) + 0.64;
+        pipeRun(d, pf, [[x, 2.9, z], [x, yP, z], [x, yP, z0 + 8], [px, yP, z0 + 8], [px, yP, z0 + 11], [px, 1.25, z0 + 11]], 0.1, d.p.pipeBlue);
+      }
       pipeRun(d, pf, [[x0 + 1.0, yP - 0.4, z0 + 7.0], [x1 - 1.0, yP - 0.4, z0 + 7.0]], 0.14);
       pipeRun(d, pf, [[x0 + 1.0, yP - 0.75, z0 + 14.0], [x1 - 1.0, yP - 0.75, z0 + 14.0]], 0.12, d.p.pipeBlue);
       for (let i = 0; i < 4; i++) pipeRun(d, pf, [[x0 + 4 + i * 3.2 + 0.32, 1.32, z0 + 11], [x0 + 4 + i * 3.2 + 0.32, yP - 0.75, z0 + 11], [x0 + 4 + i * 3.2 + 0.32, yP - 0.75, z0 + 14]], 0.08);
@@ -323,7 +323,7 @@ export function furnishRoom(b: Builder, d: Dress, fm: FurnishMats, r: RoomDef): 
       const n = Math.floor((W - 1.0) / 1.0);
       along(b, r, 'n', Array.from({ length: Math.min(n, 5) }, (_, i) => ({ w: 1.0, put: (f: Frame) => cubicle(d, f.sub(0, 1.4), 1.0, 1.4, i === 0) })), { corner: 0.6, gap: 0 });
       const ws = r.doors[0]?.side === 's' ? 'e' : 's';
-      along(b, r, ws, [{ w: 0.7, put: (f) => washbasin(d, f.sub(0, 0.45)) }, { w: 0.7, put: (f) => washbasin(d, f.sub(0, 0.45)) }, { w: 0.6, put: (f) => handDryer(d, f) }], { corner: 0.6, gap: 0.2 });
+      along(b, r, ws, [{ w: 0.7, put: (f) => washbasin(d, f) }, { w: 0.7, put: (f) => washbasin(d, f) }, { w: 0.6, put: (f) => handDryer(d, f) }, { w: 0.6, put: (f) => bin(d, f.sub(0, 0.3)) }], { corner: 0.6, gap: 0.2 });
       break;
     }
     case 'sauna': {
@@ -342,21 +342,18 @@ export function furnishRoom(b: Builder, d: Dress, fm: FurnishMats, r: RoomDef): 
       tier(xa, xa + 0.9, z0 + 0.4, z1 - 1.05, 0.45);
       // 段の切れ目（タイルの塊の継ぎ目に見える縦の溝）
       for (let x = xa + 2.0; x < xb - 0.5; x += 2.0) f.box(d.p.tealDark, [x - 0.02, 0.0, z1 - 1.06], [x + 0.02, 0.44, z1 - 1.04], { shadow: false });
-      // 暖房器（暗い箱）と柵
-      f.box(d.p.dark, [x1 - 1.4, 0, z1 - 1.1], [x1 - 0.4, 0.75, z1 - 0.3], { shadow: true, collide: true });
-      for (let i = 0; i < 6; i++) f.box(d.p.steel, [x1 - 1.35 + i * 0.17, 0.75, z1 - 1.05], [x1 - 1.25 + i * 0.17, 0.85, z1 - 0.35], { shadow: true });
-      for (let x = x1 - 1.7; x <= x1 - 0.1; x += 0.2) f.box(d.p.steel, [x - 0.02, 0, z1 - 1.5], [x + 0.02, 1.0, z1 - 1.46], { shadow: true });
-      f.box(d.p.steel, [x1 - 1.72, 0.96, z1 - 1.52], [x1 - 0.08, 1.0, z1 - 1.44], { shadow: true });
+      // 暖房器（石の籠）と木の柵
+      saunaHeater(propAt(d, at(b, r, x1 - 0.9, z1 - 0.7, 0)), 1.0, 0.8);
+      woodFence(propAt(d, at(b, r, x1 - 0.9, z1 - 1.48, 2)), 1.6, 1.0);
       // 温度計・時計・注意
-      f.box(d.p.white, [x1 - 0.6, 1.5, z0 + 0.02], [x1 - 0.4, 1.9, z0 + 0.06], { shadow: false });
-      f.box(d.p.red, [x1 - 0.51, 1.55, z0 + 0.06], [x1 - 0.49, 1.85, z0 + 0.07], { shadow: false });
+      saunaThermometer(propAt(d, at(b, r, x1 - 0.5, z0, 0), [0, 0, 0.02]));
       clock(d, sideFrame(b, r, 'n').f.sub(W / 2 + 2.0, 0.06), 1.9, 0.16);
       along(b, r, 'n', [ct(141), nt(142)], { from: 1.0, gap: 0.3, clear: 0.3 });
       break;
     }
     case 'aid': {
       aidBed(d, at(b, r, x0 + 1.2, cz, 1));
-      along(b, r, 'e', [{ w: 1.0, put: (f) => shelf(d, f.sub(0, 0.45), 0.9, 1.8, 0.45, 'box') }], { corner: 0.4 });
+      along(b, r, 'e', [{ w: 1.0, put: (f) => shelf(d, f.sub(0, 0.45), 0.9, 1.8, 0.45, ['aid', 'towels', 'bottles', 'linen']) }, { w: 0.6, put: (f) => bin(d, f.sub(0, 0.3)) }], { corner: 0.4, gap: 0.3 });
       along(b, r, 'n', [{ w: 1.6, put: (f) => desk(d, f.sub(0, 0.4), 1.4) }, { w: 0.7, put: (f) => washbasin(d, f) }, { w: 0.6, put: (f) => aed(d, f) }], { corner: 0.4, gap: 0.3 });
       along(b, r, 's', [{ w: 0.8, put: (f) => backboard(d, f) }, { w: 0.6, put: (f) => wallNotice(d, f, d.signs.notice(101), 0.55, 0.73, 1.55) }], { corner: 0.5, gap: 0.3 });
       break;
@@ -382,13 +379,14 @@ export function furnishRoom(b: Builder, d: Dress, fm: FurnishMats, r: RoomDef): 
       f.box(d.p.teal, [x1 - 7.05, 1.0, z0 + 0.95], [x1 - 0.95, 1.05, z0 + 1.65], { shadow: true });
       f.box(d.p.pale, [x1 - 7.0, 0, z0 + 0.05], [x1 - 1.0, 0.9, z0 + 0.6], { shadow: true, collide: true });
       decal(sideFrame(b, r, 'n').f.sub(W - 4.0, 0), d.signs.label('軽食'), [0, 2.6, 0.01], 1.2, 0.3);
+      snackCounter(d, at(b, r, x1 - 4.0, z0 + 1.3, 0));
       for (let i = 0; i < 4; i++)
         for (let j = 0; j < 3; j++) {
           const t = at(b, r, x0 + 4.0 + i * 3.6, z0 + 5.0 + j * 3.4, 0);
           table(d, t, 1.2, 0.8);
           for (const dz of [-0.65, 0.65]) chair(d, t.sub(0, dz, dz < 0 ? 0 : 2));
         }
-      along(b, r, 's', [{ w: 2.4, put: (f2) => sofa(d, f2.sub(0, 0.45), 2.2) }, { w: 2.4, put: (f2) => sofa(d, f2.sub(0, 0.45), 2.2) }, { w: 1.0, put: (f2) => vending(d, f2.sub(0, 0.35), 'drink') }, { w: 1.0, put: (f2) => vending(d, f2.sub(0, 0.35), 'water') }], { from: 1.0, gap: 0.6 });
+      along(b, r, 's', [{ w: 2.4, put: (f2) => sofa(d, f2.sub(0, 0.45), 2.2) }, { w: 2.4, put: (f2) => sofa(d, f2.sub(0, 0.45), 2.2) }, { w: 1.0, put: (f2) => vending(d, f2.sub(0, 0.4), 'drink') }, { w: 1.0, put: (f2) => vending(d, f2.sub(0, 0.4), 'water') }, { w: 1.2, put: (f2) => recycleBin(d, f2.sub(0, 0.28)) }], { from: 1.0, gap: 0.6 });
       plant(d, at(b, r, x0 + 0.8, z1 - 0.8, 0), 1.2);
       plant(d, at(b, r, x1 - 0.8, z1 - 0.8, 0), 1.2);
       clock(d, sideFrame(b, r, 'w').f.sub(D / 2 - 2.0, 0), 3.0, 0.3);
@@ -398,64 +396,64 @@ export function furnishRoom(b: Builder, d: Dress, fm: FurnishMats, r: RoomDef): 
   }
 }
 
-// ---------------------------------------------------------------- 部屋だけの物
+// ---------------------------------------------------------------- 部屋だけの物（形は ./props/*.ts）
 
-/** 水着の脱水機（白い円筒の箱・ふた） */
+/** 水着の脱水機（Frame の原点が壁の面） */
 function spinner(d: Dress, f: Frame): void {
-  f.box(d.p.white, [-0.3, 0, -0.55], [0.3, 0.85, -0.05], { shadow: true, collide: true });
-  f.cyl(d.p.metal, [0, 0.86, -0.3], 0.2, 0.02, { segments: 16 });
-  f.box(d.p.dark, [-0.08, 0.6, -0.05], [0.08, 0.7, -0.04], { shadow: false });
+  spinnerK(propAt(d, f, [0, 0, 0.3 + 0.025]));
 }
 
-/** 流しと電子レンジ・ポットの台 */
+/** 流し台・電子レンジ・ポット・吊り戸棚（Frame の原点が壁の面） */
 function kitchenette(d: Dress, f: Frame, w: number): void {
-  f.box(d.p.white, [-w / 2, 0, -0.6], [w / 2, 0.85, 0], { shadow: true, collide: true });
-  f.box(d.p.chrome, [-0.5, 0.86, -0.5], [0.0, 0.88, -0.1], { shadow: false });
-  f.box(d.p.white, [0.3, 0.86, -0.55], [0.8, 1.15, -0.2], { shadow: true });
-  f.box(d.p.dark, [0.35, 0.92, -0.2], [0.65, 1.1, -0.19], { shadow: false });
-  f.box(d.p.pale, [-w / 2, 1.5, -0.35], [w / 2, 2.2, 0], { shadow: true });
+  kitchenetteK(propAt(d, f, [0, 0, 0.3 + 0.025]), w);
 }
 
-/** 冷蔵庫 */
+/** 冷蔵庫（Frame の原点が壁の面） */
 function fridge(d: Dress, f: Frame): void {
-  f.box(d.p.white, [-0.3, 0, -0.65], [0.3, 1.75, 0], { shadow: true, collide: true });
-  f.box(d.p.metal, [0.22, 0.9, 0], [0.25, 1.4, 0.03], { shadow: false });
+  fridgeK(propAt(d, f, [0, 0, 0.33 + 0.025]));
 }
 
-/** 手を乾かす機械 */
+/** 手の乾燥機（Frame の原点が壁の面） */
 function handDryer(d: Dress, f: Frame): void {
-  f.box(d.p.white, [-0.15, 1.0, -0.2], [0.15, 1.5, 0], { shadow: true });
-  f.box(d.p.dark, [-0.12, 1.02, -0.18], [0.12, 1.06, -0.02], { shadow: false });
+  handDryerK(propAt(d, f, [0, 0, 0.025]));
 }
 
-/** コースロープの巻き取り台（大きな筒に巻いたロープ） */
+/** コースロープの巻き取り台 */
 function ropeReel(d: Dress, f: Frame): void {
-  for (const x of [-0.8, 0.8]) f.box(d.p.steel, [x - 0.04, 0, -0.5], [x + 0.04, 1.0, 0.5], { shadow: true, collide: true });
-  f.cyl(d.p.rope, [0, 0.75, 0], 0.32, 1.5, { axis: 'x', segments: 18 });
-  f.cyl(d.p.ropeRed, [-0.6, 0.75, 0], 0.33, 0.2, { axis: 'x', segments: 18 });
-  f.cyl(d.p.ropeRed, [0.6, 0.75, 0], 0.33, 0.2, { axis: 'x', segments: 18 });
-  for (const x of [-0.8, 0.8]) for (const z of [-0.45, 0.45]) f.cyl(d.p.dark, [x, 0.06, z], 0.06, 0.05, { axis: 'x', segments: 10 });
+  ropeReelK(propAt(d, f));
 }
 
-/** プール清掃機（水中掃除機の箱とホース） */
+/** プールの掃除機（台車に載せる） */
 function cleaner(d: Dress, f: Frame): void {
-  f.box(d.p.teal, [-0.35, 0, -0.3], [0.35, 0.4, 0.3], { shadow: true, collide: true });
-  f.cyl(d.p.dark, [0, 0.55, 0], 0.25, 0.25, { axis: 'z', segments: 16 });
+  poolCleaner(propAt(d, f, [0, 0, 0], Math.PI + (d.r() - 0.5) * 0.3));
 }
 
 /** 重ねた椅子 */
 function stackedChairs(d: Dress, f: Frame): void {
-  for (let i = 0; i < 6; i++) f.box(d.p.pale, [-0.22, 0.43 + i * 0.07, -0.2], [0.22, 0.47 + i * 0.07, 0.22], { shadow: true });
-  for (const x of [-0.2, 0.2]) f.box(d.p.metal, [x - 0.012, 0, -0.18], [x + 0.012, 0.85, -0.16], { shadow: true });
-  f.box(d.p.pale, [-0.2, 0.85, -0.22], [0.2, 1.2, -0.19], { shadow: true });
+  stackedChairsK(propAt(d, f, [0, 0, 0], (d.r() - 0.5) * 0.3), 5 + Math.floor(d.r() * 3), d.r() < 0.5 ? PC.teal : PC.tealDark);
 }
 
-/** 熱交換器（横長の胴と管） */
+/** 熱交換器 */
 function heatExchanger(d: Dress, f: Frame): void {
-  f.cyl(d.p.metal, [0, 0.9, 0], 0.45, 2.6, { axis: 'x', segments: 18 });
-  for (const x of [-1.0, 1.0]) f.box(d.p.steel, [x - 0.1, 0, -0.35], [x + 0.1, 0.5, 0.35], { shadow: true, collide: true });
-  f.cyl(d.p.pipeBlue, [-0.8, 1.6, 0], 0.08, 0.6, { segments: 10 });
-  f.cyl(d.p.pipe, [0.8, 1.6, 0], 0.08, 0.6, { segments: 10 });
+  heatExchangerK(propAt(d, f));
+}
+
+/** 分別のごみ箱 */
+function recycleBin(d: Dress, f: Frame): void {
+  poolBin(propAt(d, f), 'recycle');
+}
+
+/** 薬品の置き場（床の上のポリドラム・ポリ缶・ペール缶）。Frame の原点が壁の面 */
+function chemCorner(d: Dress, f: Frame): void {
+  drum(propAt(d, f, [-0.25, 0, 0.25], d.r() * 6), PC.blue);
+  jerrycan(propAt(d, f, [0.22, 0, 0.15], (d.r() - 0.5) * 0.3), PC.white);
+  if (d.r() < 0.7) jerrycan(propAt(d, f, [0.24, 0, 0.42], (d.r() - 0.5) * 0.5), d.r() < 0.5 ? PC.blue : PC.yellow, PC.white);
+  pail(propAt(d, f, [-0.2, 0, 0.62], d.r() * 6), PC.white);
+}
+
+/** 軽食の売り場のカウンターの上の物（形は ./props/furniture.ts） */
+function snackCounter(d: Dress, f: Frame): void {
+  snackItems(propAt(d, f));
 }
 
 /**
@@ -466,11 +464,17 @@ export function contactShadows(b: Builder, r: RoomDef, mat: THREE.Material): voi
   const y0 = r.floor;
   const boxes: THREE.Box3[] = [];
   b.root.updateMatrixWorld(true);
-  for (const ob of b.root.children) {
-    const mesh = ob as THREE.Mesh;
-    if (!mesh.isMesh || mesh.name.startsWith('gobo')) continue;
-    mesh.geometry.computeBoundingBox();
-    const bb = mesh.geometry.boundingBox!.clone().applyMatrix4(mesh.matrixWorld);
+  // 小物（小物の道具で作った物）は部品ごとではなく外形の箱で
+  const foot = footprints(b).map(([mn, mx]) => new THREE.Box3(new THREE.Vector3(...mn), new THREE.Vector3(...mx)));
+  for (const ob of [...b.root.children, ...foot]) {
+    let bb: THREE.Box3;
+    if (ob instanceof THREE.Box3) bb = ob;
+    else {
+      const mesh = ob as THREE.Mesh;
+      if (!mesh.isMesh || mesh.name.startsWith('gobo') || mesh.name === 'prop') continue;
+      mesh.geometry.computeBoundingBox();
+      bb = mesh.geometry.boundingBox!.clone().applyMatrix4(mesh.matrixWorld);
+    }
     const sx = bb.max.x - bb.min.x;
     const sz = bb.max.z - bb.min.z;
     // 床から 0.6 m 以内に下端があり、0.25 m より高く立ち上がる、4 m より小さい物

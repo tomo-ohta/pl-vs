@@ -3,7 +3,13 @@ import type { SceneContext } from '../../scenes/types.ts';
 import { DOORS, FLOOR2, room, ROOMS, STAIR, WINDOWS, type Rect, type RoomDef, type Side } from './layout.ts';
 import type { Paints } from './paint.ts';
 import * as P from './props.ts';
-import { C, Fr, Posters } from './props.ts';
+import { Fr, Posters } from './props.ts';
+import { bracketLamp, cupboard, darkCabinet, extinguisher, fridge, pendant, sinkCounter } from './props/kitchen.ts';
+import { bench, clock, magazineRack, payPhone, plant, shoeRack, slipperStand, stove, umbrellaStand, waterDispenser } from './props/lobby.ts';
+import { K, prop } from './props/mats.ts';
+import { cart, centrifuge, cup, exam, glassCabinet, ivPole, microscope, mopSink, oxygen, scale, screen, treatBed, tubeRack, urinal, viewer, washBasin, wheelchair } from './props/medical.ts';
+import { bookcase, coatStand, desk, deskTop, dispensingTable, drawerCabinet, lowCabinet, lowTable, safe, sofa, stool, swivelChair, teacup, wasteBin, woodChair } from './props/office.ts';
+import { boxes, cones, ladder, shelfUnit } from './props/storage.ts';
 import { LINING, sideSpecs } from './shell.ts';
 import { pastelPlan } from './plan.ts';
 import { pilasterRects, structOf } from './trim.ts';
@@ -235,7 +241,7 @@ function darkCab(pl: Placer, rnd: () => number): void {
     for (const s of sides) {
       const f = pl.wall(s, w, 0.45, 1.05, { start: 0.15 + rnd() * 0.3 }) ?? pl.wall(s, w, 0.45, 1.05);
       if (f) {
-        P.darkCabinet(f, w, 1.0, 0.45, Math.floor(rnd() * 99));
+        darkCabinet(prop(f, Math.floor(rnd() * 99)), w, 1.0, 0.45);
         return;
       }
     }
@@ -333,8 +339,8 @@ export function furnishAll(ctx: SceneContext, p: Paints, bOf: (k: string) => Bui
         lobby(pl, post, rnd);
         break;
       case 'vest':
-        P.mat(new Fr(b, p, 0, 3.4, 0), 1.6, 0.9, C.darker);
-        P.umbrellaStand(new Fr(b, p, 1.15, 4.6, Math.PI), 3);
+        P.mat(new Fr(b, p, 0, 3.4, 0), 1.6, 0.9, K.darker);
+        umbrellaStand(prop(new Fr(b, p, 1.15, 4.6, Math.PI), 3), 3);
         P.ceilingLamp(new Fr(b, p, 0, 3.9, 0), r.ceil, 0.4, 0.4);
         P.drift(new Fr(b, p, 0.7, 4.55, 0.1), 1.0, 0.6, 0.16);
         break;
@@ -366,17 +372,18 @@ export function furnishAll(ctx: SceneContext, p: Paints, bOf: (k: string) => Bui
         pantry(pl, post, rnd);
         break;
       case 'porch':
-        P.shoeRack(new Fr(b, p, -1.27, -22.25, Math.PI / 2), 1.6, 0.9, 0.38, 0.5, 5);
+        shoeRack(prop(new Fr(b, p, -1.27, -22.25, Math.PI / 2), 5), 1.6, 0.9, 0.38, 0.5);
         // 下駄箱の上の掲示板と、扉の横の掛け金物（職員の通り道の決まり）
         P.noticeBoard(new Fr(b, p, -1.499, -22.3, Math.PI / 2), 1.1, 0.62, 1.25, 3);
         P.hooks(new Fr(b, p, -0.9, -23.199, 0), 0.6, 1.62, 3);
         // 外の扉に貼った紙（「施錠中」の知らせ）と、扉の横の外灯のスイッチ
-        new Fr(b, p, -0.12, -23.19, 0).box(C.paper, [-0.14, 1.02, 0.03], [0.14, 1.26, 0.034]);
+        new Fr(b, p, -0.12, -23.19, 0).box(K.paper, [-0.14, 1.02, 0.03], [0.14, 1.26, 0.034]);
         new Fr(b, p, -0.12, -23.19, 0).box('#b8c3bb', [-0.1, 1.18, 0.034], [0.1, 1.2, 0.036]);
         new Fr(b, p, -0.12, -23.19, 0).box('#b8c3bb', [-0.1, 1.12, 0.034], [0.06, 1.135, 0.036]);
-        P.umbrellaStand(new Fr(b, p, 1.2, -21.65, -Math.PI / 2), 2);
-        P.mopSink(new Fr(b, p, 1.48, -22.9, -Math.PI / 2));
-        P.mat(new Fr(b, p, 0, -21.85, 0), 1.2, 0.7, C.darker);
+        umbrellaStand(prop(new Fr(b, p, 1.2, -21.65, -Math.PI / 2), 9), 2);
+        // 掃除の流し（北の端は壁ぎわなので、モップとバケツは南の側 = 局所の +x）
+        mopSink(prop(new Fr(b, p, 1.48, -22.9, -Math.PI / 2), 4), { mop: 1, bucket: 1 });
+        P.mat(new Fr(b, p, 0, -21.85, 0), 1.2, 0.7, K.darker);
         P.drift(new Fr(b, p, 0.1, -22.85, 0.15), 1.6, 0.6, 0.2);
         P.ceilingLamp(new Fr(b, p, 0, -22.2, 0), r.ceil, 0.35, 0.35);
         posters(pl, post, 'e', 1, 77, 1.6);
@@ -429,45 +436,46 @@ function lobby(pl: Placer, post: Posters, rnd: () => number): void {
   pl.block([-3.6, -4.2, 3.2, -2.0]);
   pl.block([-1.9, -2.0, 1.9, 2.6]);
   // 長椅子: 西は受付の窓口を向く 3 列、東は東の壁ぎわとストーブの周り
+  let seed = 100;
   for (const z of [-1.3, 0.1, 1.5]) for (const x of [-6.0, -3.85]) {
     const f = pl.at(x, z, Math.PI, 0.95, 0.3);
-    if (f) P.bench(f, 1.8);
+    if (f) bench(prop(f, seed++), 1.8);
   }
   const s1 = pl.wall('e', 1.8, 0.45, 0.9, { start: 0.0 });
-  if (s1) P.bench(s1, 1.8);
+  if (s1) bench(prop(s1, seed++), 1.8);
   const st = pl.at(4.0, 0.6, 0, 0.6, 0.6);
-  if (st) P.stove(st);
+  if (st) stove(prop(st, seed++));
   const s2 = pl.at(4.0, -1.0, 0, 0.95, 0.3);
-  if (s2) P.bench(s2, 1.8);
+  if (s2) bench(prop(s2, seed++), 1.8);
   const s3 = pl.at(2.75, 0.9, -Math.PI / 2, 0.75, 0.3);
-  if (s3) P.bench(s3, 1.4);
+  if (s3) bench(prop(s3, seed++), 1.4);
   // 下足箱（南の壁の窓の下に低い物）・スリッパ立て・傘立て
   for (const [side, w, o] of [['s', 2.4, { start: 0.02 }], ['s', 2.4, { reverse: true, start: 0.02 }]] as const) {
     const f = pl.wall(side, w, 0.36, 0.85, o);
-    if (f) P.shoeRack(f, w, 0.85, 0.36, 0.45, Math.floor(rnd() * 99));
+    if (f) shoeRack(prop(f, Math.floor(rnd() * 99)), w, 0.85, 0.36, 0.45);
   }
   const ss = pl.at(-2.4, 2.25, Math.PI, 0.35, 0.12);
-  if (ss) P.slipperStand(ss, 0.6, 6);
+  if (ss) slipperStand(prop(ss, seed++), 0.6, 6);
   const us = pl.at(2.25, 2.3, Math.PI, 0.22, 0.14);
-  if (us) P.umbrellaStand(us, 3);
+  if (us) umbrellaStand(prop(us, seed++), 3);
   // 雑誌の棚・植木・給水機・公衆電話（西と東の壁）
   const mr = pl.wall('w', 0.8, 0.3, 1.1, { start: 0.0 });
-  if (mr) P.magazineRack(mr, 0.8);
+  if (mr) magazineRack(prop(mr, seed++), 0.8);
   for (const [side, o] of [['w', { reverse: true }], ['e', { reverse: true }]] as const) {
     const f = pl.wall(side, 0.45, 0.45, 1.2, o);
-    if (f) P.plant(f, 1.1 + rnd() * 0.3);
+    if (f) plant(prop(f, seed++), 1.1 + rnd() * 0.3);
   }
   const wc = pl.wall('e', 0.36, 0.36, 1.3, { start: 0.45 });
-  if (wc) P.waterCooler(wc);
+  if (wc) waterDispenser(prop(wc, seed++));
   const ph = pl.wall('e', 0.6, 0.25, 1.2, { start: 0.6 });
-  if (ph) P.phone(ph);
-  // 時計（受付の窓口の上）・掲示（東の塊・南の壁）・灯り
-  P.clock(new Fr(b, p, -5.0, -4.18, 0), 3.3);
+  if (ph) payPhone(prop(ph, seed++));
+  // 柱時計（受付の窓口の上）・掲示（東の塊・南の壁）・灯り
+  clock(prop(new Fr(b, p, -5.0, -4.18, 0), seed++), 3.3, 'pendulum');
   for (let i = 0; i < 4; i++) post.put(b, 3 + i, 'pz', [3.6 + i * 0.75, 1.75 + (i % 2) * 0.12, -4.272], 0.5, 0.65);
   post.put(b, 9, 'pz', [-6.9, 2.3, -4.172], 0.4, 0.5);
   posters(pl, post, 's', 2, 11, 2.2);
   posters(pl, post, 'w', 1, 12, 1.9);
-  P.extinguisher(new Fr(b, p, 6.9, -4.28, 0));
+  extinguisher(prop(new Fr(b, p, 6.9, -4.28, 0)));
   lamps(b, p, r, 2);
 }
 
@@ -476,32 +484,31 @@ function office(pl: Placer, post: Posters, rnd: () => number): void {
   // 窓口の内側の台と椅子（南の壁）
   for (const [x, w] of [[-6.42, 1.0], [-4.85, 1.5]] as const) {
     const f = new Fr(b, p, x, -4.46 - 0.35, Math.PI);
-    P.desk(f, w, 0.6, { drawers: false });
-    P.deskTop(f, w, 0.72, Math.floor(rnd() * 99), false);
-    P.officeChair(f.sub(0, 0.65, Math.PI + (rnd() - 0.5) * 0.4));
+    desk(prop(f), w, 0.6, { drawers: false });
+    deskTop(prop(f, Math.floor(rnd() * 99)).sub([0, 0.72, 0]), w, 0.6, { lamp: false, phone: w > 1.2 });
+    swivelChair(prop(f.sub(0, 0.65, Math.PI + (rnd() - 0.5) * 0.4)));
     pl.block([x - w / 2, -5.6, x + w / 2, -4.46]);
   }
-  P.deskPhone(new Fr(b, p, -4.3, -4.75, Math.PI), 0.72);
   // 薬の引き出しの棚・薬品棚（東の壁 = 廊下の壁）
   const dc = pl.wall('e', 1.8, 0.42, 1.8, { start: 0.05 });
-  if (dc) P.drawerCabinet(dc, 1.8, 1.8, 0.42);
+  if (dc) drawerCabinet(prop(dc, 11), 1.8, 1.8, 0.42);
   const gc = pl.wall('e', 0.9, 0.4, 1.85, { start: 0.05 });
-  if (gc) P.glassCabinet(gc, 0.9, 1.85, 0.4, 3);
+  if (gc) glassCabinet(prop(gc, 3), { dp: 0.4, content: 'medicine' });
   const sh = pl.wall('e', 0.9, 0.4, 1.9, { open: true });
-  if (sh) P.shelf(sh, 0.9, 1.9, 0.4, 'bottle', 4, C.enamel);
+  if (sh) shelfUnit(prop(sh, 4), 0.9, 1.9, 0.4, ['supplies', 'bottles', 'bottles', 'bottles'], { frame: K.enamel });
   // 調剤台（中ほど）
   const dt = pl.at(-4.6, -7.4, 0, 0.85, 0.42);
-  if (dt) P.dispensingTable(dt, 1.6, 0.75);
+  if (dt) dispensingTable(prop(dt, 12), 1.6, 0.75);
   // 金庫・書類の棚（北の壁）・低い棚（西の窓の下）
   const sf = pl.wall('n', 0.65, 0.6, 0.8, { start: 0.25 });
-  if (sf) P.safe(sf);
+  if (sf) safe(prop(sf));
   const fc = pl.wall('n', 0.9, 0.45, 1.8, { start: 0.3, open: true });
-  if (fc) P.shelf(fc, 0.9, 1.8, 0.4, 'file', 6);
+  if (fc) shelfUnit(prop(fc, 6), 0.9, 1.8, 0.4, ['archive', 'binders', 'charts']);
   const lc = pl.wall('w', 1.6, 0.45, 0.85);
-  if (lc) P.lowCabinet(lc, 1.6, 0.85, 0.45);
+  if (lc) lowCabinet(prop(lc, 13), 1.6, 0.85, 0.45);
   const bn = pl.wall('w', 0.3, 0.3, 0.4, { reverse: true });
-  if (bn) P.bin(bn);
-  P.clock(new Fr(b, p, -4.6, -9.75, 0), 2.5);
+  if (bn) wasteBin(prop(bn, 14));
+  clock(prop(new Fr(b, p, -4.6, -9.75, 0), 15), 2.5);
   posters(pl, post, 'n', 2, 21, 1.6);
   posters(pl, post, 'w', 1, 22, 2.1);
   lamps(b, p, r, 2);
@@ -512,28 +519,29 @@ function doctor(pl: Placer, post: Posters, rnd: () => number): void {
   // 窓ぎわの机（西の窓の下）と椅子
   const dk = pl.wall('w', 1.3, 0.7, 0.75, { start: 0.3 });
   if (dk) {
-    P.desk(dk, 1.3, 0.7);
-    P.deskTop(dk, 1.3, 0.72, 5, true);
-    P.officeChair(dk.sub(0.1, 0.7, Math.PI + 0.3));
+    desk(prop(dk), 1.3, 0.7);
+    deskTop(prop(dk, 5).sub([0, 0.72, 0]), 1.3, 0.7, { lamp: true });
+    // 椅子は机の下へ押し込んだまま（向かいの応接の机と重ならないように）
+    swivelChair(prop(dk.sub(-0.15, 0.45, Math.PI + 0.15)), K.greyBlue);
   }
-  // 応接のソファと低い机
+  // 応接のソファと低い机（ソファの前 0.15 m）
   const so = pl.wall('e', 1.4, 0.75, 0.8, { start: 0.25 });
   if (so) {
-    P.sofa(so, 1.4);
-    const lt = pl.at(so.x - 1.0, so.z, Math.PI / 2, 0.55, 0.3);
-    if (lt) P.lowTable(lt, 1.0, 0.55);
+    sofa(prop(so), 1.4);
+    const lt = pl.at(so.x - 0.8, so.z, Math.PI / 2, 0.55, 0.28);
+    if (lt) lowTable(prop(lt), 1.0, 0.55);
   }
   const bk = pl.wall('e', 0.9, 0.35, 1.9, { open: true });
-  if (bk) P.shelf(bk, 0.9, 1.9, 0.35, 'book', 8, C.wood);
+  if (bk) bookcase(prop(bk, 8), 0.9, 1.9, 0.35);
   const bk2 = pl.wall('e', 0.9, 0.35, 1.9, { open: true });
-  if (bk2) P.shelf(bk2, 0.9, 1.9, 0.35, 'book', 9, C.wood);
+  if (bk2) bookcase(prop(bk2, 9), 0.9, 1.9, 0.35);
   const sk = pl.wall('n', 0.5, 0.42, 1.6, { start: 0.0 });
-  if (sk) P.sink(sk, 0.5);
+  if (sk) washBasin(prop(sk), 0.5);
   const cs = pl.at(r.rect[0] + 0.35, r.rect[3] - 0.45, 0, 0.25, 0.25);
-  if (cs) P.coatStand(cs);
+  if (cs) coatStand(prop(cs));
   const bn = pl.wall('w', 0.3, 0.3, 0.4, { reverse: true });
-  if (bn) P.bin(bn, C.wood);
-  P.clock(new Fr(b, p, -5.9, -15.1, 0), 2.6);
+  if (bn) wasteBin(prop(bn, 21), K.wood);
+  clock(prop(new Fr(b, p, -5.9, -15.1, 0), 22), 2.6);
   posters(pl, post, 'e', 1, 31, 2.3);
   lamps(b, p, r, 1);
   void rnd;
@@ -541,19 +549,22 @@ function doctor(pl: Placer, post: Posters, rnd: () => number): void {
 
 function store(pl: Placer, rnd: () => number): void {
   const { b, p, r } = pl;
-  // 両側の壁に金属の棚（カルテ・箱）
+  // 両側の壁に金属の棚: カルテの棚（立てたカルテ・文書の保存箱）と物品の棚（段ボール・物品の箱・保存箱）を交互に。天板の上にも箱
   for (const side of ['w', 'e'] as const)
     for (let i = 0; i < 4; i++) {
       const f = pl.wall(side, 0.9, 0.45, 2.1, { open: true });
-      if (f) P.shelf(f, 0.9, 2.1, 0.45, i % 2 ? 'file' : 'box', Math.floor(rnd() * 999));
+      const loads = i % 2 ? (['charts', 'charts', 'archive', 'charts'] as const) : (['cardboard', 'supplies', 'archive', 'cardboard'] as const);
+      if (f) shelfUnit(prop(f, Math.floor(rnd() * 999)), 0.9, 2.1, 0.45, [...loads], { top: true });
     }
-  const wc = pl.at(-3.3, -12.5, 0.4, 0.35, 0.35);
-  if (wc) P.wheelchair(wc);
-  const ld = pl.at(-3.0, -11.3, -0.2, 0.3, 0.25);
-  if (ld) P.ladder(ld, 1.5);
-  for (const [x, z] of [[-3.6, -13.9], [-2.8, -10.9]]) {
-    const f = pl.at(x, z, rnd() * 0.5, 0.3, 0.25);
-    if (f) P.boxes(f, 2 + Math.floor(rnd() * 2), Math.floor(rnd() * 99));
+  // 通路（棚の間 1.3 m）に置く物は片側の棚に寄せて、人が通れる幅（0.6 m 以上）を残す: たたんだ車椅子（西の棚の前に縦に）・
+  // 脚立（東の棚の前）・段ボールの山（西の棚の前）
+  const wc = pl.at(-3.76, -12.6, 0, 0.2, 0.43);
+  if (wc) wheelchair(prop(wc));
+  const ld = pl.at(-2.96, -11.7, Math.PI / 2, 0.25, 0.3);
+  if (ld) ladder(prop(ld), 1.5);
+  for (const [x, z] of [[-3.64, -13.9], [-2.8, -10.9]]) {
+    const f = pl.at(x, z, (rnd() - 0.5) * 0.2, 0.32, 0.25);
+    if (f) boxes(prop(f, Math.floor(rnd() * 99)), 2 + Math.floor(rnd() * 2));
   }
   lamps(b, p, r, 1, false);
 }
@@ -563,30 +574,30 @@ function consult(pl: Placer, post: Posters, rnd: () => number): void {
   // 机（東の窓の下）・医者の椅子・患者の丸椅子
   const dk = pl.wall('e', 1.3, 0.65, 0.75);
   if (dk) {
-    P.desk(dk, 1.3, 0.65);
-    P.deskTop(dk, 1.3, 0.72, Math.floor(rnd() * 99), true);
-    P.officeChair(dk.sub(0.15, 0.7, Math.PI + 0.25));
-    P.stool(dk.sub(-0.75, 0.75, 0));
+    desk(prop(dk), 1.3, 0.65);
+    deskTop(prop(dk, Math.floor(rnd() * 99)).sub([0, 0.72, 0]), 1.3, 0.65, { lamp: true, chart: true });
+    swivelChair(prop(dk.sub(0.15, 0.7, Math.PI + 0.25)));
+    stool(prop(dk.sub(-0.75, 0.75, 0)));
   }
   // 診察台と踏み台・衝立
   const side = r.id === 'E1' ? 's' : 'n';
   const ex = pl.wall(side, 1.9, 0.65, 0.7, { start: 0.12 });
   if (ex) {
-    P.exam(ex, 1.8);
+    exam(prop(ex), 1.8);
     const sc = pl.at(ex.x + (ex.x > 4.5 ? -1.35 : 1.35), ex.z + (side === 's' ? -0.55 : 0.55), Math.PI / 2, 0.85, 0.15);
-    if (sc) P.screen(sc, 3, 0.55, 1.65);
+    if (sc) screen(prop(sc), 3, 0.55, 1.65);
   }
   // ガラス戸の薬品棚・流し・シャウカステン・体重計・屑かご
   const gc = pl.wall(side === 's' ? 'n' : 's', 0.9, 0.4, 1.85, { start: 0.1 });
-  if (gc) P.glassCabinet(gc, 0.9, 1.85, 0.4, Math.floor(rnd() * 99));
+  if (gc) glassCabinet(prop(gc, Math.floor(rnd() * 99)), { dp: 0.4, content: 'medicine' });
   const sk = pl.wall('w', 0.5, 0.42, 1.6) ?? pl.wall(side === 's' ? 'n' : 's', 0.5, 0.42, 1.6);
-  if (sk) P.sink(sk, 0.5);
+  if (sk) washBasin(prop(sk), 0.5);
   const vw = pl.onWall(side === 's' ? 'n' : 's', 1.0, 1.2, 1.8, { reverse: true });
-  if (vw) P.viewer(vw, 0.9, 1.5);
+  if (vw) viewer(prop(vw), 0.9, 1.5);
   const scl = pl.wall(side === 's' ? 'n' : 's', 0.45, 0.45, 1.42);
-  if (scl) P.scale(scl);
+  if (scl) scale(prop(scl));
   const bn = pl.wall('e', 0.3, 0.3, 0.4, { reverse: true });
-  if (bn) P.bin(bn);
+  if (bn) wasteBin(prop(bn, 31));
   posters(pl, post, 'w', 1, 41 + Math.floor(rnd() * 9), 1.6);
   lamps(b, p, r, 1);
 }
@@ -596,24 +607,24 @@ function treat(pl: Placer, post: Posters, rnd: () => number): void {
   // 処置台 2 台（頭を東の壁に。カーテンレール）
   for (const z of [-14.4, -12.6]) {
     const f = pl.at(6.15, z, -Math.PI / 2, 0.45, 1.0);
-    if (f) P.treatBed(f, r.ceil);
+    if (f) treatBed(prop(f), r.ceil);
   }
   const ic = pl.wall('w', 0.9, 0.4, 1.85);
-  if (ic) P.glassCabinet(ic, 0.9, 1.85, 0.4, 13);
+  if (ic) glassCabinet(prop(ic, 13), { dp: 0.4, content: 'instruments' });
   const sc = pl.wall('n', 1.6, 0.6, 0.85, { start: 0.0 });
-  if (sc) P.sinkCounter(sc, 1.6, { upper: true, sinkAt: -0.3 });
+  if (sc) sinkCounter(prop(sc), 1.6, { upper: true, sinkAt: -0.3 });
   const sh = pl.wall('s', 0.9, 0.4, 1.9, { start: 0.05, open: true });
-  if (sh) P.shelf(sh, 0.9, 1.9, 0.4, 'mixed', 17, C.enamel);
+  if (sh) shelfUnit(prop(sh, 17), 0.9, 1.9, 0.4, ['linen', 'supplies', 'bottles', 'supplies'], { frame: K.enamel });
   const ct = pl.at(4.4, -13.6, 0.3, 0.35, 0.3);
-  if (ct) P.cart(ct, 0.6, 0.45, 0.9);
+  if (ct) cart(prop(ct, 18), 0.6, 0.45, 0.9);
   const iv = pl.at(5.0, -12.0, 0, 0.25, 0.25);
-  if (iv) P.ivPole(iv);
+  if (iv) ivPole(prop(iv));
   const ox = pl.wall('s', 0.3, 0.3, 1.3, { reverse: true });
-  if (ox) P.oxygen(ox);
+  if (ox) oxygen(prop(ox));
   const bn = pl.wall('w', 0.3, 0.3, 0.4, { reverse: true });
-  if (bn) P.bin(bn);
+  if (bn) wasteBin(prop(bn, 19));
   const st = pl.at(3.8, -12.3, 0, 0.2, 0.2);
-  if (st) P.stool(st, C.enamel);
+  if (st) stool(prop(st), K.enamel);
   posters(pl, post, 'w', 1, 51, 1.7);
   lamps(b, p, r, 2);
   void rnd;
@@ -624,26 +635,28 @@ function lab(pl: Placer, post: Posters, rnd: () => number): void {
   // 作業台（北の壁 = 便所との境・東の窓の下）と流し
   const n1 = pl.wall('n', 3.2, 0.6, 0.85, { start: 0.18 });
   if (n1) {
-    P.sinkCounter(n1, 3.2, { upper: false, sinkAt: 1.1 });
-    P.microscope(n1.sub(-0.9, 0, 0), 0.85);
-    P.centrifuge(n1.sub(-0.2, 0, 0), 0.85);
-    P.tubeRack(n1.sub(0.4, 0.05, 0), 0.85);
+    const q = prop(n1, 41);
+    sinkCounter(q, 3.2, { upper: false, sinkAt: 1.1 });
+    microscope(q.sub([-0.9, 0.85, 0], 0.3));
+    centrifuge(q.sub([-0.2, 0.85, 0]));
+    tubeRack(q.sub([0.4, 0.85, 0.05]));
   }
   const e1 = pl.wall('e', 1.4, 0.6, 0.85, { start: 0.05 });
   if (e1) {
-    P.sinkCounter(e1, 1.4, { upper: false, sinkAt: 0.3 });
-    P.tubeRack(e1.sub(-0.3, 0.0, 0), 0.85);
+    const q = prop(e1, 42);
+    sinkCounter(q, 1.4, { upper: false, sinkAt: 0.3 });
+    tubeRack(q.sub([-0.3, 0.85, 0.0]));
   }
   // 冷蔵庫・試薬棚（南の壁）・丸椅子
   const fr = pl.wall('s', 0.6, 0.6, 1.4, { start: 0.0 });
-  if (fr) P.fridge(fr, 1.4, 0.6);
+  if (fr) fridge(prop(fr), 1.4, 0.6);
   const sh = pl.wall('s', 1.0, 0.35, 1.9, { open: true });
-  if (sh) P.shelf(sh, 1.0, 1.9, 0.35, 'bottle', 61, C.enamel);
+  if (sh) shelfUnit(prop(sh, 61), 1.0, 1.9, 0.35, ['supplies', 'reagents', 'reagents', 'bottles'], { frame: K.enamel });
   const st = pl.at(4.0, -16.7, 0, 0.2, 0.2);
-  if (st) P.stool(st, C.enamel);
+  if (st) stool(prop(st), K.enamel);
   // 窓口の台の上の検体のコップ
-  const f = new Fr(b, p, 1.86, -17.15, Math.PI / 2);
-  for (let i = 0; i < 3; i++) f.cyl('#e5ece0', [-0.3 + i * 0.2, 1.0, 0], 0.035, 0.1, { segments: 8 });
+  const f = prop(new Fr(b, p, 1.86, -17.15, Math.PI / 2));
+  for (let i = 0; i < 3; i++) cup(f.sub([-0.3 + i * 0.2, 0.95, 0]));
   posters(pl, post, 's', 1, 63, 1.7);
   lamps(b, p, r, 1, true, r.ceil);
   void rnd;
@@ -659,20 +672,20 @@ function toilet(pl: Placer, rnd: () => number): void {
     P.stall(new Fr(b, p, x + w / 2, r.rect[1] + dp / 2, 0), w, dp, [0.1, 0.8, 0.35][i], i === 2);
   }
   // 小便器（東の壁）・手洗い（西の壁、扉の北）・掃除の流し（南の壁）
-  for (const z of [-19.2, -19.9]) P.urinal(new Fr(b, p, 7.2, z, -Math.PI / 2));
+  for (const z of [-19.2, -19.9]) urinal(prop(new Fr(b, p, 7.2, z, -Math.PI / 2)));
   // 小便器の間と端の仕切り板（セージの板）と、上の洗浄の管
   for (const z of [-18.85, -19.55, -20.25]) new Fr(b, p, 7.2, z, -Math.PI / 2).box(p.wall({ up: '#c9d4c6', low: '#8fa29b', band: 0.95 }), [-0.015, 0.35, 0], [0.015, 1.55, 0.42]);
-  new Fr(b, p, 7.2, -19.55, -Math.PI / 2).box(C.metal, [-0.75, 1.62, 0.02], [0.75, 1.65, 0.05]);
+  new Fr(b, p, 7.2, -19.55, -Math.PI / 2).box(K.metal, [-0.75, 1.62, 0.02], [0.75, 1.65, 0.05]);
   pl.block([2.9, -21.0, 6.6, -19.5]);
   for (const z of [-20.55, -19.95]) {
     const f = pl.at(1.745 + 0.21, z, Math.PI / 2, 0.27, 0.21);
-    if (f) P.sink(f, 0.5);
+    if (f) washBasin(prop(f), 0.5, true, false);
   }
-  const ms = pl.wall('s', 1.0, 0.5, 1.4, { start: 0.3 });
-  if (ms) P.mopSink(ms.sub(-0.2, -0.22, 0));
+  const ms = pl.wall('s', 1.4, 0.5, 1.4, { start: 0.3 });
+  if (ms) mopSink(prop(ms.sub(0, -0.22, 0), 51), { mop: -1, bucket: 1 });
   // 採尿の小窓の下の台（コップ）
-  const pf = new Fr(b, p, 6.4, -18.05, Math.PI);
-  for (let i = 0; i < 3; i++) pf.cyl('#e5ece0', [-0.12 + i * 0.12, 1.045, 0.09], 0.03, 0.09, { segments: 8 });
+  const pf = prop(new Fr(b, p, 6.4, -18.05, Math.PI));
+  for (let i = 0; i < 3; i++) cup(pf.sub([-0.12 + i * 0.12, 1.0, 0.09]));
   P.ceilingLamp(new Fr(b, p, 4.5, -19.0, 0), r.ceil, 0.9, 0.1);
   P.ceilingLamp(new Fr(b, p, 2.6, -19.5, Math.PI / 2), r.ceil, 0.6, 0.1);
   void rnd;
@@ -681,35 +694,30 @@ function toilet(pl: Placer, rnd: () => number): void {
 function stair(pl: Placer, post: Posters, rnd: () => number): void {
   const { b, p, r } = pl;
   // 上り口: 消火器・案内の札・長椅子（広間）
-  P.extinguisher(new Fr(b, p, -1.722, -17.75, -Math.PI / 2));
-  P.bench(new Fr(b, p, -2.45, -17.9 + 0.26, 0), 0.9);
+  extinguisher(prop(new Fr(b, p, -1.722, -17.75, -Math.PI / 2)));
+  bench(prop(new Fr(b, p, -2.45, -17.9 + 0.26, 0), 61), 0.9);
   post.put(b, 13, 'pz', [-2.6, 1.8, -17.895], 0.45, 0.55);
   // 階段の下の物入れの前（2 階の踊り場の下）: 段ボール・屋内消火栓・階の案内
-  P.boxes(new Fr(b, p, -6.92, -15.68, 0.1), 2, 7);
+  boxes(prop(new Fr(b, p, -6.96, -15.66, 0.08), 7), 2);
   P.hoseCabinet(new Fr(b, p, -2.25, -15.4, Math.PI));
   post.put(b, 18, 'nz', [-4.25, 1.75, -15.405], 0.5, 0.65);
-  P.pendant(new Fr(b, p, -3.2, -16.7, 0), STAIR.ceil, 2.2);
+  pendant(prop(new Fr(b, p, -3.2, -16.7, 0)), STAIR.ceil, 2.2);
   // 2 階の踊り場: 鍵の扉の前の柵と札
-  P.cones(new Fr(b, p, -6.5, -15.85, 0, FLOOR2), 1.1);
+  cones(prop(new Fr(b, p, -6.5, -15.85, 0, FLOOR2)), 1.1);
   post.put(b, 2, 'nz', [-5.3, FLOOR2 + 1.5, -15.405], 0.4, 0.5);
   // 踊り場（北）: 割れた窓の下の雪と枯れた植木
   P.drift(new Fr(b, p, -5.9, -20.75, 0.1, STAIR.mid), 1.6, 0.45, 0.14);
-  P.plant(new Fr(b, p, -6.95, -20.75, 0, STAIR.mid), 1.0);
+  plant(prop(new Fr(b, p, -6.95, -20.75, 0, STAIR.mid), 62), 1.0);
   // 階の案内（踊り場の壁）
   post.put(b, 19, 'px', [-7.195, STAIR.mid + 1.6, -20.4], 0.35, 0.45);
   // 階段の壁の灯り（1 本目の西の壁と 2 本目の上の壁の腕木の灯り）と、上り口の階の札
-  for (const [x, z, y, yaw] of [[-7.2, -18.3, 3.6, Math.PI / 2], [-7.2, -16.9, 6.6, Math.PI / 2]] as const) {
-    const f = new Fr(b, p, x, z, yaw);
-    f.box(C.metal, [-0.04, y - 0.05, 0], [0.04, y + 0.05, 0.12]);
-    f.box(C.enamel, [-0.13, y - 0.16, 0.08], [0.13, y - 0.04, 0.22]);
-    f.box(p.glow('#f4f6e4'), [-0.11, y - 0.165, 0.1], [0.11, y - 0.155, 0.2]);
-  }
+  for (const [x, z, y, yaw] of [[-7.2, -18.3, 3.6, Math.PI / 2], [-7.2, -16.9, 6.6, Math.PI / 2]] as const) bracketLamp(prop(new Fr(b, p, x, z, yaw)), y);
   // 中壁の 1 本目の側の掲示（足元の注意）
   post.put(b, 6, 'nx', [-6.003, 1.95, -17.2], 0.3, 0.38);
   new Fr(b, p, -7.199, -16.75, Math.PI / 2).box('#e5ece0', [-0.16, 1.55, 0], [0.16, 1.85, 0.01]);
   new Fr(b, p, -7.199, -16.75, Math.PI / 2).box('#8f9e98', [-0.08, 1.64, 0.01], [0.08, 1.76, 0.012]);
   // 灯り（吹き抜けの天井・広間の天井・踊り場の壁の灯り）
-  P.pendant(new Fr(b, p, -5.95, -18.0, 0), STAIR.ceil, 1.4);
+  pendant(prop(new Fr(b, p, -5.95, -18.0, 0)), STAIR.ceil, 1.4);
   new Fr(b, p, -5.95, -21.0, 0).box(p.glow('#f4f6e4'), [-0.15, STAIR.mid + 2.35, 0], [0.15, STAIR.mid + 2.45, 0.05]);
   // ---- 壁の小さな器具（どの部屋とも同じ決まり。階段の横は段が埋まるので、広間と踊り場の壁に手で置く）----
   // 広間: 階段室の口の北（東の壁）・医局の扉の横（南の壁）・給湯室の扉の横（給湯室の外の面）
@@ -744,22 +752,22 @@ function stair(pl: Placer, post: Posters, rnd: () => number): void {
 function pantry(pl: Placer, post: Posters, rnd: () => number): void {
   const { b, p, r } = pl;
   const sc = pl.wall('n', 2.0, 0.6, 0.85, { start: 0.1 });
-  if (sc) P.sinkCounter(sc, 2.0, { stove: true, upper: false, sinkAt: -0.45 });
+  if (sc) sinkCounter(prop(sc, 71), 2.0, { stove: true, upper: false, sinkAt: -0.45 });
   const cb = pl.wall('w', 0.9, 0.42, 1.83, { start: 0.05 });
-  if (cb) P.cupboard(cb, 0.9, 1.8);
+  if (cb) cupboard(prop(cb, 72), 0.9, 1.8);
   const fr = pl.wall('w', 0.6, 0.6, 1.3);
-  if (fr) P.fridge(fr, 1.3, 0.6);
+  if (fr) fridge(prop(fr), 1.3, 0.6);
   const tb = pl.at(-2.8, -19.4, 0, 0.45, 0.35);
   if (tb) {
-    P.desk(tb, 0.8, 0.6, { drawers: false, top: C.enamel });
-    P.chair(tb.sub(-0.1, 0.55, Math.PI + 0.2));
-    P.chair(tb.sub(0.15, -0.55, 0.15));
-    tb.cyl(C.enamel, [0.15, 0.78, 0.05], 0.04, 0.09, { segments: 8 });
+    desk(prop(tb), 0.8, 0.6, { drawers: false, top: K.enamel });
+    woodChair(prop(tb.sub(-0.1, 0.55, Math.PI + 0.2)));
+    woodChair(prop(tb.sub(0.15, -0.55, 0.15)));
+    teacup(prop(tb).sub([0.15, 0.72, 0.05]));
   }
   const bn = pl.wall('e', 0.3, 0.3, 0.4, { reverse: true });
-  if (bn) P.bin(bn);
+  if (bn) wasteBin(prop(bn, 73));
   posters(pl, post, 'e', 1, 71, 1.5);
-  P.clock(new Fr(b, p, -1.722, -19.5, -Math.PI / 2), 2.2);
+  clock(prop(new Fr(b, p, -1.722, -19.5, -Math.PI / 2), 74), 2.2);
   lamps(b, p, r, 1);
   void rnd;
 }

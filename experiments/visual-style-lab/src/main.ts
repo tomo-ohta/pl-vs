@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { App } from './App.ts';
 import { setStyleColors } from './render/StyleMaterial.ts';
 import { ARCH_SCENES } from './arch/index.ts';
+import { GALLERY_SCENES } from './props/gallery.ts';
 import { SCENES } from './scenes/index.ts';
 import { Panel } from './ui/Panel.ts';
 
@@ -10,9 +11,11 @@ const root = document.getElementById('app')!;
 const capture = params.has('capture');
 /** 建築版（arch.html）: 間取り図から作った場面。元の版（index.html）はそのまま */
 const ARCH = /arch\.html$/.test(location.pathname);
-const REGISTRY = ARCH ? ARCH_SCENES : SCENES;
+/** 小物の見本帳（props.html）: 小物を並べて近くから確かめる */
+const PROPS = /props\.html$/.test(location.pathname);
+const REGISTRY = PROPS ? GALLERY_SCENES : ARCH ? ARCH_SCENES : SCENES;
 const app = new App(root, REGISTRY, { persistFilm: !capture });
-app.variant = ARCH ? 'arch' : 'v1';
+app.variant = PROPS ? 'props' : ARCH ? 'arch' : 'v1';
 if (capture) document.body.classList.add('capture');
 
 // 開発・撮影用の窓口

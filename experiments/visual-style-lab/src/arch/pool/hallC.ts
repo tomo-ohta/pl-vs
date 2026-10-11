@@ -4,7 +4,8 @@ import { gobo, roofGobo, T, towardSun } from '../../scenes/pool/kit.ts';
 import { Frame } from './frame.ts';
 import { perimeterWall, type HallEnv } from './hallkit.ts';
 import { hallDress, unseenPlacer, viewSees } from './halldress.ts';
-import { clock, decal, deckBench, depthMark, drain, exitSign, lifeguardChair, plant, poolLadder, rescueBoard, wallNotice, type Dress } from './props.ts';
+import { clock, decal, deckBench, depthMark, drain, exitSign, lifeguardChair, plant, poolLadder, propAt, rescueBoard, wallNotice, type Dress } from './props.ts';
+import { lounger as loungerK } from './props/poolside.ts';
 import { UPPER_Y } from './layout.ts';
 import { CAM_C, SUN_C } from '../../scenes/pool/zoneC.ts';
 import { HALL } from './layout.ts';
@@ -251,12 +252,7 @@ export function buildHallC(env: HallEnv, dr: Dress): void {
   blockBench(-12.9, 1.0, -11.2, 3.4);
   const lounger = (x: number, z: number): void => {
     if (sees([X(x - 0.4), 0, Z(z - 1.0)], [X(x + 0.4), 1.0, Z(z + 1.0)])) return;
-    const f = new Frame(k.b, [X(x), 0.15, Z(z)], 0);
-    f.box(dr.p.white, [-0.33, 0.28, -0.95], [0.33, 0.34, 0.6], { shadow: true, collide: true });
-    const g = new THREE.BoxGeometry(0.66, 0.06, 0.7);
-    g.rotateX(0.6);
-    k.b.mesh(g, dr.p.white, [X(x), 0.55, Z(z - 1.15)], { shadow: true });
-    for (const sx of [-0.28, 0.28]) for (const sz of [-0.85, 0.5]) f.box(dr.p.metal, [sx - 0.02, 0, sz - 0.02], [sx + 0.02, 0.28, sz + 0.02], { shadow: true });
+    loungerK(propAt(dr, new Frame(k.b, [X(x), 0.15, Z(z)], 0), [0, 0, 0], (dr.r() - 0.5) * 0.12));
   };
   for (const x of [-9.5, -8.4, -7.3, -4.4, -3.3]) lounger(x, 6.4);
   if (!sees([X(-6.2), 0, Z(4.0)], [X(-5.0), 1.6, Z(5.2)])) {

@@ -35,8 +35,8 @@ export class App {
   view: ViewDef | null = null;
   style!: StylePreset;
   sun: THREE.DirectionalLight | null = null;
-  /** 'v1' = 元の版、'arch' = 建築版（間取り図から作った場面） */
-  variant: 'v1' | 'arch' = 'v1';
+  /** 'v1' = 元の版、'arch' = 建築版（間取り図から作った場面）、'props' = 小物の見本帳 */
+  variant: 'v1' | 'arch' | 'props' = 'v1';
   /** 参考画像の比率で描く（false で画面いっぱい） */
   letterbox = true;
   /** 時間を止める（撮影用） */
@@ -126,6 +126,7 @@ export class App {
       setSun: (l) => (this.sun = l),
       updateShadows: () => (this.renderer.shadowMap.needsUpdate = true),
       addLamp: (l) => this.lamps.add(l),
+      setLampRange: (m) => (this.lamps.maxDist = m),
     };
     this.renderer.shadowMap.autoUpdate = true; // 場面の build が変えてもよい
     this.built = def.build(ctx);
@@ -179,6 +180,11 @@ export class App {
     this.onChange?.();
   }
 
+  /** 参考画像の寸法（今の視点 → 場面の最初の視点 → 既定 1456×816） */
+  refSize(v: ViewDef | null = this.view): [number, number] {
+    return v?.size ?? this.def?.views[0]?.size ?? [REF_W, REF_H];
+  }
+
   setStyle(s: StylePreset): void {
     this.style = s;
     applyStyleUniforms(s);
@@ -193,7 +199,8 @@ export class App {
     if (this.fixedSize) {
       [w, h] = this.fixedSize;
     } else if (this.letterbox) {
-      const a = REF_W / REF_H;
+      const [rw, rh] = this.refSize();
+      const a = rw / rh;
       if (cw / ch > a) {
         h = ch;
         w = Math.round(ch * a);
@@ -345,7 +352,7 @@ export class App {
     g.font = 'bold 14px sans-serif';
     for (const v of this.def?.views ?? []) {
       const [vx, vz] = toPx(v.eye[0], v.eye[2]);
-      const hf = Math.atan(Math.tan(THREE.MathUtils.degToRad(v.fov) / 2) * (REF_W / REF_H));
+      const hf = Math.atan(Math.tan(THREE.MathUtils.degToRad(v.fov) / 2) * (this.refSize(v)[0] / this.refSize(v)[1]));
       const len = Math.min(W, H) * 0.12;
       g.strokeStyle = '#ffcc33';
       g.fillStyle = 'rgba(255, 204, 51, 0.2)';
@@ -370,7 +377,10 @@ export class App {
   async planImage(o: { level?: number; top?: boolean; cut?: number } = {}): Promise<string | null> {
     const plan = this.def?.plan;
     if (!plan) return null;
-    const views = (this.def?.views ?? []).map((v) => ({ id: v.id, eye: v.eye, yaw: v.yaw, fov: v.fov, reach: this.viewFan(v.eye, v.yaw, v.fov) }));
+    const views = (this.def?.views ?? []).map((v) => {
+      const [w, h] = this.refSize(v);
+      return { id: v.id, eye: v.eye, yaw: v.yaw, fov: v.fov, aspect: w / h, reach: this.viewFan(v.eye, v.yaw, v.fov, 48, 80, w / h) };
+    });
     const c = document.createElement('canvas');
     if (o.top) {
       const t = await this.topDownMap(o.cut ?? 2.2, 1600, false);
@@ -455,8 +465,9 @@ export class App {
   }
 
   /** 視点の横の画角を、目の高さで当たり判定の壁まで伸ばした扇の各光線の長さ（間取り図で「どこまで見えるか」を描く） */
-  viewFan(eye: [number, number, number], yaw: number, fov: number, n = 48, maxDist = 80): number[] {
-    const hf = Math.atan(Math.tan(THREE.MathUtils.degToRad(fov) / 2) * (REF_W / REF_H));
+  viewFan(eye: [number, number, number], yaw: number, fov: number, n = 48, maxDist = 80, aspect?: number): number[] {
+    const [rw, rh] = this.refSize();
+    const hf = Math.atan(Math.tan(THREE.MathUtils.degToRad(fov) / 2) * (aspect ?? rw / rh));
     const out: number[] = [];
     for (let i = 0; i <= n; i++) {
       const a = yaw - hf + (2 * hf * i) / n;
@@ -706,7 +717,9 @@ export class App {
     const prevFrozen = this.frozen;
     this.frozen = true;
     this.player.bob = 0;
-    this.fixedSize = [REF_W, REF_H];
+    // 参考画像と同じ寸法で描く（視点ごとの寸法。既定 1456×816）
+    const [RW, RH] = this.refSize();
+    this.fixedSize = [RW, RH];
     this.resize();
     // カメラ効果: ノイズの種を固定して、時間を少し進めた状態で撮る（揺れ・ノイズを毎回同じに）
     this.film.freezeNoise(7);
@@ -724,18 +737,18 @@ export class App {
     const ref = refId ? await loadImage(`refs/${refId}.jpg`).catch(() => null) : null;
     if (ref) {
       const c = document.createElement('canvas');
-      c.width = REF_W;
-      c.height = Math.round(REF_H / 2);
+      c.width = RW;
+      c.height = Math.round(RH / 2);
       const g = c.getContext('2d')!;
-      g.drawImage(img, 0, 0, REF_W / 2, REF_H / 2);
-      g.drawImage(ref, REF_W / 2, 0, REF_W / 2, REF_H / 2);
+      g.drawImage(img, 0, 0, RW / 2, RH / 2);
+      g.drawImage(ref, RW / 2, 0, RW / 2, RH / 2);
       g.fillStyle = 'rgba(0,0,0,0.6)';
       g.fillRect(0, 0, 70, 18);
-      g.fillRect(REF_W / 2, 0, 70, 18);
+      g.fillRect(RW / 2, 0, 70, 18);
       g.fillStyle = '#fff';
       g.font = '12px sans-serif';
       g.fillText('render', 6, 13);
-      g.fillText('reference', REF_W / 2 + 6, 13);
+      g.fillText('reference', RW / 2 + 6, 13);
       compare = c.toDataURL('image/png');
       metrics = compareImages(img, ref, gridX, gridY);
       diff = diffImage(img, ref);
@@ -764,8 +777,9 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
  * 下に参考画像を薄く敷く（どこの差かが分かるように）
  */
 export function diffImage(a: HTMLImageElement, b: HTMLImageElement): string {
-  const W = REF_W / 2;
-  const H = REF_H / 2;
+  // 参考画像（b）の半分の寸法で比べる（縦横比の違う参考画像も）
+  const W = Math.round((b.naturalWidth || REF_W) / 2);
+  const H = Math.round((b.naturalHeight || REF_H) / 2);
   const read = (img: HTMLImageElement): Uint8ClampedArray => {
     const c = document.createElement('canvas');
     c.width = W;
@@ -811,8 +825,8 @@ export function diffImage(a: HTMLImageElement, b: HTMLImageElement): string {
  * - F: 両方の調和平均（×100）。画像: 暗くした参考画像の上に、参考の輪郭を赤、描画の輪郭を水色、重なりを白
  */
 export function edgeCompare(a: HTMLImageElement, b: HTMLImageElement): { f: number; p: number; r: number; image: string } {
-  const W = REF_W / 2;
-  const H = REF_H / 2;
+  const W = Math.round((b.naturalWidth || REF_W) / 2);
+  const H = Math.round((b.naturalHeight || REF_H) / 2);
   const lum = (img: HTMLImageElement): Float32Array => {
     const c = document.createElement('canvas');
     c.width = W;
@@ -924,7 +938,7 @@ function linToOklabArr(r: number, g: number, b: number): [number, number, number
 /** 縮小して OKLab で比べる（全体・3×4 の地域ごと・明るさの帯） */
 export function compareImages(a: HTMLImageElement, b: HTMLImageElement, GX = 4, GY = 3): Record<string, unknown> {
   const W = 182;
-  const H = 102;
+  const H = Math.round((182 * (b.naturalHeight || REF_H)) / (b.naturalWidth || REF_W));
   const get = (img: HTMLImageElement): Float32Array => {
     const c = document.createElement('canvas');
     c.width = W;

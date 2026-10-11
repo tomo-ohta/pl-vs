@@ -8,6 +8,11 @@ import { instanced, strut, trs, tuftGeometry } from './kit.ts';
 import { A, BLD, D, FREIGHT, LANE, PLAZA, ROAD, SITE, TRACK, Y } from './layout.ts';
 import type { Mats } from './mats.ts';
 import { signGeo, signUV, type SignKind } from './signs.ts';
+import { bicycle, car, keiTruck, vendingMachine } from '../../props/lib/index.ts';
+import { placer, type Placer } from './props/mats.ts';
+import { STATION_COLORS as C } from './props/colors.ts';
+import { phoneBooth, postBox } from './props/machines.ts';
+import { bale, barricade, cone, drum, handcart, palletStack, parcelPallet, sackPallet } from './props/goods.ts';
 
 /**
  * 構外と構内の端: 駅前広場・西へ出る道と踏切・旧踏切道（station-2 の場所）・ホームの端・旧貨物ホームと倉庫・
@@ -19,9 +24,12 @@ export function buildSite(ctx: SceneContext, root: THREE.Object3D, mat: Mats, ra
   const col = ctx.colliders;
   // 場所ごとにまとめる（画角の外の場所は描かない）。下の道具は今の場所の b を使う
   let b!: Builder;
+  /** 小物を置く道具（今の場所の b へ。駅の材質） */
+  let put!: Placer;
   const at = (noReflect: boolean, fn: () => void): void => {
     region(ctx, root, noReflect, (rb) => {
       b = rb;
+      put = placer(rb, ctx);
       fn();
     });
   };
@@ -177,7 +185,12 @@ export function buildSite(ctx: SceneContext, root: THREE.Object3D, mat: Mats, ra
       for (let x = xa + 0.2; x < xb; x += 3.9) for (const z of [za + 0.15, za + 3.0]) b.box(mat.steel, [x, Y.road + 1.15, z], [0.08, 2.3, 0.08], { collide: true });
       b.boxMM(mat.steel, [xa, Y.road + 0.3, za + 0.6], [xb, Y.road + 0.36, za + 0.66]);
       for (let x = xa + 0.6; x < xb - 0.3; x += 0.6) {
-        if (rand() < 0.45) bike(b, mat, [x, Y.road, za + 1.5], Math.PI / 2 + (rand() - 0.5) * 0.15, rand);
+        // 自転車（前輪をラックへ向けて。互い違いに少し前後へずらす）。乱数の数は元の版と同じ（後の配置を変えない）
+        if (rand() < 0.45) {
+          const yaw = Math.PI + (rand() - 0.5) * 0.15;
+          const o = rand() < 0.5 ? C.bikeSilver : (x * 7) % 2 < 1 ? C.bikeRed : C.bikeBlack;
+          put((p) => bicycle(p, o), [x, Y.road, za + 1.62 + (Math.round(x / 0.6) % 2) * 0.16], yaw);
+        }
         b.box(mat.steel, [x, Y.road + 0.2, za + 0.63], [0.03, 0.4, 0.03]);
       }
       col.add({ x: xa, y: Y.road, z: za + 0.5 }, { x: xb, y: Y.road + 1.0, z: za + 2.4 });
@@ -186,24 +199,17 @@ export function buildSite(ctx: SceneContext, root: THREE.Object3D, mat: Mats, ra
     {
       const x = x0 + 5.2;
       const z = 27.5;
-      b.boxMM(mat.sash, [x - 0.5, Y.road, z - 0.5], [x + 0.5, Y.road + 0.15, z + 0.5]);
-      b.boxMM(mat.glass, [x - 0.48, Y.road + 0.15, z - 0.48], [x + 0.48, Y.road + 2.2, z + 0.48], { collide: true });
-      b.boxMM(mat.sash, [x - 0.52, Y.road + 2.2, z - 0.52], [x + 0.52, Y.road + 2.42, z + 0.52]);
-      b.boxMM(mat.green, [x - 0.2, Y.road + 0.95, z + 0.3], [x + 0.2, Y.road + 1.5, z + 0.47]);
-      b.box(mat.signWhite, [x, Y.road + 2.31, z - 0.53], [0.7, 0.14, 0.02]);
-      b.cyl(mat.red, [x0 + 3.2, Y.road + 0.75, 26.0], 0.22, 1.25, { segments: 14, collide: true });
-      b.cyl(mat.red, [x0 + 3.2, Y.road + 1.4, 26.0], 0.25, 0.06, { segments: 14 });
-      for (const zz of [12.0, 13.0]) {
-        b.boxMM(mat.vending, [x0 + 0.15, Y.road + 0.12, zz - 0.45], [x0 + 0.95, Y.road + 1.95, zz + 0.45], { collide: true });
-        b.box(mat.vendingLit, [x0 + 0.96, Y.road + 1.35, zz], [0.02, 0.6, 0.7], { shadow: false });
-      }
+      // 電話ボックス（折れ戸を歩道へ向ける）・丸型ポスト（歩道の上）・自動販売機 2 台（駅舎の壁沿い、広場へ向ける）
+      put((p) => phoneBooth(p), [x, Y.road, z], -Math.PI / 2);
+      put((p) => postBox(p), [x0 + 3.2, Y.road + 0.12, 26.0], Math.PI / 2);
+      put((p) => vendingMachine(p, C.vendingWhite), [x0 + 0.52, Y.road + 0.12, 11.92], Math.PI / 2, 21);
+      put((p) => vendingMachine(p, C.vendingRed), [x0 + 0.52, Y.road + 0.12, 13.08], Math.PI / 2, 22);
       signMM('map', [x0 + 3.6, Y.road + 0.9, 8.0], [x0 + 3.68, Y.road + 2.0, 9.6]);
       for (const zz of [8.2, 9.4]) b.box(mat.steel, [x0 + 3.64, Y.road + 0.45, zz], [0.06, 0.9, 0.06]);
       for (const [lx, lz] of [[x0 + 4.2, 2], [x1 - 2, 4], [x1 - 2, 22], [x0 + 4.2, 34]] as const) lamp(b, mat, lx, Y.road + 0.12, lz);
     }
     // 駐車した軽自動車（タクシーの枠の脇）
-    car(b, mat, [x1 - 3, Y.road, 8.5], Math.PI / 2);
-    col.addCentered(x1 - 3, Y.road + 0.8, 8.5, 1.6, 1.6, 3.5);
+    put((p) => car(p, C.carHatch), [x1 - 3, Y.road, 8.5], -Math.PI / 2);
     // ---------- 広場の細部（建築版で足した物。乱数は別の種） ----------
     // 横断歩道（歩道から中央の島へ）
     for (let k = 0; k < 5; k++) line(x0 + 4.2, 16.2 + k * 0.9, x0 + 9.8, 16.65 + k * 0.9);
@@ -224,9 +230,8 @@ export function buildSite(ctx: SceneContext, root: THREE.Object3D, mat: Mats, ra
       for (let k = 0; k < 5; k++) b.box(mat.steel, [x0 + 4.25, Y.road + 0.014, zz - 0.24 + k * 0.12], [0.36, 0.006, 0.03], { shadow: false });
     }
     // 送迎の車（歩道の脇に寄せて止めた 2 台）
-    car(b, mat, [x0 + 5.6, Y.road, 9.6], 0, mat.roofT);
-    car(b, mat, [x0 + 5.6, Y.road, 13.9], 0);
-    for (const zz of [9.6, 13.9]) col.addCentered(x0 + 5.6, Y.road + 0.8, zz, 1.6, 1.6, 3.5);
+    put((p) => car(p, C.carNavy), [x0 + 5.6, Y.road, 9.6], 0);
+    put((p) => car(p, C.carWhite), [x0 + 5.6, Y.road, 13.9], 0);
     // 車止めの柱（入口の前の歩道の縁。反射の帯）
     for (let zz = 13.8; zz <= 23.9; zz += 1.4) {
       b.cyl(mat.steel, [x0 + 3.75, Y.road + 0.52, zz], 0.05, 0.8, { segments: 8, collide: true });
@@ -290,12 +295,11 @@ export function buildSite(ctx: SceneContext, root: THREE.Object3D, mat: Mats, ra
     // 道の西の端: 通行止め（霧の向こうの工事。歩ける範囲の端）
     {
       const x = SITE.x0 + 1.5;
-      for (const dz of [-1.5, 0, 1.5]) {
-        b.boxMM(mat.signWhite, [x - 0.05, Y.road + 0.5, zc + dz - 0.6], [x + 0.05, Y.road + 0.7, zc + dz + 0.6]);
-        b.boxMM(mat.red, [x - 0.06, Y.road + 0.55, zc + dz - 0.3], [x + 0.06, Y.road + 0.65, zc + dz + 0.3]);
-        for (const e of [-0.5, 0.5]) strut(b, mat.steel, [x - 0.4, Y.road, zc + dz + e], [x, Y.road + 0.75, zc + dz + e], 0.04, 0.04);
-      }
+      // A 形のバリケード 3 台と、手前のカラーコーン・看板（2 本の柱に付ける）
+      for (const dz of [-1.5, 0, 1.5]) put((p) => barricade(p), [x, Y.road, zc + dz], Math.PI / 2 + (dz === 0 ? 0.04 : -0.03));
+      for (const [dx, dz] of [[1.1, -1.9], [1.3, -0.4], [1.0, 1.2], [1.4, 2.2]] as const) put((p) => cone(p), [x + dx, Y.road, zc + dz], dz);
       signMM('closed', [x + 0.1, Y.road + 1.0, zc - 1.4], [x + 0.14, Y.road + 1.5, zc + 1.4]);
+      for (const e of [-1.2, 1.2]) b.box(mat.steel, [x + 0.07, Y.road + 0.6, zc + e], [0.05, 1.2, 0.05]);
       b.cyl(mat.redLit, [x, Y.road + 0.85, zc + 2.3], 0.08, 0.16, { segments: 10 });
     }
     // 電柱（道の南側、30 m おき）と電線。広場へ続く
@@ -442,12 +446,18 @@ export function buildSite(ctx: SceneContext, root: THREE.Object3D, mat: Mats, ra
     b.boxMM(mat.tin, [wx1, 3.4, wz0], [x1 + 0.6, 3.5, wz1]);
     for (let z = wz0 + 1; z < wz1; z += 4.5) strut(b, mat.steel, [wx1, 2.6, z], [x1 + 0.3, 3.4, z], 0.08, 0.08);
     // ホームの上の物: パレット・米袋の山・リヤカー
+    // パレットの荷（米袋の山・段ボール・空のパレットの山）。乱数の数は元の版と同じ（後の配置を変えない）
     for (let i = 0; i < 6; i++) {
       const z = z0 + 2 + rand() * (z1 - z0 - 4);
       const x = wx1 + 0.8 + rand() * 1.6;
-      b.boxMM(mat.wood, [x - 0.55, 0, z - 0.55], [x + 0.55, 0.14, z + 0.55]);
-      if (rand() < 0.6) b.boxMM(mat.signWhite, [x - 0.45, 0.14, z - 0.45], [x + 0.45, 0.14 + 0.25 * (1 + Math.floor(rand() * 3)), z + 0.45]);
+      const yaw = (i % 3) * 0.07 - 0.05;
+      if (rand() < 0.6) {
+        const lv = 1 + Math.floor(rand() * 3);
+        if (i % 2 === 0) put((p) => sackPallet(p, { layers: 2 + lv * 2 }), [x, 0, z], yaw, 300 + i);
+        else put((p) => parcelPallet(p, { layers: lv }), [x, 0, z], yaw, 300 + i);
+      } else put((p) => palletStack(p, { n: 3 + i }), [x, 0, z], yaw, 300 + i);
     }
+    put((p) => handcart(p), [x0 + 4.0, 0, z0 + 1.9], Math.PI / 2 + 0.15);
     // 南の端のスロープ（道へ）
     for (let k = 0; k < 4; k++) {
       const y = 0 - (k + 1) * ((0 - Y.road) / 4);
@@ -467,12 +477,11 @@ export function buildSite(ctx: SceneContext, root: THREE.Object3D, mat: Mats, ra
       for (let k = 0; k < 5; k++) {
         const dz = wz0 - 2.2 + (k % 3) * 0.62;
         const dx = wx1 + 2.6 + Math.floor(k / 3) * 0.62;
-        b.cyl(k % 2 ? mat.roofT : mat.rust, [dx, 0.44, dz], 0.29, 0.88, { segments: 14, collide: true });
-        b.cyl(mat.black, [dx, 0.885, dz], 0.27, 0.01, { segments: 14, shadow: false });
+        put((p) => drum(p, { color: C.drums[k % 2] }), [dx, 0, dz], k * 0.7, 400 + k);
       }
     }
     // 軽トラック
-    truck(b, mat, [x0 - 3, Y.ground, z1 - 6], 0.1);
+    put((p) => keiTruck(p, C.truck), [x0 - 3, Y.ground, z1 - 6], 0.1);
     col.addCentered(x0 - 3, Y.ground + 0.9, z1 - 6, 1.6, 1.8, 3.6);
   });
 
@@ -510,10 +519,7 @@ export function buildSite(ctx: SceneContext, root: THREE.Object3D, mat: Mats, ra
     shrine(b, mat, -92.0, 46.0);
     col.addCentered(-92.0, Y.ground + 0.8, 46.8, 1.6, 1.6, 1.6);
     // 稲わらのロール（畑の隅）
-    for (const [x, z] of [[-84, 36], [-82, 39], [33, -6], [36, 8]] as const) {
-      b.cyl(mat.signWhite, [x, Y.ground + 0.6, z], 0.6, 1.1, { axis: 'x', segments: 16 });
-      col.addCentered(x, Y.ground + 0.6, z, 1.2, 1.2, 1.2);
-    }
+    for (const [x, z] of [[-84, 36], [-82, 39], [33, -6], [36, 8]] as const) put((p) => bale(p), [x, Y.ground, z], x * 0.37);
   });
 
   // ---------- 歩ける範囲の端の用水路（コンクリートの溝と水面）と、越えられない見えない壁 ----------
@@ -596,27 +602,6 @@ export function fence(b: Builder, mat: Mats, a: [number, number], c: [number, nu
   }
 }
 
-/** 自転車（2 つの輪・三角の骨組み・ハンドル・サドル） */
-function bike(b: Builder, mat: Mats, p: V3, yaw: number, rand: () => number): void {
-  const c = Math.cos(yaw);
-  const s = Math.sin(yaw);
-  const P = (u: number, y: number): V3 => [p[0] + u * s, p[1] + y, p[2] + u * c];
-  const m = rand() < 0.5 ? mat.steel : mat.red;
-  for (const u of [-0.52, 0.52]) {
-    const g = new THREE.TorusGeometry(0.33, 0.02, 4, 16);
-    g.rotateY(yaw + Math.PI / 2);
-    b.mesh(g, mat.black, P(u, 0.34), { shadow: false });
-  }
-  strut(b, m, P(-0.52, 0.34), P(0.0, 0.36), 0.03, 0.03);
-  strut(b, m, P(0.0, 0.36), P(0.45, 0.82), 0.03, 0.03);
-  strut(b, m, P(-0.52, 0.34), P(-0.12, 0.78), 0.03, 0.03);
-  strut(b, m, P(-0.12, 0.78), P(0.42, 0.8), 0.03, 0.03);
-  strut(b, m, P(0.52, 0.34), P(0.45, 0.82), 0.03, 0.03);
-  b.box(mat.black, P(-0.14, 0.86), [0.12, 0.05, 0.12], { shadow: false });
-  const hb = P(0.44, 0.92);
-  b.box(mat.steel, hb, [0.5 * Math.abs(c) + 0.03, 0.03, 0.5 * Math.abs(s) + 0.03], { shadow: false });
-}
-
 /** 街灯（細い柱と腕・灯具。昼なので灯りは弱い） */
 function lamp(b: Builder, mat: Mats, x: number, y: number, z: number): void {
   b.cyl(mat.steel, [x, y + 2.8, z], 0.07, 5.6, { segments: 8, collide: true });
@@ -662,36 +647,6 @@ function shed(b: Builder, mat: Mats, p: V3, yaw: number, rand: () => number): vo
   b.mesh(new THREE.BoxGeometry(W + 0.6, 0.1, Dp + 0.6), mat.rust, L(0, 2.85, 0), { rotY: yaw, rotZ: 0.12 });
   b.mesh(new THREE.BoxGeometry(0.05, 2.0, 1.6), mat.black, L(W / 2 + 0.01, 1.0, 1.0), { rotY: yaw });
   for (let v = -Dp / 2 + 0.3; v < Dp / 2; v += 0.4) b.mesh(new THREE.BoxGeometry(0.02, 2.6, 0.03), mat.wallBase, L(W / 2 + 0.01, 1.3, v), { rotY: yaw, shadow: false });
-}
-
-/** 軽自動車（箱を重ねた形） */
-function car(b: Builder, mat: Mats, p: V3, yaw: number, body: THREE.Material = mat.signWhite): void {
-  const L = 3.4;
-  b.mesh(new THREE.BoxGeometry(1.45, 0.75, L), body, [p[0], p[1] + 0.55, p[2]], { rotY: yaw });
-  b.mesh(new THREE.BoxGeometry(1.35, 0.6, L * 0.55), mat.glass, [p[0] - Math.sin(yaw) * 0.25, p[1] + 1.2, p[2] - Math.cos(yaw) * 0.25], { rotY: yaw });
-  b.mesh(new THREE.BoxGeometry(1.4, 0.06, L * 0.56), body, [p[0] - Math.sin(yaw) * 0.25, p[1] + 1.52, p[2] - Math.cos(yaw) * 0.25], { rotY: yaw });
-  for (const u of [-1.1, 1.1]) for (const v of [-0.65, 0.65]) {
-    const g = new THREE.CylinderGeometry(0.27, 0.27, 0.18, 12);
-    g.rotateZ(Math.PI / 2);
-    g.rotateY(yaw);
-    b.mesh(g, mat.black, [p[0] + Math.sin(yaw) * u + Math.cos(yaw) * v, p[1] + 0.27, p[2] + Math.cos(yaw) * u - Math.sin(yaw) * v]);
-  }
-}
-
-/** 軽トラック */
-function truck(b: Builder, mat: Mats, p: V3, yaw: number): void {
-  const fx = Math.sin(yaw);
-  const fz = Math.cos(yaw);
-  b.mesh(new THREE.BoxGeometry(1.45, 0.5, 3.3), mat.signWhite, [p[0], p[1] + 0.6, p[2]], { rotY: yaw });
-  b.mesh(new THREE.BoxGeometry(1.4, 0.9, 1.1), mat.signWhite, [p[0] + fx * 1.05, p[1] + 1.25, p[2] + fz * 1.05], { rotY: yaw });
-  b.mesh(new THREE.BoxGeometry(1.3, 0.5, 0.05), mat.glass, [p[0] + fx * 1.61, p[1] + 1.35, p[2] + fz * 1.61], { rotY: yaw });
-  for (const [u, v] of [[1.0, 0.65], [1.0, -0.65], [-1.0, 0.65], [-1.0, -0.65]]) {
-    const g = new THREE.CylinderGeometry(0.27, 0.27, 0.18, 12);
-    g.rotateZ(Math.PI / 2);
-    g.rotateY(yaw);
-    b.mesh(g, mat.black, [p[0] + fx * u + fz * v, p[1] + 0.27, p[2] + fz * u - fx * v]);
-  }
-  b.mesh(new THREE.BoxGeometry(1.4, 0.4, 2.0), mat.tin, [p[0] - fx * 0.55, p[1] + 1.05, p[2] - fz * 0.55], { rotY: yaw });
 }
 
 /** 冬枯れの木（幹と、枝分かれする細い枝） */

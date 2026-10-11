@@ -4,7 +4,8 @@ import type { Kit } from '../../scenes/pool/kit.ts';
 import type { SceneContext } from '../../scenes/types.ts';
 import { Frame } from './frame.ts';
 import { TERRACE } from './layout.ts';
-import { plant, type Dress } from './props.ts';
+import { plant, propAt, type Dress } from './props.ts';
+import { lounger, parasol } from './props/poolside.ts';
 
 /**
  * A の西の屋外テラス（外。冬は閉めている）: タイルの床・腰の高さの壁・シートを掛けた屋外プール・重ねたデッキチェア・閉じたパラソル・植え込み。
@@ -31,15 +32,10 @@ export function buildTerrace(k: Kit, ctx: SceneContext, d: Dress): void {
   // 重ねたデッキチェア・閉じたパラソル・植え込み
   for (const [x, z] of [[-26, -3], [-23.5, -3], [-21, -3]] as [number, number][]) {
     const f = new Frame(b, [x, 0.15, z], 0);
-    for (let i = 0; i < 5; i++) f.box(d.p.white, [-0.33, 0.2 + i * 0.1, -0.9], [0.33, 0.25 + i * 0.1, 0.9], { shadow: true });
-    for (const sx of [-0.3, 0.3]) f.box(d.p.metal, [sx - 0.02, 0, -0.85], [sx + 0.02, 0.7, -0.8], { shadow: true });
+    const n = 4 + Math.floor(d.r() * 3);
+    for (let i = 0; i < n; i++) lounger(propAt(d, f, [(d.r() - 0.5) * 0.04, i * 0.075, (d.r() - 0.5) * 0.04], (d.r() - 0.5) * 0.04), { flat: true });
   }
-  for (const [x, z] of [[-32, -27], [-32, -16], [-32, -5]] as [number, number][]) {
-    const f = new Frame(b, [x, 0.15, z], 0);
-    f.cyl(d.p.white, [0, 0.15, 0], 0.35, 0.3, { segments: 12, shadow: true });
-    f.cyl(d.p.metal, [0, 1.3, 0], 0.03, 2.3, { segments: 6, shadow: true });
-    f.cyl(d.p.teal, [0, 1.6, 0], 0.14, 1.2, { radiusTop: 0.05, segments: 8, shadow: true });
-  }
+  for (const [x, z] of [[-32, -27], [-32, -16], [-32, -5]] as [number, number][]) parasol(propAt(d, new Frame(b, [x, 0.15, z], 0), [0, 0, 0], d.r() * 6));
   for (const z of [-28.5, -20, -11]) plant(d, new Frame(b, [-20.0, 0.15, z], 0), 1.3);
   // 腰壁の上の段々の笠木（タイルの塊を 2 段）と、2.5 m おきの柱型
   const cap = m({ name: 't-cap', color: '#f2f5ec', shade: '#a9c2b6', dark: '#8faea3', hi: '#f8f9f4', tiles: { size: T, line: 0.012, color: '#cdd8cd' } });

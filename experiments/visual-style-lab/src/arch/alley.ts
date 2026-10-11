@@ -11,6 +11,7 @@ import { buildNorth } from './alley/north.ts';
 import { buildOutside, resetOutsideCache } from './alley/outside.ts';
 import { resetSunCache } from './alley/sun.ts';
 import { resetPaintCache } from './alley/paint.ts';
+import { resetAlleyPropCache } from './alley/props/mats.ts';
 import { resetTreeCache } from './alley/tree.ts';
 import { alleyPlan } from './alley/plan.ts';
 import { paintEast, paintWest, sunMaskEast } from './alley/reflect.ts';
@@ -57,6 +58,7 @@ export const alley: SceneDef = {
     resetDecalCache();
     resetOutsideCache();
     resetSunCache();
+    resetAlleyPropCache();
     const b = new Builder(ctx);
     const doors = new Doors(ctx);
     buildLane(b);

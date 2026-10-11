@@ -3,6 +3,13 @@ import { decalMaterial } from '../../render/Decal.ts';
 import type { Atlas } from '../../scenes/corridor/kit.ts';
 import { bar, inkNotice, notice, paper, pin, scribble, stamp } from '../../scenes/corridor/tex.ts';
 import type { Mats } from './furnish.ts';
+import type { Prop } from '../../props/kit.ts';
+import { extinguisher as libExtinguisher } from '../../props/lib/furniture.ts';
+import { coat } from './props/furniture.ts';
+import { wardMats } from './props/mats.ts';
+import { pedalBin, portableUnit } from './props/medical.ts';
+import { commonOpts } from './props/place.ts';
+import { parcelPile, supplyBox, wallShelfItems } from './props/storage.ts';
 import type { LegId } from './layout.ts';
 import type { Leg } from './leg.ts';
 
@@ -243,6 +250,12 @@ export function kitFor(mats: Mats, zone: LegId, atlas: Atlas, paperMat: M): Kit 
 
 const pick = <T>(a: T[], r: () => number): T => a[Math.floor(r() * a.length) % a.length];
 
+/** 作り込んだ小物（corridor/props）を壁・床の座標系 s の点に置く。種は呼ぶ側の乱数から */
+let KP_N = 0;
+function kp(k: Kit, s: Leg, x = 0, y = 0, z = 0, yaw = 0): Prop {
+  return wardMats(k.mats).at(s, x, z, yaw, 7919 * ++KP_N, y);
+}
+
 type FaceKey = 'px' | 'nx' | 'py' | 'ny' | 'pz' | 'nz';
 type FaceSw = Partial<Record<FaceKey, Sw>>;
 
@@ -375,10 +388,7 @@ export function board(k: Kit, s: Leg, x: number, y: number, w: number, h: number
 
 /** 消火器（床に置いた赤い円柱と、上の赤い表示） */
 export function extinguisher(k: Kit, s: Leg, x: number): void {
-  fcyl(k, s, [x, 0.3, 0.12], 0.08, 0.5, 'red', { segments: 14 });
-  fcyl(k, s, [x, 0.6, 0.12], 0.032, 0.1, 'dark', { segments: 10 });
-  sbox(k, s, [x + 0.05, 0.25, 0.1], [x + 0.08, 0.62, 0.14], 'dark');
-  fbox(k, s, [x - 0.16, 0, 0], [x + 0.16, 0.04, 0.26], { py: 'dark', pz: 'dark', px: 'dark', nx: 'dark' });
+  libExtinguisher(kp(k, s, x, 0, 0.14), commonOpts.extinguisher());
   s.sheet(k.paperMat, '+z', [x, 1.05, 0.006], 0.3, 0.1, k.lib.fireSign);
 }
 
@@ -453,18 +463,7 @@ export function scrap(k: Kit, s: Leg, x: number, z: number, w: number, d: number
 
 /** 段ボールの山（床に置いた箱 1〜3 個） */
 export function boxStack(k: Kit, s: Leg, r: () => number): void {
-  const n = 1 + Math.floor(r() * 3);
-  let y = 0;
-  for (let i = 0; i < n; i++) {
-    const w = 0.5 - i * 0.08 - r() * 0.06;
-    const d = 0.38 - i * 0.04;
-    const h = 0.28 + r() * 0.12;
-    const dx = (r() - 0.5) * 0.06;
-    const c = i % 2 ? 'white' : 'cardboard';
-    fbox(k, s, [dx - w / 2, y, -d / 2], [dx + w / 2, y + h, d / 2], { pz: c, nz: c, px: c === 'white' ? 'plateIn' : 'cardboardS', nx: c === 'white' ? 'plateIn' : 'cardboardS', py: c }, { shadow: true, collide: i === 0 });
-    fbox(k, s, [dx - w / 2, y + h * 0.5 - 0.02, d / 2], [dx + w / 2, y + h * 0.5 + 0.02, d / 2 + 0.002], { pz: 'plateIn' });
-    y += h;
-  }
+  parcelPile(kp(k, s, 0, 0, 0, (r() - 0.5) * 0.2));
 }
 
 /** 白いポール（反射材の付いた低い柱。参考画像の corridor-0 の左） */
@@ -476,18 +475,12 @@ export function lowPole(k: Kit, s: Leg, x: number, z: number): void {
 
 /** 床に置いた機械（暗い台の上の白い箱。参考画像の corridor-0 の右下） */
 export function floorDevice(k: Kit, s: Leg): void {
-  fbox(k, s, [-0.12, 0, -0.08], [0.12, 0.16, 0.08], { pz: 'dark', nx: 'dark', px: 'dark', nz: 'dark' }, { collide: true });
-  fbox(k, s, [-0.14, 0.16, -0.1], [0.14, 0.3, 0.1], { pz: 'white', nx: 'plateIn', px: 'plateIn', nz: 'white', py: 'white' }, { shadow: true });
-  fbox(k, s, [-0.08, 0.3, -0.06], [0.08, 0.302, 0.04], { py: 'screen' });
+  portableUnit(kp(k, s));
 }
 
 /** 四角いごみ箱（下がすぼまる） */
 export function squareBin(k: Kit, s: Leg): void {
-  const g = new THREE.CylinderGeometry(0.2, 0.15, 0.42, 4, 1, true).rotateY(Math.PI / 4);
-  s.mesh(setUv(g, k.sw.white), k.paperMat, [0, 0.21, 0]);
-  const rg = new THREE.CylinderGeometry(0.215, 0.2, 0.04, 4, 1, false).rotateY(Math.PI / 4);
-  s.mesh(setUv(rg, k.sw.plateIn), k.paperMat, [0, 0.4, 0]);
-  s.collider([-0.15, 0, -0.15], [0.15, 0.42, 0.15]);
+  pedalBin(kp(k, s), { lid: k.zone === 'D' ? '#5a797b' : '#80a496' });
 }
 
 /** 屋内消火栓の箱（赤い扉・上に赤い灯り・表示）。床から 0.25〜1.3 m、出っ張り 0.18 */
@@ -511,15 +504,9 @@ export function pipeRun(k: Kit, s: Leg, x0: number, x1: number, y: number, r = 0
 export function wallShelf(k: Kit, s: Leg, x: number, w: number, y: number, r: () => number): void {
   fbox(k, s, [x - w / 2, y - 0.025, 0], [x + w / 2, y, 0.25], { py: 'white', pz: 'plateIn', ny: 'plateIn', px: 'plateIn', nx: 'plateIn' });
   for (const bx of [x - w / 2 + 0.08, x + w / 2 - 0.08]) fbox(k, s, [bx - 0.012, y - 0.18, 0], [bx + 0.012, y - 0.025, 0.2], { px: 'metal', nx: 'metal', pz: 'metal' });
-  const cols: Sw[] = ['white', 'bucket', 'plate', 'teal', 'cardboard'];
-  let xx = x - w / 2 + 0.04;
-  while (xx < x + w / 2 - 0.2) {
-    const bw = 0.12 + r() * 0.12;
-    const bh = 0.08 + r() * 0.12;
-    const c = cols[Math.floor(r() * cols.length)];
-    fbox(k, s, [xx, y, 0.03], [Math.min(xx + bw, x + w / 2 - 0.03), y + bh, 0.22], { pz: c, py: c, px: 'plateIn', nx: 'plateIn' });
-    xx += bw + 0.02 + r() * 0.08;
-  }
+  // 手袋・マスクの箱と消毒液の瓶
+  void r;
+  wallShelfItems(kp(k, s, x, y, 0.13), w - 0.06, 0.2);
 }
 
 /** エプロン・ガウンの掛け具（横の棒と、掛けた布 1〜3 枚） */
@@ -530,8 +517,8 @@ export function apronHooks(k: Kit, s: Leg, x: number, w: number, r: () => number
     const cx = x - w / 2 + (w * (i + 0.5)) / n;
     sbox(k, s, [cx - 0.01, 1.6, 0.02], [cx + 0.01, 1.64, 0.08], 'metal');
     if (r() < 0.65) {
-      const c: Sw = r() < 0.5 ? 'bucket' : 'white';
-      fbox(k, s, [cx - 0.16, 0.85 + r() * 0.15, 0.04], [cx + 0.16, 1.62, 0.09], { pz: c, px: 'plateIn', nx: 'plateIn', py: c });
+      const c = r() < 0.5 ? '#80a496' : '#e3eed3';
+      coat(kp(k, s, cx, 1.62, 0.0), 0.62 + r() * 0.15, c, 'apron');
     }
   }
 }
@@ -546,11 +533,10 @@ export function wallClock(k: Kit, s: Leg, x: number, y: number): void {
 
 /** 手袋の箱の掛け具（針金の枠に 3 色の箱）。中心の高さ y */
 export function gloveRack(k: Kit, s: Leg, x: number, y: number): void {
-  const cols: Sw[] = ['bucket', 'white', 'teal'];
   for (let i = 0; i < 3; i++) {
     const cx = x - 0.27 + i * 0.27;
-    fbox(k, s, [cx - 0.12, y - 0.065, 0.01], [cx + 0.12, y + 0.065, 0.13], { pz: cols[i], py: cols[i], px: 'plateIn', nx: 'plateIn', ny: 'plateIn' });
-    fbox(k, s, [cx - 0.05, y - 0.03, 0.13], [cx + 0.05, y + 0.0, 0.132], { pz: 'dark' });
+    // 立てた手袋の箱（取り出し口が前）
+    supplyBox(kp(k, s, cx, y, 0.01).sub([0, 0, 0], 0, { pitch: Math.PI / 2 }), 0.24, 0.12, 0.13, ['#80a496', '#c9d7bb', '#5a797b'][i], { glove: true, body: '#eef5e2' });
   }
   fbox(k, s, [x - 0.41, y - 0.08, 0], [x + 0.41, y - 0.065, 0.14], { py: 'metal', pz: 'metal', ny: 'metal' });
 }

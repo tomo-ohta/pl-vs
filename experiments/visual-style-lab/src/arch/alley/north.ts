@@ -13,6 +13,10 @@ import { buildTree } from './tree.ts';
 import { buildFarRelief } from './far.ts';
 import type { ViewDef } from '../../scenes/types.ts';
 import { contact } from './dress.ts';
+import { bicycle } from '../../props/lib/index.ts';
+import { outMats, PropArea, propAt } from './props/mats.ts';
+import { BIKE_COLORS } from './props/place.ts';
+import { cubicle, drum, faucet, garbageBag, hoseReel, palletStack, wheelbarrow } from './props/yard.ts';
 import { groundSun, STREET_RECT, sunLayer, YARD_RECT } from './sun.ts';
 
 /**
@@ -89,17 +93,27 @@ export function buildNorth(b: Builder, doors: Doors, view: ViewDef): void {
   box(P({ color: { pz: '#9fcdb9', side: '#5f9190' }, fog: 0.35 }), [(ANNEX.door[0] + ANNEX.door[1]) / 2 - 0.12, 2.12, az0], [(ANNEX.door[0] + ANNEX.door[1]) / 2 + 0.12, 2.24, az0 + 0.1]);
   box(P({ color: { pz: '#4f8a8c', side: '#2f6070' }, fog: 0.35 }), [ANNEX.door[1] + 0.2, 1.45, az0], [ANNEX.door[1] + 0.55, 1.6, az0 + 0.01]);
   b.cyl(P({ color: { side: '#1f4a58', py: '#2a5b6a' }, fog: 0.35 }), [ax1 - 0.12, ANNEX.h / 2, az0 + 0.1], 0.045, ANNEX.h, { segments: 8, shadow: false });
-  // 倉庫のまわり: 一輪車・パレット・ドラム缶・ホースの巻き取り
-  const crate = P({ color: { py: '#2a5257', side: '#1d3d42' }, fog: 0.5 });
-  box(crate, [ax0 - 1.6, 0, az1 + 0.3], [ax0 - 0.4, 0.14, az1 + 1.4], true);
-  box(crate, [ax0 - 1.55, 0.14, az1 + 0.35], [ax0 - 0.45, 0.28, az1 + 1.35]);
-  const drum = P({ color: { side: '#1f4a55', py: '#2a5b6a' }, fog: 0.5 });
-  for (const [x, z] of [[ax0 - 0.7, az1 - 0.6], [ax0 - 1.4, az1 - 0.7]]) {
-    b.cyl(drum, [x, 0.45, z], 0.29, 0.9, { segments: 14, collide: true, shadow: false });
-    contact(b, x - 0.29, z - 0.29, x + 0.29, z + 0.29, 0.08);
+  // 倉庫のまわり: パレットに積んだ土の袋・ドラム缶・一輪車・壁の散水栓とホースの巻き取り
+  const yardArea = new PropArea(b);
+  const sink = yardArea.sink;
+  {
+    const pc: V3 = [ax0 - 1.0, 0, az1 + 0.85];
+    palletStack(propAt(sink, outMats(pc, 0.5), pc, 0.04, 51), { base: 2, load: 'sacks' });
+    contact(b, pc[0] - 0.56, pc[2] - 0.56, pc[0] + 0.56, pc[2] + 0.56, 0.06);
   }
-  contact(b, ax0 - 1.6, az1 + 0.3, ax0 - 0.4, az1 + 1.4, 0.06);
-  b.cyl(P({ color: '#1a3d48', fog: 0.5 }), [ax0 - 0.25, 0.9, az0 - 1.6], 0.28, 0.12, { axis: 'x', segments: 16, shadow: false });
+  ([[ax0 - 0.7, az1 - 0.6, '#3d6f9a'], [ax0 - 1.4, az1 - 0.7, '#7a4a3a']] as [number, number, string][]).forEach(([x, z, c], i) => {
+    drum(propAt(sink, outMats([x, 0, z], 0.5), [x, 0, z], 0.6 + i * 1.7, 52 + i), c);
+    contact(b, x - 0.29, z - 0.29, x + 0.29, z + 0.29, 0.08);
+  });
+  {
+    const wb: V3 = [ax0 - 1.5, 0, az0 - 1.9];
+    wheelbarrow(propAt(sink, outMats(wb, 0.5), wb, 2.75, 54));
+    contact(b, wb[0] - 0.35, wb[2] - 0.6, wb[0] + 0.35, wb[2] + 0.6, 0.04);
+    const hr: V3 = [ax0 - 0.28, 0, az0 - 1.6];
+    hoseReel(propAt(sink, outMats(hr, 0.5), hr, -Math.PI / 2, 55));
+    faucet(propAt(sink, outMats(hr, 0.5), [ax0, 0.55, az0 - 1.25], -Math.PI / 2, 56));
+    contact(b, hr[0] - 0.2, hr[2] - 0.22, hr[0] + 0.2, hr[2] + 0.22, 0.06);
+  }
 
   // ---------------------------------------------------------------- 部室棟（北東の 2 階建て。西の面が参考画像の右奥の明るい壁）
   const [cx0, cx1] = CLUB.x;
@@ -141,18 +155,15 @@ export function buildNorth(b: Builder, doors: Doors, view: ViewDef): void {
   box(mesh, [gx0 - 0.01, 0.05, gz0], [gx0 + 0.01, 1.9, gz1], true);
   box(P({ color: { py: '#2c5257', ny: '#173238', side: '#1f4047' }, fog: 0.6 }), [gx0 - 0.15, 2.1, gz0 - 0.1], [gx1 + 0.15, 2.18, gz1 + 0.25]);
   contact(b, gx0, gz0, gx1, gz1, 0.05);
-  for (let i = 0; i < 4; i++) {
-    const x = gx0 + 0.5 + i * 0.75;
-    const bag = P({ color: { side: i % 2 ? '#3f6f70' : '#4a7b78', py: '#5a8b86' }, fog: 0.6 });
-    b.mesh(new THREE.SphereGeometry(0.33, 10, 8).scale(1, 0.85, 1), bag, [x, 0.3, gz0 + 0.6 + (i % 2) * 0.5], { shadow: false });
+  // ごみ袋（45 L の半透明の袋。白・薄い青・薄い黄）
+  const bagCols = ['#dfe4de', '#c9d6e0', '#e3e0c4'];
+  for (let i = 0; i < 7; i++) {
+    const at: V3 = [gx0 + 0.45 + (i % 4) * 0.72 + (r() - 0.5) * 0.15, 0, gz0 + 0.5 + Math.floor(i / 4) * 0.55 + (i % 2) * 0.15];
+    garbageBag(propAt(sink, outMats(at, 0.6), at, r() * Math.PI * 2, 60 + i), bagCols[Math.floor(r() * bagCols.length)]);
   }
   // キュービクル（高圧の受電設備）とその柵
-  const cub = P({ color: { side: '#2a5560', py: '#356570', nz: '#24505a' }, fog: 0.6 });
-  box(cub, [-10.6, 0.15, -39.6], [-7.4, 2.3, -38.3], true);
+  cubicle(propAt(sink, outMats([-9.0, 0, -38.95], 0.6), [-9.0, 0, -38.95], 0, 70));
   contact(b, -10.6, -39.6, -7.4, -38.3, 0.2);
-  box(P({ color: '#1a3c46', fog: 0.6 }), [-10.6, 0, -39.6], [-7.4, 0.15, -38.3]);
-  for (let x = -10.4; x < -7.6; x += 0.8) box(P({ color: '#1f4650', fog: 0.6 }), [x, 0.4, -38.29], [x + 0.6, 2.0, -38.28]);
-  box(P({ color: '#a8812f', fog: 0.6 }), [-9.2, 1.6, -38.27], [-8.9, 1.8, -38.26]);
   // キュービクルの柵（柱・上下の桟・縦の格子。当たり判定は柵の面）
   const fenceMat = P({ color: { side: '#1b3c44', py: '#24484f' }, fog: 0.6 });
   const fenceBar = P({ color: { side: '#1f444c' }, fog: 0.6, side: THREE.DoubleSide });
@@ -173,9 +184,11 @@ export function buildNorth(b: Builder, doors: Doors, view: ViewDef): void {
     }
     b.ctx.colliders.add({ x: Math.min(a[0], c[0]) - 0.05, y: 0, z: Math.min(a[1], c[1]) - 0.05 }, { x: Math.max(a[0], c[0]) + 0.05, y: 1.85, z: Math.max(a[1], c[1]) + 0.05 });
   }
-  // 自転車 2 台（用務員さんの）・ホースの巻き取り
-  bike(b, [-4.2, 0, -44.8], 0.3);
-  bike(b, [-3.4, 0, -45.3], -0.2);
+  // 自転車 2 台（用務員さんの。スタンドで立てる）
+  ([[-4.2, -44.8, 0.3], [-3.4, -45.3, -0.2]] as [number, number, number][]).forEach(([x, z, yaw], i) => {
+    bicycle(propAt(sink, outMats([x, 0, z], 0.6), [x, 0, z], yaw + Math.PI / 2, 80 + i), { frame: BIKE_COLORS[i * 3 + 1], basket: '#8e9994' });
+  });
+  yardArea.done();
 
   // ---------------------------------------------------------------- 境界: 西の塀・北のフェンスと通用門
   // ブロック塀（40 × 20 cm の目地）
@@ -291,29 +304,6 @@ export function buildNorth(b: Builder, doors: Doors, view: ViewDef): void {
   box(town, [-50, 0, -72], [-30, 18, FAR.z[1] + 2]);
   // 近くから見ても平らな板に見えないように形を足す（参考画像の視点から見える所は壁の絵のまま）
   buildFarRelief(b, view);
-}
-
-/** 自転車（簡単な形） */
-export function bike(b: Builder, at: V3, yaw: number, color = '#2a5560'): void {
-  const fr = P({ color: { side: color, py: color }, fog: 0.6 });
-  const tyre = P({ color: '#0b1a1f', fog: 0.6 });
-  const g = new THREE.Group();
-  const add = (geo: THREE.BufferGeometry, m: THREE.Material): void => {
-    g.add(new THREE.Mesh(geo, m));
-  };
-  for (const x of [-0.55, 0.55]) add(new THREE.TorusGeometry(0.31, 0.025, 6, 20).translate(x, 0.33, 0), tyre);
-  add(new THREE.CylinderGeometry(0.018, 0.018, 1.0, 5).rotateZ(Math.PI / 2 - 0.25).translate(0, 0.55, 0), fr);
-  add(new THREE.CylinderGeometry(0.018, 0.018, 0.6, 5).rotateZ(0.35).translate(-0.18, 0.5, 0), fr);
-  add(new THREE.CylinderGeometry(0.018, 0.018, 0.55, 5).rotateZ(-0.3).translate(0.5, 0.62, 0), fr);
-  add(new THREE.BoxGeometry(0.22, 0.05, 0.1).translate(-0.3, 0.85, 0), tyre);
-  add(new THREE.BoxGeometry(0.06, 0.04, 0.5).translate(0.58, 0.95, 0), fr);
-  add(new THREE.BoxGeometry(0.3, 0.2, 0.28).translate(0.72, 0.8, 0), fr);
-  for (const c of g.children) {
-    const m = c as THREE.Mesh;
-    m.geometry.rotateY(yaw);
-    m.geometry.translate(...at);
-    b.mesh(m.geometry, m.material as THREE.Material, [0, 0, 0], { shadow: false });
-  }
 }
 
 /** 向かいの建物の壁の絵に、西棟の斜めの屋根の影を描き足す（壁の絵は 1 m = 16 画素、左下が建物の西の端・地面） */

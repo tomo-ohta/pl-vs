@@ -17,7 +17,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    // 元の版（index.html）と建築版（arch.html）の 2 ページ
-    rollupOptions: { input: { main: here('./index.html'), arch: here('./arch.html') } },
+    // 元の版（index.html）・建築版（arch.html）・小物の見本帳（props.html）の 3 ページ
+    rollupOptions: { input: { main: here('./index.html'), arch: here('./arch.html'), props: here('./props.html') } },
   },
 });

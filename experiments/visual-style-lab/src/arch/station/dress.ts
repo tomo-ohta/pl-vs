@@ -8,6 +8,9 @@ import { A, D, FREIGHT, ROAD, SITE, TRACK, Y } from './layout.ts';
 import type { Mats } from './mats.ts';
 import { tileRegion } from './region.ts';
 import { seen } from './seen.ts';
+import { placer } from './props/mats.ts';
+import { signalCabinet } from './props/machines.ts';
+import { bale, sleeperPile } from './props/goods.ts';
 
 /**
  * 作り込みの決まり（参考画像の視点の外を、同じ程度の作り込みにする）。どこにでも同じ決まりで置き、参考画像の画角（seen.ts）の中には置かない。
@@ -224,16 +227,14 @@ function trackside(ctx: SceneContext, root: THREE.Object3D, mat: Mats, r: () => 
   {
     for (const [x, z] of [[TRACK.t0 + 2.9, 0.0], [TRACK.t7 - 2.6, -12], [TRACK.t0 + 2.9, 47]] as const) {
       if (seen(x, z, 1, 2)) continue;
-      b.boxMM(mat.cabinet, [x - 0.4, Y.ground, z - 0.6], [x + 0.4, Y.ground + 1.5, z + 0.6], { collide: true });
-      b.boxMM(mat.housing, [x - 0.45, Y.ground + 1.5, z - 0.65], [x + 0.45, Y.ground + 1.58, z + 0.65]);
-      b.box(mat.black, [x + (x > TRACK.t0 ? -0.41 : 0.41), Y.ground + 0.9, z], [0.01, 0.9, 0.5], { shadow: false });
-      b.box(mat.signWhite, [x + (x > TRACK.t0 ? -0.415 : 0.415), Y.ground + 1.25, z], [0.01, 0.12, 0.3], { shadow: false });
+      // 扉を線路へ向ける
+      placer(b, ctx)((p) => signalCabinet(p), [x, Y.ground, z], x > TRACK.t0 ? -Math.PI / 2 : Math.PI / 2, 90 + Math.round(z));
     }
     const px = TRACK.t7 - 3.6;
     for (const z0 of [6, 22]) {
       if (seen(px, z0, 3, 2)) continue;
-      for (let k = 0; k < 5; k++) b.box(mat.sleeper, [px, Y.ground + 0.07 + k * 0.14, z0 + (k % 2) * 0.1], [2.0, 0.14, 1.2 - k * 0.15], { rotY: Math.PI / 2, collide: k === 0 });
-      for (let k = 0; k < 4; k++) b.box(mat.railRust, [px + 1.6 + k * 0.12, Y.ground + 0.08, z0 + 4], [0.07, 0.15, 8], { shadow: false });
+      // 外した枕木の山と、脇の外したレール（レールは z0 + 4 を中心に南北へ 8 m）
+      placer(b, ctx)((p) => sleeperPile(p), [px, Y.ground, z0], 0, 57 + z0);
       ctx.colliders.addCentered(px, Y.ground + 0.4, z0, 1.4, 0.8, 2.2);
     }
   }
@@ -499,7 +500,7 @@ function fields(ctx: SceneContext, root: THREE.Object3D, mat: Mats, r: () => num
     b.boxMM(mat.tin, [x - 2, Y.ground, z - 3], [x + 2, Y.ground + 2.5, z + 3], { collide: true });
     b.box(mat.rust, [x, Y.ground + 2.75, z], [4.6, 0.1, 6.6], { rotZ: 0.12 });
     b.box(mat.black, [x + 2.01, Y.ground + 1.0, z + 1.0], [0.05, 2.0, 1.6], { shadow: false });
-    for (let k = 0; k < 3; k++) b.cyl(mat.signWhite, [x + 3.2, Y.ground + 0.55, z - 2 + k * 1.3], 0.55, 1.0, { axis: 'z', segments: 14, collide: true });
+    for (let k = 0; k < 3; k++) placer(b, ctx)((p) => bale(p, { r: 0.55 }), [x + 3.2, Y.ground, z - 2 + k * 1.3], Math.PI / 2 + (k - 1) * 0.08);
   })(fb);
 
   // 稲のはさ掛け（東の畑。木の柱と横木に、乾かす稲の束）

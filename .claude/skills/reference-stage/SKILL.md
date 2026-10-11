@@ -23,7 +23,8 @@ description: 参考画像（生成画像・コンセプトアート・写真）�
 | カメラ効果（VHS） | `src/render/Film.ts`（v2 の LensPass / VideoPass / CameraRig を読み込む） |
 | API と手順の詳細 | `docs/03-scene-guide.md` |
 | 建築版（間取り図・壁と開口・階段・道順・歩けるか） | `src/arch/plan.ts`・`kit.ts`、ページ `arch.html`、手順 `docs/06-architecture.md` |
-| 写っていない所の仕上げ（質感の物差し・無作為の場所・灯りの光だまり） | `src/core/Quality.ts`・`src/render/Lamps.ts`（`ctx.addLamp`）、capture の `--quality`・`--shot`、手順 `docs/07-unseen-quality.md` |
+| 写っていない所の仕上げ（質感の物差し・無作為の場所・灯りの光だまり） | `src/core/Quality.ts`・`src/render/Lamps.ts`（`ctx.addLamp`。広い場面は `ctx.setLampRange(m)` で送る距離を伸ばす）、capture の `--quality`・`--shot`、手順 `docs/07-unseen-quality.md` |
+| 小物の作り込み（形の道具・場所の材質・共通の小物・見本帳） | `src/props/kit.ts`・`src/props/lib/`・`src/props/gallery.ts`（ページ `props.html`）、場所ごとの見本帳 `src/arch/<場所>/props/gallery.ts`、手順 `docs/08-props.md` |
 
 `experiments/` の外（v1/・v2/・shared/）は変えない。
 
@@ -53,7 +54,7 @@ description: 参考画像（生成画像・コンセプトアート・写真）�
 4. `FloorPlan`（`src/arch/plan.ts`）を書いて `SceneDef.plan` に入れる。道順（tour）は 10 か所以上
 5. `--page arch.html --plan <場所>` で画角に参考画像に無い物が入らないかを確かめる（曲がり・閉じた扉・霧で隠す）
 6. 図のとおりに作る（`src/arch/kit.ts`）。部屋の種類ごとに置く物の決まりを作り、写っていない所も同じ作り込みに
-7. **合格**: 元の版との比べ（`--baseline tools/baseline-v1.json`。ΔE +0.5・構図 F −3 以内）・図との重ね（`-plan-top.png`）・
+7. **合格**: 元の版との比べ（`--baseline tools/baseline-v1.json`。2 つ目の組は `tools/baseline-v2.json`。16:9 でない参考画像は ViewDef に `size: [w, h]`。ΔE +0.5・構図 F −3 以内）・図との重ね（`-plan-top.png`）・
    歩いて行けるか（`--reach`）・写っていない所の撮影（`--tour`）・重さ
 
 ### 段階 1.6. 写っていない所を参考画像の視点と同じ仕上がりにする
@@ -65,6 +66,17 @@ description: 参考画像（生成画像・コンセプトアート・写真）�
 3. 部屋の種類・面の種類ごとの決まりで直す（撮られる所だけを直さない）。光は本物の器具の下に `ctx.addLamp`（照らす箱 = 部屋の内側）
 4. **合格**: 道順と無作為（種を変えて 2〜3 回）の中央値が視点の描画の 0.85〜1.35 倍、印の付く撮影が 2 割程度まで。
    視点の比べ・歩けるか・重さはそのまま合格。最後は参考画像と並べて目で決める（数値を意味の無い粒で上げない）
+
+### 段階 1.7. 小物を最初から作り込む
+
+小物（機械・乗り物・家具・設備・棚の中身）は、箱を重ねただけ・箱に絵を貼っただけにしない（詳しくは `experiments/visual-style-lab/docs/08-props.md`）。
+部屋の広さの数値では見逃すので、小物は見本帳で近くから確かめる。
+
+1. 場所ごとに小物の一覧（何を・どこに・いくつ・どの距離で見られるか）。共通の小物（`src/props/lib`）で足りる物はそれを使う
+2. 実物の寸法と、何か分かる部位を表にする（例: 軽自動車 = 前のガラスと柱・ライト・グリル・バンパー・ナンバー・ミラー・輪の穴・ホイール）
+3. 形の道具（`src/props/kit.ts`: 角の丸い箱・回転体・押し出し・管）で作る。色は場所の色の表から、材質は場所の材質の作り方（`PropMats`）で
+4. 見本帳（`--page props.html --tour <場所>`）の近くと 4 m の 2 枚で確かめて直してから、決まりで場面に置く
+5. **合格**: 近く（1.5 m）で何か分かる・実寸・主な部位・厚みがある・場所の絵柄から浮かない。棚に無地の箱の積み重ねが無い
 
 ### 段階 2. 描き方の道具を確かめる
 

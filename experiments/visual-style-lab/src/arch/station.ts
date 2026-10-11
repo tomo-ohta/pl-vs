@@ -11,6 +11,7 @@ import { plan } from './station/plan.ts';
  * - 配置: station/layout.ts（数値）・station/plan.ts（間取り図・判断の記録）
  * - 形: station/build.ts（ホーム・ベンチ）・canopies.ts（上屋）・dplat.ts と frame.ts（D。元の版の形を南北に回す）・tracks.ts（線路・架線・信号・遠景）
  *       building.ts（駅舎・地下道）・site.ts（広場・道・踏切・旧踏切道・ホームの端・野原・農家）・signs.ts（掲示物の絵を 1 枚にまとめる）
+ * - 小物: station/props/（共通の小物 src/props/lib と駅だけの物を、駅の材質の作り方 props/mats.ts で作る。見本帳は props/gallery.ts）
  * - 材質: station/mat.ts（明るさ = 屋根に隠されない空の割合）・mats.ts（色の表）・region.ts（場所ごとにまとめる・色だけ違う材質を頂点色に）
  * - 空気の色: station/looks-data.ts（視点ごとの値をカメラの位置で混ぜる）
  */

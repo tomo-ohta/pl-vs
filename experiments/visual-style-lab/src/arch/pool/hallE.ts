@@ -120,8 +120,8 @@ export function buildHallE(env: HallEnv, dr: Dress, ctx: SceneContext): void {
   // 南の壁ぞい: ベンチ・ビート板の棚・救命浮環・時計・掲示
   for (const x of [38.0, 44.0, 52.0, 58.0]) deckBench(dr, F(x, z1 - 0.6, 2), 2.6);
   const S = (x: number): Frame => new Frame(b, [x, 0, z1], 2);
-  shelf(dr, S(64.5).sub(0, 0.5), 2.0, 1.6, 0.5, 'float');
-  shelf(dr, S(67.0).sub(0, 0.5), 2.0, 1.6, 0.5, 'float');
+  shelf(dr, S(64.5).sub(0, 0.5), 2.0, 1.6, 0.5, ['boards', 'buoys', 'boards']);
+  shelf(dr, S(67.0).sub(0, 0.5), 2.0, 1.6, 0.5, ['buoys', 'boards', 'tubes']);
   rescueBoard(dr, S(48.5));
   clock(dr, S(47.5), 3.6, 0.35);
   wallNotice(dr, S(34.0), dr.signs.notice(131), 0.6, 0.8, 1.6);

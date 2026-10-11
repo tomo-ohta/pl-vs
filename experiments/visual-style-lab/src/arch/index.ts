@@ -10,4 +10,11 @@ export const ARCH_SCENES: SceneEntry[] = [
   { id: 'pool', label: '屋内プール（建築版）', load: async () => (await import('./pool.ts')).pool },
   { id: 'alley', label: '校舎の間の通路（建築版）', load: async () => (await import('./alley.ts')).alley },
   { id: 'pastel', label: '淡色の廊下（建築版）', load: async () => (await import('./pastel.ts')).pastel },
+  // 2 つ目の参考画像の組（imageboart_20261008。2026-10-11）
+  { id: 'waterpark', label: '地下のウォーターパーク', load: async () => (await import('./waterpark.ts')).waterpark },
+  { id: 'classroom', label: '海の見える教室', load: async () => (await import('./classroom.ts')).classroom },
+  { id: 'serverroom', label: 'サーバールーム', load: async () => (await import('./serverroom.ts')).serverroom },
+  { id: 'whiteroom', label: '白いコンクリートの中庭', load: async () => (await import('./whiteroom.ts')).whiteroom },
+  { id: 'squareroom', label: '立方体の大広間と水路', load: async () => (await import('./squareroom.ts')).squareroom },
+  { id: 'planetarium', label: 'プラネタリウム', load: async () => (await import('./planetarium.ts')).planetarium },
 ];

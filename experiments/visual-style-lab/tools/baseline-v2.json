@@ -1,0 +1,73 @@
+{
+  "note": "建築版の 2 つ目の参考画像の組（imageboart_20261008）の 17 視点。2026-10-11 の 3 回目の直しの後の値。--page arch.html <場面> --baseline tools/baseline-v2.json で比べる",
+  "views": {
+    "waterpark-0": {
+      "dE": 10.9,
+      "edgeF": 53.7
+    },
+    "waterpark-1": {
+      "dE": 11.8,
+      "edgeF": 52.5
+    },
+    "waterpark-2": {
+      "dE": 11.8,
+      "edgeF": 50.1
+    },
+    "waterpark-3": {
+      "dE": 12,
+      "edgeF": 53.6
+    },
+    "classroom-0": {
+      "dE": 8.9,
+      "edgeF": 51
+    },
+    "classroom-1": {
+      "dE": 9.1,
+      "edgeF": 54.7
+    },
+    "serverroom-0": {
+      "dE": 7.9,
+      "edgeF": 47
+    },
+    "serverroom-1": {
+      "dE": 7.8,
+      "edgeF": 45
+    },
+    "serverroom-2": {
+      "dE": 8.1,
+      "edgeF": 52.2
+    },
+    "whiteroom-0": {
+      "dE": 5.9,
+      "edgeF": 58.6
+    },
+    "whiteroom-1": {
+      "dE": 5.9,
+      "edgeF": 66.5
+    },
+    "whiteroom-2": {
+      "dE": 5.7,
+      "edgeF": 72.6
+    },
+    "squareroom-0": {
+      "dE": 5.8,
+      "edgeF": 60.1
+    },
+    "squareroom-1": {
+      "dE": 4.9,
+      "edgeF": 45.9
+    },
+    "squareroom-2": {
+      "dE": 6.9,
+      "edgeF": 45.8
+    },
+    "squareroom-3": {
+      "dE": 8.3,
+      "edgeF": 54.8
+    },
+    "planetarium-0": {
+      "dE": 5.3,
+      "edgeF": 55
+    }
+  }
+}
