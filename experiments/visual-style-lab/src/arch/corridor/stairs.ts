@@ -6,10 +6,12 @@ import { lamp } from '../../scenes/corridor/props.ts';
 import { bar, paper, scribble } from '../../scenes/corridor/tex.ts';
 import type { SceneContext } from '../../scenes/types.ts';
 import { type Mats, ZONE_COLORS } from './furnish.ts';
+import { bucketMop, foldedChair } from './props/furniture.ts';
+import { WARD, wardMats } from './props/mats.ts';
 import type { RoomDef } from './layout.ts';
 import { trackLamp } from './dress.ts';
 import { Leg } from './leg.ts';
-import { alarmBox, board, boxStack, conduit, fbox, fcyl, kitFor, lowPole, outlet, paperCluster, sbox, scrap, smokeDet, sprinkler } from './wallkit.ts';
+import { alarmBox, board, boxStack, conduit, fbox, fcyl, kitFor, lowPole, outlet, paperCluster, scrap, smokeDet, sprinkler } from './wallkit.ts';
 import type { RoomPalette } from './rooms.ts';
 
 /**
@@ -502,21 +504,15 @@ export function dressStairs(env: { ctx: SceneContext; mats: Mats; atlas: Atlas; 
     const s = new Leg(b, ctx, f.w([0.42, y, sz + 0.32]), CAM0, f.yaw + (rnd() - 0.5) * 0.3);
     if (y > 0) {
       // たたんだパイプ椅子を壁に立てかける
-      for (let i = 0; i < 3; i++) {
-        const zc = -0.12 + i * 0.06;
-        fbox(k, s, [0.05 * i - 0.26, 0.05, zc - 0.015], [0.05 * i + 0.16, 0.86, zc + 0.015], { pz: 'teal', nz: 'teal', px: 'dark', nx: 'dark', py: 'teal' }, { shadow: true });
-        sbox(k, s, [0.05 * i - 0.28, 0, zc - 0.03], [0.05 * i - 0.26, 0.88, zc - 0.01], 'metal');
-        sbox(k, s, [0.05 * i + 0.16, 0, zc - 0.03], [0.05 * i + 0.18, 0.88, zc - 0.01], 'metal');
-      }
+      const pm = wardMats(mats);
+      for (let i = 0; i < 3; i++) foldedChair(pm.at(s, 0.05 * i - 0.05, -0.16 + i * 0.07, 0, 3100 + i).sub([0, 0, 0], 0, { pitch: -0.13 }), { seat: WARD.teal });
       s.collider([-0.3, 0, -0.2], [0.3, 0.9, 0.1]);
       boxStack(k, new Leg(b, ctx, f.w([1.0, y, sz + 0.3]), CAM0, f.yaw + 0.1), rnd);
     } else {
       boxStack(k, s, rnd);
       // バケツとモップ
       const bk = new Leg(b, ctx, f.w([1.05, y, sz + 0.28]), CAM0, f.yaw);
-      fcyl(k, bk, [0, 0.15, 0], 0.15, 0.3, 'bucket', { radiusTop: 0.17, segments: 14 });
-      fcyl(k, bk, [0.08, 0.7, -0.05], 0.012, 1.3, 'metal', { segments: 6 });
-      bk.collider([-0.17, 0, -0.17], [0.17, 0.3, 0.17]);
+      bucketMop(wardMats(mats).at(bk, 0, 0, 0.4, 3200));
       lowPole(k, new Leg(b, ctx, f.w([0.25, y, -0.6]), CAM0, f.yaw), 0, -1.2);
     }
   }

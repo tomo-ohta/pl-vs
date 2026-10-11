@@ -20,6 +20,8 @@ export interface ViewDef {
   roll?: number;
   /** 縦の画角（度） */
   fov: number;
+  /** 参考画像の寸法 [幅, 高さ]（既定 1456×816。縦横比の違う参考画像はここで渡す。撮影・比べ・ViewCam もこの寸法） */
+  size?: [number, number];
   /** この視点の間だけ使う見た目の上書き（場所ごとの差。歩いても同じ区域なら維持） */
   style?: StylePreset;
 }
@@ -41,6 +43,8 @@ export interface SceneContext {
    * 返した Lamp の on・intensity を後で変えてよい（点滅など）
    */
   addLamp(l: Lamp): Lamp;
+  /** 照らす箱までこれより遠い灯りを送らない距離（m。既定 24。広い場面で遠くの光だまりが消えるときに伸ばす） */
+  setLampRange(m: number): void;
 }
 
 /** 区域ごとの見た目（カメラがこの箱に入ると style に切り替わる。どの区域にも入っていなければそのまま） */

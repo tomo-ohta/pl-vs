@@ -8,6 +8,9 @@ import { LocalFrame } from './frame.ts';
 import { BACKDOOR, W_CORR, W_ROOM, WBAY, WEST } from './layout.ts';
 import { facadeMat } from './mats.ts';
 import { SUN_DIR } from './sun.ts';
+import { extinguisher, trashBin } from '../../props/lib/index.ts';
+import { PropArea, propMats, propOnFrame } from './props/mats.ts';
+import { bookStack, ceilingTv, cleaningCabinet, cleaningTools, cubbyLocker, duckboard, gymBag, lectern, pencilCase, schoolBag, schoolChair, schoolDesk, slipperRack, steelLocker, umbrellaStand, wallClock, wallSpeaker } from './props/school.ts';
 
 /**
  * 西棟 1 階の入れる所: 通路の裏口 → 廊下（通路側。3 段の大きな窓）→ 教室（後ろの引き戸から）。
@@ -44,6 +47,21 @@ export function buildInside(b: Builder, doors: Doors): void {
   const dark = P({ color: { side: '#122a2f', py: '#1a3a3f' }, fog: 0.4 });
   const metal = P({ color: { side: '#3a6266', py: '#46706f', ny: '#2a4a4d' }, fog: 0.4 });
   backDoor(fr, doors);
+  // 小物（実物の色で頼み、灯りの室内の段へ写す）
+  // 置き場は廊下と教室で分ける（画面に入らない方の小物は描かない）
+  const corrArea = new PropArea(b);
+  const roomArea = new PropArea(b);
+  let sink = corrArea.sink;
+  const pm = propMats('room', 0.4);
+  type Face = 'out' | 'in' | 'along' | 'back';
+  const put = (u: number, y: number, w: number, face: Face, seed: number) => propOnFrame(sink, pm, fr, u, y, w, face, seed);
+  // 小物の当たり判定は壁の座標で切る（斜めの西棟で、回した外形の外接箱が通り道へはみ出さないように）。hx・hz は物の局所の半幅・半奥行き
+  const foot = (u: number, w: number, face: Face, hx: number, hz: number, h: number): void => {
+    const across = face === 'out' || face === 'in';
+    const du = across ? hx : hz;
+    const dw = across ? hz : hx;
+    fr.collide(b.ctx.colliders, [u - du, 0, w - dw], [u + du, h, w + dw]);
+  };
   const [cu0, cu1] = W_CORR.u;
   const wIn = W_CORR.wIn;
   const wOut = W_CORR.wOut;
@@ -187,59 +205,30 @@ export function buildInside(b: Builder, doors: Doors): void {
   notice(b, fr, 'w', wOut + 0.166, hy + 0.08, hy + 0.67, 1.66, 1.8, 1, 28);
   fr.box(b, P({ color: '#ff7a68', fog: 0.2, lamp: 0 }), [hy + 0.3, 1.92, wOut + 0.02], [hy + 0.45, 2.04, wOut + 0.1]);
   b.cyl(P({ color: { side: '#9a4a44', py: '#b0564e' }, fog: 0.4 }), fr.w(hy + 0.37, 2.2, wOut + 0.04), 0.07, 0.05, { axis: 'z', segments: 14, rotY: Math.atan2(fr.N.x, fr.N.z), shadow: false });
-  extinguisher(b, fr, hy + 0.95, wOut + 0.22);
+  extinguisher(put(hy + 0.95, 0, wOut + 0.2, 'out', 21).p, { red: '#c8463e' });
   notice(b, fr, 'w', wOut + 0.004, hy + 0.83, hy + 1.07, 0.75, 0.95, 1, 28);
-  // ごみ箱（分別 3 つ。灰緑の箱に色の付いた蓋）・掃除用具（ほうき・モップ）・傘立て
-  const binBody = P({ color: { side: '#3a6062', py: '#2c4e50' }, fog: 0.4 });
-  ['#4f7f8c', '#a89a58', '#8a5a58'].forEach((c0, i) => {
-    box(binBody, [15.2 + i * 0.42, 0, wOut + 0.05], [15.55 + i * 0.42, 0.72, wOut + 0.42], true);
-    box(P({ color: { side: c0, py: c0 }, fog: 0.4 }), [15.19 + i * 0.42, 0.72, wOut + 0.04], [15.56 + i * 0.42, 0.76, wOut + 0.43]);
-    box(dark, [15.27 + i * 0.42, 0.761, wOut + 0.18], [15.48 + i * 0.42, 0.762, wOut + 0.3]);
-  });
-  for (const [u, lean] of [[14.92, 0.12], [15.02, 0.08]] as [number, number][]) {
-    const g = new THREE.CylinderGeometry(0.012, 0.012, 1.25, 5);
-    g.rotateZ(lean);
-    g.translate(u, 0.62, wOut + 0.12);
-    b.mesh(fr.place(g), metal, [0, 0, 0], { shadow: false });
-  }
-  box(P({ color: { side: '#5a7068', py: '#6a8078' }, fog: 0.4 }), [14.86, 0, wOut + 0.06], [15.12, 0.16, wOut + 0.24]);
-  box(P({ color: { side: '#3a6266', py: '#2a4a4d' }, fog: 0.4 }), [BACKDOOR.u[1] + 0.3, 0, -0.75], [BACKDOOR.u[1] + 0.8, 0.5, -0.4], true);
-  for (let i = 0; i < 3; i++) {
-    const g = new THREE.CylinderGeometry(0.012, 0.012, 0.85, 5);
-    g.rotateX((r() - 0.5) * 0.3);
-    g.rotateZ((r() - 0.5) * 0.3);
-    g.translate(BACKDOOR.u[1] + 0.4 + i * 0.13, 0.62, -0.58 + (r() - 0.5) * 0.15);
-    b.mesh(fr.place(g), P({ color: { side: ['#3d6a72', '#6a7a70', '#2c4c50'][i] }, fog: 0.4 }), [0, 0, 0], { shadow: false });
-  }
-  // 下駄箱（裏口の南の脇。来客用のスリッパの棚）
-  const shoe = P({ color: { side: '#355b5e', py: '#40686a', pz: '#2f5457', nz: '#2f5457' }, fog: 0.4 });
-  box(shoe, [BACKDOOR.u[0] - 1.6, 0, -0.75], [BACKDOOR.u[0] - 0.2, 1.1, -0.35], true);
-  for (let y = 0.25; y < 1.1; y += 0.28) {
-    box(dark, [BACKDOOR.u[0] - 1.55, y, -0.351], [BACKDOOR.u[0] - 0.25, y + 0.2, -0.349]);
-    for (let u = BACKDOOR.u[0] - 1.5; u < BACKDOOR.u[0] - 0.35; u += 0.23) if (r() < 0.6) box(P({ color: { side: r() < 0.5 ? '#6a8a84' : '#4f7f8c', py: '#7a9a92' }, fog: 0.4 }), [u, y, -0.62], [u + 0.18, y + 0.06, -0.37]);
-  }
-  // ロッカー（掲示板の下。2 段の扉に取っ手と名札）
-  const lockerC = P({ color: { side: '#36595a', py: '#41666a', px: '#3d6264', nx: '#3d6264' }, fog: 0.4 });
-  const lockerLine = P({ color: { side: '#1d3a3c' }, fog: 0.4 });
-  const handle = P({ color: { side: '#5f8580' }, fog: 0.4 });
-  const tagM = P({ color: { side: '#bcd2c8' }, fog: 0.4 });
-  box(lockerC, [20.25, 0, wOut], [24.1, 1.0, wOut + 0.36], true);
+  // ごみ箱（分別 3 口の箱）・掃除用具（壁に立て掛けたほうき・モップと床のバケツ）・傘立て（裏口の脇）
+  trashBin(put(15.8, 0, wOut + 0.24, 'out', 22).p, { kind: 'recycle', body: '#c4c9bf', lid: '#4f8a6a' });
+  cleaningTools(put(14.78, 0, wOut, 'out', 23).p, { collide: false });
+  foot(14.86, wOut + 0.17, 'out', 0.36, 0.17, 0.3);
+  umbrellaStand(put(BACKDOOR.u[1] + 0.55, 0, -0.56, 'in', 24).p, { w: 0.5, d: 0.32, h: 0.5, nx: 3, nz: 2, fill: 0.5, collide: false });
+  foot(BACKDOOR.u[1] + 0.55, -0.56, 'in', 0.26, 0.17, 0.5);
+  contactF(b, fr, BACKDOOR.u[1] + 0.3, -0.72, BACKDOOR.u[1] + 0.8, -0.4, 0.06);
+  // 下駄箱（裏口の南の脇。来客用のスリッパの棚。背を外壁に付ける）
+  slipperRack(put(BACKDOOR.u[0] - 0.9, 0, -0.55, 'in', 25).p, { w: 1.4, h: 1.1, d: 0.4, collide: false });
+  foot(BACKDOOR.u[0] - 0.9, -0.55, 'in', 0.7, 0.2, 1.1);
+  // ロッカー（掲示板の下。2 段 × 10 のスチールロッカー。当たり判定は壁の座標で切る）
+  steelLocker(put(22.175, 0, wOut + 0.18, 'out', 26).p, { cols: 10, cw: 0.385, h: 1.0, d: 0.36, collide: false });
+  fr.collide(b.ctx.colliders, [20.25, 0, wOut], [24.1, 1.0, wOut + 0.37]);
   contactF(b, fr, 20.25, wOut, 24.1, wOut + 0.36, 0.08);
-  contactF(b, fr, 15.2, wOut + 0.05, 16.39, wOut + 0.42, 0.07);
+  contactF(b, fr, 15.26, wOut + 0.02, 16.34, wOut + 0.46, 0.07);
   contactF(b, fr, BACKDOOR.u[0] - 1.6, -0.75, BACKDOOR.u[0] - 0.2, -0.35, 0.07);
-  for (let u = 20.25; u < 24.05; u += 0.385) {
-    box(lockerLine, [u - 0.006, 0.03, wOut + 0.36], [u + 0.006, 0.98, wOut + 0.362]);
-    for (const y0 of [0.04, 0.52]) {
-      box(handle, [u + 0.3, y0 + 0.2, wOut + 0.36], [u + 0.33, y0 + 0.28, wOut + 0.375]);
-      if (r() < 0.8) box(tagM, [u + 0.08, y0 + 0.36, wOut + 0.36], [u + 0.22, y0 + 0.41, wOut + 0.363]);
-    }
-  }
-  box(lockerLine, [20.25, 0.5, wOut + 0.36], [24.1, 0.515, wOut + 0.362]);
   // 床の上の簀の子（裏口の内）
-  box(P({ color: { py: '#2c4e50', side: '#22403f' }, fog: 0.4 }), [BACKDOOR.u[0] - 0.1, 0.0, -1.6], [BACKDOOR.u[1] + 0.1, 0.04, -0.4], true);
-  for (let w = -1.55; w < -0.42; w += 0.12) box(dark, [BACKDOOR.u[0] - 0.08, 0.04, w], [BACKDOOR.u[1] + 0.08, 0.041, w + 0.025]);
+  duckboard(put((BACKDOOR.u[0] + BACKDOOR.u[1]) / 2, 0, -1.0, 'in', 27).p, { w: BACKDOOR.u[1] - BACKDOOR.u[0] + 0.2, d: 1.2 });
 
   // ---------------------------------------------------------------- 教室
+  corrArea.done();
+  sink = roomArea.sink;
   const w1 = W_ROOM.w[1]; // 窓側（-11.2）。廊下側は間仕切りの面 wP0
   box(roomFloor, [ru0, -0.25, w1], [ru1, 0.0, wP0], true);
   box(ceil, [ru0, H, w1], [ru1, H + 0.1, wP0]);
@@ -271,59 +260,43 @@ export function buildInside(b: Builder, doors: Doors): void {
   notice(b, fr, 'u', ru1 - 0.004, -8.6, -6.0, 2.2, 2.42, -1, 16 + Math.floor(r() * 8));
   notice(b, fr, 'u', ru1 - 0.004, -4.75, -4.2, 1.3, 1.95, -1, 2);
   notice(b, fr, 'u', ru1 - 0.004, -10.35, -9.85, 1.4, 1.75, -1, 6);
-  // 教壇の机
-  const desk = P({ color: { py: '#4f746c', side: '#3b5c56', ny: '#22403d' }, fog: 0.4 });
-  fr.box(b, desk, [ru1 - 1.6, 0, -6.8], [ru1 - 1.0, 1.0, -7.8], { collide: true });
-  fr.box(b, P({ color: { py: '#6f9a8c', side: '#4a7068' }, fog: 0.4, lamp: 0.3 }), [ru1 - 1.45, 1.0, -7.0], [ru1 - 1.15, 1.02, -7.4]);
-  // 時計・スピーカー（黒板の上）
-  fr.box(b, P({ color: { side: '#c6e0d4', py: '#d8ece2' }, fog: 0.4 }), [ru1 - 0.05, 2.45, -7.15], [ru1, 2.75, -7.45]);
-  fr.box(b, dark, [ru1 - 0.055, 2.59, -7.3], [ru1 - 0.05, 2.61, -7.42]);
-  fr.box(b, P({ color: { side: '#3a5e60' }, fog: 0.4 }), [ru1 - 0.18, 2.55, -4.0], [ru1, 2.85, -4.4]);
-  // テレビ（前の窓の側の角、天井から）
-  fr.box(b, dark, [ru1 - 0.6, 2.2, -10.3], [ru1 - 0.45, 2.8, -11.0]);
-  fr.box(b, metal, [ru1 - 0.55, 2.8, -10.62], [ru1 - 0.5, H, -10.68]);
-  // 机と椅子（6 列 × 6 行。列は w の向き、行は u の向き。前を向く）
-  const top = P({ color: { py: '#4a8282', side: '#27535c', ny: '#18363f' }, fog: 0.4 });
-  const leg = P({ color: { side: '#2c4c4f', py: '#36585a' }, fog: 0.4 });
-  const seat = P({ color: { py: '#386b6f', side: '#27535c', ny: '#18363f' }, fog: 0.4 });
-  const things = ['#3f6f7c', '#5f8a80', '#8a8060', '#5a4f58', '#6f9a8c'];
+  // 教卓（生徒の側を向く）
+  lectern(put(ru1 - 1.3, 0, -7.3, 'back', 31).p, { collide: false });
+  foot(ru1 - 1.3, -7.3, 'back', 0.53, 0.33, 0.98);
+  // 時計・スピーカー（黒板の上）・テレビ（前の窓の側の角、天井から）
+  wallClock(put(ru1, 2.6, -7.3, 'back', 32).p);
+  wallSpeaker(put(ru1, 2.7, -4.2, 'back', 33).p);
+  ceilingTv(put(ru1 - 0.4, 2.48, -10.65, 'back', 34).p, { drop: H - 2.48 - 0.225 });
+  // 机と椅子（6 列 × 6 行。列は w の向き、行は u の向き。黒板を向く）
+  const bagCols = ['#253246', '#2e2f33', '#3a4f6b', '#4a3a36'];
+  const caseCols = ['#3f6f9a', '#c9a24a', '#7a4a6a', '#4f7a5a', '#d9d6cc'];
   for (let row = 0; row < 6; row++) {
     for (let c = 0; c < 6; c++) {
       // 前の列は黒板から 2.2 m、後ろはロッカーの前に 1 m 余りの通り。列の間は 0.6 m 空ける
       const u = ru1 - 2.2 - row * 0.85 + (r() - 0.5) * 0.04;
       const w = -4.15 - c * 1.2 + (r() - 0.5) * 0.04;
-      // 机（天板・脚・物入れ）
-      fr.box(b, top, [u - 0.22, 0.68, w - 0.3], [u + 0.22, 0.71, w + 0.3]);
-      fr.box(b, leg, [u - 0.18, 0.5, w - 0.28], [u + 0.2, 0.62, w + 0.28]);
-      for (const dw of [-0.27, 0.27]) fr.box(b, leg, [u - 0.2, 0, w + dw - 0.015], [u + 0.2, 0.68, w + dw + 0.015]);
-      fr.collide(b.ctx.colliders, [u - 0.2, 0, w - 0.27], [u + 0.2, 0.71, w + 0.27]);
+      // 机（座る側 = 後ろ = -u）
+      const desk = put(u, 0, w, 'back', 100 + row * 6 + c).p;
+      schoolDesk(desk, { collide: false });
+      foot(u, w, 'back', 0.3, 0.22, 0.71);
       contactF(b, fr, u - 0.65, w - 0.3, u + 0.22, w + 0.3, 0.04);
       // 椅子（後ろ）。少し引いたもの・机に入れたもの
-      const cu = u - 0.4 - r() * 0.1;
-      fr.box(b, seat, [cu - 0.18, 0.42, w - 0.19], [cu + 0.18, 0.45, w + 0.19]);
-      fr.box(b, seat, [cu - 0.22, 0.55, w - 0.18], [cu - 0.2, 0.82, w + 0.18]);
-      for (const du of [-0.15, 0.15]) for (const dw of [-0.16, 0.16]) fr.box(b, leg, [cu + du - 0.012, 0, w + dw - 0.012], [cu + du + 0.012, 0.42, w + dw + 0.012]);
-      // 机の横の袋（ところどころ）・机の上の筆箱や教科書
-      if (r() < 0.35) fr.box(b, P({ color: { side: r() < 0.5 ? '#3d6170' : '#5a6a50' }, fog: 0.4 }), [u - 0.1, 0.3, w + 0.32], [u + 0.12, 0.62, w + 0.38]);
-      if (r() < 0.3) {
-        const tu = u + (r() - 0.5) * 0.15;
-        const tw = w + (r() - 0.5) * 0.3;
-        fr.box(b, P({ color: { py: things[Math.floor(r() * things.length)], side: '#2c4a46' }, fog: 0.4, lamp: 0.4 }), [tu - 0.1, 0.71, tw - 0.13], [tu + 0.1, 0.735, tw + 0.13]);
-      }
+      // 後ろの列の椅子は机に入れる（ロッカーの前の通りを空ける）
+      const cu = u - (row === 5 ? 0.24 : 0.36 + r() * 0.08);
+      const cw = w + (r() - 0.5) * 0.04;
+      schoolChair(put(cu, 0, cw, 'along', 200 + row * 6 + c).p, { collide: false });
+      foot(cu, cw, 'along', 0.2, 0.2, 0.8);
+      // 机の横のフックのかばん（ところどころ）・机の上の教科書や筆箱
+      if (r() < 0.35) schoolBag(desk.sub([0.36, 0.33, 0.03], Math.PI / 2), bagCols[Math.floor(r() * bagCols.length)]);
+      if (r() < 0.3) bookStack(desk.sub([(r() - 0.5) * 0.25, 0.71, (r() - 0.5) * 0.15], (r() - 0.5) * 0.4), 1 + Math.floor(r() * 3));
+      else if (r() < 0.2) pencilCase(desk.sub([(r() - 0.5) * 0.3, 0.71, 0.1], (r() - 0.5) * 0.6), caseCols[Math.floor(r() * caseCols.length)]);
     }
   }
-  // 後ろ（南）: ロッカー（2 段 × 9）・掲示板・後ろの黒板
-  const locker = P({ color: { side: '#3f6461', py: '#4a706c', nx: '#355653', px: '#355653' }, fog: 0.4 });
-  fr.box(b, locker, [ru0, 0, -4.2], [ru0 + 0.45, 1.05, -10.4], { collide: true });
+  // 後ろ（南）: ロッカー（1 人 1 区画・2 段 × 9）・掲示板・後ろの黒板。当たり判定は壁の座標で切る
+  cubbyLocker(put(ru0 + 0.225, 0, -7.3, 'along', 41).p, { cols: 9, rows: 2, cw: 0.68, h: 1.05, d: 0.45, collide: false });
+  fr.collide(b.ctx.colliders, [ru0, 0, -4.2], [ru0 + 0.45, 1.05, -10.4]);
   contactF(b, fr, ru0, -4.2, ru0 + 0.45, -10.4, 0.08);
-  contactF(b, fr, ru1 - 1.6, -6.8, ru1 - 1.0, -7.8, 0.08);
-  for (let i = 0; i < 9; i++) {
-    const w = -4.3 - i * 0.68;
-    for (const y of [0.1, 0.58]) {
-      fr.box(b, dark, [ru0 + 0.45, y, w - 0.6], [ru0 + 0.451, y + 0.4, w - 0.04]);
-      if (r() < 0.6) fr.box(b, P({ color: { side: ['#4a6f80', '#6a7a58', '#7a5a5a', '#5a6e8a'][i % 4], py: '#4a6070' }, fog: 0.4 }), [ru0 + 0.25, y + 0.02, w - 0.5], [ru0 + 0.44, y + 0.3, w - 0.15]);
-    }
-  }
+  contactF(b, fr, ru1 - 1.63, -6.77, ru1 - 0.97, -7.83, 0.08);
   fr.box(b, board, [ru0, 1.25, -5.2], [ru0 + 0.02, 2.25, -7.8]);
   for (let i = 0; i < 4; i++) fr.box(b, chalk, [ru0 + 0.02, 1.5 + i * 0.15, -6.9], [ru0 + 0.025, 1.509 + i * 0.15, -5.6 - r() * 0.6]);
   const corkB = P({ color: { side: '#3c5e55', py: '#466a60' }, fog: 0.4 });
@@ -336,14 +309,14 @@ export function buildInside(b: Builder, doors: Doors): void {
   // 廊下側の壁（教室の側）の腰の高さのフック掛けと体操着の袋（ところどころ）
   for (let u = ru0 + 1.6; u < ru1 - 1.6; u += 0.32) {
     fr.box(b, metal, [u - 0.01, 1.02, wP0 - 0.05], [u + 0.01, 1.05, wP0]);
-    if (r() < 0.45) fr.box(b, P({ color: { side: ['#3f6f7c', '#5a4f58', '#386b6f', '#8a8060'][Math.floor(r() * 4)] }, fog: 0.4 }), [u - 0.11, 0.62, wP0 - 0.09], [u + 0.11, 1.0, wP0 - 0.03]);
+    if (r() < 0.45) gymBag(put(u, 1.03, wP0 - 0.035, 'in', 400 + Math.round(u * 10)).p, ['#2f4f7a', '#6a3a40', '#3f5a48', '#7a6a4a'][Math.floor(r() * 4)]);
   }
   fr.box(b, P({ color: { side: '#27535c', py: '#386b6f' }, fog: 0.4 }), [ru0 + 1.4, 1.0, wP0 - 0.02], [ru1 - 1.4, 1.03, wP0]);
   // 後ろの壁の上の作品の列（横長の紙。黒板・掲示板の上）
   for (let w = -4.4; w > -10.4; w -= 0.52) notice(b, fr, 'u', ru0 + 0.006, w - 0.42, w, 2.38, 2.68, 1, 16 + Math.floor(r() * 8));
-  // 掃除用具入れ（後ろの廊下側の角）
-  fr.box(b, P({ color: { side: '#3a5e60', py: '#46706f' }, fog: 0.4 }), [ru0, 0, wP0 - 0.05], [ru0 + 0.5, 1.8, wP0 - 0.75], { collide: true });
-  fr.box(b, lockerLine, [ru0 + 0.5, 0.1, wP0 - 0.405], [ru0 + 0.502, 1.7, wP0 - 0.395]);
+  // 掃除用具入れ（後ろの廊下側の角。教室の前を向く）
+  cleaningCabinet(put(ru0 + 0.25, 0, wP0 - 0.4, 'along', 42).p, { w: 0.7, d: 0.5, h: 1.8, collide: false });
+  foot(ru0 + 0.25, wP0 - 0.4, 'along', 0.35, 0.25, 1.8);
   // 蛍光灯（3 列 × 3。前の列だけ点いている）
   const roomBox = { u: [ru0, ru1] as [number, number], w: [w1, wP0] as [number, number], y: [-0.1, H + 0.05] as [number, number] };
   for (const w of [-4.6, -7.2, -9.8]) {
@@ -382,6 +355,7 @@ export function buildInside(b: Builder, doors: Doors): void {
     }
     quadPatch(b, fr, sunPatch, pts, 0.004);
   }
+  roomArea.done();
 }
 
 /** 世界の向きを壁の座標の向き [u, y, w] へ */
@@ -401,17 +375,6 @@ function quadPatch(b: Builder, fr: LocalFrame, mat: THREE.Material, pts: [number
   const cross = (c[0] - a[0]) * (d[1] - a[1]) - (c[1] - a[1]) * (d[0] - a[0]);
   g.setIndex(cross < 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]);
   b.mesh(fr.place(g), mat, [0, 0, 0], { shadow: false });
-}
-
-/** 消火器（赤い筒・黒いホース・台） */
-function extinguisher(b: Builder, fr: LocalFrame, u: number, w: number): void {
-  const red = P({ color: { side: '#a04a44', py: '#b85850' }, fog: 0.4 });
-  const blk = P({ color: { side: '#14262a' }, fog: 0.4 });
-  fr.box(b, P({ color: { side: '#3a5e60', py: '#46706f' }, fog: 0.4 }), [u - 0.16, 0, w - 0.16], [u + 0.16, 0.08, w + 0.16]);
-  b.cyl(red, fr.w(u, 0.36, w), 0.075, 0.56, { segments: 12, shadow: false });
-  b.cyl(red, fr.w(u, 0.66, w), 0.04, 0.06, { segments: 10, shadow: false });
-  b.cyl(blk, fr.w(u, 0.71, w), 0.03, 0.05, { segments: 8, shadow: false });
-  fr.box(b, blk, [u + 0.06, 0.25, w - 0.012], [u + 0.085, 0.68, w + 0.012]);
 }
 
 /** 襞のあるカーテン（u0〜u1 の幅、w の面）。襞はなめらかな波で、面の向きで明るい襞と暗い襞の帯になる */

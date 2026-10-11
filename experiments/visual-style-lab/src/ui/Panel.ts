@@ -50,10 +50,13 @@ export class Panel {
       <button data-k="copy">カメラの値をコピー</button>`;
     root.appendChild(this.el);
     const arch = app.variant === 'arch';
-    (this.el.querySelector('.title') as HTMLElement).textContent = arch ? '見た目の検証ステージ（建築版）' : '見た目の検証ステージ';
-    (this.el.querySelector('.variant') as HTMLElement).innerHTML = arch
-      ? '間取り図から作った版 ・ <a href="index.html">元の版へ</a> ・ M 間取り図'
-      : '<a href="arch.html">建築版（間取り図から作った版）へ</a>';
+    const props = app.variant === 'props';
+    (this.el.querySelector('.title') as HTMLElement).textContent = props ? '小物の見本帳' : arch ? '見た目の検証ステージ（建築版）' : '見た目の検証ステージ';
+    (this.el.querySelector('.variant') as HTMLElement).innerHTML = props
+      ? '小物を並べて近くから確かめる ・ <a href="arch.html">建築版へ</a> ・ [ ] で次の物'
+      : arch
+        ? '間取り図から作った版 ・ <a href="index.html">元の版へ</a> ・ <a href="props.html">小物の見本帳</a> ・ M 間取り図'
+        : '<a href="arch.html">建築版（間取り図から作った版）へ</a>';
     this.minimap = document.createElement('canvas');
     this.minimap.className = 'minimap';
     root.appendChild(this.minimap);

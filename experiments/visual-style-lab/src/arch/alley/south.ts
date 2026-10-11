@@ -9,7 +9,11 @@ import { LocalFrame } from './frame.ts';
 import { createGlass, GLASS_MODE, ROOM } from './glass.ts';
 import { BIKES, COURT, EAST, LANE, MAIN, WALKWAY, WEST, wpos, type WingFrame } from './layout.ts';
 import { facadeMat } from './mats.ts';
-import { bike } from './north.ts';
+import { bench as slatBench, bicycle } from '../../props/lib/index.ts';
+import { outMats, PropArea, propAt, propMats } from './props/mats.ts';
+import { BIKE_COLORS, VENDING } from './props/place.ts';
+import { umbrellaStand } from './props/school.ts';
+import { bikeRack, canBin, drinkVending, faucet, parkBench } from './props/yard.ts';
 import { buildTree } from './tree.ts';
 import { apartment, house } from './town.ts';
 import { COURT_RECT, groundSun, sunLayer } from './sun.ts';
@@ -71,26 +75,13 @@ export function buildSouth(b: Builder, doors: Doors): void {
       b.mesh(leafCluster([x, 0.55, z1 - 0.5], [1.6, 0.7, 0.7], 4, 400 + x * 3 + z1, 0, 1.2), shrub, [0, 0, 0], { shadow: false });
     }
   }
-  // ベンチ（木の下・花壇の縁）
-  const benchWood = P({ color: { py: '#3a6a68', side: '#2c5452', ny: '#1a3436' } });
-  const benchLeg = P({ color: { side: '#173238', py: '#1f4046' } });
+  // ベンチ（木の下・花壇の縁。背もたれ付き。当たり判定は小物の外形）。中庭の小物は 1 つの置き場にまとめる
+  const court = new PropArea(b);
+  const sink = court.sink;
   const bench = (x: number, z: number, yaw: number): void => {
-    const parts: [THREE.BufferGeometry, THREE.Material][] = [
-      [new THREE.BoxGeometry(1.8, 0.05, 0.42).translate(0, 0.42, 0), benchWood],
-      [new THREE.BoxGeometry(1.8, 0.3, 0.04).translate(0, 0.7, -0.2).rotateX(0), benchWood],
-      [new THREE.BoxGeometry(0.06, 0.42, 0.4).translate(-0.75, 0.21, 0), benchLeg],
-      [new THREE.BoxGeometry(0.06, 0.42, 0.4).translate(0.75, 0.21, 0), benchLeg],
-      [new THREE.BoxGeometry(0.05, 0.35, 0.05).translate(-0.75, 0.6, -0.2), benchLeg],
-      [new THREE.BoxGeometry(0.05, 0.35, 0.05).translate(0.75, 0.6, -0.2), benchLeg],
-    ];
-    for (const [geo, m] of parts) {
-      geo.rotateY(yaw);
-      geo.translate(x, 0, z);
-      b.mesh(geo, m, [0, 0, 0], { shadow: false });
-    }
+    parkBench(propAt(sink, outMats([x, 0, z], 0.7), [x, 0, z], yaw, Math.round(x * 13 + z * 7)));
     const c = Math.abs(Math.cos(yaw)) > 0.5;
-    contact(b, x - (c ? 0.9 : 0.21), z - (c ? 0.21 : 0.9), x + (c ? 0.9 : 0.21), z + (c ? 0.21 : 0.9), 0.1, 0.004);
-    b.ctx.colliders.add({ x: x - (c ? 0.9 : 0.22), y: 0, z: z - (c ? 0.22 : 0.9) }, { x: x + (c ? 0.9 : 0.22), y: 0.45, z: z + (c ? 0.22 : 0.9) });
+    contact(b, x - (c ? 0.9 : 0.25), z - (c ? 0.25 : 0.9), x + (c ? 0.9 : 0.25), z + (c ? 0.25 : 0.9), 0.1, 0.004);
   };
   bench(-14, 23.3, Math.PI);
   bench(-11, 23.3, Math.PI);
@@ -102,12 +93,10 @@ export function buildSouth(b: Builder, doors: Doors): void {
   contact(b, -8.2, 20.4, -4.2, 21.1, 0.15);
   box(P({ color: { py: '#0f2328' } }), [-8.05, 0.72, 20.5], [-4.35, 0.73, 21.0]);
   box(conc, [-8.2, 0.72, 20.95], [-4.2, 0.82, 21.1]);
-  const tap = P({ color: { side: '#41706c', py: '#4f7f7a' } });
+  // 蛇口（立ち上がりの管・十字の取っ手。飲む口は上向き、洗う口は下向きを交互に。流しの北の側を向く）
   for (let i = 0; i < 6; i++) {
     const x = -7.85 + i * 0.66;
-    box(tap, [x - 0.012, 0.82, 21.0], [x + 0.012, 1.0, 21.025]);
-    box(tap, [x - 0.012, 0.975, 20.88], [x + 0.012, 1.0, 21.025]);
-    box(tap, [x - 0.03, 0.96, 20.98], [x + 0.03, 0.99, 21.0]);
+    faucet(propAt(sink, outMats([x, 0, 20.9], 0.7), [x, 0.95, 21.0], Math.PI, 600 + i), { up: i % 2 === 0, riser: 0.13 });
   }
   // マンホールの蓋・本館の前の側溝（格子の蓋）
   const lid = P({ color: { py: '#1d3a42', side: '#16303a' } });
@@ -150,7 +139,8 @@ export function buildSouth(b: Builder, doors: Doors): void {
     b.ctx.addLamp({ pos: [(wx0 + wx1) / 2, 2.0, z], radius: 2.9, intensity: 1.4, color: '#e6fff4', down: true, shadow: 0, box: [wx0, -0.1, wz0, wx1, H, wz1] });
   }
   // 自動販売機の前の明るさ
-  b.ctx.addLamp({ pos: [4.2, 1.1, 19.0], radius: 2.0, intensity: 0.9, color: '#e8fff6', shadow: 0, box: [2.6, -0.1, 18.7, 5.8, 2.4, 20.6] });
+  // （見本の窓の光る板が前の床と壁ぎわを照らす。窓が 2 台ぶん並ぶので強め）
+  b.ctx.addLamp({ pos: [4.2, 1.1, 19.0], radius: 2.4, intensity: 1.5, color: '#e8fff6', shadow: 0, box: [2.0, -0.1, 18.75, 6.4, 2.4, 20.8] });
   // 屋根の縁（鼻隠し）と樋・たて樋
   box(P({ color: { side: '#2a5057', py: '#2f575e' } }), [wx0 - 0.32, H + 0.1, wz0], [wx0 - 0.28, H + 0.3, wz1]);
   box(P({ color: { side: '#2a5057', py: '#2f575e' } }), [wx1 + 0.28, H + 0.1, wz0], [wx1 + 0.32, H + 0.3, wz1]);
@@ -232,28 +222,27 @@ export function buildSouth(b: Builder, doors: Doors): void {
   box(P({ color: { py: '#24454c', side: '#1a3a40' }, fog: 0.8 }), [MAIN.x[0], 0, MAIN.z[0] + 0.3], [MAIN.x[1], MAIN.parapet - 0.9, MAIN.z[1]], false);
   // 傘立て・マット（入口の前）
   box(P({ color: { py: '#173a3c', side: '#132f31' } }), [MAIN.x[0] + entryU - 1.5, 0, MAIN.z[0] - 1.3], [MAIN.x[0] + entryU + 1.5, 0.02, MAIN.z[0] - 0.2]);
-  for (const s of [-1, 1]) box(P({ color: { side: '#2f5a5e', py: '#3a666a' } }), [MAIN.x[0] + entryU + s * 2.3 - 0.35, 0, MAIN.z[0] - 0.5], [MAIN.x[0] + entryU + s * 2.3 + 0.35, 0.55, MAIN.z[0] - 0.2], true);
+  for (const s of [-1, 1]) {
+    const at: V3 = [MAIN.x[0] + entryU + s * 2.3, 0, MAIN.z[0] - 0.36];
+    umbrellaStand(propAt(sink, outMats(at, 0.7), at, Math.PI, 70 + s), { w: 0.7, d: 0.3, h: 0.55, nx: 5, fill: 0.35 });
+    contact(b, at[0] - 0.35, at[2] - 0.15, at[0] + 0.35, at[2] + 0.15, 0.06);
+  }
 
   // ---------------------------------------------------------------- 自動販売機（東棟の南の壁ぞい。渡り廊下の東）
-  contact(b, 2.6, 18.0, 5.15, 18.72, 0.15);
-  vending(b, [3.2, 0, EAST.u0 * -1], '#b9e8d2', '#386b6f');
-  vending(b, [4.2, 0, EAST.u0 * -1], '#b9e8d2', '#27535c');
-  // 自販機の横のベンチ（背なし）と、もう 1 つの回収箱
+  // 白い飲料の自販機と赤い飲料の自販機・横の空き缶とペットボトルの回収箱・背なしのベンチ（灯りの光だまりの中）
   {
-    const seatM = P({ color: { py: '#386b6f', side: '#27535c', ny: '#18363f' } });
-    const legM = P({ color: { side: '#1b3b44', py: '#27535c' } });
-    for (let i = 0; i < 4; i++) box(seatM, [5.35 + i * 0.26, 0.42, 18.15], [5.58 + i * 0.26, 0.45, 18.55]);
-    for (const x of [5.45, 6.3]) box(legM, [x - 0.03, 0, 18.18], [x + 0.03, 0.42, 18.52]);
-    box(legM, [5.35, 0.36, 18.33], [6.4, 0.39, 18.37]);
-    contact(b, 5.35, 18.15, 6.4, 18.55, 0.08);
-    b.ctx.colliders.add({ x: 5.35, y: 0, z: 18.15 }, { x: 6.4, y: 0.45, z: 18.55 });
-    box(P({ color: { side: '#27535c', py: '#386b6f', pz: '#1f454d' } }), [2.0, 0, 18.05], [2.5, 0.85, 18.45], true);
-    box(P({ color: { pz: '#0d2026' } }), [2.15, 0.62, 18.451], [2.35, 0.72, 18.452]);
-    contact(b, 2.0, 18.05, 3.1, 18.45, 0.08);
+    const z0 = -EAST.u0;
+    // 自販機の前の灯り（光だまり）は床と前の物を照らす。機械の箱は灯りをあまり受けない（窓の光る板が浮き立つ）
+    const vm = propMats('shade', 0.8, 0.25);
+    contact(b, 2.0, z0, 5.22, z0 + 0.74, 0.15);
+    // 窓の中の棚と見本は中の灯りで明るい（日なたの段）
+    const inner = propMats('lit', 0.8, 0);
+    VENDING.forEach((v, i) => drinkVending(propAt(sink, vm, [3.7 + i * 1.02, 0, z0 + 0.37], 0, 80 + i), { ...v, inner }));
+    canBin(propAt(sink, vm, [2.27, 0, z0 + 0.25], 0, 90), { body: '#3f78b0', band: '#e2c23e' });
+    canBin(propAt(sink, vm, [2.84, 0, z0 + 0.25], 0, 91), { body: '#e0e2da', band: '#3f78b0' });
+    slatBench(propAt(sink, vm, [5.9, 0, z0 + 0.36], 0, 92), { w: 1.05, seat: '#a08460', frame: '#5a625e' });
+    contact(b, 5.37, z0 + 0.16, 6.43, z0 + 0.56, 0.08);
   }
-  // 空き缶・ペットボトルの回収箱
-  box(P({ color: { side: '#3f7a80', py: '#4c878c', pz: '#3a7076' } }), [2.6, 0, 18.05], [3.1, 0.85, 18.45], true);
-  box(P({ color: { pz: '#0d2026' } }), [2.75, 0.62, 18.451], [2.95, 0.72, 18.452]);
 
   // ---------------------------------------------------------------- 東棟の外階段（屋外避難階段。各階の非常口へ。扉は鍵）
   fireStair(b);
@@ -323,37 +312,7 @@ export function buildSouth(b: Builder, doors: Doors): void {
 
   // ---------------------------------------------------------------- 西棟の裏の細い土地（入れない。教室の窓から見える）
   westStrip(b, r);
-}
-
-/** 自動販売機（前が光る。商品見本の段・取り出し口） */
-function vending(b: Builder, at: V3, face: string, body: string): void {
-  const [x, , z] = at;
-  const box = (m: THREE.Material, min: V3, max: V3, collide = false): void => {
-    b.boxMM(m, min, max, { collide, shadow: false });
-  };
-  const bodyM = P({ color: { side: body, py: body, pz: body }, fog: 0.8 });
-  box(bodyM, [x, 0, z], [x + 0.95, 1.83, z + 0.72], true);
-  const panel = P({ color: { pz: face }, fog: 0.6 });
-  box(panel, [x + 0.07, 0.95, z + 0.72], [x + 0.88, 1.75, z + 0.725]);
-  // 商品見本（3 段）
-  const cols = ['#8f7a70', '#5f8a9a', '#a8a07a', '#5f9790', '#8a7a80', '#b9e8d2'];
-  for (let row = 0; row < 3; row++) {
-    for (let i = 0; i < 6; i++) {
-      const cx = x + 0.13 + i * 0.125;
-      const cy = 1.04 + row * 0.24;
-      box(P({ color: cols[(i + row * 2) % cols.length], fog: 0.6 }), [cx, cy, z + 0.726], [cx + 0.07, cy + 0.14, z + 0.73]);
-      box(P({ color: '#2f5f63', fog: 0.6 }), [cx, cy - 0.04, z + 0.726], [cx + 0.07, cy - 0.02, z + 0.73]);
-    }
-  }
-  box(P({ color: { pz: '#0e2228' }, fog: 0.8 }), [x + 0.15, 0.18, z + 0.72], [x + 0.8, 0.42, z + 0.73]);
-  box(P({ color: { pz: '#3a6a72' }, fog: 0.8 }), [x + 0.66, 0.6, z + 0.72], [x + 0.84, 0.85, z + 0.73]);
-  // 前の面の帯（銘柄の帯・お金の口とボタンの列・取り出し口の縁）と、横の面の広告
-  box(P({ color: { pz: '#27535c' }, fog: 0.8 }), [x + 0.04, 1.77, z + 0.72], [x + 0.91, 1.81, z + 0.728]);
-  box(P({ color: { pz: '#1f454d' }, fog: 0.8 }), [x + 0.04, 0.88, z + 0.72], [x + 0.91, 0.92, z + 0.728]);
-  for (let i = 0; i < 4; i++) box(P({ color: { pz: '#b9e8d2' }, fog: 0.8, lamp: 0 }), [x + 0.7, 0.64 + i * 0.05, z + 0.731], [x + 0.8, 0.66 + i * 0.05, z + 0.734]);
-  box(P({ color: { pz: '#386b6f' }, fog: 0.8 }), [x + 0.12, 0.43, z + 0.72], [x + 0.83, 0.46, z + 0.735]);
-  const fr = new LocalFrame({ origin: [x, z + 0.72], tangent: [0, -1], normal: [-1, 0] } as WingFrame);
-  notice(b, fr, 'w', 0.002, 0.08, 0.64, 0.95, 1.7, 1, 17 + Math.floor((x * 7) % 6), 0.8);
+  court.done();
 }
 
 /** 東棟の南の端の外階段（鉄骨の折り返し階段。踏み板・ささら桁・手すり。段は当たり判定の薄い板） */
@@ -480,15 +439,22 @@ function buildBikeShed(b: Builder, r: () => number): void {
     s.translate((x0 + x1) / 2, 2.43, z);
     b.mesh(s, roof, [0, 0, 0], { shadow: false });
   }
-  // ラック（前輪を差す金物）と自転車（東向き）
-  const rack = P({ color: { side: '#2a5257', py: '#35616a' } });
-  contact(b, x1 - 2.1, z0 + 0.3, x1 - 0.9, z1 - 0.3, 0.05);
-  box(rack, [x1 - 1.0, 0, z0 + 0.3], [x1 - 0.95, 0.35, z1 - 0.3]);
-  const colors = ['#2a5560', '#3a6a64', '#1f4a55', '#4a6f6a', '#2f5a6a', '#506e6a'];
-  for (let z = z0 + 0.5; z < z1 - 0.3; z += 0.62) {
+  // ラック（前輪を差す金物）と自転車（前輪を西のラックへ差し、後ろが車路を向く。ママチャリ）
+  const area = new PropArea(b);
+  const sink = area.sink;
+  const bm = propMats('shade', 0.6);
+  const pitch = 0.62;
+  const n = Math.floor((z1 - 0.3 - (z0 + 0.5)) / pitch) + 1;
+  const rz = z0 + 0.5 + ((n - 1) * pitch) / 2;
+  const xr = x1 - 2.12;
+  bikeRack(propAt(sink, bm, [xr, 0, rz], Math.PI / 2, 40), { n, pitch });
+  contact(b, xr - 0.2, z0 + 0.2, x1 - 0.7, z1 - 0.2, 0.05);
+  for (let i = 0; i < n; i++) {
     if (r() < 0.22) continue;
-    bike(b, [x1 - 1.5 + (r() - 0.5) * 0.1, 0, z], Math.PI + (r() - 0.5) * 0.1, colors[Math.floor(r() * colors.length)]);
+    const z = z0 + 0.5 + i * pitch;
+    bicycle(propAt(sink, bm, [xr + 0.57 + (r() - 0.5) * 0.06, 0, z], -Math.PI / 2 + (r() - 0.5) * 0.06, 300 + i), { frame: BIKE_COLORS[Math.floor(r() * BIKE_COLORS.length)], basket: '#8e9994' });
   }
+  area.done();
   // 屋根の下の照明（点いている。床に光だまり）
   for (const z of [z0 + 3.4, z1 - 3.4]) {
     box(P({ color: { ny: '#d9f4e8', side: '#9fc8b8' }, fog: 0.4, lamp: 0 }), [(x0 + x1) / 2 - 0.6, 2.25, z - 0.07], [(x0 + x1) / 2 + 0.6, 2.32, z + 0.07]);

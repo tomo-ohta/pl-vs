@@ -94,6 +94,8 @@ function gradient(L: Float32Array, w: number, h: number): Float32Array {
 export function palette(imgs: { L: Float32Array; A: Float32Array; B: Float32Array }[], k = 16): [number, number, number][] {
   const pts: [number, number, number][] = [];
   for (const m of imgs) for (let i = 0; i < m.L.length; i += 37) pts.push([m.L[i], m.A[i], m.B[i]]);
+  // 参考画像の無い場面（小物の見本帳）は色の表なし
+  if (!pts.length) return [];
   pts.sort((p, q) => p[0] - q[0]);
   // 明るさの順に等間隔で種を取る
   const cs: [number, number, number][] = Array.from({ length: k }, (_, i) => [...pts[Math.floor(((i + 0.5) / k) * pts.length)]] as [number, number, number]);
@@ -149,7 +151,7 @@ export function imageStats(m: { L: Float32Array; A: Float32Array; B: Float32Arra
   let chroma = 0;
   for (let i = 0; i < n; i++) chroma += Math.hypot(A[i], B[i]);
   let pd = 0;
-  if (pal) {
+  if (pal && pal.length) {
     let cnt = 0;
     for (let i = 0; i < n; i += 7) {
       let bd = Infinity;

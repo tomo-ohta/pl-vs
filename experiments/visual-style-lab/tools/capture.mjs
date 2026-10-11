@@ -17,6 +17,7 @@
 //   node tools/capture.mjs --page arch.html --tour corridor   … 間取り図の道順（参考画像の外）を撮って一覧に
 //   node tools/capture.mjs --page arch.html --reach corridor  … 出発点から各視点・道順へ歩いて行けるか
 //   node tools/capture.mjs --page arch.html --shot corridor 1.2,1.6,-5,0.5,0[,60]  … 好きな位置から 1 枚（質感の数値も出す）
+//   node tools/capture.mjs --page props.html --tour common   … 小物の見本帳（物ごとに近く・4 m の 2 枚）。場所ごとは --tour pool など
 //   node tools/capture.mjs --page arch.html --quality corridor [--n 18] [--seed 1]
 //       … 質感の物差し: 参考画像・視点の描画・道順・無作為の場所を同じ数値（細部・形・明暗・平ら・色）で測り、
 //         視点の描画より簡素な所に印を付ける。道順と無作為の場所の一覧（-tour.jpg・-random.jpg）と -quality.json も出す
@@ -65,6 +66,13 @@ const doPerf = perfIdx >= 0;
 if (doPerf) args.splice(perfIdx, 1);
 const base = opt('--url', 'http://localhost:5176/');
 const chrome = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+// 開発サーバーが止まっていると、ページが開かず分かりにくい失敗になるので先に確かめる
+try {
+  await fetch(base, { method: 'HEAD' });
+} catch {
+  console.error(`開発サーバー（${base}）に繋がりません。npm run dev --prefix experiments/visual-style-lab で起動してください`);
+  process.exit(1);
+}
 mkdirSync(out, { recursive: true });
 
 const refs = readdirSync(join(here, '..', 'public', 'refs')).filter((f) => f.endsWith('.jpg')).map((f) => f.slice(0, -4)).sort();
@@ -246,7 +254,8 @@ if (qualityScene) {
   save(join(out, `${qualityScene}-random.jpg`), q.randomSheet);
   const keys = ['detail', 'shape', 'light', 'contrast', 'flat', 'chroma', 'palette'];
   const names = { detail: '細部', shape: '形', light: '明暗', contrast: '幅', flat: '平ら', chroma: '彩度', palette: '色差' };
-  const med = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : 0; };
+  // 中央値（偶数個のときは真ん中の 2 つの平均。視点が 2 つ・4 つの場所で大きい方に寄らないように）
+  const med = (a) => { const b = [...a].sort((x, y) => x - y); const n = b.length; return n ? +(n % 2 ? b[(n - 1) / 2] : (b[n / 2 - 1] + b[n / 2]) / 2).toFixed(3) : 0; };
   // 基準 = 参考画像の視点の描画（利用者が見て良いとした所）。細部・形・明暗はその最小の 0.75 倍、平らは最大 + 0.08、色差は最大の 1.4 倍 + 1 を超えたら印
   const vs = q.views.map((v) => v.stats);
   const lo = (k, f) => Math.min(...vs.map((s) => s[k])) * f;
@@ -435,6 +444,9 @@ for (const v of views) {
       if (ok || err) { if (err) { logs.push(err); ok = false; } break; }
     }
     if (!ok) { console.error(`${v}: 読み込みに失敗`, logs.join('\n')); continue; }
+    // この版に無い場面（元の版で all に建築版だけの参考画像が入ったときなど）は飛ばす
+    const id = await evaluate('window.__lab.app.def && window.__lab.app.def.id');
+    if (id !== scene) { console.log(`${v}: この版（${pageFile || 'index.html'}）に場面 ${scene} が無いので飛ばす`); lastScene = ''; continue; }
     lastScene = scene;
   }
   // 他の作業でファイルが変わると開発サーバーがページを読み直して撮影が止まるので、1 回だけ開き直してやり直す

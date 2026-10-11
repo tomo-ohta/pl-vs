@@ -20,6 +20,7 @@ import { Mats } from './pool/frame.ts';
 import type { HallEnv } from './pool/hallkit.ts';
 import { ROOMS } from './pool/layout.ts';
 import { dressOf } from './pool/props.ts';
+import { poolPropMats } from './pool/props/mats.ts';
 import { buildPartitions, finishes, roomMats, roomShell } from './pool/rooms.ts';
 import { contactShadows, furnishMats, furnishRoom } from './pool/furnish.ts';
 import { Signs } from './pool/signs.ts';
@@ -233,11 +234,12 @@ export const pool: SceneDef = {
       roomOnly.add(f.floor);
       if (f.band) roomOnly.add(f.band.mat);
     }
-    const shadeSwap = [...roomOnly].map((m) => {
+    const swapOf = (m: THREE.Material) => {
       const mm = m as THREE.MeshStandardMaterial;
       const u = mm.userData.sl;
       return { mm, u, color: mm.color.clone(), sh: u.uSlRatioShade.value.clone(), dk: u.uSlRatioDark.value.clone(), hi: u.uSlRatioHi.value.clone(), tile: u.uSlTileColor.value.clone() };
-    });
+    };
+    const shadeSwap = [...roomOnly].map(swapOf);
     let shaded = false;
     const setRoomShade = (on: boolean): void => {
       if (on === shaded) return;
@@ -264,9 +266,11 @@ export const pool: SceneDef = {
       if (r.closed) return;
       const b = kitOf(`room:${r.id}`).b;
       roomShell(b, rm, r, fin[r.kind]);
-      furnishRoom(b, dressOf(ctx, mats, signs, 1000 + i * 37), fm, r);
+      furnishRoom(b, dressOf(ctx, mats, signs, 1000 + i * 37, true), fm, r);
       contactShadows(b, r, contactMat);
     });
+    // 部屋の中の小物の材質も、ホールから見る時は陰の色に
+    for (const m of poolPropMats(mats, true).solids()) shadeSwap.push(swapOf(m));
     buildPartitions(kitOf('shell').b, rm, doors);
     signs.done();
     root.add(doors.root);

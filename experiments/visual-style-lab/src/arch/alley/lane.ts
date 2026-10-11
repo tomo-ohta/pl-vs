@@ -5,6 +5,8 @@ import { createLeafMaterial, leafCluster, makeLeafTexture } from '../../scenes/a
 import { addGroundSun, sunLayer as computedSun } from './sun.ts';
 import { rng, type Builder, type V3 } from '../../scenes/Builder.ts';
 import { CABINETS, EAST, LANE, LN, LK, PLANTER, roofAt, WEST, westX } from './layout.ts';
+import { PropArea, propAt, propMats } from './props/mats.ts';
+import { acUnit } from './props/yard.ts';
 
 /**
  * 通路（路面・歩道の敷石・白線・排水の蓋）と、通路に沿った物（花壇・分電盤・植え込み・配管・室外機・屋上の柱）。
@@ -202,16 +204,15 @@ export function buildLane(b: Builder): LaneMats {
     box(dpipe2, [2.2, 0, z - 0.08], [2.46, 0.12, z + 0.08]);
     for (let y = 1.2; y < roofAt(EAST, -z) - 1; y += 2.2) box(dpipe2, [2.32, y, z - 0.07], [2.5, y + 0.04, z + 0.07]);
   }
-  const acuDark = P({ color: { nx: '#2c5254', px: '#2c5254', pz: '#264a4c', nz: '#264a4c', py: '#33595b', ny: '#1d3c3f' }, fog: 0.7 });
+  // 室外機（壁の金物に載せる。前に扇の格子・横に配管のカバー）。参考画像の画角の外なので小物の道具で作る
+  const acArea = new PropArea(b);
+  const acM = propMats('shade', 0.7);
   for (const [z, y] of [
     [4.2, 6.75],
     [13.0, 10.2],
     [7.6, 13.6],
   ] as const) {
-    box(acuDark, [1.85, y, z - 0.42], [2.5, y + 0.6, z + 0.42]);
-    box(pole, [1.9, y - 0.05, z - 0.4], [2.5, y, z - 0.36]);
-    box(pole, [1.9, y - 0.05, z + 0.36], [2.5, y, z + 0.4]);
-    box(pipe, [2.4, y - 1.2, z + 0.26], [2.46, y + 0.25, z + 0.32]);
+    acUnit(propAt(acArea.sink, acM, [2.5, y, z], -Math.PI / 2, Math.round(z * 10)), { bracket: true, up: 0.9, sx: -1 });
   }
   // 西棟（u < 6 は画角の外）
   const lx = (d: number): number => WEST.origin[0] + LK * d;
@@ -225,10 +226,8 @@ export function buildLane(b: Builder): LaneMats {
     [-9.4, 12.2],
     [2.6, 16.4],
   ] as const) {
-    const x = lx(d);
-    box(acuDark, [x, y, -d - 0.42], [x + 0.6, y + 0.6, -d + 0.42]);
-    box(pole, [x, y - 0.05, -d - 0.4], [x + 0.62, y, -d - 0.36]);
-    box(pole, [x, y - 0.05, -d + 0.36], [x + 0.62, y, -d + 0.4]);
+    acUnit(propAt(acArea.sink, acM, [lx(d), y, -d], Math.atan2(WEST.normal[0], WEST.normal[1]), Math.round(d * 10) + 50), { bracket: true, up: 0.7 });
   }
+  acArea.done();
   return { pole, acu, pipe };
 }

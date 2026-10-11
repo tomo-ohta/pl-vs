@@ -137,6 +137,8 @@ export interface PlanViewMark {
   eye: [number, number, number];
   yaw: number;
   fov: number;
+  /** 画像の横 ÷ 縦（省略で 1456 / 816） */
+  aspect?: number;
   /** 画角の扇の各光線の長さ（m。壁で止まる所まで）。無ければ決まった長さの三角 */
   reach?: number[];
 }
@@ -288,7 +290,7 @@ export function drawPlan(plan: FloorPlan, canvas: HTMLCanvasElement, o: DrawPlan
   // 視点の画角（参考画像）
   for (const v of views) {
     const [vx, vz] = P(v.eye[0], v.eye[2]);
-    const hf = Math.atan(Math.tan(THREE.MathUtils.degToRad(v.fov) / 2) * (1456 / 816));
+    const hf = Math.atan(Math.tan(THREE.MathUtils.degToRad(v.fov) / 2) * (v.aspect ?? 1456 / 816));
     const len = o.compact ? 10 * s : Math.max(40, 18 * s);
     g.fillStyle = 'rgba(255, 204, 51, 0.18)';
     g.strokeStyle = '#ffcc33';

@@ -7,6 +7,10 @@ import { contact, contactF, floorPatchXZ, notice, patchMat } from './dress.ts';
 import { LocalFrame } from './frame.ts';
 import { ANNEX, COURT, EAST, LANE, MAIN, NORTH, roofAt, STREET, TREE, WALKWAY, WEST, wpos, type WingFrame } from './layout.ts';
 import { sunAt } from './sun.ts';
+import { trashBin } from '../../props/lib/index.ts';
+import { outMats, PropArea, propAt, propMats, propOnFrame } from './props/mats.ts';
+import { acUnit as acUnitProp, faucet, handCart, hoseReel as hoseReelProp, meterBox as meterProp } from './props/yard.ts';
+import type { PropSink } from '../../props/kit.ts';
 
 /**
  * 外の置く物の決まり（写っていない所を、参考画像の視点と同じ情報量にする）。
@@ -52,11 +56,6 @@ export function resetOutsideCache(): void {
   pals = null;
 }
 
-/** 壁の座標の向き（局所 z = 法線）を Y 回りの角度で */
-function yawN(fr: LocalFrame): number {
-  return Math.atan2(fr.N.x, fr.N.z);
-}
-
 /** たて樋（屋根から地面まで。受け金物・下の桝・上の集水器） */
 function downpipe(b: Builder, fr: LocalFrame, u: number, top: number, p: Pal): void {
   b.cyl(p.pipe, fr.w(u, top / 2, 0.11), 0.05, top, { segments: 8, shadow: false });
@@ -68,48 +67,28 @@ function downpipe(b: Builder, fr: LocalFrame, u: number, top: number, p: Pal): v
   for (let k = 0; k < 4; k++) fr.box(b, p.metal, [u - 0.18, 0.012, 0.12 + k * 0.09], [u + 0.18, 0.016, 0.135 + k * 0.09]);
 }
 
-/** 室外機（前に扇の格子・横に放熱の筋・下に架台・横から冷媒管のカバーが壁を上る） */
-function acUnit(b: Builder, fr: LocalFrame, u: number, y: number, p: Pal, pipeUp = 1.6, side = 1): void {
-  const w0 = 0.04;
-  const w1 = 0.34;
-  fr.box(b, p.body, [u - 0.4, y + 0.06, w0], [u + 0.4, y + 0.66, w1]);
-  // 扇の格子（暗い丸と十字の桟）
-  const c = fr.w(u - 0.08, y + 0.36, w1 + 0.006);
-  b.cyl(p.dark, c, 0.2, 0.012, { axis: 'z', rotY: yawN(fr), segments: 20, shadow: false });
-  fr.box(b, p.metal, [u - 0.29, y + 0.355, w1 + 0.012], [u + 0.13, y + 0.365, w1 + 0.016]);
-  fr.box(b, p.metal, [u - 0.085, y + 0.15, w1 + 0.012], [u - 0.075, y + 0.57, w1 + 0.016]);
-  // 横の放熱の筋
-  for (let k = 0; k < 4; k++) fr.box(b, p.dark, [u + 0.2 + k * 0.04, y + 0.12, w1 + 0.001], [u + 0.21 + k * 0.04, y + 0.6, w1 + 0.004]);
-  // 架台
-  fr.box(b, p.metal, [u - 0.36, y, w0], [u - 0.32, y + 0.06, w1 + 0.04]);
-  fr.box(b, p.metal, [u + 0.32, y, w0], [u + 0.36, y + 0.06, w1 + 0.04]);
-  // 冷媒管のカバー（壁を上って壁の中へ）
-  const pu = u + side * 0.48;
-  fr.box(b, p.cover, [pu - 0.05, y + 0.3, 0.0], [pu + 0.05, y + 0.3 + pipeUp, 0.09]);
-  fr.box(b, p.cover, [Math.min(pu, u + side * 0.4) - 0.02, y + 0.3, 0.0], [Math.max(pu, u + side * 0.4) + 0.02, y + 0.4, 0.12]);
-}
-
-/** メーター・分電の小さな箱（窓付き） */
-function meterBox(b: Builder, fr: LocalFrame, u: number, y: number, p: Pal): void {
-  fr.box(b, p.body, [u - 0.16, y, 0.0], [u + 0.16, y + 0.42, 0.14]);
-  fr.box(b, p.dark, [u - 0.09, y + 0.22, 0.14], [u + 0.09, y + 0.34, 0.145]);
-  fr.box(b, p.cover, [u - 0.03, y - 0.5, 0.0], [u + 0.03, y, 0.06]);
-}
-
 /** 換気口（羽根の格子） */
 function vent(b: Builder, fr: LocalFrame, u: number, y: number, p: Pal): void {
   fr.box(b, p.metal, [u - 0.17, y - 0.17, 0.0], [u + 0.17, y + 0.17, 0.05]);
   for (let k = 0; k < 5; k++) fr.box(b, p.dark, [u - 0.13, y - 0.13 + k * 0.06, 0.05], [u + 0.13, y - 0.11 + k * 0.06, 0.055]);
 }
 
-/** 散水栓とホースの巻き取り */
-function hoseReel(b: Builder, fr: LocalFrame, u: number, p: Pal): void {
-  fr.box(b, p.metal, [u - 0.03, 0.5, 0.0], [u + 0.03, 0.75, 0.12]);
-  const hose = P({ color: { side: '#3f7a6c', py: '#4c8a7a' }, fog: 0.7 });
-  const g = new THREE.TorusGeometry(0.2, 0.05, 6, 16);
-  g.translate(0, 0.32, 0);
-  b.mesh(fr.place(g.translate(u + 0.35, 0, 0.22)), hose, [0, 0, 0], { shadow: false });
-  fr.box(b, p.metal, [u + 0.12, 0, 0.1], [u + 0.58, 0.05, 0.34]);
+/** 壁ぞいの小物（室外機・電力量計・散水栓とホースの巻き取り）。日なたか陰かで材質の段を選ぶ */
+function wallProp(sink: PropSink, fr: LocalFrame, it: { k: 'ac' | 'meter' | 'hose'; u: number; y?: number; up?: number; side?: number }, lit: boolean, seed: number): void {
+  const mats = propMats(lit ? 'lit' : 'shade', 0.7);
+  if (it.k === 'ac') {
+    const y = it.y ?? 0;
+    const { p, sx } = propOnFrame(sink, mats, fr, it.u, 0, 0, 'out', seed);
+    acUnitProp(p, { up: it.up ?? 1.6, sx: (it.side ?? 1) * sx, stand: y });
+    p.collide([-0.45, 0, 0], [0.45, y + 0.6, 0.36]);
+  } else if (it.k === 'meter') {
+    meterProp(propOnFrame(sink, mats, fr, it.u, it.y ?? 1.0, 0, 'out', seed).p);
+  } else {
+    // 散水栓（壁の蛇口）と、その前の地面のホースの巻き取り
+    faucet(propOnFrame(sink, mats, fr, it.u, 0.55, 0, 'out', seed).p);
+    const { p } = propOnFrame(sink, mats, fr, it.u + 0.4, 0, 0.3, 'out', seed + 1);
+    hoseReelProp(p);
+  }
 }
 
 /** 扉の上の灯り（昼は消えている）と札 */
@@ -208,19 +187,26 @@ export function buildOutside(b: Builder): void {
       ],
     },
   ];
+  let seed = 900;
   for (const run of runs) {
+    // 壁ごとに置き場を分ける（画面の外の壁の小物は描かない）
+    const area = new PropArea(b);
+    const sink = area.sink;
     for (const it of run.items) {
+      seed += 7;
       const y0 = 'y' in it && it.y !== undefined ? it.y : 0.3;
       const lit = sunAt(run.fr.w(it.u, y0 + 0.3, 0.6)) > 0.5;
       const p = pal(lit);
       if (it.k === 'pipe') downpipe(b, run.fr, it.u, run.top - 0.3, p);
       else if (it.k === 'ac') {
-        acUnit(b, run.fr, it.u, it.y ?? 0, p, it.up ?? 1.6, it.side ?? 1);
-        if ((it.y ?? 0) < 0.1) contactF(b, run.fr, it.u - 0.4, 0.04, it.u + 0.4, 0.38, 0.08, 0.004);
-      }
-      else if (it.k === 'meter') meterBox(b, run.fr, it.u, it.y, p);
+        wallProp(sink, run.fr, it, lit, seed);
+        contactF(b, run.fr, it.u - 0.4, 0.04, it.u + 0.4, 0.38, 0.08, 0.004);
+      } else if (it.k === 'meter') wallProp(sink, run.fr, it, lit, seed);
       else if (it.k === 'vent') vent(b, run.fr, it.u, it.y, p);
-      else if (it.k === 'hose') hoseReel(b, run.fr, it.u, p);
+      else if (it.k === 'hose') {
+        wallProp(sink, run.fr, it, lit, seed);
+        contactF(b, run.fr, it.u + 0.2, 0.1, it.u + 0.6, 0.5, 0.06, 0.004);
+      }
       else if (it.k === 'light') doorLight(b, run.fr, it.u, it.y, p);
       else if (it.k === 'sign') {
         const w = it.w ?? 0.3;
@@ -229,14 +215,17 @@ export function buildOutside(b: Builder): void {
         notice(b, run.fr, 'w', 0.022, it.u - w / 2, it.u + w / 2, it.y, it.y + h, 1, it.cell, 0.7);
       }
     }
+    area.done();
   }
 
   groundDetail(b, r);
-  courtyardProps(b, r);
+  const court = new PropArea(b);
+  courtyardProps(b, r, court.sink);
+  court.done();
 }
 
 /** 中庭の小物: 百葉箱・屋根付きの掲示板・ごみ箱・花壇の札・台車 */
-function courtyardProps(b: Builder, r: () => number): void {
+function courtyardProps(b: Builder, r: () => number, sink: PropSink): void {
   const box = (m: THREE.Material, min: V3, max: V3, collide = false): void => {
     b.boxMM(m, min, max, { collide, shadow: false });
   };
@@ -290,11 +279,8 @@ function courtyardProps(b: Builder, r: () => number): void {
     [10.4, 23.4],
     [-4.4, 29.0],
   ] as [number, number][]) {
-    const p = at(x, z);
-    b.cyl(p.body, [x, 0.38, z], 0.22, 0.76, { segments: 12, collide: true, shadow: false });
+    trashBin(propAt(sink, outMats([x, 0, z], 0.7), [x, 0, z], r() * Math.PI * 2, 500 + Math.round(x * 10)), { body: '#5f7a6a', lid: '#3a4a44' });
     contact(b, x - 0.22, z - 0.22, x + 0.22, z + 0.22, 0.08);
-    b.cyl(p.dark, [x, 0.77, z], 0.17, 0.02, { segments: 12, shadow: false });
-    b.cyl(p.metal, [x, 0.79, z], 0.23, 0.03, { segments: 12, shadow: false });
   }
   // 花壇の札（杭に白い札）
   const stake = P({ color: { side: '#3f6a62' }, fog: 0.7 });
@@ -309,14 +295,9 @@ function courtyardProps(b: Builder, r: () => number): void {
     box(stake, [x - 0.015, 0.2, z - 0.015], [x + 0.015, 0.75, z + 0.015]);
     box(plate, [x - 0.15, 0.62, z - 0.01], [x + 0.15, 0.82, z + 0.01]);
   }
-  // 台車（西棟の昇降口の庇の下）
-  {
-    const p = at(-12.6, 19.4);
-    box(p.cover, [-13.1, 0.12, 19.0], [-12.2, 0.16, 19.6], true);
-    box(p.metal, [-13.12, 0.16, 19.0], [-13.08, 0.95, 19.6]);
-    box(p.metal, [-13.12, 0.9, 19.0], [-13.06, 0.95, 19.6]);
-    for (const [x, z] of [[-13.0, 19.05], [-13.0, 19.55], [-12.3, 19.05], [-12.3, 19.55]]) b.cyl(p.dark, [x, 0.06, z], 0.06, 0.04, { axis: 'z', segments: 10, shadow: false });
-  }
+  // 台車（西棟の昇降口の庇の下。持ち手は西）
+  handCart(propAt(sink, outMats([-12.65, 0, 19.3], 0.7), [-12.65, 0, 19.3], Math.PI / 2, 510));
+  contact(b, -13.1, 19.0, -12.2, 19.6, 0.06);
 }
 
 /** 地面の細かい物（補修の跡・ひび・油じみ・桝・落ち葉・雑草） */
