@@ -36,6 +36,8 @@ export interface Lamp {
    * 室内の場面の sun は天井の明かりの代わりなので、家具の下・棚の陰の影が灯りで消えないようにする。屋外の街灯などは 0
    */
   shadow?: number;
+  /** リアルな照明（render/Real.ts）のときだけ使う灯り（照明器具から作った物など）。塗りの照明では無いのと同じ */
+  realOnly?: boolean;
 }
 
 export const MAX_LAMPS = 16;
@@ -107,6 +109,62 @@ vec3 sl_lamps(vec3 p, vec3 n, float sunVis) {
   }
   return acc;
 }
+// ---- リアルな照明（render/Real.ts。uReal = 1 のときだけ使う。uReal は FOG_GLSL にある） ----
+uniform vec4 uRealLight; // 環境光, 日光, 灯り, 灯りの届く距離（倍率）
+uniform vec4 uRealExtra; // 光る面の倍率, 塗りの材質の明るさ, 陰の空の色
+// 灯りの明るさ（照明の倍率に足す。RGB）。距離の 2 乗で弱まり、届く距離の端で 0 になる（UE4 の窓付きの減衰）。
+// 中心から半径の半分あたりで、塗りの光だまりと同じくらいの明るさ。近くはもっと明るく、遠くは暗い
+vec3 sl_lampsReal(vec3 p, vec3 n, float sunVis) {
+  vec3 acc = vec3(0.0);
+  if (any(lessThan(p, uLampAllMin)) || any(greaterThan(p, uLampAllMax))) return acc;
+  for (int i = 0; i < ${MAX_LAMPS}; i++) {
+    if (float(i) >= uLampCount) break;
+    vec3 q = p;
+    float yw = uLampExtra[i].y;
+    if (yw != 0.0) {
+      vec3 bc = (uLampBoxMin[i] + uLampBoxMax[i]) * 0.5;
+      vec3 r = p - bc;
+      float cs = cos(yw);
+      float sn = sin(yw);
+      q = bc + vec3(cs * r.x - sn * r.z, r.y, sn * r.x + cs * r.z);
+    }
+    if (any(lessThan(q, uLampBoxMin[i])) || any(greaterThan(q, uLampBoxMax[i]))) continue;
+    vec3 d = uLampPos[i].xyz - p;
+    float dist2 = dot(d, d);
+    float dist = sqrt(dist2);
+    float r = uLampPos[i].w;
+    float R = r * uRealLight.w;
+    vec3 l = d / max(dist, 1e-4);
+    float att;
+    float ndl;
+    if (uLampExtra[i].z > 0.5) {
+      // 四角（窓・天窓の明るさ）: 面の光。形はそのまま、縁はなめらか
+      vec3 e = -d;
+      if (yw != 0.0) {
+        float c2 = cos(yw);
+        float s2 = sin(yw);
+        e = vec3(c2 * e.x - s2 * e.z, e.y, s2 * e.x + c2 * e.z);
+      }
+      vec3 a = abs(e) / R;
+      float x = max(max(a.x, a.z), a.y * 0.5);
+      if (x >= 1.0) continue;
+      att = 1.0 - x * x;
+      att *= att * 1.2;
+      ndl = max(dot(n, l), 0.0) * 0.7 + 0.3;
+    } else {
+      if (dist >= R) continue;
+      float x = dist / R;
+      float win = clamp(1.0 - x * x * x * x, 0.0, 1.0);
+      win *= win;
+      float r0 = 0.25 * r;
+      att = (0.25 * r * r) / (dist2 + r0 * r0) * win;
+      ndl = max(dot(n, l), 0.0);
+    }
+    float cone = uLampColor[i].w > 0.5 ? smoothstep(0.05, 0.75, l.y) : 1.0;
+    acc += uLampColor[i].rgb * att * ndl * cone * mix(1.0, sunVis, uLampExtra[i].x);
+  }
+  return acc;
+}
 `;
 
 const _c = new THREE.Color();
@@ -131,9 +189,17 @@ export class LampSet {
   update(eye: THREE.Vector3): void {
     const u = styleUniforms;
     this.order.length = 0;
+    // リアルな照明では灯りが遠くまで届くので、箱の無い灯りの箱（球の外接箱）も届く距離に合わせて広げる
+    const reach = u.uReal.value > 0.5 ? Math.max(1, u.uRealLight.value.w) : 1;
+    const boxOf = (l: Lamp): [number, number, number, number, number, number] => {
+      if (l.box) return l.box;
+      const r = l.radius * reach;
+      return [l.pos[0] - r, l.pos[1] - r, l.pos[2] - r, l.pos[0] + r, l.pos[1] + r, l.pos[2] + r];
+    };
+    const real = u.uReal.value > 0.5;
     for (const l of this.list) {
-      if (l.on === false || l.intensity <= 0) continue;
-      const b = l.box ?? [l.pos[0] - l.radius, l.pos[1] - l.radius, l.pos[2] - l.radius, l.pos[0] + l.radius, l.pos[1] + l.radius, l.pos[2] + l.radius];
+      if (l.on === false || l.intensity <= 0 || (l.realOnly && !real)) continue;
+      const b = boxOf(l);
       const dx = Math.max(b[0] - eye.x, 0, eye.x - b[3]);
       const dy = Math.max(b[1] - eye.y, 0, eye.y - b[4]);
       const dz = Math.max(b[2] - eye.z, 0, eye.z - b[5]);
@@ -146,7 +212,7 @@ export class LampSet {
     const all = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
     for (let i = 0; i < n; i++) {
       const l = this.order[i].l;
-      const b = l.box ?? [l.pos[0] - l.radius, l.pos[1] - l.radius, l.pos[2] - l.radius, l.pos[0] + l.radius, l.pos[1] + l.radius, l.pos[2] + l.radius];
+      const b = boxOf(l);
       u.uLampPos.value[i].set(l.pos[0], l.pos[1], l.pos[2], l.radius);
       _c.set(l.color ?? 0xffffff);
       u.uLampColor.value[i].set(_c.r * l.intensity, _c.g * l.intensity, _c.b * l.intensity, l.down ? 1 : 0);

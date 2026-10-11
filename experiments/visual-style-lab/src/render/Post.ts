@@ -3,6 +3,7 @@ import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { COLOR_GLSL, NOISE_GLSL } from './glsl.ts';
 import type { Film } from './Film.ts';
 import type { PlanarReflector } from './PlanarReflector.ts';
+import { RealPost } from './RealPost.ts';
 import { styleUniforms, type StylePreset } from './Style.ts';
 
 /**
@@ -13,13 +14,13 @@ const VS = /* glsl */ `
 varying vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
 
-function pass(fs: string, uniforms: Record<string, THREE.IUniform>, defines: Record<string, string | number> = {}): FullScreenQuad {
+export function pass(fs: string, uniforms: Record<string, THREE.IUniform>, defines: Record<string, string | number> = {}): FullScreenQuad {
   return new FullScreenQuad(
     new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: fs, uniforms, defines, depthTest: false, depthWrite: false }),
   );
 }
 
-function rt(w: number, h: number, opts: THREE.RenderTargetOptions = {}): THREE.WebGLRenderTarget {
+export function rt(w: number, h: number, opts: THREE.RenderTargetOptions = {}): THREE.WebGLRenderTarget {
   const t = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: false, ...opts });
   t.texture.colorSpace = THREE.LinearSRGBColorSpace;
   t.texture.generateMipmaps = false;
@@ -27,7 +28,7 @@ function rt(w: number, h: number, opts: THREE.RenderTargetOptions = {}): THREE.W
 }
 
 // ---------- ぼかしの段（ブルーム・ディフュージョン共用。Kawase の dual filter） ----------
-class BlurPyramid {
+export class BlurPyramid {
   private readonly levels: THREE.WebGLRenderTarget[] = [];
   private readonly ups: THREE.WebGLRenderTarget[] = [];
   private readonly prefilter: FullScreenQuad;
@@ -103,6 +104,13 @@ class BlurPyramid {
       cur = this.ups[i].texture;
     }
     return cur;
+  }
+  /** 縮めた段（0 = 半分）。リアルな照明の自動露出が画面の平均を読む */
+  level(i: number): THREE.WebGLRenderTarget | undefined {
+    return this.levels[i];
+  }
+  get levelCount(): number {
+    return this.count;
   }
   dispose(): void {
     for (const t of [...this.levels, ...this.ups]) t.dispose();
@@ -235,6 +243,9 @@ uniform vec4 uHaze;       // color.rgb, amount
 uniform float uToneMap;
 uniform float uLinearOut;
 uniform float uFilmScale;
+// リアルな照明（RealPost）: 有無, ブルームを混ぜる割合, ブルームの段の数
+uniform vec4 uReal;
+uniform sampler2D tExposure;
 varying vec2 vUv;
 ${NOISE_GLSL}
 ${COLOR_GLSL}
@@ -338,6 +349,11 @@ void main() {
   }
 
   // ---- ブルーム・ディフュージョン ----
+  if (uReal.x > 0.5) {
+    // リアルな照明: しきい値の無いブルームを混ぜ、自動露出を掛ける
+    col = mix(col, texture2D(tBloom, vUv).rgb / uReal.z, uReal.y);
+    col *= texture2D(tExposure, vec2(0.5)).x;
+  } else
   col += texture2D(tBloom, vUv).rgb * uBloom;
   if (uDiffusion > 0.0) {
     vec3 dfz = texture2D(tDiffuse, vUv).rgb;
@@ -502,8 +518,13 @@ export class Post {
       uToneMap: { value: 0 },
       uLinearOut: { value: 0 },
       uFilmScale: { value: 1 },
+      uReal: { value: new THREE.Vector4() },
+      tExposure: { value: null },
     });
   }
+
+  /** リアルな照明（render/Real.ts の設定は real.settings） */
+  readonly real = new RealPost();
 
   /** カメラ効果（v2 の LensPass / VideoPass）。描画効果が 'off' 以外なら合成の後に掛ける */
   film: Film | null = null;
@@ -522,6 +543,7 @@ export class Post {
     this.diffusion.setSize(w, h);
     for (const r of this.reflectors) r.setSize(w, h);
     this.film?.setSize(w, h);
+    this.real.setSize(w, h);
   }
 
   render(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void {
@@ -536,8 +558,13 @@ export class Post {
     r.render(scene, camera);
 
     let colorTex: THREE.Texture = this.sceneRT.textures[0];
+    // リアルな照明: 物の隅の暗さ・空気の光・ブルーム・自動露出（クワハラ・ディフュージョン・画面のグラデーションは使わない）
+    const real = this.real.settings;
+    const realOn = real.enabled && this.debug === 0;
+    const realOut = realOn ? this.real.render(r, colorTex, this.sceneRT.depthTexture!, this.sceneRT.textures[1], camera) : null;
+    if (realOut) colorTex = realOut.color;
     const kw = s.post.kuwahara;
-    if (kw.enabled && this.enable.kuwahara && this.debug === 0) {
+    if (kw.enabled && this.enable.kuwahara && this.debug === 0 && !realOn) {
       const texel = new THREE.Vector2(1 / this.width, 1 / this.height);
       const ks = THREE.MathUtils.clamp(kw.scale ?? 1, 0.25, 1);
       const kw2 = Math.max(1, Math.round(this.width * ks));
@@ -576,12 +603,12 @@ export class Post {
 
     const bl = s.post.bloom;
     let bloomTex: THREE.Texture | null = null;
-    if (bl.strength > 0 && this.enable.bloom) {
+    if (bl.strength > 0 && this.enable.bloom && !realOn) {
       this.bloom.prefilterUniforms.uThreshold.value = bl.threshold;
       bloomTex = this.bloom.render(r, colorTex, bl.radius * 1.5 + 0.5);
     }
     let diffTex: THREE.Texture | null = null;
-    if (ex.diffusion.amount > 0 && this.enable.bloom) {
+    if (ex.diffusion.amount > 0 && this.enable.bloom && !realOn) {
       this.diffusion.prefilterUniforms.uThreshold.value = ex.diffusion.threshold;
       diffTex = this.diffusion.render(r, colorTex, ex.diffusion.radius * 1.5 + 0.5);
     }
@@ -591,7 +618,9 @@ export class Post {
     u.tColor.value = colorTex;
     u.tInfo.value = this.sceneRT.textures[1];
     u.tDepth.value = this.sceneRT.depthTexture;
-    u.tBloom.value = bloomTex ?? this.sceneRT.textures[0];
+    u.tBloom.value = realOut ? realOut.bloom : (bloomTex ?? this.sceneRT.textures[0]);
+    u.tExposure.value = realOut ? realOut.exposure : null;
+    u.uReal.value.set(realOut ? 1 : 0, realOut && this.enable.bloom ? real.bloom : 0, realOut ? realOut.bloomLevels : 1, 0);
     u.tDiffuse.value = diffTex ?? this.sceneRT.textures[0];
     u.uBloom.value = bloomTex ? bl.strength : 0;
     u.uDiffusion.value = diffTex ? ex.diffusion.amount : 0;
@@ -602,22 +631,30 @@ export class Post {
     u.uCamWorld.value.copy(camera.matrixWorld);
     u.uDebug.value = this.debug;
     const ln = s.post.lines;
-    const on = ln.enabled && this.enable.lines;
+    const on = ln.enabled && this.enable.lines && (!realOn || real.lines > 0);
     u.uLine.value.set(on ? 1 : 0, ln.width * (this.height / 816), ln.depth, ln.normal);
-    u.uLine2.value.set(ln.id, ln.breakup, ln.fadeFar, ln.opacity);
+    u.uLine2.value.set(ln.id, ln.breakup, ln.fadeFar, ln.opacity * (realOn ? real.lines : 1));
     u.uLineColor.value.set(ln.color);
     const g = s.post.grade;
     const gon = this.enable.grade;
+    if (realOn) {
+      // リアルな照明: 露出は自動露出、トーンは Neutral（色の濃さを保つ）。場面の色調整は彩度・色相・色の偏りだけ残す（黒の持ち上げ・段落としは止める）
+      const k = gon ? real.grade : 0;
+      u.uGrade1.value.set(real.autoExposure ? 1 : g.exposure, gon ? g.lift * 0.3 : 0, 1, 1);
+      u.uGrade2.value.set(1 + (g.saturation - 1) * k, ((g.hue * Math.PI) / 180) * k, g.tint[0] * k, g.tint[1] * k);
+      u.uGrade3.value.set(0, ex.posterizeSharpness, gon ? g.vignette : 0, gon ? g.grain : 0);
+    } else {
     u.uGrade1.value.set(g.exposure, gon ? g.lift : 0, gon ? g.gamma : 1, gon ? g.gain : 1);
     u.uGrade2.value.set(gon ? g.saturation : 1, gon ? (g.hue * Math.PI) / 180 : 0, gon ? g.tint[0] : 0, gon ? g.tint[1] : 0);
     u.uGrade3.value.set(gon ? g.posterize : 0, ex.posterizeSharpness, gon ? g.vignette : 0, gon ? g.grain : 0);
+    }
     if (g.haze && gon) {
       const hc = new THREE.Color(g.haze.color);
-      u.uHaze.value.set(hc.r, hc.g, hc.b, g.haze.amount);
+      u.uHaze.value.set(hc.r, hc.g, hc.b, g.haze.amount * (realOn ? 0.3 : 1));
     } else u.uHaze.value.set(0, 0, 0, 0);
-    u.uToneMap.value = ex.toneMap === 'agx' ? 1 : ex.toneMap === 'neutral' ? 2 : 0;
+    u.uToneMap.value = realOn ? 2 : ex.toneMap === 'agx' ? 1 : ex.toneMap === 'neutral' ? 2 : 0;
     for (let i = 0; i < 3; i++) {
-      const gr = gon ? ex.gradients[i] : undefined;
+      const gr = gon && !realOn ? ex.gradients[i] : undefined;
       if (!gr) {
         u.uGradB.value[i].set(0, 0, 0, 0);
         continue;
@@ -642,5 +679,6 @@ export class Post {
     this.tensorRT2.dispose();
     this.bloom.dispose();
     this.diffusion.dispose();
+    this.real.dispose();
   }
 }
