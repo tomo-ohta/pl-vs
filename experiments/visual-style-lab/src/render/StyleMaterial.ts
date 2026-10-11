@@ -271,6 +271,7 @@ uniform vec4 uFogParams2;
 uniform vec3 uFogGlowColor;
 uniform vec3 uFogGlowDir;
 uniform vec3 uFogExtinction;
+uniform float uReal; // リアルな照明（render/Real.ts）
 vec3 sl_fogColor(vec3 rd) {
   float e = rd.y;
   vec3 c = e >= 0.0 ? mix(uFogHorizon, uFogZenith, smoothstep(0.0, 0.55, e)) : mix(uFogHorizon, uFogGround, smoothstep(0.0, 0.35, -e));
@@ -298,7 +299,7 @@ float sl_fogOptical(vec3 wp, vec3 ro) {
 vec3 sl_applyFog(vec3 col, vec3 wp, vec3 ro) {
   float od = sl_fogOptical(wp, ro);
   float fa = 1.0 - exp(-od);
-  if (uFogParams2.y > 0.0) {
+  if (uFogParams2.y > 0.0 && uReal < 0.5) {
     float st = uFogParams2.y;
     float nz = sl_warp(wp * 0.35, 3) * 0.7;
     fa = clamp(floor(fa * st + 0.5 + nz) / st, 0.0, 0.9999);
@@ -375,7 +376,7 @@ vec3 sl_geoNormal() {
   return n;
 }
 vec4 sl_shadowCoord(vec4 c, int idx) {
-  if (idx != 0 || uSlQuant <= 0.0 || (uShadowQuant <= 0.0 && uShadowJitter <= 0.0)) return c;
+  if (idx != 0 || uSlQuant <= 0.0 || (uShadowQuant <= 0.0 && uShadowJitter <= 0.0) || uReal > 0.5) return c;
   vec3 wn = sl_geoNormal();
   vec3 a = abs(wn);
   vec3 q = vSlWorld;
@@ -485,10 +486,25 @@ float sl_puddleMask() {
   reflectedLight.directSpecular = vec3(0.0);
   reflectedLight.indirectSpecular = vec3(0.0);
 #endif
-#if !defined(SL_UNLIT)
-  vec3 slLamp = uLampCount > 0.0 ? sl_lamps(vSlWorld, slN, slSunShadow) * uLampParams.x : vec3(0.0);
+#ifdef SL_UNLIT
+  // リアルな照明: 明るい光る面（照明器具・窓・画面）を HDR へ持ち上げる（ブルームで光る）
+  if (uReal > 0.5) reflectedLight.directDiffuse *= mix(1.0, uRealExtra.x, smoothstep(0.7, 0.95, min(min(diffuseColor.r, diffuseColor.g), diffuseColor.b)));
 #endif
-#if !defined(SL_TOON) && !defined(SL_UNLIT)
+#if !defined(SL_UNLIT)
+  if (uReal > 0.5) {
+    // リアルな照明: 段を作らない。方向の光（日光・スポット）と環境光を分けて倍率を掛け、灯りは距離の 2 乗で弱める
+    vec3 slAlb = diffuseColor.rgb;
+    float slBnc = (uSlBounce >= 0.0 ? uSlBounce : uToonBounce) * max(-slN.y, 0.0);
+    vec3 slLampR = uLampCount > 0.0 ? sl_lampsReal(vSlWorld, slN, slSunShadow) * uLampParams.x * uRealLight.z : vec3(0.0);
+    reflectedLight.directDiffuse = reflectedLight.directDiffuse * uRealLight.y + slAlb * slLampR;
+    // 環境光は空の色を帯びる（屋外の陰は空の青み。場面の霧の天頂の色を明るさ 1 にならし、3 乗で色を濃くして掛ける）
+    vec3 slSky = pow(uFogZenith / max(max(uFogZenith.r, max(uFogZenith.g, uFogZenith.b)), 1e-3), vec3(3.0));
+    reflectedLight.indirectDiffuse = (reflectedLight.indirectDiffuse + slAlb * slBnc) * uRealLight.x * mix(vec3(1.0), slSky, uRealExtra.z);
+    reflectedLight.directSpecular *= uRealLight.y;
+    totalEmissiveRadiance *= uRealExtra.x;
+  } else {
+  vec3 slLamp = uLampCount > 0.0 ? sl_lamps(vSlWorld, slN, slSunShadow) * uLampParams.x : vec3(0.0);
+#if !defined(SL_TOON)
   reflectedLight.directDiffuse += diffuseColor.rgb * slLamp;
 #endif
 #ifdef SL_TOON
@@ -515,6 +531,8 @@ float sl_puddleMask() {
       reflectedLight.directSpecular *= 1.0 - amt * uSlSpecKill;
       reflectedLight.indirectSpecular *= 1.0 - amt * uSlSpecKill;
     }
+  }
+#endif
   }
 #endif
 #ifdef SL_UNDERWATER

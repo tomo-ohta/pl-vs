@@ -300,6 +300,16 @@ void main() {
     vec4 m = texture2D(uMap, vUv);
     col = mix(col, m.rgb, m.a);
   }
+  if (uReal > 0.5) {
+    // リアルな照明: 塗りの色を「照らされた色」とみなし、灯りの無い所は暗く、灯りの近くは距離の 2 乗で明るく。
+    // 灯りを受けない面（空・光る面）は、明るい所を HDR へ持ち上げる
+    if (uLampLit > 0.0) {
+      vec3 lr = uLampCount > 0.0 ? sl_lampsReal(vWorld, n, 1.0) * uLampParams.x * uRealLight.z * uLampLit : vec3(0.0);
+      col *= uRealExtra.y + lr;
+    } else {
+      col *= mix(1.0, uRealExtra.x, smoothstep(0.7, 0.95, min(min(col.r, col.g), col.b)));
+    }
+  } else
   // 灯りの光だまり: 色を明るくする。光の縁はノイズでちぎって、塗りの光だまりにする
   if (uLampCount > 0.0 && uLampLit > 0.0) {
     vec3 lp = sl_lamps(vWorld, n, 1.0) * uLampParams.x;

@@ -26,6 +26,12 @@
       .panel details.film input[type=range] { max-width: 120px; }
       .panel details.film .note { color: #8fa29d; font-size: 10.5px; line-height: 1.5; margin-top: 4px; }
       .panel :disabled { opacity: 0.45; }
+      /* リアルな照明のパネル（項目が多いので、パネルは画面の高さで巻き取る） */
+      .panel { max-height: calc(100vh - 20px); overflow-y: auto; box-sizing: border-box; }
+      .panel details.real span { width: 34px; text-align: right; font-family: ui-monospace, monospace; font-size: 10.5px; }
+      .panel details.real .real-body { display: flex; flex-direction: column; gap: 2px; }
+      .panel .real-toggle { padding: 6px 8px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: #1d2a2d; color: #dfe9e6; cursor: pointer; }
+      .panel .real-toggle.on { background: #f2c66d; color: #1b1405; border-color: #f2c66d; }
       /* REC 表示の枠（描画の枠に合わせる。transform で position:fixed の子をこの枠に閉じ込める） */
       #app .film-frame { position: absolute; left: var(--vx); top: var(--vy); width: var(--vw); height: var(--vh); pointer-events: none; transform: translateZ(0); z-index: 1; }
       .help { position: absolute; left: 10px; bottom: 10px; padding: 6px 10px; border-radius: 6px; background: rgba(10, 16, 18, 0.6); color: #c9d6d3; font-size: 11px; line-height: 1.6; z-index: 2; }

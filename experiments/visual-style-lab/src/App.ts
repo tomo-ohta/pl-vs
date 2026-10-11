@@ -10,7 +10,9 @@ import { imageStats, palette, rng, toLab, type ImageStats } from './core/Quality
 import { Film } from './render/Film.ts';
 import { applyStyleUniforms, styleUniforms, type StylePreset } from './render/Style.ts';
 import { createStyleMaterial } from './render/StyleMaterial.ts';
-import { LampSet } from './render/Lamps.ts';
+import { LampSet, type Lamp } from './render/Lamps.ts';
+import { applyRealUniforms, realFor, type RealSettings } from './render/Real.ts';
+import { fixtureLamps } from './render/RealFixtures.ts';
 import type { SceneEntry } from './scenes/index.ts';
 import type { BuiltScene, SceneContext, SceneDef, ViewDef } from './scenes/types.ts';
 
@@ -48,6 +50,13 @@ export class App {
   private fpsT = 0;
   private pixelRatio = Math.min(window.devicePixelRatio, 1.5);
   private fixedSize: [number, number] | null = null;
+  private lastDt = 1 / 60;
+  /** リアルな照明で照明器具から作った灯り（場面ごとに 1 回、入れた時に作る） */
+  private fixtures: Lamp[] | null = null;
+  /** 照明器具から作った灯りの数（確かめ用） */
+  get fixtureCount(): number {
+    return this.fixtures?.length ?? 0;
+  }
   onChange: (() => void) | null = null;
 
   private readonly defs = new Map<string, SceneDef>();
@@ -111,6 +120,7 @@ export class App {
     this.scene.clear();
     this.colliders.clear();
     this.lamps.clear();
+    this.fixtures = null;
     this.sun = null;
     const ctx: SceneContext = {
       style: def.style,
@@ -144,6 +154,23 @@ export class App {
     if (vid) this.setView(vid);
     else this.player.applyCamera();
     this.resize();
+    // リアルな照明: 場面ごとの既定（入り切りはそのまま）と、平行光源（影の地図）・スポットライト
+    this.post.real.settings = realFor(def.id, { enabled: this.post.real.settings.enabled });
+    this.post.real.setScene(this.scene, this.sun);
+    this.onChange?.();
+  }
+
+  /** リアルな照明（render/Real.ts）の設定を変える。enabled だけ変えれば入り切り */
+  setReal(r: Partial<RealSettings>): void {
+    Object.assign(this.post.real.settings, r);
+    if (r.enabled !== undefined || r.autoExposure !== undefined || r.exposure !== undefined) this.post.real.resetExposure();
+    this.onChange?.();
+  }
+
+  /** 場面の既定のリアルな照明に戻す（入り切りはそのまま） */
+  resetReal(): void {
+    this.post.real.settings = realFor(this.def?.id, { enabled: this.post.real.settings.enabled });
+    this.post.real.resetExposure();
     this.onChange?.();
   }
 
@@ -232,6 +259,7 @@ export class App {
       requestAnimationFrame(loop);
       const now = performance.now();
       const dt = Math.min((now - this.last) / 1000, 0.1);
+      this.lastDt = dt;
       this.last = now;
       this.step(dt);
       this.frames++;
@@ -276,6 +304,15 @@ export class App {
 
   renderFrame(): void {
     this.built?.beforeRender?.(this.camera);
+    // リアルな照明の値（灯りの箱の広げ方にも使うので、灯りより先）。撮影（止めている時）は露出をすぐに合わせる
+    const rs = this.post.real.settings;
+    if (rs.enabled && !this.fixtures && this.def) {
+      this.fixtures = fixtureLamps(this.scene, this.colliders, this.lamps.list.filter((l) => !l.realOnly));
+      for (const l of this.fixtures) this.lamps.add(l);
+    }
+    if (this.fixtures) for (const l of this.fixtures) l.on = rs.fixtures;
+    applyRealUniforms(rs);
+    this.post.real.adapt = this.frozen ? 1 : 1 - Math.exp(-this.lastDt * 1.5);
     this.lamps.update(this.camera.position);
     if (this.sun) {
       styleUniforms.uSunShadowMatrix.value.copy(this.sun.shadow.matrix);

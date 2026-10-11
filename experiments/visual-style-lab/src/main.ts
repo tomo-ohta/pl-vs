@@ -77,6 +77,15 @@ function applyOverrides(): void {
     app.setStyle(app.style);
   }
   if (params.get('debug')) app.post.debug = Number(params.get('debug'));
+  // リアルな照明: ?real=1（入れる）・?rset=ambient=0.3,shafts=2,autoExposure=false（値の上書き）
+  if (params.has('real') || params.has('rset')) {
+    const r: Record<string, number | boolean> = {};
+    for (const kv of (params.get('rset') ?? '').split(',').filter(Boolean)) {
+      const [k, v] = kv.split('=');
+      r[k] = v === 'true' ? true : v === 'false' ? false : Number(v);
+    }
+    app.setReal({ ...(params.has('real') ? { enabled: params.get('real') !== '0' } : {}), ...r });
+  }
   // カメラ効果: ?film=tape&vhs=1.5&keep=0.85&handheld=0.6&hold=24&ae=1&awb=1
   const film = params.get('film');
   if (film) {

@@ -1,6 +1,7 @@
 import type { App } from '../App.ts';
 import { drawPlan } from '../arch/plan.ts';
 import { FilmPanel } from './FilmPanel.ts';
+import { RealPanel } from './RealPanel.ts';
 
 type CompareMode = 'off' | 'overlay' | 'swipe' | 'diff' | 'ref';
 const MODES: CompareMode[] = ['off', 'overlay', 'swipe', 'diff', 'ref'];
@@ -19,6 +20,7 @@ export class Panel {
   private readonly info: HTMLDivElement;
   private readonly help: HTMLDivElement;
   private readonly filmPanel: FilmPanel;
+  private readonly realPanel: RealPanel;
   private readonly minimap: HTMLCanvasElement;
   private minimapOn = false;
   mode: CompareMode = 'off';
@@ -61,12 +63,13 @@ export class Panel {
     this.minimap.className = 'minimap';
     root.appendChild(this.minimap);
     setInterval(() => this.drawMinimap(), 100);
+    this.realPanel = new RealPanel(app, this.el);
     this.filmPanel = new FilmPanel(app.film, this.el);
     this.help = document.createElement('div');
     this.help.className = 'help';
     this.help.innerHTML =
       'クリックで視点操作 ・ WASD 移動 ・ Shift 走る ・ C しゃがむ ・ Space ジャンプ ・ F 飛行<br>' +
-      '1〜6 場面 ・ [ ] 視点 ・ V 比較 ・ G 表示 ・ K カメラ効果 ・ L 画面いっぱい ・ R 視点に戻る ・ H 隠す';
+      '1〜6 場面 ・ [ ] 視点 ・ V 比較 ・ G 表示 ・ J リアルな照明 ・ K カメラ効果 ・ L 画面いっぱい ・ R 視点に戻る ・ H 隠す';
     root.appendChild(this.help);
 
     const q = <T extends HTMLElement>(k: string): T => this.el.querySelector(`[data-k="${k}"]`) as T;
@@ -159,6 +162,7 @@ export class Panel {
   private sync(): void {
     const app = this.app;
     this.filmPanel?.sync();
+    this.realPanel?.sync();
     if (!app.def) return;
     this.sceneSel.value = app.def.id;
     this.viewSel.innerHTML = '';

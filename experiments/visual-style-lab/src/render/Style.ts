@@ -174,6 +174,10 @@ export const styleUniforms = {
   uLampParams: { value: new THREE.Vector2(1, 0.25) }, // gain, tint
   uLampAllMin: { value: new THREE.Vector3() }, // 使う灯りの箱を全部包む箱
   uLampAllMax: { value: new THREE.Vector3() },
+  // リアルな照明（render/Real.ts）。0 なら今までの塗りの照明のまま（材質の計算も変わらない）
+  uReal: { value: 0 },
+  uRealLight: { value: new THREE.Vector4(0.35, 1.5, 2.5, 1.6) }, // 環境光, 日光, 灯り, 灯りの届く距離（倍率）
+  uRealExtra: { value: new THREE.Vector4(3, 0.55, 0.6, 0) }, // 光る面の倍率, 塗りの材質の明るさ, 陰の空の色
 };
 
 export function applyStyleUniforms(s: StylePreset): void {
