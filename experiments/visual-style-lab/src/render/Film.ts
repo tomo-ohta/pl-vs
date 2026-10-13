@@ -108,7 +108,8 @@ export class Film {
     this.rig = new CameraRig(camera);
     this.rec = new RecOverlay(recParent);
     const rt = (name: string): THREE.WebGLRenderTarget => {
-      const t = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false });
+      // 合成の受け口（linear）だけ深度を持つ（手に持つ物 = タブレットを重ねて描く。Post.overlay）
+      const t = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: name === 'Film.linear', stencilBuffer: false });
       t.texture.name = name;
       t.texture.colorSpace = THREE.NoColorSpace;
       t.texture.generateMipmaps = false;

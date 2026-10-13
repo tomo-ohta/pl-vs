@@ -529,6 +529,12 @@ export class Post {
   /** カメラ効果（v2 の LensPass / VideoPass）。描画効果が 'off' 以外なら合成の後に掛ける */
   film: Film | null = null;
 
+  /**
+   * 手に持つ物（タブレット。src/tablet）を世界の絵の上に重ねる場面とカメラ。合成の直後（カメラ効果の前）に、深度を消してから描く
+   * （壁に埋まらない。カメラ効果は世界と同じく掛かる。v2 の ViewmodelPass と同じ置き場所）
+   */
+  overlay: { scene: THREE.Scene; camera: THREE.Camera; visible: boolean } | null = null;
+
   setFilm(f: Film | null): void {
     this.film = f;
     f?.setSize(this.width, this.height);
@@ -669,6 +675,15 @@ export class Post {
     u.uFilmScale.value = film ? film.inputScale : 1;
     r.setRenderTarget(film ? film.linearTarget : null);
     this.composite.render(r);
+    const ov = this.overlay;
+    if (ov?.visible && this.debug === 0) {
+      r.clearDepth();
+      // 画面へ直接描くときは sRGB にする（合成は sRGB にしてから画面へ書く）。カメラ効果の前は線形のまま
+      const prev = r.outputColorSpace;
+      if (!film) r.outputColorSpace = THREE.SRGBColorSpace;
+      r.render(ov.scene, ov.camera);
+      r.outputColorSpace = prev;
+    }
     film?.render(r);
   }
 

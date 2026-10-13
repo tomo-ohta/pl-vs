@@ -51,6 +51,8 @@ export class Panel {
       <div class="info"></div>
       <button data-k="copy">カメラの値をコピー</button>`;
     root.appendChild(this.el);
+    // 設定のパネルは既定で隠す（H キーで開く・閉じる。URL の ?panel=1 で開いた状態から）
+    if (!new URLSearchParams(location.search).has('panel')) this.el.style.display = 'none';
     const arch = app.variant === 'arch';
     const props = app.variant === 'props';
     (this.el.querySelector('.title') as HTMLElement).textContent = props ? '小物の見本帳' : arch ? '見た目の検証ステージ（建築版）' : '見た目の検証ステージ';
@@ -69,7 +71,7 @@ export class Panel {
     this.help.className = 'help';
     this.help.innerHTML =
       'クリックで視点操作 ・ WASD 移動 ・ Shift 走る ・ C しゃがむ ・ Space ジャンプ ・ F 飛行<br>' +
-      '1〜6 場面 ・ [ ] 視点 ・ V 比較 ・ G 表示 ・ J リアルな照明 ・ K カメラ効果 ・ L 画面いっぱい ・ R 視点に戻る ・ H 隠す';
+      '1〜6 場面 ・ [ ] 視点 ・ Tab タブレット ・ V 比較 ・ G 表示 ・ J リアルな照明 ・ K カメラ効果 ・ L 画面いっぱい ・ R 視点に戻る ・ H 設定パネル';
     root.appendChild(this.help);
 
     const q = <T extends HTMLElement>(k: string): T => this.el.querySelector(`[data-k="${k}"]`) as T;
@@ -117,6 +119,11 @@ export class Panel {
       this.updateRef();
     });
     window.addEventListener('keydown', (e) => this.key(e));
+    // タブレットの設定のアプリ: 隠したパネルも出す
+    app.onShowPanel = () => {
+      this.el.style.display = '';
+      this.help.style.display = '';
+    };
     app.onChange = () => this.sync();
     this.sync();
     setInterval(() => this.tick(), 250);
@@ -126,6 +133,8 @@ export class Panel {
     const t = e.target as HTMLElement;
     if (t.tagName === 'INPUT' || t.tagName === 'SELECT') return;
     const app = this.app;
+    // タブレットを出している間の数字キーは、タブレット（探索の番号）へ
+    if (app.tablet?.out && /^(?:Digit|Numpad)\d$/.test(e.code)) return;
     const views = app.def?.views ?? [];
     const idx = views.findIndex((v) => v.id === (app.view?.id ?? this.refId));
     if (/^Digit[1-9]$/.test(e.code)) {
@@ -147,9 +156,8 @@ export class Panel {
       this.minimapOn = !this.minimapOn && !!app.def?.plan;
       this.minimap.style.display = this.minimapOn ? 'block' : 'none';
     } else if (e.code === 'KeyH') {
-      const hide = this.el.style.display !== 'none';
-      this.el.style.display = hide ? 'none' : '';
-      this.help.style.display = hide ? 'none' : '';
+      // 設定のパネルを開く・閉じる（下の操作の説明は出したまま）
+      this.el.style.display = this.el.style.display === 'none' ? '' : 'none';
     }
   }
 
