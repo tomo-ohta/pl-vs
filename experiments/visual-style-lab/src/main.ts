@@ -103,6 +103,8 @@ function applyOverrides(): void {
 
 async function boot(): Promise<void> {
   await app.load(sceneId, viewParam ?? undefined);
+  // QR コードの URL（?scene=…&stop=… / &at=x,y,z,yaw,pitch）: その場所に立つ
+  if (params.has('stop') || params.has('at')) app.goTo(params);
   applyOverrides();
   const panel = capture ? null : new Panel(app, root);
   if (panel && params.get('compare')) panel.setMode(params.get('compare') as 'overlay');

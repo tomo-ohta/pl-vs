@@ -131,6 +131,11 @@ export interface StyleMaterialOptions {
   depthWrite?: boolean;
   /** 影を受けるか（シェーダー側。メッシュの receiveShadow も必要） */
   alphaTest?: number;
+  /**
+   * 線の検出に使う材質の番号（0〜1）。省略時は作った順に振る。後から足す物（QR コードなど）は決まった値を渡すと、
+   * その後に作られる材質の番号をずらさない（ずれると、ほかの物の線の出方が 1 画素ほど変わる）
+   */
+  id?: number;
 }
 
 let idCounter = 0;
@@ -183,7 +188,7 @@ export function createStyleMaterial(style: StylePreset, o: StyleMaterialOptions)
     uSlBounce: { value: o.bounce ?? -1 },
     uSlQuant: { value: o.shadowQuant === false ? 0 : 1 },
     uSlLine: { value: o.line ?? 1 },
-    uSlId: { value: ((idCounter++ * 0.618034) % 1) * 0.9 + 0.05 },
+    uSlId: { value: o.id ?? ((idCounter++ * 0.618034) % 1) * 0.9 + 0.05 },
     uSlTile: { value: new THREE.Vector4(tileSize[0], tileSize[1], o.tiles?.line ?? 0.01, o.tiles?.jitter ?? 0) },
     uSlTileOffset: { value: new THREE.Vector3(o.tiles?.offset?.[0] ?? 0, o.tiles?.offset?.[1] ?? 0, o.tiles?.broken ?? 0) },
     uSlTileColor: { value: new THREE.Color(o.tiles?.color ?? 0x000000) },

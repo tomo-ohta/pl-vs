@@ -13,6 +13,8 @@ import { createStyleMaterial } from './render/StyleMaterial.ts';
 import { LampSet, type Lamp } from './render/Lamps.ts';
 import { applyRealUniforms, realFor, type RealSettings } from './render/Real.ts';
 import { fixtureLamps } from './render/RealFixtures.ts';
+import { LabTablet } from './tablet/LabTablet.ts';
+import { QrWorld } from './qr/QrWorld.ts';
 import type { SceneEntry } from './scenes/index.ts';
 import type { BuiltScene, SceneContext, SceneDef, ViewDef } from './scenes/types.ts';
 
@@ -51,6 +53,14 @@ export class App {
   private pixelRatio = Math.min(window.devicePixelRatio, 1.5);
   private fixedSize: [number, number] | null = null;
   private lastDt = 1 / 60;
+  /** v2 のタブレット（Tab。src/tablet/LabTablet.ts） */
+  tablet: LabTablet | null = null;
+  /** タブレットのズーム・写真から移った直後の画角を掛ける前の画角（カメラ効果を切っているとき。掛けていない間は null） */
+  heldFovBase: number | null = null;
+  /** 操作パネルを出す（タブレットの設定のアプリ） */
+  onShowPanel: (() => void) | null = null;
+  /** ステージの QR コードと割れた石板（src/qr。建築版だけ） */
+  readonly qr = new QrWorld(this);
   /** リアルな照明で照明器具から作った灯り（場面ごとに 1 回、入れた時に作る） */
   private fixtures: Lamp[] | null = null;
   /** 照明器具から作った灯りの数（確かめ用） */
@@ -82,6 +92,7 @@ export class App {
     this.film = new Film(this.scene, this.camera, frame, opts.persistFilm ?? true);
     this.post.setFilm(this.film);
     this.film.onChange = () => {
+      this.heldFovBase = null;
       if (!this.film.active) {
         // 効果を切ったら、手持ち感のズームで変わった画角を戻す
         this.camera.fov = this.film.rig.baseFov;
@@ -90,6 +101,8 @@ export class App {
       this.onChange?.();
     };
     window.addEventListener('resize', () => this.resize());
+    // v2 のタブレット（Tab で出す・しまう。写真・SNS はこのステージだけの保存先）
+    this.tablet = new LabTablet(this, container);
   }
 
   /** 場面の定義を読み込む（遅れて import） */
@@ -143,6 +156,7 @@ export class App {
     if (this.built.staticShadows) this.renderer.shadowMap.autoUpdate = false;
     this.scene.add(this.built.root);
     if (def.sky !== false) this.scene.add(createSky(def.sky ?? {}));
+    this.qr.place();
     this.renderer.shadowMap.needsUpdate = true;
     const sp = this.built.spawn;
     this.player.setSpawn({ x: sp.pos[0], y: sp.pos[1], z: sp.pos[2] }, sp.yaw, sp.pitch ?? 0);
@@ -157,6 +171,44 @@ export class App {
     // リアルな照明: 場面ごとの既定（入り切りはそのまま）と、平行光源（影の地図）・スポットライト
     this.post.real.settings = realFor(def.id, { enabled: this.post.real.settings.enabled });
     this.post.real.setScene(this.scene, this.sun);
+    this.onChange?.();
+  }
+
+  /**
+   * URL の場所へ（QR コードの読み取り・初めの URL）: scene（場面）・view（参考画像の視点）・stop（道順の何番目。数で割った余り）・
+   * at（目の位置と向き x,y,z,yaw,pitch）。場面が違えば読み直す
+   */
+  async openUrl(url: string): Promise<boolean> {
+    const q = new URL(url, location.href).searchParams;
+    const scene = q.get('scene') ?? (q.get('view') ?? '').replace(/-\d+$/, '');
+    if (!scene || !this.scenes.some((s) => s.id === scene)) return false;
+    const view = q.get('view');
+    if (this.def?.id !== scene) await this.load(scene, view ?? null);
+    else if (view) this.setView(view);
+    this.goTo(q);
+    return true;
+  }
+
+  /** URL の stop・at の所に立つ（無ければ何もしない） */
+  goTo(q: URLSearchParams): void {
+    const tour = this.def?.plan?.tour ?? [];
+    let eye: [number, number, number] | null = null;
+    let yaw = 0;
+    let pitch = 0;
+    const stop = q.get('stop');
+    const at = q.get('at');
+    if (at) {
+      const v = at.split(',').map(Number);
+      if (v.length >= 4 && v.every(Number.isFinite)) [eye, yaw, pitch] = [[v[0], v[1], v[2]], v[3], v[4] ?? 0];
+    } else if (stop !== null && tour.length) {
+      const t = tour[((Number(stop) % tour.length) + tour.length) % tour.length];
+      [eye, yaw, pitch] = [t.eye, t.yaw, t.pitch ?? 0];
+    }
+    if (!eye) return;
+    this.setView(null);
+    this.player.placeEye({ x: eye[0], y: eye[1], z: eye[2] }, yaw, pitch, 0, this.colliders);
+    this.player.applyCamera();
+    this.film.snap(this.camera, yaw, pitch);
     this.onChange?.();
   }
 
@@ -201,6 +253,7 @@ export class App {
     if (!v) return;
     this.camera.fov = v.fov;
     this.camera.updateProjectionMatrix();
+    this.heldFovBase = null;
     this.player.placeEye({ x: v.eye[0], y: v.eye[1], z: v.eye[2] }, v.yaw, v.pitch, v.roll ?? 0, this.colliders);
     this.player.applyCamera();
     this.film.snap(this.camera, v.yaw, v.pitch);
@@ -276,6 +329,8 @@ export class App {
   step(dt: number): void {
     if (!this.frozen) this.time += dt;
     styleUniforms.uTime.value = this.time;
+    // タブレットの操作（プレイヤーより先。持っている間は見回し・走る・跳ぶを止める）
+    this.tablet?.input(dt);
     const before = this.player.pos.clone();
     this.player.externalCamera = this.film.active;
     this.player.update(dt, this.input, this.colliders);
@@ -285,12 +340,74 @@ export class App {
       this.onChange?.();
     }
     this.input.endFrame();
+    this.applyHeldView();
     const pl = this.player;
     this.film.updateCamera(dt, { pos: pl.pos, yaw: pl.yaw, pitch: pl.pitch, eye: pl.eyeHeight, onGround: pl.onGround, crouching: pl.height < 1.5 });
     this.film.update(dt);
     this.built?.update?.(dt, this.time, this.camera);
     this.applyZoneStyle();
+    this.tablet?.update(dt);
     this.renderFrame();
+  }
+
+  /**
+   * タブレットのカメラのズームと、写真から移った直後の画角（v2 の CameraRig の zoom・hold）。
+   * カメラ効果が入っていれば v2 の CameraRig にそのまま渡し、切っていればここで画角だけ掛ける（位置と向きは写真の所に立っている）
+   */
+  private applyHeldView(): void {
+    const rig = this.tablet?.rig;
+    if (!rig) return;
+    if (this.film.active) {
+      this.film.rig.zoom = rig.zoom;
+      this.film.rig.hold = rig.hold;
+      return;
+    }
+    const hold = rig.hold && rig.hold.k > 0 ? rig.hold : null;
+    if (rig.zoom === 1 && !hold) {
+      if (this.heldFovBase !== null) {
+        this.camera.fov = this.heldFovBase;
+        this.camera.updateProjectionMatrix();
+        this.heldFovBase = null;
+      }
+      return;
+    }
+    if (this.heldFovBase === null) this.heldFovBase = this.camera.fov;
+    const base = this.heldFovBase;
+    let f = rig.zoom === 1 ? base : (2 * Math.atan(Math.tan((base * Math.PI) / 360) / Math.max(1, rig.zoom)) * 180) / Math.PI;
+    if (hold) f += (hold.fov - f) * Math.min(1, hold.k);
+    if (Math.abs(f - this.camera.fov) > 1e-6) {
+      this.camera.fov = f;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  /**
+   * タブレットの写真（手に持つ物を除いた今の画面）。video = false ならカメラ効果（VHS）も掛けない。
+   * 描いた直後に同じ処理の中で画面を写す（preserveDrawingBuffer が無くても写せる）。横 maxWidth まで縮める
+   */
+  capturePhoto(o: { video: boolean; maxWidth: number }): HTMLCanvasElement | null {
+    const ov = this.post.overlay;
+    const shown = ov?.visible ?? false;
+    const film = this.post.film;
+    if (ov) ov.visible = false;
+    if (!o.video) this.post.film = null;
+    let c: HTMLCanvasElement | null = null;
+    try {
+      this.renderFrame();
+      const src = this.renderer.domElement;
+      const k = Math.min(1, o.maxWidth / Math.max(1, src.width));
+      c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(src.width * k));
+      c.height = Math.max(1, Math.round(src.height * k));
+      c.getContext('2d')!.drawImage(src, 0, 0, c.width, c.height);
+    } catch (e) {
+      console.warn('[タブレット] 写真を撮れません', e);
+      c = null;
+    } finally {
+      this.post.film = film;
+      if (ov) ov.visible = shown;
+    }
+    return c;
   }
 
   /** カメラが入っている区域の見た目にする（区域の外ならそのまま） */
