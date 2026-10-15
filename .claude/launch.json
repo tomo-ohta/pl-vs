@@ -74,6 +74,26 @@
         "experiments/visual-style-lab"
       ],
       "port": 5176
+    },
+    {
+      "name": "puzzle-hint-lab",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "experiments/puzzle-hint-lab"
+      ],
+      "port": 5181
+    },
+    {
+      "name": "puzzle-hint-lab-pages",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd experiments/puzzle-hint-lab && exec npx vite preview --base /pl-vs/hint/ --port 4182 --strictPort"
+      ],
+      "port": 4182
     }
   ]
 }
