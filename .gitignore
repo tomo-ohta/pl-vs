@@ -18,3 +18,6 @@ shared/assets/cc0/audio/
 shared/public/audio/steps/
 # Adobe Audition の効果音（Adobe のライセンス: 作品への組み込み可・単体配布不可。shared/tools/build-footsteps.mjs が読む）
 shared/assets/adobe/
+
+# Demo Hub publication package
+.demo-package/

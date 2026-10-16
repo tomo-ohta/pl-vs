@@ -1,0 +1,16 @@
+{
+  "demos": {
+    "visual-demo": {
+      "install": "npm ci",
+      "check": "npm run typecheck --prefix experiments/visual-style-lab",
+      "build": "npm run build --prefix experiments/visual-style-lab -- --base=./",
+      "directory": "experiments/visual-style-lab/dist"
+    },
+    "hint-demo": {
+      "install": "npm ci",
+      "check": "npm run typecheck --prefix experiments/puzzle-hint-lab && npm test --prefix experiments/puzzle-hint-lab",
+      "build": "npm run build --prefix experiments/puzzle-hint-lab -- --base=./",
+      "directory": "experiments/puzzle-hint-lab/dist"
+    }
+  }
+}

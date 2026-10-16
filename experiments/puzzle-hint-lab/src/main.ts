@@ -5,6 +5,7 @@
  * - ?h1=50&h2=75&h3=95 … ヒント 1 / 2 / 3 を解放する制圧の部屋の数
  * - ?test=1 … Pointer Lock を使わない（自動の確かめ用。見回しはできない）
  */
+import './fonts.ts';
 import './ui/style.css';
 import { App } from './App.ts';
 import { HINT_THRESHOLDS } from './gen/progress.ts';
@@ -20,7 +21,7 @@ const thresholds = HINT_THRESHOLDS.map((t, i) => {
 
 const world = generateWorld(seed);
 
-/** 画面の絵に使う文字（Google Fonts の日本語は文字の範囲ごとに読むので、使う文字を先に読ませる） */
+/** 画面の絵に使う文字（日本語フォントは文字の範囲ごとに読むので、使う文字を先に読ませる） */
 const UI_TEXT =
   '全体マップヒント今いる部屋踏破制圧未済み難易度状態謎ボタン個押せば決まった順に押す（全部押すと判定）次の解放あと集計凡例現在地段階すべてを解放済み' +
   'ヒントは全部屋の制圧数で解放抽象具体核心で解放部屋進行率＝：・';
