@@ -32,3 +32,7 @@ npm run build:cc0 -w shared      # 素材の変換（他は shared/package.json�
 - **ブラウザ保存の名前**: v1 と v2 は同じ公開元（tomo-ohta.github.io）に置くので、localStorage / IndexedDB の保存領域を共有する。v1 は `liminal.*` / `liminal-codex`、v2 は `liminal2.*` などの別の接頭辞を使い、混ざらないようにする。
 - **公開**: v1 は今の URL（/pl-vs/）、v2 は /pl-vs/v2/。素材は二重に置かない（v2 は素材の配信元を設定で指定できるようにする。詳細は継承計画）。
   - 注意: v1 の `deploy:pages` は gh-pages ブランチを丸ごと置き換える。v2 を公開した後は、両方の版をまとめて 1 回で公開する手順に切り替える。
+
+## 検証デモの限定公開
+
+ビジュアルデモとヒントデモは、mainへのマージ後に検証成功でDemo Hubへ自動公開します。手順は [.demo/README.md](.demo/README.md) を参照してください。

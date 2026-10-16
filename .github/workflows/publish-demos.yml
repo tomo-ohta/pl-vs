@@ -1,0 +1,97 @@
+name: Publish demos
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      demo:
+        description: Demo ID (blank publishes all configured demos)
+        required: false
+        type: string
+      rollback:
+        description: Optional previous release ID to restore (requires demo)
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    outputs:
+      demos: ${{ steps.matrix.outputs.demos }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - id: matrix
+        env:
+          DEMO_INPUT: ${{ inputs.demo }}
+          ROLLBACK_RELEASE: ${{ inputs.rollback }}
+        run: |
+          if [ -n "$ROLLBACK_RELEASE" ]; then
+            node .demo/publish.mjs --matrix --demo "$DEMO_INPUT" --rollback "$ROLLBACK_RELEASE"
+          elif [ -n "$DEMO_INPUT" ]; then
+            node .demo/publish.mjs --matrix --demo "$DEMO_INPUT"
+          else
+            node .demo/publish.mjs --matrix
+          fi
+  build:
+    needs: configure
+    if: ${{ inputs.rollback == '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        demo: ${{ fromJSON(needs.configure.outputs.demos) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Check and build without publication credentials
+        env:
+          DEMO_ID: ${{ matrix.demo }}
+        run: node .demo/publish.mjs --demo "$DEMO_ID" --prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-${{ matrix.demo }}-${{ github.sha }}
+          path: .demo-package/
+          include-hidden-files: true
+          retention-days: 2
+          if-no-files-found: error
+  publish:
+    needs: [configure, build]
+    if: ${{ always() && needs.configure.result == 'success' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.rollback != '')) && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        demo: ${{ fromJSON(needs.configure.outputs.demos) }}
+    concurrency:
+      group: demo-publication-${{ matrix.demo }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.rollback == '' }}
+        with:
+          name: demo-${{ matrix.demo }}-${{ github.sha }}
+          path: .demo-package/
+      - name: Publish verified main build
+        env:
+          DEMO_ID: ${{ matrix.demo }}
+          ROLLBACK_RELEASE: ${{ inputs.rollback }}
+        run: |
+          if [ -n "$ROLLBACK_RELEASE" ]; then
+            node .demo/publish.mjs --demo "$DEMO_ID" --rollback "$ROLLBACK_RELEASE"
+          else
+            node .demo/publish.mjs --demo "$DEMO_ID" --upload
+          fi
